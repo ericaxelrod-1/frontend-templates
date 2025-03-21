@@ -1,0 +1,115 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+ ---
+description: "Guidelines for tracking implementation status of project tasks"
+globs: ["**/*"]
+tags: ["project", "tracking", "implementation"]
+priority: 3
+---
+
+# MANDATORY PRE-IMPLEMENTATION CHECKLIST
+
+⚠️ **STOP: You MUST complete this checklist before ANY code exploration or implementation**
+
+- [ ] Read @000-variables.mdc[implementation_steps] in its entirety
+- [ ] Read @000-variables.mdc[current-state] in its entirety
+- [ ] Identify current focus areas and their priority
+- [ ] Report your understanding of the current state to the user
+- [ ] Identify the next task to work on based on dependencies and priority
+- [ ] Confirm with the user before proceeding to code exploration
+
+⚠️ **Failure to complete this checklist before exploring code is a critical violation**
+
+# Implementation Tracking Guidelines
+
+Before any code exploration or implementation, first read [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] and [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] in full. Report your understanding of the current state and next task dependencies before exploring any project directories.
+
+This rule provides guidance on how to track the implementation status of project tasks using the [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] file.
+
+
+
+
+## Purpose
+
+The [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] file serves as:
+- A development log tracking implementation progress
+- A backlog of pending tasks
+- A reference for project status
+
+## How to Track Implementation Status
+
+When starting a new development session **follow this exact sequence**
+
+1. **Review [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps]** first to understand the project plan
+2. **Review @000-variables.mdc[current_state]** first to understand the current project state
+3. **Check task dependencies** before starting work on a new task
+4. **Select the next task based on Review @000-variables.mdc[implementation_steps] and @000-variables.mdc[current_state]** 
+- 1st priority: Tasks which with a status of "Has Issues" or which have failed tests
+- 2nd priority: Tasks with a status of Not Started
+5. Examine the code base
+6. Begin editing and testing code for the **chosen task**
+7. **Update task status** after completing work
+
+## Status Tracking Format
+
+Each implementation task in [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] should include:
+
+```markdown
+### [Task Number] [Task Name]
+- **Status**: [Complete/In Progress/Has Issues/Not Started]
+- **Testing**: [Passed/Failed/Not Started]
+  - [Test Name]: [Passed/Failed]
+  - [Test Name]: [Passed/Failed]
+- **Dependencies**: [Task references or "None"]
+- **Last Updated**: [Date]
+```
+
+## Status Definitions
+
+- **Complete**: All requirements implemented and tested
+- **In Progress**: Implementation has started but is not finished
+- **Has Issues**: Implementation attempted but has known problems
+- **Not Started**: Implementation has not begun
+
+## Testing Status Definitions
+
+- **Passed**: All tests passing
+- **Failed**: One or more tests failing
+- **Not Started**: Testing has not begun
+
+## Dependency Management
+
+Dependencies should be clearly listed for each task to indicate what must be completed first. When encountering a task with unmet dependencies:
+
+1. Identify the blocking tasks
+2. Prioritize those blocking tasks
+3. Update the [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] to reflect the dependency chain
+
+## Current Focus Tracking
+
+The [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] file should be maintained to highlight:
+
+1. Current focus areas
+2. Recent accomplishments
+3. Known issues
+4. Immediate priorities
+5. Blockers
+
+## Using Task References
+
+When referring to [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] in conversations and code:
+
+1. Use the task numbering scheme (e.g., "Task 1.2.3")
+2. Quote relevant sections when discussing specific requirements
+3. Reference dependencies explicitly
+
+## Rule Application
+
+This rule should be applied whenever:
+1. Starting a new development session
+2. Completing a task
+3. Encountering implementation issues
+4. Planning next development steps

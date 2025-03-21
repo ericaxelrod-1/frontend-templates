@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+ ---
+description: "Strict rules for order of operations before code changes"
+globs: ["**/*"]
+tags: ["scripts", "code", "configuration","implementation","package"]
+priority: 2
+---
+
+# STRICT MANDATORY SEQUENCE - DO NOT SKIP ANY STEPS
+
+⚠️ **WARNING: It is ABSOLUTELY PROHIBITED to explore project files, run commands, or begin any implementation before completing steps 1-4 below. No exceptions!**
+
+⚠️ **You MUST NOT browse directories, check code files, or run any commands until you have thoroughly reviewed the implementation status files.**
+
+Before making any code changes **follow this exact sequence**
+- New scripts
+- Editing scripts
+- Installing packages
+- Uninstalling packages
+- Creating configuration files
+- Editing configuration files
+
+ **Never deviate from the priority order in Review @000-variables.mdc[current_state] unless explicitly authorized in the conversation.**
+
+
+1. **Review @000-variables.mdc[implementation_steps]** first to understand the project plan
+2. **Review @000-variables.mdc[current_state]** first to understand the current project state
+3. **Check task dependencies** before starting work on a new task
+4. **Select the next task based on Review @000-variables.mdc[implementation_steps] and @000-variables.mdc[current_state]** 
+- 1st priority: Tasks which with a status of "Has Issues" or which have failed tests
+- 2nd priority: Tasks with a status of Not Started
+5. Examine the code base
+6. Begin editing and testing code for the **chosen task**
+7. **Update task status** after completing work
+
+# Status-first protocol
+
+When receiving any new instructions, **first check how they align with the current state tracking before proceeding**.
+
+# Verification checkpoint
+
+⚠️ After reviewing the implementation files but before exploring any code:
+- You **MUST** report your understanding of the current state
+- You **MUST** explain which task you're planning to work on and why
+- You **MUST** list any dependencies for that task and confirm they're completed
+

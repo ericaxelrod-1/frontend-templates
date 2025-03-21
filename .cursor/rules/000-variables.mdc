@@ -1,0 +1,37 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: "User-defined variable definitions for the project. These will be referenced throughout the project."
+globs: ["*"]
+priority: 1
+---
+
+# Project Variables
+
+## File Paths
+-working_dir
+ - angular/
+-working_docs_dir
+ - [working_dir]/docs/
+-general_docs_dir
+ - /docs/
+-angular_backend
+ - angular/backend
+
+## Key Files
+-implementation_steps
+ - [working_docs_dir]/implementation_steps.md
+-current_state
+ - [working_docs_dir]/current_state.md
+-package_management
+ - [working_docs_dir]/package-management.md
+
+
+# Error handling
+
+Prompt the user if you are unclear about the referenced variable. Do not make assumptions.
+
+

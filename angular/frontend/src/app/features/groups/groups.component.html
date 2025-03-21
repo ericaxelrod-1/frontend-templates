@@ -1,0 +1,32 @@
+<div class="groups-container">
+  <h1>Groups</h1>
+  
+  <div class="actions-bar">
+    <button mat-raised-button color="primary">
+      <mat-icon>add</mat-icon> Create Group
+    </button>
+  </div>
+  
+  <div class="groups-grid">
+    <mat-card *ngFor="let group of groups" class="group-card">
+      <mat-card-header>
+        <mat-card-title>{{ group.name }}</mat-card-title>
+        <mat-card-subtitle>Owner: {{ group.owner }}</mat-card-subtitle>
+      </mat-card-header>
+      
+      <mat-card-content>
+        <p>{{ group.description }}</p>
+        <mat-chip color="primary">{{ group.members }} members</mat-chip>
+      </mat-card-content>
+      
+      <mat-card-actions>
+        <button mat-button color="primary">
+          <mat-icon>people</mat-icon> View Members
+        </button>
+        <button mat-button color="accent">
+          <mat-icon>edit</mat-icon> Edit
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+</div>

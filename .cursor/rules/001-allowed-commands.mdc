@@ -1,0 +1,55 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+ ---
+description: "Windows-specific command guidelines to ensure proper syntax"
+globs: ["*"]
+tags: ["windows", "powershell", "python","pip","npm", "npx", "java"]
+priority: 1
+---
+
+# Windows Command Guidelines
+
+## Direcctory verification
+
+⚠️ **STOP**: You **MUST** follow instructions in this section in the sequences they are listed **before runing ANY shell commands**
+
+⚠️ **WARNING: It is ABSOLUTELY PROHIBITED to run any shell commands without first confirming your working directory**
+
+- Execute *pwd*
+- Verify you are in the proper working directory
+- *If in the wrong directory* Execute *cd* to change to the correct working directory
+- Execute your planned command
+
+# Allowable Commands
+
+⚠️ **STOP**: You **MUST** follow rules in **before runing ANY shell commands**
+
+## Navigation
+
+- **ls**
+- **dir**
+- **pwd**
+- **mkdir**
+
+## Execution
+- **npm**
+- **pip**
+- **python**
+- **java**
+
+# Prohibited Commands
+
+⚠️ **STOP**: You **MUST** follow rules in **before runing ANY shell commands**
+
+⚠️ **WARNING: It is ABSOLUTELY PROHIBITED to run any shell commands without first asking for permission**
+
+- **rm**
+- **del**
+
+# OS Independent
+
+
+#W

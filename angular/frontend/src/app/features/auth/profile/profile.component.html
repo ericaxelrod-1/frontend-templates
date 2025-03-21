@@ -1,0 +1,70 @@
+<div class="profile-container">
+  <div class="profile-card">
+    <h2>User Profile</h2>
+    
+    <div *ngIf="loading && !user" class="loading-spinner">
+      <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
+    
+    <div *ngIf="message" class="alert" [ngClass]="{'alert-success': !isError, 'alert-danger': isError}">
+      {{message}}
+    </div>
+    
+    <form *ngIf="user" [formGroup]="profileForm" (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input 
+          type="email" 
+          id="email" 
+          formControlName="email" 
+          class="form-control"
+          readonly
+        />
+        <small class="form-text text-muted">Email cannot be changed</small>
+      </div>
+      
+      <div class="form-group">
+        <label for="firstName">First Name</label>
+        <input 
+          type="text" 
+          id="firstName" 
+          formControlName="firstName" 
+          class="form-control" 
+          [ngClass]="{ 'is-invalid': submitted && f['firstName'].errors }"
+        />
+        <div *ngIf="submitted && f['firstName'].errors" class="invalid-feedback">
+          <div *ngIf="f['firstName'].errors['required']">First name is required</div>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="lastName">Last Name</label>
+        <input 
+          type="text" 
+          id="lastName" 
+          formControlName="lastName" 
+          class="form-control" 
+          [ngClass]="{ 'is-invalid': submitted && f['lastName'].errors }"
+        />
+        <div *ngIf="submitted && f['lastName'].errors" class="invalid-feedback">
+          <div *ngIf="f['lastName'].errors['required']">Last name is required</div>
+        </div>
+      </div>
+      
+      <div class="user-info">
+        <p><strong>User ID:</strong> {{user.id}}</p>
+        <p><strong>Created:</strong> {{user.createdAt | date:'medium'}}</p>
+        <p *ngIf="user.roles && user.roles.length"><strong>Roles:</strong> {{user.roles.join(', ')}}</p>
+      </div>
+      
+      <div class="form-group">
+        <button type="submit" [disabled]="loading" class="btn btn-primary btn-block">
+          <span *ngIf="loading" class="spinner-border spinner-border-sm mr-1"></span>
+          Update Profile
+        </button>
+      </div>
+    </form>
+  </div>
+</div> 

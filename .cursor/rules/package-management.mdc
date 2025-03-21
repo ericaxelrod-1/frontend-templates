@@ -1,0 +1,207 @@
+---
+description: This rule applies when you make a decision to install or udpate a package
+globs: 
+alwaysApply: false
+---
+---
+description: "Guidelines for selecting, installing and documenting project packages and dependencies"
+globs: ["**/*"]
+tags: ["dependencies", "packages", "security", "versioning"]
+priority: 3
+---
+
+# Package and Dependency Management Guidelines
+
+**This rule applies when you make a decision to install or update a package**
+
+This rule provides guidance on selecting, installing, and maintaining packages and dependencies across all languages and frameworks.
+
+You have access to search the web for all of these resources.
+
+## Core Principles
+
+1. **Research thoroughly** before selecting any package
+2. **Document everything** in the requirements.md file
+3. **Pin exact versions** to ensure consistency and reproducibility
+4. **Prioritize stability** over latest features
+5. **Avoid deprecated or pre-release** packages
+6. **Audit for security** vulnerabilities before adoption
+7. **Use proper workspace management** and lock files
+
+## Package Selection Process
+
+### Research Phase
+
+Before selecting a package:
+
+1. **Search the web for Official documentation** for the most recent stable release
+2. **Search the web to Review GitHub/source repository** for:
+   - Active maintenance (recent commits)
+   - Open issues and their resolution rate
+   - Release frequency and stability
+   - Stars, forks, and community adoption
+3. **Search the web to Check for alternatives** and compare feature sets
+4. **Search the web for deprecation notices** or upcoming major changes
+5. **Search the web to verify license compatibility** with the project
+
+### Security Audit
+
+1. **Check for known vulnerabilities** using:
+   - Package manager security tools (npm audit, etc.)
+   - Online vulnerability databases
+   - GitHub security advisories
+2. **Review security disclosure policies** of the package
+3. **Assess sensitive data handling** requirements
+
+### Installation Guidelines
+
+1. **Use exact version pinning**:
+   ```
+   // DO use
+   "package-name": "1.2.3"
+   
+   // DON'T use
+   "package-name": "^1.2.3" or "~1.2.3"
+   ```
+
+2. **Include lock files from the start**:
+   - package-lock.json (npm)
+   - yarn.lock (Yarn)
+   - pnpm-lock.yaml (pnpm)
+   - Pipfile.lock (pipenv)
+   - Cargo.lock (Rust)
+   - maven-wrapper.properties (Maven)
+   - gradle-wrapper.properties (Gradle)
+
+3. **Use workspace-level package management** when the project contains multiple packages:
+   - npm workspaces (for Node.js projects)
+   - Yarn workspaces
+   - pnpm workspaces
+   - Maven multi-module projects
+   - Gradle multi-project builds
+   - Lerna (for more complex monorepo setups)
+
+4. **Install packages one at a time** to isolate installation issues
+
+5. **Watch for warnings and deprecation messages** during installation
+
+## Documentation Requirements
+
+All dependencies must be documented in [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[package_management] including:
+
+```markdown
+## [Package Name]
+
+- **Version**: 1.2.3 (exact version)
+- **Purpose**: Brief description of why this package is needed
+- **Alternatives Considered**: 
+  - Alternative 1: Reason for not selecting
+  - Alternative 2: Reason for not selecting
+- **Documentation**: [Link to official docs]
+- **License**: MIT/Apache/etc.
+- **Last Verified**: YYYY-MM-DD
+```
+
+## Dependency Maintenance
+
+1. **Regular security audits** using package manager tools
+2. **Update strategy**:
+   - Update one package at a time
+   - Test thoroughly after each update
+   - Document any breaking changes or issues
+
+## Language-Specific Guidelines
+
+### JavaScript/TypeScript (npm/Yarn/pnpm)
+
+1. Prefer established packages from trusted publishers
+2. Check bundle size impact before adoption
+3. Prefer packages with TypeScript definitions included
+4. Use npm scripts for consistent commands
+
+<example>
+// package.json with exact versions
+{
+  "dependencies": {
+    "express": "4.18.2",
+    "react": "18.2.0"
+  },
+  "devDependencies": {
+    "typescript": "5.0.4"
+  }
+}
+</example>
+
+### Java (Maven/Gradle)
+
+1. **Build Tool Selection**:
+   - Use Maven for standardized builds with conventional project structures
+   - Use Gradle for more flexible, programmatic build configurations
+
+2. **Repository Management**:
+   - Configure explicit repository sources (Maven Central, JCenter, custom repositories)
+   - Consider using repository proxies/mirrors for security and performance
+
+3. **Dependency Scopes**:
+   - Use appropriate scopes: compile, runtime, provided, test
+   - Minimize the use of compile-time dependencies
+
+4. **Transitive Dependency Management**:
+   - Regularly check and manage the full dependency tree
+   - Use exclusions to resolve version conflicts
+   - Consider using dependency management sections (Maven) or platform configurations (Gradle)
+
+5. **Java Version Compatibility**:
+   - Verify library compatibility with your JDK version
+   - Check for Java 9+ module system compatibility if applicable
+
+6. **Artifact Management**:
+   - Consider packaging implications (JAR, WAR, EAR)
+   - Define appropriate plugin configurations for assembly
+
+<example>
+<!-- Maven pom.xml with exact versions -->
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+        <version>3.1.5</version>
+    </dependency>
+    <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <version>2.1.214</version>
+        <scope>runtime</scope>
+    </dependency>
+</dependencies>
+</example>
+
+<example>
+// Gradle build.gradle with exact versions
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web:3.1.5'
+    runtimeOnly 'com.h2database:h2:2.1.214'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test:3.1.5'
+}
+</example>
+
+### Python (pip/Poetry)
+
+1. Use virtual environments for all projects
+2. Verify compatibility with the target Python version
+3. Prefer widely-used packages from PyPI
+
+<example>
+# requirements.txt with exact versions
+numpy==1.24.3
+pandas==2.0.1
+requests==2.30.0
+</example>
+
+## Rule Application
+
+This rule should be applied whenever:
+1. Adding a new dependency to the project
+2. Updating an existing dependency
+3. Initializing a new project component
+4. Reviewing the project's dependency tree

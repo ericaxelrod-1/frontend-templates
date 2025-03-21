@@ -1,0 +1,21 @@
+<div class="error-container">
+  <mat-card class="error-card">
+    <mat-card-header>
+      <mat-icon color="warn" class="error-icon">error</mat-icon>
+      <mat-card-title>{{ errorTitle }}</mat-card-title>
+    </mat-card-header>
+    
+    <mat-card-content>
+      <p>{{ errorMessage }}</p>
+    </mat-card-content>
+    
+    <mat-card-actions>
+      <button mat-button color="primary" *ngIf="showBackButton" (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon> Go Back
+      </button>
+      <button mat-button color="primary" *ngIf="showHomeButton" routerLink="/">
+        <mat-icon>home</mat-icon> Home
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

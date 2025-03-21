@@ -47,6 +47,19 @@ To enable debug mode, use the `--debug` flag:
 npm run start:dev -- --debug
 ```
 
+The server will start at http://localhost:3000 by default. In development mode, you'll see:
+- Server URL
+- Debug mode status
+- API Documentation URL (Swagger UI)
+
+### API Documentation
+The API documentation is available at http://localhost:3000/api when the server is running. This interactive documentation includes:
+- All available endpoints
+- Request/response schemas
+- Authentication requirements
+- Example requests and responses
+- Try-it-out functionality
+
 ## Future Enhancements
 - Advanced authentication (email verification, MFA, social login)
 - Unit, Integration and e2e tests
