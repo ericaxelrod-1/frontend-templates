@@ -9,7 +9,7 @@ import { NgxsFormPluginModule } from '@ngxs/form-plugin';
 import { NgxsReduxDevtoolsPluginModule } from '@ngxs/devtools-plugin';
 import { provideHttpClient, withInterceptorsFromDi, withFetch } from '@angular/common/http';
 import { httpInterceptorProviders } from './core/interceptors';
-import { AuthState } from './store/auth/auth.state';
+import { AuthState } from './store';
 
 export const appConfig: ApplicationConfig = {
   providers: [

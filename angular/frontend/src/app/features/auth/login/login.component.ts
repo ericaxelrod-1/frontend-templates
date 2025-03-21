@@ -1,22 +1,23 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, PLATFORM_ID } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { Store, Select } from '@ngxs/store';
 import { Observable, Subscription } from 'rxjs';
 import { AuthState, AuthActions } from '../../../store/auth/auth.state';
-import { CommonModule } from '@angular/common';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule]
+  imports: [CommonModule, ReactiveFormsModule, RouterModule]
 })
 export class LoginComponent implements OnInit, OnDestroy {
   loginForm!: FormGroup;
   returnUrl: string = '/';
   private subscription: Subscription = new Subscription();
+  private platformId = inject(PLATFORM_ID);
 
   @Select(AuthState.loading) loading$!: Observable<boolean>;
   @Select(AuthState.error) error$!: Observable<string | null>;
@@ -43,26 +44,29 @@ export class LoginComponent implements OnInit, OnDestroy {
     // Get return URL from route parameters or default to home
     this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
 
-    // Subscribe to state changes
-    this.subscription.add(
-      this.loading$.subscribe(loading => {
-        this.loading = loading;
-      })
-    );
+    // Only subscribe to observables in browser environment
+    if (isPlatformBrowser(this.platformId)) {
+      // Subscribe to state changes
+      this.subscription.add(
+        this.loading$.subscribe(loading => {
+          this.loading = loading;
+        })
+      );
 
-    this.subscription.add(
-      this.error$.subscribe(error => {
-        this.error = error || '';
-      })
-    );
+      this.subscription.add(
+        this.error$.subscribe(error => {
+          this.error = error || '';
+        })
+      );
 
-    this.subscription.add(
-      this.isAuthenticated$.subscribe(isAuthenticated => {
-        if (isAuthenticated) {
-          this.router.navigate([this.returnUrl]);
-        }
-      })
-    );
+      this.subscription.add(
+        this.isAuthenticated$.subscribe(isAuthenticated => {
+          if (isAuthenticated) {
+            this.router.navigate([this.returnUrl]);
+          }
+        })
+      );
+    }
   }
 
   ngOnDestroy(): void {

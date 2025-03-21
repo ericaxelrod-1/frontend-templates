@@ -1,22 +1,23 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, PLATFORM_ID } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Store, Select } from '@ngxs/store';
 import { Observable, Subscription } from 'rxjs';
 import { AuthState, AuthActions } from '../../../store/auth/auth.state';
-import { CommonModule } from '@angular/common';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 
 @Component({
   selector: 'app-reset-password',
   templateUrl: './reset-password.component.html',
   styleUrls: ['./reset-password.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule]
+  imports: [CommonModule, ReactiveFormsModule, RouterModule]
 })
 export class ResetPasswordComponent implements OnInit, OnDestroy {
   resetPasswordForm!: FormGroup;
   token: string = '';
   private subscription: Subscription = new Subscription();
+  private platformId = inject(PLATFORM_ID);
 
   @Select(AuthState.loading) loading$!: Observable<boolean>;
   @Select(AuthState.error) error$!: Observable<string | null>;
@@ -51,24 +52,27 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
       validator: this.passwordMatchValidator
     });
 
-    // Subscribe to state changes
-    this.subscription.add(
-      this.loading$.subscribe(loading => {
-        this.loading = loading;
-      })
-    );
+    // Only subscribe to observables in browser environment
+    if (isPlatformBrowser(this.platformId)) {
+      // Subscribe to state changes
+      this.subscription.add(
+        this.loading$.subscribe(loading => {
+          this.loading = loading;
+        })
+      );
 
-    this.subscription.add(
-      this.error$.subscribe(error => {
-        this.error = error || '';
-      })
-    );
+      this.subscription.add(
+        this.error$.subscribe(error => {
+          this.error = error || '';
+        })
+      );
 
-    this.subscription.add(
-      this.success$.subscribe(success => {
-        this.success = success;
-      })
-    );
+      this.subscription.add(
+        this.success$.subscribe(success => {
+          this.success = success;
+        })
+      );
+    }
   }
 
   ngOnDestroy(): void {

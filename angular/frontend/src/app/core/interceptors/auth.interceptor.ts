@@ -44,12 +44,12 @@ export class AuthInterceptor implements HttpInterceptor {
   }
 
   private isAuthRequest(request: HttpRequest<any>): boolean {
-    const url = request.url.toLowerCase();
-    return url.includes('/auth/login') || 
-           url.includes('/auth/register') || 
-           url.includes('/auth/refresh') || 
-           url.includes('/auth/forgot-password') || 
-           url.includes('/auth/reset-password');
+    const apiUrl = this.authService['API_URL']; // Accessing the API_URL from AuthService
+    return request.url.includes(`${apiUrl}/login`) || 
+           request.url.includes(`${apiUrl}/register`) || 
+           request.url.includes(`${apiUrl}/refresh`) || 
+           request.url.includes(`${apiUrl}/forgot-password`) || 
+           request.url.includes(`${apiUrl}/reset-password`);
   }
 
   private addAuthHeader(request: HttpRequest<any>, token: string): HttpRequest<any> {

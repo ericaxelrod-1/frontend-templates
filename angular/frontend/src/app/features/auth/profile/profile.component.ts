@@ -1,16 +1,17 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject, PLATFORM_ID } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/services';
 import { User } from '../../../models';
 import { finalize } from 'rxjs';
-import { CommonModule } from '@angular/common';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule]
+  imports: [CommonModule, ReactiveFormsModule, RouterModule]
 })
 export class ProfileComponent implements OnInit {
   profileForm!: FormGroup;
@@ -19,6 +20,7 @@ export class ProfileComponent implements OnInit {
   user: User | null = null;
   message = '';
   isError = false;
+  private platformId = inject(PLATFORM_ID);
 
   constructor(
     private formBuilder: FormBuilder,
@@ -26,8 +28,6 @@ export class ProfileComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.loading = true;
-    
     // Initialize form with empty values
     this.profileForm = this.formBuilder.group({
       firstName: ['', Validators.required],
@@ -35,23 +35,28 @@ export class ProfileComponent implements OnInit {
       email: [{ value: '', disabled: true }]
     });
     
-    // Load user profile data
-    this.authService.getUserProfile()
-      .pipe(
-        finalize(() => {
-          this.loading = false;
-        })
-      )
-      .subscribe({
-        next: (user: User) => {
-          this.user = user;
-          this.updateForm(user);
-        },
-        error: error => {
-          this.isError = true;
-          this.message = 'Failed to load profile: ' + (error?.message || 'Unknown error');
-        }
-      });
+    // Only load user profile in the browser
+    if (isPlatformBrowser(this.platformId)) {
+      this.loading = true;
+      
+      // Load user profile data
+      this.authService.getUserProfile()
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          })
+        )
+        .subscribe({
+          next: (user: User) => {
+            this.user = user;
+            this.updateForm(user);
+          },
+          error: error => {
+            this.isError = true;
+            this.message = 'Failed to load profile: ' + (error?.message || 'Unknown error');
+          }
+        });
+    }
   }
 
   // Convenience getter for easy access to form fields

@@ -1,5 +1,5 @@
-import { Component, EventEmitter, Output, OnInit, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, EventEmitter, Output, OnInit, OnDestroy, inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -35,21 +35,24 @@ export class HeaderComponent implements OnInit, OnDestroy {
   isAuthenticated = false;
   user: User | null = null;
   private subscription = new Subscription();
+  private platformId = inject(PLATFORM_ID);
   
   constructor(private store: Store) {}
   
   ngOnInit(): void {
-    this.subscription.add(
-      this.isAuthenticated$.subscribe(isAuthenticated => {
-        this.isAuthenticated = isAuthenticated;
-      })
-    );
-    
-    this.subscription.add(
-      this.user$.subscribe(user => {
-        this.user = user;
-      })
-    );
+    if (isPlatformBrowser(this.platformId)) {
+      this.subscription.add(
+        this.isAuthenticated$.subscribe(isAuthenticated => {
+          this.isAuthenticated = isAuthenticated;
+        })
+      );
+      
+      this.subscription.add(
+        this.user$.subscribe(user => {
+          this.user = user;
+        })
+      );
+    }
   }
   
   ngOnDestroy(): void {

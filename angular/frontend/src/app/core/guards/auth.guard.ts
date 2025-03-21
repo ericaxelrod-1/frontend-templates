@@ -28,8 +28,8 @@ export class AuthGuard implements CanActivate {
       return true;
     }
     
-    // Redirect to login page with return URL
-    return this.router.createUrlTree(['/auth/login'], { 
+    // Redirect to login page with return URL (updated path without auth prefix)
+    return this.router.createUrlTree(['/login'], { 
       queryParams: { returnUrl: state.url } 
     });
   }
