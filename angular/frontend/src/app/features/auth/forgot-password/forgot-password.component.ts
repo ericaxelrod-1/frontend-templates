@@ -5,13 +5,27 @@ import { Observable, Subscription } from 'rxjs';
 import { AuthState, AuthActions } from '../../../store/auth/auth.state';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
 
 @Component({
   selector: 'app-forgot-password',
   templateUrl: './forgot-password.component.html',
   styleUrls: ['./forgot-password.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule]
+  imports: [
+    CommonModule, 
+    ReactiveFormsModule, 
+    RouterModule,
+    MatTooltipModule,
+    MatIconModule,
+    MatButtonModule,
+    MatInputModule,
+    MatFormFieldModule
+  ]
 })
 export class ForgotPasswordComponent implements OnInit, OnDestroy {
   forgotPasswordForm!: FormGroup;

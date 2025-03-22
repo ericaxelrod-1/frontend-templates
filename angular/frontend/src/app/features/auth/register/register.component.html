@@ -10,7 +10,13 @@
             id="firstName" 
             formControlName="firstName" 
             class="form-control"
+            [ngClass]="{ 'is-invalid': submitted && f['firstName'].errors }"
+            placeholder="Enter your first name"
+            matTooltip="Your first name"
           />
+          <div *ngIf="submitted && f['firstName'].errors" class="invalid-feedback">
+            <div *ngIf="f['firstName'].errors['required']">First name is required</div>
+          </div>
         </div>
         
         <div class="form-group">
@@ -20,7 +26,13 @@
             id="lastName" 
             formControlName="lastName" 
             class="form-control"
+            [ngClass]="{ 'is-invalid': submitted && f['lastName'].errors }"
+            placeholder="Enter your last name"
+            matTooltip="Your last name"
           />
+          <div *ngIf="submitted && f['lastName'].errors" class="invalid-feedback">
+            <div *ngIf="f['lastName'].errors['required']">Last name is required</div>
+          </div>
         </div>
       </div>
       
@@ -32,6 +44,8 @@
           formControlName="email" 
           class="form-control" 
           [ngClass]="{ 'is-invalid': submitted && f['email'].errors }"
+          placeholder="Enter your email address"
+          matTooltip="We'll never share your email with anyone else"
         />
         <div *ngIf="submitted && f['email'].errors" class="invalid-feedback">
           <div *ngIf="f['email'].errors['required']">Email is required</div>
@@ -39,18 +53,60 @@
         </div>
       </div>
       
-      <div class="form-group">
+      <div class="form-group password-field">
         <label for="password">Password</label>
-        <input 
-          type="password" 
-          id="password" 
-          formControlName="password" 
-          class="form-control" 
-          [ngClass]="{ 'is-invalid': submitted && f['password'].errors }"
-        />
+        <div class="input-with-icon">
+          <input 
+            [type]="passwordVisible ? 'text' : 'password'" 
+            id="password" 
+            formControlName="password" 
+            class="form-control" 
+            [ngClass]="{ 'is-invalid': submitted && f['password'].errors }"
+            placeholder="Create a strong password"
+            matTooltip="Password must be at least 8 characters and include uppercase, lowercase, numbers, and special characters"
+          />
+          <mat-icon class="visibility-icon" (click)="togglePasswordVisibility()">
+            {{passwordVisible ? 'visibility_off' : 'visibility'}}
+          </mat-icon>
+        </div>
+        
+        <!-- Password strength indicator -->
+        <div class="password-strength-container" *ngIf="f['password'].value">
+          <mat-progress-bar 
+            [value]="passwordStrength" 
+            [ngClass]="{'weak': passwordStrength < 50, 'medium': passwordStrength >= 50 && passwordStrength < 75, 'strong': passwordStrength >= 75}"
+          ></mat-progress-bar>
+          <span class="strength-text" [ngClass]="{'weak': passwordStrength < 50, 'medium': passwordStrength >= 50 && passwordStrength < 75, 'strong': passwordStrength >= 75}">
+            {{passwordMessage}}
+          </span>
+        </div>
+        
         <div *ngIf="submitted && f['password'].errors" class="invalid-feedback">
           <div *ngIf="f['password'].errors['required']">Password is required</div>
           <div *ngIf="f['password'].errors['minlength']">Password must be at least 8 characters</div>
+          <div *ngIf="f['password'].errors['passwordStrength']">Password must include uppercase, lowercase, numbers, and special characters</div>
+        </div>
+      </div>
+      
+      <div class="form-group password-field">
+        <label for="confirmPassword">Confirm Password</label>
+        <div class="input-with-icon">
+          <input 
+            [type]="confirmPasswordVisible ? 'text' : 'password'" 
+            id="confirmPassword" 
+            formControlName="confirmPassword" 
+            class="form-control" 
+            [ngClass]="{ 'is-invalid': submitted && (f['confirmPassword'].errors || registerForm.errors?.['passwordMismatch']) }"
+            placeholder="Confirm your password"
+            matTooltip="Retype your password to confirm"
+          />
+          <mat-icon class="visibility-icon" (click)="toggleConfirmPasswordVisibility()">
+            {{confirmPasswordVisible ? 'visibility_off' : 'visibility'}}
+          </mat-icon>
+        </div>
+        <div *ngIf="submitted && (f['confirmPassword'].errors || registerForm.errors?.['passwordMismatch'])" class="invalid-feedback">
+          <div *ngIf="f['confirmPassword'].errors?.['required']">Please confirm your password</div>
+          <div *ngIf="registerForm.errors?.['passwordMismatch']">Passwords do not match</div>
         </div>
       </div>
       
