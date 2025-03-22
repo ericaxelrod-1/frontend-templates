@@ -8,6 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "serve:ssr:frontend": "node dist/frontend/server/server.mjs",
+    "start:maildev": "node server/email-service/start-maildev.js",
+    "start:email-dev": "concurrently \"npm run start:maildev\" \"npm run serve:ssr:frontend\"",
     "lint:styles": "stylelint \"src/**/*.scss\" --fix",
     "test:styles": "stylelint \"src/**/*.scss\"",
     "check:duplicate-css": "node tools/check-duplicate-css.js",
@@ -20,7 +22,8 @@
     "security:audit:fix": "node tools/security-audit.js --fix",
     "security:audit:report": "node tools/security-audit.js --report",
     "security:full": "node tools/security-audit.js --fix --report",
-    "security:schedule": "node tools/schedule-security-audit.js"
+    "security:schedule": "node tools/schedule-security-audit.js",
+    "security-test": "node server/email-service/test/security-tests.js"
   },
   "private": true,
   "dependencies": {
@@ -41,7 +44,9 @@
     "@ngxs/router-plugin": "19.0.0",
     "@ngxs/store": "19.0.0",
     "express": "4.21.2",
+    "express-rate-limit": "7.1.5",
     "ngx-toastr": "17.0.2",
+    "nodemailer": "6.9.12",
     "rxjs": "7.8.1",
     "tslib": "2.6.2",
     "zone.js": "0.15.0"
@@ -53,6 +58,7 @@
     "@types/express": "4.17.21",
     "@types/jasmine": "5.1.4",
     "@types/node": "20.11.30",
+    "concurrently": "8.2.2",
     "glob": "10.3.10",
     "jasmine-core": "5.1.2",
     "karma": "6.4.2",
@@ -60,6 +66,7 @@
     "karma-coverage": "2.2.1",
     "karma-jasmine": "5.1.0",
     "karma-jasmine-html-reporter": "2.1.0",
+    "maildev": "2.2.1",
     "stylelint": "15.11.0",
     "stylelint-config-standard-scss": "11.1.0",
     "stylelint-scss": "5.3.1",

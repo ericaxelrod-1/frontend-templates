@@ -1,5 +1,9 @@
 # Angular Template Application
 
+## Overview
+
+This project is a template for building modern Angular web applications with enterprise-grade features and best practices. It provides a solid foundation that you can customize and extend to build your own applications. Before using this template in production, some components need to be configured to match your specific requirements.
+
 This project is a template application for Angular, designed to provide a solid foundation for building enterprise-grade web applications. It includes common features such as authentication, user management, and responsive layouts.
 
 ## Features
@@ -12,6 +16,17 @@ This project is a template application for Angular, designed to provide a solid 
 - Responsive layout for all screen sizes
 - State management with NGXS
 - Comprehensive validation tools
+
+## Deployment
+
+For detailed instructions on deploying this application to a production environment, please refer to our [Deployment Guide](../docs/deployment-guide.md). This guide covers:
+
+- Required deployment steps
+- Running automated tests
+- Security verification
+- Email service configuration
+- Environment setup
+- Maintenance best practices
 
 ## Project Structure
 
@@ -109,3 +124,54 @@ Please read the [Development Guide](docs/DEVELOPMENT_GUIDE.md) for details on ou
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Security Features
+
+The application implements various security features to protect user data and prevent attacks:
+
+### Email Service Security
+
+- **Input Validation**: All email addresses are rigorously validated before processing
+- **Template Injection Protection**: Context data is sanitized to prevent XSS attacks
+- **Rate Limiting**: Limits are placed on email sending to prevent abuse
+- **Secure Password Reset Flow**: Password reset emails use secure tokens and validation
+- **TLS Enforcement**: In production, TLS is enforced for all SMTP connections
+
+### Testing Email Security
+
+To run security tests for the email service:
+
+```bash
+# Navigate to the project directory
+cd angular/frontend
+
+# Run security tests
+npm run security-test
+```
+
+### Debugging Email Service
+
+The email service includes a comprehensive debug configuration for troubleshooting:
+
+- **Console Logging**: View detailed logs during development
+- **File Logging**: Enable persistent logs for debugging
+- **Multiple Log Levels**: Control verbosity with configurable log levels
+
+To enable debug mode:
+
+```bash
+# Enable debug mode
+DEBUG=true npm run start
+
+# Enable debug mode with file logging
+DEBUG=true DEBUG_LOG_FILE=true npm run start
+```
+
+For more details, see the [Email Service Configuration README](server/email-service/config/README.md).
+
+### Security Best Practices
+
+- Set up environment variables for production deployment
+- Never commit sensitive credentials to version control
+- Run security tests regularly
+- Keep dependencies updated to patch security vulnerabilities

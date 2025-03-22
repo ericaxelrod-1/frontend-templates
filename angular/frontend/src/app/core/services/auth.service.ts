@@ -108,12 +108,17 @@ export class AuthService {
   // Forgot password
   forgotPassword(email: string): Observable<any> {
     const request: ForgotPasswordRequest = { email };
-    return this.http.post(`${this.API_URL}/forgot-password`, request);
+    return this.http.post(`/api/auth/forgot-password`, request);
+  }
+
+  // Verify reset token
+  verifyResetToken(token: string): Observable<any> {
+    return this.http.post(`/api/auth/verify-reset-token`, { token });
   }
 
   // Reset password
   resetPassword(resetData: ResetPasswordRequest): Observable<any> {
-    return this.http.post(`${this.API_URL}/reset-password`, resetData);
+    return this.http.post(`/api/auth/reset-password`, resetData);
   }
 
   // Validate CSRF token

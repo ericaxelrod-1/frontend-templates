@@ -124,6 +124,60 @@ This document tracks all third-party dependencies used in the project, following
 - **Security Status**: No known vulnerabilities
 - **Last Verified**: 2025-03-22
 
+## Email Services
+
+### nodemailer
+
+- **Version**: 6.9.12
+- **Purpose**: Sending emails via SMTP from Node.js
+- **Alternatives Considered**: 
+  - SendGrid SDK: Not selected to avoid dependency on external service for development
+  - AWS SES SDK: Not selected as it requires AWS account and is more complex for simple use cases
+- **Documentation**: https://nodemailer.com/
+- **License**: MIT
+- **Research Findings**:
+  - Stable and widely adopted library with over 15M weekly downloads
+  - Active maintenance with regular updates
+  - Compatible with various SMTP providers
+  - Simple API with good documentation
+- **Security Status**: No known vulnerabilities
+- **Last Verified**: 2025-03-22
+
+## Development Tools
+
+### maildev
+
+- **Version**: 2.2.1
+- **Purpose**: Local SMTP server and web interface for email testing during development
+- **Alternatives Considered**: 
+  - MailHog: Not selected as MailDev has better Node.js integration
+  - MailSlurper: Not selected due to smaller community and less active development
+- **Documentation**: https://github.com/maildev/maildev
+- **License**: MIT
+- **Research Findings**:
+  - Cross-platform email testing tool
+  - Provides both SMTP server and web UI for viewing emails
+  - Simple to integrate with Node.js applications
+  - Previously had vulnerabilities that were addressed in version 2.2.1
+- **Security Status**: Fixed vulnerabilities from previous versions
+- **Last Verified**: 2025-03-22
+
+### concurrently
+
+- **Version**: 8.2.2
+- **Purpose**: Run multiple npm scripts concurrently
+- **Alternatives Considered**: 
+  - npm-run-all: Not selected as concurrently provides better cross-platform support
+  - parallelshell: Not selected due to lack of maintenance
+- **Documentation**: https://github.com/open-cli-tools/concurrently
+- **License**: MIT
+- **Research Findings**:
+  - Stable tool with good community adoption
+  - Cross-platform compatibility
+  - Regular maintenance and updates
+- **Security Status**: No known vulnerabilities
+- **Last Verified**: 2025-03-22
+
 ## Version Considerations
 
 The project uses Angular v19 across all Angular packages to ensure compatibility. We specifically resolved the Material theme error by:
