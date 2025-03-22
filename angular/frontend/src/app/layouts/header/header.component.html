@@ -8,7 +8,7 @@
   <span class="spacer"></span>
   
   <ng-container *ngIf="isAuthenticated; else loginButton">
-    <button mat-icon-button routerLink="/auth/profile">
+    <button mat-icon-button routerLink="/profile">
       <mat-icon>account_circle</mat-icon>
     </button>
     
@@ -21,7 +21,7 @@
         <p class="user-name">{{ user.firstName || 'User' }} {{ user.lastName || '' }}</p>
         <p class="user-email">{{ user.email }}</p>
       </div>
-      <button mat-menu-item routerLink="/auth/profile">
+      <button mat-menu-item routerLink="/profile">
         <mat-icon>person</mat-icon>
         <span>Profile</span>
       </button>
@@ -38,11 +38,11 @@
   </ng-container>
   
   <ng-template #loginButton>
-    <button mat-button routerLink="/auth/login">
+    <button mat-button routerLink="/login">
       <mat-icon>login</mat-icon>
       <span>Login</span>
     </button>
-    <button mat-button routerLink="/auth/register">
+    <button mat-button routerLink="/register">
       <mat-icon>person_add</mat-icon>
       <span>Register</span>
     </button>

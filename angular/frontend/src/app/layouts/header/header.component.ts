@@ -8,7 +8,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { RouterModule } from '@angular/router';
 import { Store, Select } from '@ngxs/store';
 import { AuthState, AuthActions } from '../../store/auth/auth.state';
-import { Observable, Subscription } from 'rxjs';
+import { Observable, Subscription, of } from 'rxjs';
 import { User } from '../../models';
 
 @Component({
@@ -29,8 +29,8 @@ import { User } from '../../models';
 export class HeaderComponent implements OnInit, OnDestroy {
   @Output() sidebarToggle = new EventEmitter<void>();
   
-  @Select(AuthState.isAuthenticated) isAuthenticated$!: Observable<boolean>;
-  @Select(AuthState.user) user$!: Observable<User | null>;
+  @Select(AuthState.isAuthenticated) isAuthenticated$?: Observable<boolean>;
+  @Select(AuthState.user) user$?: Observable<User | null>;
   
   isAuthenticated = false;
   user: User | null = null;
@@ -41,14 +41,18 @@ export class HeaderComponent implements OnInit, OnDestroy {
   
   ngOnInit(): void {
     if (isPlatformBrowser(this.platformId)) {
+      // Safely handle potential undefined observables
+      const isAuth$ = this.isAuthenticated$ || of(false);
+      const user$ = this.user$ || of(null);
+      
       this.subscription.add(
-        this.isAuthenticated$.subscribe(isAuthenticated => {
+        isAuth$.subscribe(isAuthenticated => {
           this.isAuthenticated = isAuthenticated;
         })
       );
       
       this.subscription.add(
-        this.user$.subscribe(user => {
+        user$.subscribe(user => {
           this.user = user;
         })
       );

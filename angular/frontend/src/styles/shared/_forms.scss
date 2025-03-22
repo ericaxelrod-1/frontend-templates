@@ -1,0 +1,39 @@
+// Form styles
+.form-group {
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px 15px;
+  border: 1px solid #666;
+  border-radius: 4px;
+  font-size: 16px;
+  margin-bottom: 15px;
+  background-color: #424242;
+  color: #fff;
+}
+
+.form-control:focus {
+  border-color: #5c6bc0;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(92, 107, 192, 0.25);
+}
+
+.form-control.is-invalid {
+  border-color: #f44336;
+}
+
+.invalid-feedback {
+  color: #f44336;
+  font-size: 14px;
+  margin-top: 5px;
+  margin-bottom: 15px;
+} 

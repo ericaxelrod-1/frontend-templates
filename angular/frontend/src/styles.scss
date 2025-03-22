@@ -1,24 +1,41 @@
 /* You can add global styles to this file, and also import other style files */
-@use '@angular/material' as mat;
+@use 'styles/shared/index' as shared;
+@import '@angular/material/prebuilt-themes/purple-green.css';
 
-@include mat.core();
-
-// Define a light theme
-$light-theme: mat.define-theme();
-
-// Apply the theme to all components - must be wrapped in a selector for M3 themes
+/* CSS Variables for custom components */
 :root {
-  @include mat.all-component-themes($light-theme);
+  --primary-color: #7b1fa2;
+  --primary-light: #ae52d4;
+  --primary-dark: #4a0072;
+  --accent-color: #69f0ae;
+  --text-on-primary: #ffffff;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --background-dark: #303030;
+  --background-card: #424242;
+  --surface: #484848;
+  --error: #f44336;
+  --success: #4caf50;
+  --warning: #ff9800;
+  --info: #2196f3;
 }
 
+/* Base styles */
 html, body { 
   height: 100%; 
   margin: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
 }
 
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  background-color: var(--background-dark);
+  color: var(--text-primary);
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 16px;
-}
+} 

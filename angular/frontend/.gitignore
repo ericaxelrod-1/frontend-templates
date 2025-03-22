@@ -40,3 +40,13 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Security audit files
+/docs/security/security-audit-*.md
+/security-audit-task.xml
+/run-security-audit.bat
+/run-security-audit.sh
+/crontab-instructions.txt
+
+# Keep security README
+!/docs/security/README.md

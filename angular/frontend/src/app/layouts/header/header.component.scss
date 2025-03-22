@@ -14,7 +14,7 @@
 
 .user-menu-header {
   padding: 12px 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #5c5c5c;
   margin-bottom: 8px;
 }
 
@@ -27,7 +27,7 @@
 .user-email {
   margin: 5px 0 0;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 ::ng-deep .mat-menu-content {
@@ -40,4 +40,6 @@ mat-toolbar {
   left: 0;
   right: 0;
   z-index: 100;
+  background-color: #212121;
+  color: white;
 }

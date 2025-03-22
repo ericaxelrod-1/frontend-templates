@@ -41,16 +41,88 @@ This project serves as a template for deploying new Angular applications with a 
    npm run start:dev
    ```
 
-## Development Mode
-To enable debug mode, use the `--debug` flag:
+## Development Server Modes
+
+### Standard Development Mode
+```bash
+# Frontend
+npm start
+# or
+ng serve
 ```
-npm run start:dev -- --debug
+Use this for regular development. It provides:
+- Live reload on file changes
+- Basic error reporting
+- Default development configuration
+
+### Debug Mode
+```bash
+# Frontend
+npm start -- --configuration=development
+# or
+ng serve --configuration=development
+```
+Use this when you need to debug application issues:
+- More detailed console output
+- Source maps for debugging in browser dev tools
+- Enables Angular's debug tools for component inspection
+
+### Verbose Mode
+```bash
+# Frontend
+npm start -- --verbose
+# or
+ng serve --verbose
+```
+Use this when you need detailed build information:
+- Shows full compilation process logs
+- Displays webpack configuration details
+- Helpful for troubleshooting build issues or optimizing build performance
+
+### Production Simulation
+```bash
+# Frontend
+npm start -- --configuration=production
+# or
+ng serve --configuration=production
+```
+Use this to test how your app will behave in production:
+- Applies production optimization (bundling, minification)
+- Disables debug tools and verbose logging
+- Useful for performance testing before deployment
+
+### Hot Module Replacement Mode
+```bash
+# Frontend
+npm start -- --hmr
+# or
+ng serve --hmr
+```
+Use this for faster development iterations:
+- Updates modules in-place without full page refresh
+- Preserves application state during updates
+- Speeds up development workflow for UI-heavy work
+
+### Combined Options
+You can combine these options as needed:
+```bash
+# Debug + Verbose + HMR
+ng serve --configuration=development --verbose --hmr
 ```
 
-The server will start at http://localhost:3000 by default. In development mode, you'll see:
-- Server URL
-- Debug mode status
-- API Documentation URL (Swagger UI)
+### Backend Development Modes
+```bash
+# Standard development
+npm run start:dev
+
+# Debug mode (enables detailed logging)
+npm run start:dev -- --debug
+
+# Watch mode (automatically restarts on file changes)
+npm run start:debug
+```
+
+The server will start at http://localhost:4200 for frontend and http://localhost:3000 for backend by default.
 
 ### API Documentation
 The API documentation is available at http://localhost:3000/api when the server is running. This interactive documentation includes:

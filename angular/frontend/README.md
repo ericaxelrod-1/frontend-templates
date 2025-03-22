@@ -1,59 +1,111 @@
-# Frontend
+# Angular Template Application
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.3.
+This project is a template application for Angular, designed to provide a solid foundation for building enterprise-grade web applications. It includes common features such as authentication, user management, and responsive layouts.
 
-## Development server
+## Features
 
-To start a local development server, run:
+- User authentication (login, register, forgot password)
+- Role-based access control
+- User and group management
+- Dashboard with analytics
+- Material design components
+- Responsive layout for all screen sizes
+- State management with NGXS
+- Comprehensive validation tools
 
-```bash
-ng serve
+## Project Structure
+
+The project follows a feature-based organization:
+
+```
+/src/app/
+├── core/            # Core functionality (services, guards, interceptors)
+├── shared/          # Shared components, directives, pipes
+├── features/        # Feature modules
+│   ├── auth/        # Authentication related components
+│   ├── dashboard/   # Dashboard feature
+│   ├── users/       # User management
+│   └── groups/      # Group management
+├── layouts/         # Layout components
+└── models/          # Data models/interfaces
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Development
 
-## Code scaffolding
+### Prerequisites
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+- Node.js (version 14 or higher)
+- npm (version 6 or higher)
+- Angular CLI (version 16 or higher)
 
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+### Installation
 
 ```bash
-ng generate --help
+# Clone the repository
+git clone https://github.com/organization/angular-template.git
+
+# Navigate to the project directory
+cd angular-template/frontend
+
+# Install dependencies
+npm install
 ```
 
-## Building
-
-To build the project run:
+### Development Server
 
 ```bash
-ng build
+# Start the development server
+npm start
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Navigate to `http://localhost:4200/` to view the application.
 
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+### Build
 
 ```bash
-ng test
+# Build for production
+npm run build
 ```
 
-## Running end-to-end tests
+The build artifacts will be stored in the `dist/` directory.
 
-For end-to-end (e2e) testing, run:
+## Code Quality
+
+This project includes several tools to ensure code quality:
 
 ```bash
-ng e2e
+# Run style validation
+npm run verify:styles
+
+# Run layout validation
+npm run verify:layouts
+
+# Run all verification tools
+npm run verify
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Documentation
 
-## Additional Resources
+Comprehensive documentation is available in the `docs/` directory:
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- [Project Plan](docs/PROJECT_PLAN.md): Overview of the project architecture and features
+- [Development Guide](docs/DEVELOPMENT_GUIDE.md): Guidelines for development
+- [API Documentation](docs/API_DOCUMENTATION.md): Details about the backend API
+
+## Testing
+
+```bash
+# Run unit tests
+npm test
+
+# Run unit tests with code coverage
+npm test -- --code-coverage
+```
+
+## Contributing
+
+Please read the [Development Guide](docs/DEVELOPMENT_GUIDE.md) for details on our code of conduct and the process for submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

@@ -6,7 +6,6 @@
 
 .sidenav-container {
   flex: 1;
-  margin-top: 64px; /* For the fixed header */
 }
 
 .sidebar {
@@ -17,6 +16,7 @@
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 64px);
+  margin-top: 64px; /* For the fixed header */
 }
 
 .content-wrapper {
@@ -24,12 +24,53 @@
   flex: 1;
 }
 
+/* Auth pages styles */
+.auth-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background-color: var(--primary-color);
+  color: var(--text-on-primary);
+  box-shadow: 0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px 0 rgba(0,0,0,.14), 0 1px 18px 0 rgba(0,0,0,.12);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+}
+
+.auth-header .logo {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.auth-sidenav-container {
+  margin-top: 64px; /* Match auth header height */
+}
+
+.auth-content {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 64px);
+  background-color: var(--background-dark);
+}
+
 @media (max-width: 599px) {
-  .sidenav-container {
+  .main-content {
     margin-top: 56px; /* Smaller top margin for mobile */
+    min-height: calc(100vh - 56px);
   }
   
-  .main-content {
+  .auth-header {
+    height: 56px;
+  }
+  
+  .auth-sidenav-container {
+    margin-top: 56px; /* Match auth header height for mobile */
+  }
+  
+  .auth-content {
     min-height: calc(100vh - 56px);
   }
 }
