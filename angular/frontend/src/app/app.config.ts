@@ -10,6 +10,7 @@ import { NgxsReduxDevtoolsPluginModule } from '@ngxs/devtools-plugin';
 import { provideHttpClient, withInterceptorsFromDi, withFetch } from '@angular/common/http';
 import { httpInterceptorProviders } from './core/interceptors';
 import { AuthState } from './store';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -18,6 +19,7 @@ export const appConfig: ApplicationConfig = {
     provideAnimations(),
     provideHttpClient(withInterceptorsFromDi(), withFetch()),
     httpInterceptorProviders,
+    { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { appearance: 'outline' } },
     importProvidersFrom(
       NgxsModule.forRoot([AuthState]),
       NgxsRouterPluginModule.forRoot(),

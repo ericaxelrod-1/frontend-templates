@@ -58,6 +58,7 @@ Use this for regular development. It provides:
 ### Debug Mode
 ```bash
 # Frontend
+# executed in angular/frontend
 npm start -- --configuration=development
 # or
 ng serve --configuration=development

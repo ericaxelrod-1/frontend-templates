@@ -10,6 +10,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { provideAnimations } from '@angular/platform-browser/animations';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-forgot-password',
@@ -25,12 +27,18 @@ import { MatFormFieldModule } from '@angular/material/form-field';
     MatButtonModule,
     MatInputModule,
     MatFormFieldModule
+  ],
+  providers: [
+    provideAnimations()
   ]
 })
 export class ForgotPasswordComponent implements OnInit, OnDestroy {
   forgotPasswordForm!: FormGroup;
   private subscription: Subscription = new Subscription();
   private platformId = inject(PLATFORM_ID);
+  
+  // Flag to track if Material icons are loaded
+  isMatIconsLoaded = false;
 
   @Select(AuthState.loading) loading$!: Observable<boolean>;
   @Select(AuthState.error) error$!: Observable<string | null>;
@@ -39,11 +47,12 @@ export class ForgotPasswordComponent implements OnInit, OnDestroy {
   loading = false;
   submitted = false;
   success = false;
-  error = '';
+  errorMessage = '';
 
   constructor(
     private formBuilder: FormBuilder,
-    private store: Store
+    private store: Store,
+    private authService: AuthService
   ) { }
 
   ngOnInit(): void {
@@ -51,6 +60,9 @@ export class ForgotPasswordComponent implements OnInit, OnDestroy {
     this.forgotPasswordForm = this.formBuilder.group({
       email: ['', [Validators.required, Validators.email]]
     });
+    
+    // Check if Material icons are loaded
+    this.checkMaterialIconsLoaded();
 
     // Only subscribe to observables in browser environment
     if (isPlatformBrowser(this.platformId)) {
@@ -63,7 +75,7 @@ export class ForgotPasswordComponent implements OnInit, OnDestroy {
 
       this.subscription.add(
         this.error$.subscribe(error => {
-          this.error = error || '';
+          this.errorMessage = error || '';
         })
       );
 
@@ -84,12 +96,43 @@ export class ForgotPasswordComponent implements OnInit, OnDestroy {
 
   onSubmit(): void {
     this.submitted = true;
-
-    // Stop here if form is invalid
+    
     if (this.forgotPasswordForm.invalid) {
       return;
     }
 
-    this.store.dispatch(new AuthActions.ForgotPassword(this.f['email'].value));
+    this.loading = true;
+    this.errorMessage = '';
+    this.success = false;
+    
+    const email = this.forgotPasswordForm.get('email')?.value;
+    console.log('Component submitting email:', email);
+    
+    this.authService.forgotPassword(email).subscribe({
+      next: (response: any) => {
+        console.log('Component received response:', response);
+        this.loading = false;
+        this.success = true;
+        // Form can be reset only if successful
+        this.forgotPasswordForm.reset();
+        this.submitted = false;
+      },
+      error: (error: any) => {
+        console.error('Component error handling:', error);
+        this.loading = false;
+        this.errorMessage = error?.error?.message || 'An error occurred while processing your request.';
+      }
+    });
+  }
+
+  // Check if Material icons are loaded correctly
+  private checkMaterialIconsLoaded(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      // Simple check to see if Material icons font is loaded
+      setTimeout(() => {
+        const testIcon = document.querySelector('mat-icon');
+        this.isMatIconsLoaded = !!testIcon && window.getComputedStyle(testIcon).fontFamily.includes('Material Icons');
+      }, 100); // Small delay to allow icons to load
+    }
   }
 } 

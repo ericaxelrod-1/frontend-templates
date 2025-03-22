@@ -1,6 +1,6 @@
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, tap, throwError, catchError } from 'rxjs';
 import { isPlatformBrowser } from '@angular/common';
 import { 
   User, 
@@ -108,17 +108,47 @@ export class AuthService {
   // Forgot password
   forgotPassword(email: string): Observable<any> {
     const request: ForgotPasswordRequest = { email };
-    return this.http.post(`/api/auth/forgot-password`, request);
+    console.log('AuthService.forgotPassword called with:', email);
+    console.log('Request URL:', `${this.API_URL}/forgot-password`);
+    console.log('Full API_URL value:', this.API_URL);
+    
+    // Mock implementation for testing when backend is not available
+    if (true) { // Change to 'if (true)' to use mock, 'if (false)' to use real API
+      console.log('Using mock implementation for forgotPassword');
+      // Simulate a delay like a real API call would have
+      return new Observable(observer => {
+        setTimeout(() => {
+          // Simulate a successful response
+          const mockResponse = { 
+            success: true, 
+            message: 'If the email exists, a password reset link will be sent',
+            resetToken: 'mock-token-for-testing'
+          };
+          console.log('Mock forgot password response:', mockResponse);
+          observer.next(mockResponse);
+          observer.complete();
+        }, 1000); // 1 second delay to simulate network latency
+      });
+    }
+    
+    // Real implementation when backend is available
+    return this.http.post(`${this.API_URL}/forgot-password`, request).pipe(
+      tap(response => console.log('Forgot password response:', response)),
+      catchError(error => {
+        console.error('Forgot password HTTP error:', error);
+        return throwError(() => error);
+      })
+    );
   }
 
   // Verify reset token
   verifyResetToken(token: string): Observable<any> {
-    return this.http.post(`/api/auth/verify-reset-token`, { token });
+    return this.http.post(`${this.API_URL}/verify-reset-token`, { token });
   }
 
   // Reset password
   resetPassword(resetData: ResetPasswordRequest): Observable<any> {
-    return this.http.post(`/api/auth/reset-password`, resetData);
+    return this.http.post(`${this.API_URL}/reset-password`, resetData);
   }
 
   // Validate CSRF token

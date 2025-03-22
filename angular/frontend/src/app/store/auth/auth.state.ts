@@ -193,17 +193,27 @@ export class AuthState {
 
   @Action(AuthActions.ForgotPassword)
   forgotPassword(ctx: StateContext<AuthStateModel>, action: AuthActions.ForgotPassword) {
+    console.log('ForgotPassword action triggered with email:', action.email);
     ctx.patchState({ 
       loading: true, 
       error: null,
       forgotPasswordSuccess: false
     });
     
+    console.log('Making HTTP request to:', `${this.authService['API_URL']}/forgot-password`);
     return this.authService.forgotPassword(action.email).pipe(
-      tap(() => {
+      tap(response => {
+        console.log('ForgotPassword success response:', response);
         ctx.dispatch(new AuthActions.ForgotPasswordSuccess());
       }),
       catchError(error => {
+        console.error('ForgotPassword error:', error);
+        console.error('Error details:', {
+          status: error.status,
+          statusText: error.statusText,
+          message: error?.error?.message || 'Unknown error',
+          error: error.error
+        });
         const message = error?.error?.message || 'Password reset request failed. Please try again.';
         ctx.dispatch(new AuthActions.ForgotPasswordFailure(message));
         return throwError(() => error);
@@ -260,6 +270,11 @@ export class AuthState {
       error: null,
       passwordResetSuccess: true
     });
+    
+    // After some time, redirect to login
+    setTimeout(() => {
+      ctx.dispatch(new Navigate(['/login']));
+    }, 3000); // Wait 3 seconds before redirecting to allow user to see the success message
   }
 
   @Action(AuthActions.ResetPasswordFailure)
@@ -278,12 +293,12 @@ export class AuthState {
     return this.authService.logout().pipe(
       tap(() => {
         ctx.setState(defaults);
-        return ctx.dispatch(new Navigate(['/auth/login']));
+        return ctx.dispatch(new Navigate(['/login']));
       }),
       catchError(() => {
         // Even if the API call fails, we still clear the local state
         ctx.setState(defaults);
-        return ctx.dispatch(new Navigate(['/auth/login']));
+        return ctx.dispatch(new Navigate(['/login']));
       })
     );
   }

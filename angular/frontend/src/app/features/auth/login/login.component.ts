@@ -89,4 +89,9 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.f['password'].value
     ));
   }
+  
+  // Navigate to forgot password page
+  navigateToForgotPassword(): void {
+    this.router.navigate(['/forgot-password']);
+  }
 } 
