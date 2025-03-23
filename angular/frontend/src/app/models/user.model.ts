@@ -29,6 +29,14 @@ export interface AuthResponse {
   csrfToken: string;
   expiresIn: number;
   requiresVerification?: boolean;
+  debugInfo?: {
+    verificationToken?: string;
+    emailSent?: boolean;
+    emailSender?: string;
+    emailSubject?: string;
+    sent?: string;
+    [key: string]: any;
+  };
 }
 
 export interface VerificationResponse {

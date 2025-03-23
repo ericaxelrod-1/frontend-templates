@@ -14,6 +14,25 @@
       <p>Please check your inbox and click the verification link to activate your account.</p>
       <p class="note">Note: If you don't see the email, please check your spam folder.</p>
       
+      <!-- Development-only: Display verification token for testing -->
+      <div *ngIf="testVerificationToken" class="dev-test-section">
+        <h3>Development Testing Only</h3>
+        <p>This section would not appear in production.</p>
+        <div class="token-display">
+          <label>Verification Token:</label>
+          <div class="token-value">
+            <code>{{testVerificationToken}}</code>
+            <button class="copy-button" (click)="copyTokenToClipboard()" matTooltip="Copy to clipboard">
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </div>
+          <p class="token-info">
+            <mat-icon>info</mat-icon>
+            <span>Email would be sent from: <strong>{{emailSender || 'noreply@angular-template.com'}}</strong></span>
+          </p>
+        </div>
+      </div>
+      
       <!-- Manual verification token form -->
       <div class="verification-form">
         <h3>Manual Verification</h3>

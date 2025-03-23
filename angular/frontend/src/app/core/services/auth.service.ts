@@ -24,6 +24,10 @@ export class AuthService {
   private refreshTokenSubject = new BehaviorSubject<string | null>(null);
   private csrfTokenSubject = new BehaviorSubject<string | null>(null);
   private platformId = inject(PLATFORM_ID);
+  
+  // For testing purposes - will store the most recent verification token
+  private testVerificationTokenSubject = new BehaviorSubject<string | null>(null);
+  testVerificationToken$ = this.testVerificationTokenSubject.asObservable();
 
   // Exposed as observables
   currentUser$ = this.currentUserSubject.asObservable();
@@ -52,6 +56,10 @@ export class AuthService {
 
   get csrfToken(): string | null {
     return this.csrfTokenSubject.value;
+  }
+  
+  get testVerificationToken(): string | null {
+    return this.testVerificationTokenSubject.value;
   }
 
   get isAuthenticated(): boolean {
@@ -96,6 +104,18 @@ export class AuthService {
             throw new Error('Password must be at least 8 characters long');
           }
           
+          // Generate a test verification token for development purposes
+          const testToken = `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}-${Date.now().toString().substring(8)}`;
+          
+          // Store the test token for verification purposes
+          this.testVerificationTokenSubject.next(testToken);
+          // Also store in localStorage for persistence
+          if (isPlatformBrowser(this.platformId)) {
+            localStorage.setItem('testVerificationToken', testToken);
+          }
+          
+          console.log('[DEVELOPMENT ONLY] Generated verification token:', testToken);
+          
           // Simulate a successful response
           const mockUser: User = {
             id: Math.floor(Math.random() * 1000) + 1, // Random ID
@@ -114,7 +134,15 @@ export class AuthService {
             user: mockUser,
             csrfToken: `mock-csrf-token-${Date.now()}`,
             expiresIn: 3600, // 1 hour expiration
-            requiresVerification: true // Require email verification
+            requiresVerification: true, // Require email verification
+            // Include verification details in development mode
+            debugInfo: {
+              verificationToken: testToken,
+              emailSent: true,
+              emailSender: 'noreply@angular-template.com',
+              emailSubject: 'Verify Your Email Address',
+              sent: new Date().toISOString()
+            }
           };
           
           console.log('Mock register response:', {
@@ -373,6 +401,11 @@ export class AuthService {
       localStorage.setItem('accessToken', authResponse.accessToken);
       localStorage.setItem('refreshToken', authResponse.refreshToken);
       localStorage.setItem('csrfToken', authResponse.csrfToken);
+      
+      // Save debug info if available (development only)
+      if (authResponse.debugInfo) {
+        localStorage.setItem('authDebugInfo', JSON.stringify(authResponse.debugInfo));
+      }
     }
   }
 
@@ -383,6 +416,7 @@ export class AuthService {
       const accessToken = localStorage.getItem('accessToken');
       const refreshToken = localStorage.getItem('refreshToken');
       const csrfToken = localStorage.getItem('csrfToken');
+      const testToken = localStorage.getItem('testVerificationToken');
 
       if (userJson && accessToken) {
         this.currentUserSubject.next(JSON.parse(userJson));
@@ -395,6 +429,11 @@ export class AuthService {
         if (csrfToken) {
           this.csrfTokenSubject.next(csrfToken);
         }
+      }
+      
+      // Load test verification token if available
+      if (testToken) {
+        this.testVerificationTokenSubject.next(testToken);
       }
     }
   }

@@ -1,7 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { isPlatformBrowser, isPlatformServer } from '@angular/common';
-import { PLATFORM_ID, inject } from '@angular/core';
 
 export enum LogLevel {
   Debug = 'debug',
@@ -123,20 +122,145 @@ export class LoggerService {
   
   private saveLogToStorage(logEntry: LogEntry): void {
     if (!this.isBrowser) return;
-    
+
     try {
       const logs = this.getStoredLogs();
-      logs.push(logEntry);
       
+      // Process the log entry to avoid circular references
+      const safeLogEntry = this.makeLogEntrySafe(logEntry);
+      logs.push(safeLogEntry);
+
       // Keep only the last MAX_LOGS entries
       if (logs.length > this.MAX_LOGS) {
         logs.splice(0, logs.length - this.MAX_LOGS);
       }
-      
+
       localStorage.setItem(this.LOCAL_STORAGE_KEY, JSON.stringify(logs));
     } catch (e) {
       console.error('Failed to store log in localStorage', e);
     }
+  }
+  
+  /**
+   * Creates a safe version of log entry that can be stringified without circular references
+   */
+  private makeLogEntrySafe(logEntry: LogEntry): LogEntry {
+    const safeEntry: LogEntry = {
+      timestamp: logEntry.timestamp,
+      level: logEntry.level,
+      message: logEntry.message,
+    };
+    
+    // Only process data if it exists
+    if (logEntry.data) {
+      try {
+        // Handle arrays of data
+        if (Array.isArray(logEntry.data)) {
+          safeEntry.data = logEntry.data.map(item => this.sanitizeForStorage(item));
+        } else {
+          // Handle single data object
+          safeEntry.data = this.sanitizeForStorage(logEntry.data);
+        }
+      } catch (error) {
+        // If we can't process the data, store a simplified version
+        safeEntry.data = '[Complex object that could not be stringified]';
+        console.warn('Could not safely process log data', error);
+      }
+    }
+    
+    return safeEntry;
+  }
+  
+  /**
+   * Sanitizes objects for storage by handling common circular reference patterns
+   */
+  private sanitizeForStorage(obj: any): any {
+    if (!obj || typeof obj !== 'object') {
+      return obj;
+    }
+    
+    // Handle special cases
+    if (obj instanceof Error) {
+      return {
+        name: obj.name,
+        message: obj.message,
+        stack: obj.stack
+      };
+    }
+    
+    // Handle DOM nodes
+    if (obj instanceof Node) {
+      return `[DOM Node: ${obj.nodeName}]`;
+    }
+    
+    // Handle forms and form controls (common circular reference sources)
+    if (
+      obj.constructor && 
+      (
+        obj.constructor.name === 'FormGroup' || 
+        obj.constructor.name === 'FormControl' ||
+        obj.constructor.name === 'FormArray' ||
+        obj.constructor.name === 'FormControl2'
+      )
+    ) {
+      // For form controls, just return a simplified representation
+      if (obj.value !== undefined) {
+        return {
+          value: obj.value,
+          valid: obj.valid,
+          type: obj.constructor.name
+        };
+      }
+      return `[Angular Form: ${obj.constructor.name}]`;
+    }
+    
+    // Handle circular references in objects by creating a copy with only primitive values
+    const seen = new WeakSet();
+    const safeObj = this.getCircularReplacer(obj, seen);
+    return safeObj;
+  }
+  
+  /**
+   * Recursively processes objects to handle circular references
+   */
+  private getCircularReplacer(obj: any, seen = new WeakSet()): any {
+    // For null or non-objects, return as is
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
+    }
+    
+    // Skip if we've seen this object before (circular reference)
+    if (seen.has(obj)) {
+      return '[Circular Reference]';
+    }
+    
+    // Add this object to our set of seen objects
+    seen.add(obj);
+    
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.getCircularReplacer(item, seen));
+    }
+    
+    // Handle objects
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Skip functions and symbols
+      if (typeof value !== 'function' && typeof value !== 'symbol') {
+        try {
+          // Limit recursion depth to avoid stack overflow
+          if (Object.keys(result).length < 20) {
+            result[key] = this.getCircularReplacer(value, seen);
+          } else {
+            result[key] = '[Object]';
+          }
+        } catch (e) {
+          result[key] = '[Unable to serialize]';
+        }
+      }
+    }
+    
+    return result;
   }
   
   private getStoredLogs(): LogEntry[] {

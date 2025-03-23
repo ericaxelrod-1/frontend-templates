@@ -79,6 +79,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
   passwordVisible = false;
   confirmPasswordVisible = false;
   
+  // Development-only for testing email verification
+  testVerificationToken: string | null = null;
+  emailSender: string | null = null;
+  
   // Verification form variables
   verificationLoading = false;
   verificationSubmitted = false;
@@ -216,6 +220,30 @@ export class RegisterComponent implements OnInit, OnDestroy {
             // Clear form on successful registration
             this.registerForm.reset();
             this.submitted = false;
+          }
+        })
+      );
+      
+      // Subscribe to test verification token (development-only)
+      this.subscription.add(
+        this.authService.testVerificationToken$.subscribe(token => {
+          console.log('Test verification token updated:', token ? '********' : null);
+          this.testVerificationToken = token;
+          
+          // Try to get debug info from localStorage
+          try {
+            const debugInfoString = localStorage.getItem('authDebugInfo');
+            if (debugInfoString) {
+              const debugInfo = JSON.parse(debugInfoString);
+              this.emailSender = debugInfo.emailSender || null;
+              
+              console.log('Debug info loaded from storage:', {
+                ...debugInfo,
+                verificationToken: debugInfo.verificationToken ? '********' : null
+              });
+            }
+          } catch (error) {
+            console.error('Error parsing debug info:', error);
           }
         })
       );
@@ -461,6 +489,24 @@ export class RegisterComponent implements OnInit, OnDestroy {
       localStorage.removeItem('registeredEmail');
       localStorage.removeItem('registrationSuccess');
       console.log('Cleared registration state from localStorage');
+    }
+  }
+
+  // Copy verification token to clipboard
+  copyTokenToClipboard(): void {
+    if (!this.testVerificationToken) return;
+    
+    if (isPlatformBrowser(this.platformId) && navigator.clipboard) {
+      navigator.clipboard.writeText(this.testVerificationToken)
+        .then(() => {
+          console.log('Token copied to clipboard');
+          // Could add a visual confirmation here
+        })
+        .catch(err => {
+          console.error('Could not copy text: ', err);
+        });
+    } else {
+      console.error('Clipboard API not available');
     }
   }
 } 
