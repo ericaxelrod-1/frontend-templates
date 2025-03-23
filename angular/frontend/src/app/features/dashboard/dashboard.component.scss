@@ -2,6 +2,34 @@
   padding: 16px;
 }
 
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+  
+  h1 {
+    margin: 0;
+  }
+  
+  .logo-container {
+    display: flex;
+    align-items: center;
+    margin-right: 32px;
+    
+    h1 {
+      color: var(--primary);
+      font-size: 24px;
+      margin: 0;
+    }
+    
+    .dashboard-logo {
+      height: 40px;
+      width: auto;
+      object-fit: contain;
+    }
+  }
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

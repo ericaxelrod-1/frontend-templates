@@ -10,4 +10,25 @@
     <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
     <span matListItemTitle>{{ item.label }}</span>
   </a>
+  
+  <mat-divider class="section-divider"></mat-divider>
+  
+  <div class="sidebar-section">
+    <h3>Account</h3>
+  </div>
+  
+  <a mat-list-item 
+     [routerLink]="'/profile'" 
+     routerLinkActive="active-link">
+    <mat-icon matListItemIcon>person</mat-icon>
+    <span matListItemTitle>My Profile</span>
+  </a>
+  
+  <a mat-list-item 
+     [routerLink]="'/profile'" 
+     [fragment]="'delete-account'"
+     class="delete-account-link">
+    <mat-icon matListItemIcon>delete_forever</mat-icon>
+    <span matListItemTitle>Delete Account</span>
+  </a>
 </mat-nav-list>

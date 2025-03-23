@@ -60,20 +60,76 @@ The project follows a feature-based organization:
 git clone https://github.com/organization/angular-template.git
 
 # Navigate to the project directory
-cd angular-template/frontend
+cd angular-template
 
-# Install dependencies
+# Install frontend dependencies
+cd angular/frontend
+npm install
+
+# Install backend dependencies
+cd ../backend
 npm install
 ```
 
-### Development Server
+### Running the Application
+
+#### Starting the Backend (NestJS)
 
 ```bash
-# Start the development server
-npm start
+# Navigate to the backend directory
+cd angular/backend
+
+# Development mode
+npm run start:dev
+
+# Debug mode with detailed logging
+npm run start:debug
+
+# Production mode
+npm run start:prod
 ```
 
-Navigate to `http://localhost:4200/` to view the application.
+#### Starting the Frontend (Angular)
+
+```bash
+# Navigate to the frontend directory
+cd angular/frontend
+
+# Development mode
+npm run start
+
+# Development with verbose logging
+npm run start -- --verbose
+
+# Production build and serve locally
+npm run build -- --configuration=production
+npm run start -- --configuration=production
+
+# Specify a different port (useful when running multiple instances)
+npm run start -- --port=4201
+```
+
+### Running Both Frontend and Backend
+
+For Windows (PowerShell):
+
+```powershell
+# Open two separate terminals and run:
+# Terminal 1 (Backend):
+cd angular/backend
+npm run start:dev
+
+# Terminal 2 (Frontend):
+cd angular/frontend
+npm run start
+```
+
+For Linux/Mac:
+
+```bash
+# Using concurrently (install with: npm install -g concurrently)
+concurrently "cd angular/backend && npm run start:dev" "cd angular/frontend && npm run start"
+```
 
 ### Build
 

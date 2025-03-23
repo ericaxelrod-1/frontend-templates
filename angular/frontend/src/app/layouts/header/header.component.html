@@ -3,7 +3,10 @@
     <mat-icon>menu</mat-icon>
   </button>
   
-  <span class="app-title">Angular Template</span>
+  <div class="logo-container">
+    <img [src]="headerLogo" alt="App Logo" class="app-logo">
+    <span class="app-title">{{ appName }}</span>
+  </div>
   
   <span class="spacer"></span>
   

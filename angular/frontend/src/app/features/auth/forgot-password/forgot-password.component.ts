@@ -1,10 +1,10 @@
 import { Component, OnInit, OnDestroy, inject, PLATFORM_ID } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { Router, RouterModule } from '@angular/router';
 import { Store, Select } from '@ngxs/store';
 import { Observable, Subscription } from 'rxjs';
 import { AuthState, AuthActions } from '../../../store/auth/auth.state';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { RouterModule } from '@angular/router';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,6 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { AuthService } from '../../../core/services/auth.service';
+import { AppConfigService } from '../../../core/services';
 
 @Component({
   selector: 'app-forgot-password',
@@ -47,13 +48,22 @@ export class ForgotPasswordComponent implements OnInit, OnDestroy {
   loading = false;
   submitted = false;
   success = false;
-  errorMessage = '';
+  error = '';
+  
+  // App configuration properties
+  appName: string;
+  landingLogo: string;
 
   constructor(
     private formBuilder: FormBuilder,
+    private router: Router,
     private store: Store,
-    private authService: AuthService
-  ) { }
+    private authService: AuthService,
+    private appConfig: AppConfigService
+  ) { 
+    this.appName = this.appConfig.appName;
+    this.landingLogo = this.appConfig.landingLogo;
+  }
 
   ngOnInit(): void {
     // Initialize form with validation
@@ -75,7 +85,7 @@ export class ForgotPasswordComponent implements OnInit, OnDestroy {
 
       this.subscription.add(
         this.error$.subscribe(error => {
-          this.errorMessage = error || '';
+          this.error = error || '';
         })
       );
 
@@ -102,7 +112,7 @@ export class ForgotPasswordComponent implements OnInit, OnDestroy {
     }
 
     this.loading = true;
-    this.errorMessage = '';
+    this.error = '';
     this.success = false;
     
     const email = this.forgotPasswordForm.get('email')?.value;
@@ -120,7 +130,7 @@ export class ForgotPasswordComponent implements OnInit, OnDestroy {
       error: (error: any) => {
         console.error('Component error handling:', error);
         this.loading = false;
-        this.errorMessage = error?.error?.message || 'An error occurred while processing your request.';
+        this.error = error?.error?.message || 'An error occurred while processing your request.';
       }
     });
   }

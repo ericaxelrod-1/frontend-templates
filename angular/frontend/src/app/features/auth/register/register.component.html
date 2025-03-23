@@ -1,127 +1,220 @@
 <div class="register-container">
   <div class="register-card">
-    <h2>Register</h2>
-    <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="firstName">First Name</label>
-          <input 
-            type="text" 
-            id="firstName" 
-            formControlName="firstName" 
-            class="form-control"
-            [ngClass]="{ 'is-invalid': submitted && f['firstName'].errors }"
-            placeholder="Enter your first name"
-            matTooltip="Your first name"
-          />
-          <div *ngIf="submitted && f['firstName'].errors" class="invalid-feedback">
-            <div *ngIf="f['firstName'].errors['required']">First name is required</div>
+    <!-- Logo Container -->
+    <div class="logo-container">
+      <img *ngIf="landingLogo" [src]="landingLogo" alt="{{appName}} Logo" class="app-logo">
+      <h1 *ngIf="!landingLogo">{{appName}}</h1>
+    </div>
+    
+    <!-- Registration success message -->
+    <div *ngIf="registrationSuccess" class="registration-success">
+      <mat-icon class="success-icon">check_circle</mat-icon>
+      <h2>Registration Successful!</h2>
+      <p>A verification email has been sent to your email address.</p>
+      <p>Please check your inbox and click the verification link to activate your account.</p>
+      <p class="note">Note: If you don't see the email, please check your spam folder.</p>
+      
+      <!-- Manual verification token form -->
+      <div class="verification-form">
+        <h3>Manual Verification</h3>
+        <p>If you didn't receive the email or can't click the link, you can enter the verification token below:</p>
+        <form [formGroup]="verificationForm" (ngSubmit)="verifyEmail()" class="token-form">
+          <div class="form-group">
+            <label for="verificationToken">Verification Token</label>
+            <input 
+              type="text" 
+              id="verificationToken" 
+              formControlName="verificationToken" 
+              class="form-control"
+              [ngClass]="{ 'is-invalid': verificationSubmitted && v['verificationToken'].errors }"
+              placeholder="Enter your verification token"
+            />
+            <div *ngIf="verificationSubmitted && v['verificationToken'].errors" class="invalid-feedback">
+              <div *ngIf="v['verificationToken'].errors['required']">Verification token is required</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <button 
+              type="submit" 
+              class="btn btn-primary" 
+              [disabled]="verificationLoading"
+            >
+              <span *ngIf="verificationLoading" class="spinner-border spinner-border-sm mr-1"></span>
+              Verify Email
+            </button>
+          </div>
+          <div *ngIf="verificationError" class="alert alert-danger mt-3">{{verificationError}}</div>
+        </form>
+      </div>
+      
+      <div class="action-buttons mt-3">
+        <button class="btn btn-secondary" (click)="navigateToLogin()">Go to Login</button>
+      </div>
+    </div>
+    
+    <!-- Registration form -->
+    <div *ngIf="!registrationSuccess">
+      <h2>Register</h2>
+      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" autocomplete="on">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="firstName">First Name</label>
+            <input 
+              type="text" 
+              id="firstName" 
+              formControlName="firstName" 
+              class="form-control"
+              [ngClass]="{ 'is-invalid': submitted && f['firstName'].errors }"
+              placeholder="Enter your first name"
+              matTooltip="Your first name"
+              autocomplete="given-name"
+            />
+            <div *ngIf="submitted && f['firstName'].errors" class="invalid-feedback">
+              <div *ngIf="f['firstName'].errors['required']">First name is required</div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="lastName">Last Name</label>
+            <input 
+              type="text" 
+              id="lastName" 
+              formControlName="lastName" 
+              class="form-control"
+              [ngClass]="{ 'is-invalid': submitted && f['lastName'].errors }"
+              placeholder="Enter your last name"
+              matTooltip="Your last name"
+              autocomplete="family-name"
+            />
+            <div *ngIf="submitted && f['lastName'].errors" class="invalid-feedback">
+              <div *ngIf="f['lastName'].errors['required']">Last name is required</div>
+            </div>
           </div>
         </div>
         
         <div class="form-group">
-          <label for="lastName">Last Name</label>
+          <label for="email">Email</label>
           <input 
-            type="text" 
-            id="lastName" 
-            formControlName="lastName" 
-            class="form-control"
-            [ngClass]="{ 'is-invalid': submitted && f['lastName'].errors }"
-            placeholder="Enter your last name"
-            matTooltip="Your last name"
-          />
-          <div *ngIf="submitted && f['lastName'].errors" class="invalid-feedback">
-            <div *ngIf="f['lastName'].errors['required']">Last name is required</div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input 
-          type="email" 
-          id="email" 
-          formControlName="email" 
-          class="form-control" 
-          [ngClass]="{ 'is-invalid': submitted && f['email'].errors }"
-          placeholder="Enter your email address"
-          matTooltip="We'll never share your email with anyone else"
-        />
-        <div *ngIf="submitted && f['email'].errors" class="invalid-feedback">
-          <div *ngIf="f['email'].errors['required']">Email is required</div>
-          <div *ngIf="f['email'].errors['email']">Please enter a valid email address</div>
-        </div>
-      </div>
-      
-      <div class="form-group password-field">
-        <label for="password">Password</label>
-        <div class="input-with-icon">
-          <input 
-            [type]="passwordVisible ? 'text' : 'password'" 
-            id="password" 
-            formControlName="password" 
+            type="email" 
+            id="email" 
+            formControlName="email" 
             class="form-control" 
-            [ngClass]="{ 'is-invalid': submitted && f['password'].errors }"
-            placeholder="Create a strong password"
-            matTooltip="Password must be at least 8 characters and include uppercase, lowercase, numbers, and special characters"
+            [ngClass]="{ 'is-invalid': submitted && f['email'].errors }"
+            placeholder="Enter your email address"
+            matTooltip="We'll never share your email with anyone else"
+            autocomplete="email"
           />
-          <mat-icon class="visibility-icon" (click)="togglePasswordVisibility()">
-            {{passwordVisible ? 'visibility_off' : 'visibility'}}
-          </mat-icon>
+          <div *ngIf="submitted && f['email'].errors" class="invalid-feedback">
+            <div *ngIf="f['email'].errors['required']">Email is required</div>
+            <div *ngIf="f['email'].errors['email']">Please enter a valid email address</div>
+          </div>
         </div>
         
-        <!-- Password strength indicator -->
-        <div class="password-strength-container" *ngIf="f['password'].value">
-          <mat-progress-bar 
-            [value]="passwordStrength" 
-            [ngClass]="{'weak': passwordStrength < 50, 'medium': passwordStrength >= 50 && passwordStrength < 75, 'strong': passwordStrength >= 75}"
-          ></mat-progress-bar>
-          <span class="strength-text" [ngClass]="{'weak': passwordStrength < 50, 'medium': passwordStrength >= 50 && passwordStrength < 75, 'strong': passwordStrength >= 75}">
-            {{passwordMessage}}
+        <div class="form-group password-field">
+          <label for="password">Password</label>
+          <div class="input-with-icon">
+            <input 
+              [type]="passwordVisible ? 'text' : 'password'" 
+              id="password" 
+              formControlName="password" 
+              class="form-control" 
+              [ngClass]="{ 'is-invalid': submitted && f['password'].errors }"
+              placeholder="Create a strong password"
+              matTooltip="Password must be at least 8 characters and include uppercase, lowercase, numbers, and special characters"
+              autocomplete="new-password"
+            />
+            <mat-icon class="visibility-icon" (click)="togglePasswordVisibility()">
+              {{passwordVisible ? 'visibility_off' : 'visibility'}}
+            </mat-icon>
+          </div>
+          
+          <!-- Password strength indicator -->
+          <div class="password-strength-container" *ngIf="f['password'].value">
+            <mat-progress-bar 
+              [value]="passwordStrength" 
+              [ngClass]="{'weak': passwordStrength < 50, 'medium': passwordStrength >= 50 && passwordStrength < 75, 'strong': passwordStrength >= 75}"
+            ></mat-progress-bar>
+            <span class="strength-text" [ngClass]="{'weak': passwordStrength < 50, 'medium': passwordStrength >= 50 && passwordStrength < 75, 'strong': passwordStrength >= 75}">
+              {{passwordMessage}}
+            </span>
+          </div>
+          
+          <div *ngIf="submitted && f['password'].errors" class="invalid-feedback">
+            <div *ngIf="f['password'].errors['required']">Password is required</div>
+            <div *ngIf="f['password'].errors['minlength']">Password must be at least 8 characters</div>
+            <div *ngIf="f['password'].errors['passwordStrength']">Password must include uppercase, lowercase, numbers, and special characters</div>
+          </div>
+        </div>
+        
+        <div class="form-group password-field">
+          <label for="confirmPassword">Confirm Password</label>
+          <div class="input-with-icon">
+            <input 
+              [type]="confirmPasswordVisible ? 'text' : 'password'" 
+              id="confirmPassword" 
+              formControlName="confirmPassword" 
+              class="form-control" 
+              [ngClass]="{ 'is-invalid': submitted && (f['confirmPassword'].errors || registerForm.errors?.['passwordMismatch']) }"
+              placeholder="Confirm your password"
+              matTooltip="Retype your password to confirm"
+              autocomplete="new-password"
+            />
+            <mat-icon class="visibility-icon" (click)="toggleConfirmPasswordVisibility()">
+              {{confirmPasswordVisible ? 'visibility_off' : 'visibility'}}
+            </mat-icon>
+          </div>
+          <div *ngIf="submitted && (f['confirmPassword'].errors || registerForm.errors?.['passwordMismatch'])" class="invalid-feedback">
+            <div *ngIf="f['confirmPassword'].errors?.['required']">Please confirm your password</div>
+            <div *ngIf="registerForm.errors?.['passwordMismatch']">Passwords do not match</div>
+          </div>
+        </div>
+        
+        <!-- GDPR consent checkbox -->
+        <div class="form-group gdpr-consent">
+          <div class="checkbox-container">
+            <input 
+              type="checkbox" 
+              id="privacyConsent" 
+              formControlName="privacyConsent"
+              [ngClass]="{ 'is-invalid': submitted && f['privacyConsent'].errors }"
+            />
+            <label for="privacyConsent" class="consent-label">
+              I agree to the <a href="/privacy-policy" target="_blank">Privacy Policy</a> and consent to the processing of my personal data.
+            </label>
+          </div>
+          <div *ngIf="submitted && f['privacyConsent'].errors" class="invalid-feedback">
+            <div *ngIf="f['privacyConsent'].errors['required']">You must agree to the Privacy Policy to continue</div>
+          </div>
+        </div>
+
+        <!-- Email verification notice -->
+        <div class="email-verification-notice">
+          <mat-icon class="info-icon">info</mat-icon>
+          <span>
+            For security, we'll send a verification email to your address. 
+            Please verify your email to complete registration.
           </span>
         </div>
         
-        <div *ngIf="submitted && f['password'].errors" class="invalid-feedback">
-          <div *ngIf="f['password'].errors['required']">Password is required</div>
-          <div *ngIf="f['password'].errors['minlength']">Password must be at least 8 characters</div>
-          <div *ngIf="f['password'].errors['passwordStrength']">Password must include uppercase, lowercase, numbers, and special characters</div>
+        <div class="form-group submit-button-container">
+          <button 
+            type="submit" 
+            class="btn btn-primary btn-block" 
+            [disabled]="loading"
+            id="registerButton"
+          >
+            <span *ngIf="loading" class="spinner-border spinner-border-sm mr-1"></span>
+            Register
+          </button>
         </div>
-      </div>
-      
-      <div class="form-group password-field">
-        <label for="confirmPassword">Confirm Password</label>
-        <div class="input-with-icon">
-          <input 
-            [type]="confirmPasswordVisible ? 'text' : 'password'" 
-            id="confirmPassword" 
-            formControlName="confirmPassword" 
-            class="form-control" 
-            [ngClass]="{ 'is-invalid': submitted && (f['confirmPassword'].errors || registerForm.errors?.['passwordMismatch']) }"
-            placeholder="Confirm your password"
-            matTooltip="Retype your password to confirm"
-          />
-          <mat-icon class="visibility-icon" (click)="toggleConfirmPasswordVisibility()">
-            {{confirmPasswordVisible ? 'visibility_off' : 'visibility'}}
-          </mat-icon>
+        
+        <!-- General error message -->
+        <div *ngIf="error" class="alert alert-danger mt-3">{{error}}</div>
+        
+        <div class="mt-3 text-center">
+          <p>Already have an account? <button class="btn-link" (click)="navigateToLogin()">Login</button></p>
         </div>
-        <div *ngIf="submitted && (f['confirmPassword'].errors || registerForm.errors?.['passwordMismatch'])" class="invalid-feedback">
-          <div *ngIf="f['confirmPassword'].errors?.['required']">Please confirm your password</div>
-          <div *ngIf="registerForm.errors?.['passwordMismatch']">Passwords do not match</div>
-        </div>
-      </div>
-      
-      <div class="form-group">
-        <button [disabled]="loading" class="btn btn-primary btn-block">
-          <span *ngIf="loading" class="spinner-border spinner-border-sm mr-1"></span>
-          Register
-        </button>
-      </div>
-      
-      <div *ngIf="error" class="alert alert-danger mt-3">{{error}}</div>
-      
-      <div class="mt-3 text-center">
-        <p>Already have an account? <a routerLink="/login">Login</a></p>
-      </div>
-    </form>
+      </form>
+    </div>
   </div>
 </div> 

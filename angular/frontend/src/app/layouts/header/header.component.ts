@@ -10,6 +10,7 @@ import { Store, Select } from '@ngxs/store';
 import { AuthState, AuthActions } from '../../store/auth/auth.state';
 import { Observable, Subscription, of } from 'rxjs';
 import { User } from '../../models';
+import { AppConfigService } from '../../core/services';
 
 @Component({
   selector: 'app-header',
@@ -37,7 +38,17 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private subscription = new Subscription();
   private platformId = inject(PLATFORM_ID);
   
-  constructor(private store: Store) {}
+  // App configuration properties
+  appName: string;
+  headerLogo: string;
+  
+  constructor(
+    private store: Store,
+    private appConfig: AppConfigService
+  ) {
+    this.appName = this.appConfig.appName;
+    this.headerLogo = this.appConfig.headerLogo;
+  }
   
   ngOnInit(): void {
     if (isPlatformBrowser(this.platformId)) {

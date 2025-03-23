@@ -2,6 +2,16 @@
   flex: 1 1 auto;
 }
 
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.app-logo {
+  height: 36px;
+  width: auto;
+}
+
 .app-title {
   margin-left: 10px;
   font-size: 1.2rem;

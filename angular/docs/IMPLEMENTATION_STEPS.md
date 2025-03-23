@@ -142,6 +142,32 @@
 2. Implement rate limiting
 3. Set up input validation and sanitization
 
+### 3.4 Email Verification System
+- **Status**: Not Started
+- **Testing**: Not Started
+  - Token Generation: Not Started
+  - Email Sending: Not Started
+  - Verification Process: Not Started
+  - UI Implementation: Not Started
+- **Dependencies**: 2.2 Authentication System, 3.1 User Management
+1. Implement verification token generation and storage
+2. Create email templates for verification
+3. Build verification API endpoints
+4. Integrate with registration flow
+5. Create verification UI components
+
+### 3.5 GDPR Compliance Features
+- **Status**: Not Started
+- **Testing**: Not Started
+  - Account Deletion: Not Started
+  - Privacy Policy: Not Started
+  - Consent Management: Not Started
+- **Dependencies**: 3.1 User Management
+1. Implement account deletion functionality
+2. Create privacy policy document
+3. Build user interface for GDPR-related actions
+4. Implement PII anonymization
+
 ## Phase 4: Frontend Infrastructure (Week 4)
 
 ### 4.1 Core UI Components
@@ -307,6 +333,26 @@
 2. Security review
 3. Performance assessment
 4. Cross-browser compatibility testing
+
+## Phase 8: Future Enhancements (Backlog)
+
+### 8.1 Advanced GDPR Features
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 3.5 GDPR Compliance Features
+1. Implement user data export functionality
+2. Create granular consent management
+3. Build data retention policy enforcement
+4. Implement automated data purging for inactive accounts
+
+### 8.2 Enhanced Security Features
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 3.3 Security Implementation
+1. Implement multi-factor authentication
+2. Add IP-based login restrictions
+3. Create suspicious activity detection
+4. Implement advanced password policies
 
 ## Feature Implementation Details
 

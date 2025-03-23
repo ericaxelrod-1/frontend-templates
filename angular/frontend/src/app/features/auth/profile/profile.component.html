@@ -66,5 +66,36 @@
         </button>
       </div>
     </form>
+    
+    <!-- Delete Account Section -->
+    <div *ngIf="user" class="delete-account-section" id="delete-account">
+      <h3>Delete Account</h3>
+      <p class="warning-text">Warning: This action cannot be undone. All your data will be permanently removed.</p>
+      
+      <div *ngIf="showDeleteConfirmation" class="delete-confirmation">
+        <p>Please type <strong>DELETE</strong> to confirm:</p>
+        <input 
+          type="text"
+          [(ngModel)]="deleteConfirmationText"
+          class="form-control"
+          placeholder="Type DELETE here"
+        />
+        
+        <div class="action-buttons">
+          <button 
+            class="btn btn-danger" 
+            [disabled]="deleteConfirmationText !== 'DELETE' || deletingAccount" 
+            (click)="deleteAccount()">
+            <span *ngIf="deletingAccount" class="spinner-border spinner-border-sm mr-1"></span>
+            Permanently Delete Account
+          </button>
+          <button class="btn btn-outline-secondary" (click)="cancelDeleteAccount()">Cancel</button>
+        </div>
+      </div>
+      
+      <button *ngIf="!showDeleteConfirmation" class="btn btn-outline-danger" (click)="showDeleteConfirmation = true">
+        Delete Account
+      </button>
+    </div>
   </div>
 </div> 

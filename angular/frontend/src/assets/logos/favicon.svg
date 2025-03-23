@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Background shape -->
+  <rect x="2" y="2" width="28" height="28" rx="6" fill="#3f51b5" />
+  
+  <!-- M letter stylized -->
+  <path d="M8 24V8h4l6 10 6-10h4v16h-4V14L19 24h-2L12 14v10H8z" fill="#ffffff" />
+  
+  <!-- Accent decorative element -->
+  <circle cx="28" cy="4" r="2" fill="#ff4081" />
+</svg> 

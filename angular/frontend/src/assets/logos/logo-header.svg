@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="40" viewBox="0 0 180 40">
+  <!-- Background shape -->
+  <rect x="5" y="5" width="30" height="30" rx="6" fill="#3f51b5" />
+  
+  <!-- M letter stylized -->
+  <path d="M10 30V10h6l7 12 7-12h6v20h-6V18L24 30h-3L15 18v12h-5z" fill="#ffffff" />
+  
+  <!-- Custom App text -->
+  <text x="45" y="27" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#3f51b5">My Custom App</text>
+  
+  <!-- Accent decorative element -->
+  <path d="M45 33h60" stroke="#ff4081" stroke-width="2" stroke-linecap="round" />
+</svg> 

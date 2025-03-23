@@ -5,6 +5,7 @@ import { Store, Select } from '@ngxs/store';
 import { Observable, Subscription } from 'rxjs';
 import { AuthState, AuthActions } from '../../../store/auth/auth.state';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { AppConfigService } from '../../../core/services';
 
 @Component({
   selector: 'app-reset-password',
@@ -27,13 +28,21 @@ export class ResetPasswordComponent implements OnInit, OnDestroy {
   submitted = false;
   success = false;
   error = '';
+  
+  // App configuration properties
+  appName: string;
+  landingLogo: string;
 
   constructor(
     private formBuilder: FormBuilder,
     private route: ActivatedRoute,
     private router: Router,
-    private store: Store
-  ) { }
+    private store: Store,
+    private appConfig: AppConfigService
+  ) { 
+    this.appName = this.appConfig.appName;
+    this.landingLogo = this.appConfig.landingLogo;
+  }
 
   ngOnInit(): void {
     // Get token from query params

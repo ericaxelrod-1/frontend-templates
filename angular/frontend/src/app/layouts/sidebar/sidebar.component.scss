@@ -24,3 +24,27 @@ mat-nav-list {
 a[mat-list-item] {
   font-size: 16px;
 }
+
+// Section divider and account section styles
+.section-divider {
+  margin: 16px 0;
+}
+
+.sidebar-section {
+  padding: 8px 16px;
+  
+  h3 {
+    font-size: 14px;
+    margin: 8px 0;
+    color: rgba(0, 0, 0, 0.6);
+    font-weight: 500;
+  }
+}
+
+.delete-account-link {
+  color: #d32f2f;
+  
+  mat-icon {
+    color: #d32f2f;
+  }
+}

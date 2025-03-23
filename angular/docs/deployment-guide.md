@@ -19,6 +19,9 @@ Before deploying, ensure you have:
 - [ ] Environment variables are configured
 - [ ] Database migrations are prepared (if applicable)
 - [ ] Static assets are optimized
+- [ ] Application branding is configured (name, logos, colors)
+- [ ] Theme configuration matches organization guidelines
+- [ ] Logo assets are properly sized and optimized for web
 - [ ] Email service is configured for production
 - [ ] Any API keys have been updated for production services
 
@@ -101,6 +104,56 @@ Ensure the following security measures are in place:
 - [ ] API endpoints implement rate limiting
 - [ ] Sensitive data is properly encrypted
 
+## Email Verification Configuration
+
+The application includes an email verification system for new user registrations. This must be properly configured for production:
+
+### Email Verification Requirements
+
+1. Configure the proper base URL for email verification links:
+   ```
+   EMAIL_VERIFICATION_BASE_URL=https://your-production-domain.com/verify-email
+   ```
+
+2. Set appropriate token expiration times:
+   ```
+   EMAIL_VERIFICATION_TOKEN_EXPIRY=86400000  # 24 hours in milliseconds
+   ```
+
+3. Ensure the email service is properly configured to send verification emails
+   (See [Email Configuration Guide](./email-configuration-guide.md) for details)
+
+### Security Considerations for Email Verification
+
+- Use HTTPS for all verification links in production
+- Implement rate limiting for verification attempts
+- Do not include sensitive information in verification emails
+- Implement monitoring for unusual verification patterns
+
+For detailed implementation information, refer to the [Email Configuration Guide](./email-configuration-guide.md).
+
+## GDPR Compliance Considerations
+
+The application implements basic GDPR compliance features. For production deployment, consider:
+
+### Data Protection Requirements
+
+1. Ensure user data is stored securely and encrypted
+2. Configure appropriate data retention policies
+3. Implement proper access controls for personal data
+4. Document all data processing activities
+
+### Account Deletion Features
+
+The application includes a user account deletion feature that removes personal identifiable information (PII). When deploying:
+
+1. Ensure the account deletion mechanism is properly tested
+2. Configure a proper process for handling data deletion requests
+3. Consider implementing a mechanism for data export (future enhancement)
+4. Document what data is removed and what is retained upon deletion
+
+For more information, see the [GDPR Compliance Documentation](./gdpr-compliance.md).
+
 ## Email Service Configuration
 
 **Warning**: The local email server (MailDev) included in this template is for development purposes only. It should **not** be used in production environments for the following reasons:
@@ -111,6 +164,20 @@ Ensure the following security measures are in place:
 - It cannot ensure deliverability or proper inbox placement
 
 For production deployment, configure a proper email service as detailed in the [Email Configuration Guide](./email-configuration-guide.md).
+
+## Theme and Branding Configuration
+
+The application's visual appearance, including themes, logos, and branding elements, can be customized for your organization:
+
+### Branding Requirements
+
+1. **Application Configuration**: The [`app-config.ts`](../frontend/src/environments/app-config.ts) file contains settings for the application name and logo paths which can be customized to match your organization's branding.
+
+2. **Logo Assets**: Place your custom logo files in the `assets/logos/` directory to replace the default branding elements. Refer to the [Theme Configuration Guide](./theme-configuration-guide.md) for recommended logo specifications.
+
+3. **Theme Colors**: The [`styles.scss`](../frontend/src/styles.scss) file contains theme imports and CSS variables that can be modified to match your brand's color scheme and visual identity.
+
+For detailed instructions on customizing themes, stylesheets, and branding elements, refer to the [Theme Configuration Guide](./theme-configuration-guide.md).
 
 ## Environment Configuration
 
@@ -126,6 +193,8 @@ EMAIL_USER=your-email-user
 EMAIL_PASSWORD=your-email-password
 EMAIL_FROM=your-email-from-address
 DATABASE_URL=your-database-url
+EMAIL_VERIFICATION_BASE_URL=https://your-production-domain.com/verify-email
+EMAIL_VERIFICATION_TOKEN_EXPIRY=86400000
 ```
 
 ## Deployment to Server
@@ -177,6 +246,8 @@ After deployment, perform these checks:
 5. Check for any console errors
 6. Verify analytics tracking is working (if applicable)
 7. Test on multiple browsers and devices
+8. Verify email verification process works end-to-end
+9. Test the account deletion process (GDPR compliance)
 
 ## Monitoring and Maintenance
 
@@ -243,5 +314,6 @@ In case of critical issues after deployment:
 
 - [Angular Deployment Guide](https://angular.io/guide/deployment)
 - [Email Configuration Guide](./email-configuration-guide.md)
+- [GDPR Compliance Documentation](./gdpr-compliance.md)
 - [Security Best Practices](https://angular.io/guide/security)
 - [Performance Optimization Guide](https://web.dev/angular) 

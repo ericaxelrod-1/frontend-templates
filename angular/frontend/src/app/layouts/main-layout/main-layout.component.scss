@@ -22,6 +22,7 @@
 .content-wrapper {
   padding: 24px;
   flex: 1;
+  position: relative; /* Ensure proper positioning */
 }
 
 /* Auth pages styles */
@@ -54,6 +55,15 @@
   flex-direction: column;
   min-height: calc(100vh - 64px);
   background-color: var(--background-dark);
+  position: relative; /* Ensure proper positioning */
+  z-index: 1; /* Ensure stacking context */
+}
+
+/* Force auth pages to be visible */
+.auth-content router-outlet + * {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 @media (max-width: 599px) {

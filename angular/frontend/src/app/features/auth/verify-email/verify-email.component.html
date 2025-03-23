@@ -1,0 +1,30 @@
+<div class="verify-email-container">
+  <div class="verify-email-card">
+    <div class="logo-container">
+      <img *ngIf="landingLogo" [src]="landingLogo" alt="{{appName}} Logo" class="app-logo">
+      <h1 *ngIf="!landingLogo">{{appName}}</h1>
+    </div>
+    
+    <h2>Email Verification</h2>
+    
+    <div class="verification-content">
+      <div *ngIf="isVerifying">
+        <div class="spinner"></div>
+        <p>Verifying your email address...</p>
+      </div>
+      
+      <div *ngIf="isSuccess" class="verification-success">
+        <div class="success-icon">✓</div>
+        <p>Your email has been successfully verified!</p>
+        <p>You can now <a (click)="navigateToLogin()">login</a> to your account.</p>
+      </div>
+      
+      <div *ngIf="isError" class="verification-error">
+        <div class="error-icon">!</div>
+        <p>{{ errorMessage }}</p>
+        <p>Please try again or <a href="mailto:support@example.com">contact support</a>.</p>
+        <p>Back to <a (click)="navigateToLogin()">login</a>.</p>
+      </div>
+    </div>
+  </div>
+</div> 

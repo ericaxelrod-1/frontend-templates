@@ -6,6 +6,68 @@ This guide explains how to configure the email service in the Angular Template A
 
 While the application includes a local email server (MailDev) for development, you must configure a production-grade email service for real-world deployments. This guide covers the configuration process for several popular email service providers.
 
+## Email Verification System
+
+The application includes an email verification system for new user registrations. This section explains how to configure and customize this system.
+
+### How Email Verification Works
+
+1. When a user registers, their account is created with `emailVerified` set to `false`
+2. A verification token is generated and stored
+3. An email with a verification link is sent to the user's email address
+4. The user clicks the link, which contains the verification token
+5. The system verifies the token and sets `emailVerified` to `true`
+6. The user can now log in to their account
+
+### Configuration Options
+
+The email verification system can be configured with the following environment variables:
+
+| Variable | Description | Default Value | Example |
+|----------|-------------|---------------|---------|
+| EMAIL_VERIFICATION_REQUIRED | Whether email verification is required | "true" | "true" |
+| EMAIL_VERIFICATION_TOKEN_EXPIRY | Token expiration time in milliseconds | "86400000" (24 hours) | "43200000" (12 hours) |
+| EMAIL_VERIFICATION_BASE_URL | Base URL for verification links | "http://localhost:4200/verify-email" | "https://yourdomain.com/verify-email" |
+
+### Verification Email Template
+
+The verification email template can be customized by editing the file at:
+```
+angular/frontend/server/email-service/templates/verification-email.html
+```
+
+The template uses the following variables:
+- `{{userName}}`: The user's name or email if name is not provided
+- `{{verificationLink}}`: The full verification link with token
+- `{{expiryHours}}`: The token expiration time in hours
+
+### Verification URL Structure
+
+The verification URLs are structured as follows:
+```
+{EMAIL_VERIFICATION_BASE_URL}?token={verification_token}&email={user_email}
+```
+
+For local development, this would typically be:
+```
+http://localhost:4200/verify-email?token=abc123def456&email=user@example.com
+```
+
+For production, ensure the base URL is updated to your domain:
+```
+https://your-production-domain.com/verify-email?token=abc123def456&email=user@example.com
+```
+
+### Testing Verification
+
+To test the email verification system locally:
+
+1. Start the MailDev server
+2. Register a new user through the application
+3. Check MailDev for the verification email
+4. Click the verification link or copy it to your browser
+5. Verify the account is successfully verified
+
 ## Running Locally
 
 The Angular Template Application includes MailDev for local development and testing of email functionality.

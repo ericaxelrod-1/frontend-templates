@@ -3,6 +3,7 @@ export interface User {
   email: string;
   firstName?: string;
   lastName?: string;
+  emailVerified?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   roles?: string[];
@@ -18,6 +19,7 @@ export interface UserRegistration {
   password: string;
   firstName?: string;
   lastName?: string;
+  privacyConsent?: boolean;
 }
 
 export interface AuthResponse {
@@ -26,6 +28,17 @@ export interface AuthResponse {
   user: User;
   csrfToken: string;
   expiresIn: number;
+  requiresVerification?: boolean;
+}
+
+export interface VerificationResponse {
+  user: User;
+  success: boolean;
+  message: string;
+  accessToken?: string;
+  refreshToken?: string;
+  csrfToken?: string;
+  expiresIn?: number;
 }
 
 export interface RefreshTokenRequest {

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Angular Template Favicon</title>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect fill="#673AB7" x="0" y="0" width="32" height="32" rx="4"></rect>
+        <path d="M16,4 L28,28 L4,28 L16,4 Z" stroke="#FFFFFF" stroke-width="1.5" fill="#FFFFFF"></path>
+        <path d="M16,10 L22,24 L10,24 L16,10 Z" fill="#673AB7"></path>
+    </g>
+</svg> 

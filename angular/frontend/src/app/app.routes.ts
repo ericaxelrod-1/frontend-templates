@@ -26,6 +26,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/auth/reset-password/reset-password.component').then(c => c.ResetPasswordComponent)
       },
       {
+        path: 'verify-email',
+        loadComponent: () => import('./features/auth/verify-email/verify-email.component').then(c => c.VerifyEmailComponent)
+      },
+      {
         path: 'profile',
         loadComponent: () => import('./features/auth/profile/profile.component').then(c => c.ProfileComponent),
         canActivate: [AuthGuard]

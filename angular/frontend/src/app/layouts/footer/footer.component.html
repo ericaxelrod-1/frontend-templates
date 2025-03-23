@@ -1,6 +1,11 @@
 <footer>
   <div class="footer-content">
-    <p>© {{ currentYear }} Angular Template. All rights reserved.</p>
-    <p>Version 1.0.0</p>
+    <div class="footer-logo">
+      <img [src]="footerLogo" alt="App Logo">
+    </div>
+    <div class="footer-text">
+      <p>© {{ currentYear }} {{ appName }}. All rights reserved.</p>
+      <p>Version 1.0.0</p>
+    </div>
   </div>
 </footer>

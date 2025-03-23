@@ -4,15 +4,51 @@
   align-items: center;
   min-height: 80vh;
   padding: 20px;
+  position: relative;
+  z-index: 1000; /* Ensure it's above other elements */
 }
 
 .register-card {
   background-color: var(--background-card);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   padding: 30px;
   width: 100%;
   max-width: 500px;
+  position: relative;
+  opacity: 1;
+  animation: fade-in 0.3s ease-in-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Logo styles
+.logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 24px;
+
+  h1 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 28px;
+  }
+  
+  .app-logo {
+    max-width: 180px;
+    max-height: 70px;
+    object-fit: contain;
+  }
 }
 
 h2 {
@@ -107,5 +143,224 @@ h2 {
   .form-row {
     flex-direction: column;
     gap: 0;
+  }
+}
+
+// GDPR Consent styles
+.gdpr-consent {
+  margin-bottom: 20px;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 5px;
+}
+
+.checkbox-container input[type="checkbox"] {
+  margin-right: 10px;
+  margin-top: 3px;
+}
+
+.consent-label {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.consent-label a {
+  color: var(--primary);
+  text-decoration: none;
+  
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// Email verification notice
+.email-verification-notice {
+  display: flex;
+  align-items: flex-start;
+  background-color: rgba(33, 150, 243, 0.1);
+  border-left: 3px solid var(--primary);
+  padding: 12px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+}
+
+.info-icon {
+  color: var(--primary);
+  margin-right: 10px;
+  font-size: 20px;
+  min-width: 20px;
+}
+
+.email-verification-notice span {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+// Registration success message
+.registration-success {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.success-icon {
+  font-size: 70px;
+  height: 70px;
+  width: 70px;
+  color: #4caf50;
+  margin-bottom: 20px;
+}
+
+.registration-success h2 {
+  color: #4caf50;
+  margin-bottom: 20px;
+}
+
+.registration-success p {
+  margin-bottom: 15px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.registration-success .note {
+  font-size: 14px;
+  font-style: italic;
+  margin-top: 20px;
+  color: var(--text-hint);
+}
+
+.action-buttons {
+  margin-top: 30px;
+}
+
+.action-buttons button {
+  padding: 10px 20px;
+}
+
+.mt-3 {
+  margin-top: 16px;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+// Verification form styling
+.verification-form {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  
+  h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: #333;
+  }
+  
+  p {
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: #666;
+  }
+  
+  .token-form {
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+      letter-spacing: 1px;
+      
+      &:focus {
+        border-color: #4285f4;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.25);
+      }
+      
+      &.is-invalid {
+        border-color: #dc3545;
+      }
+    }
+    
+    .invalid-feedback {
+      color: #dc3545;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+    
+    button {
+      margin-top: 10px;
+    }
+  }
+}
+
+// Success screen styling
+.registration-success {
+  text-align: center;
+  padding: 20px;
+  
+  .success-icon {
+    font-size: 48px;
+    color: #4caf50;
+    margin-bottom: 15px;
+  }
+  
+  h2 {
+    color: #333;
+    margin-bottom: 15px;
+  }
+  
+  p {
+    color: #666;
+    margin-bottom: 10px;
+  }
+  
+  .note {
+    font-style: italic;
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  
+  .action-buttons {
+    margin-top: 20px;
+    
+    button {
+      margin: 0 5px;
+    }
   }
 } 

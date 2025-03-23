@@ -5,13 +5,15 @@ import { User } from '../../../models';
 import { finalize } from 'rxjs';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule]
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, FormsModule]
 })
 export class ProfileComponent implements OnInit {
   profileForm!: FormGroup;
@@ -21,10 +23,16 @@ export class ProfileComponent implements OnInit {
   message = '';
   isError = false;
   private platformId = inject(PLATFORM_ID);
+  
+  // Account deletion properties
+  showDeleteConfirmation = false;
+  deleteConfirmationText = '';
+  deletingAccount = false;
 
   constructor(
     private formBuilder: FormBuilder,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router
   ) { }
 
   ngOnInit(): void {
@@ -88,5 +96,45 @@ export class ProfileComponent implements OnInit {
       this.loading = false;
       this.message = 'Profile updated successfully!';
     }, 1000);
+  }
+  
+  // Account deletion methods
+  deleteAccount(): void {
+    if (this.deleteConfirmationText !== 'DELETE') {
+      return;
+    }
+    
+    this.deletingAccount = true;
+    this.message = '';
+    this.isError = false;
+    
+    this.authService.deleteAccount()
+      .pipe(
+        finalize(() => {
+          this.deletingAccount = false;
+        })
+      )
+      .subscribe({
+        next: () => {
+          // Account successfully deleted, redirect to login page
+          this.message = 'Your account has been successfully deleted.';
+          
+          // Logout and redirect after a brief delay to show the success message
+          setTimeout(() => {
+            this.authService.logout().subscribe(() => {
+              this.router.navigate(['/login']);
+            });
+          }, 2000);
+        },
+        error: (error: any) => {
+          this.isError = true;
+          this.message = 'Failed to delete account: ' + (error?.message || 'Unknown error');
+        }
+      });
+  }
+  
+  cancelDeleteAccount(): void {
+    this.showDeleteConfirmation = false;
+    this.deleteConfirmationText = '';
   }
 } 

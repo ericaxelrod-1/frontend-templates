@@ -48,6 +48,7 @@ export class MainLayoutComponent implements OnInit {
     this.isAuthPage = url.includes('/login') || 
                       url.includes('/register') || 
                       url.includes('/forgot-password') || 
-                      url.includes('/reset-password');
+                      url.includes('/reset-password') ||
+                      url.includes('/verify-email');
   }
 }

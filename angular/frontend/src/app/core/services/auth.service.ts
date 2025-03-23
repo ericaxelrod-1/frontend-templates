@@ -9,7 +9,8 @@ import {
   AuthResponse,
   RefreshTokenRequest,
   ForgotPasswordRequest,
-  ResetPasswordRequest 
+  ResetPasswordRequest,
+  VerificationResponse
 } from '../../models';
 import { environment } from '../../../environments/environment';
 
@@ -67,10 +68,79 @@ export class AuthService {
 
   // Register
   register(userData: UserRegistration): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.API_URL}/register`, userData)
-      .pipe(
-        tap(response => this.handleAuthResponse(response))
-      );
+    console.log('AuthService.register called with:', {
+      ...userData,
+      password: '******' // Don't log the actual password
+    });
+    console.log('Request URL:', `${this.API_URL}/register`);
+    
+    // Always use mock implementation for demo purposes
+    console.log('Using mock implementation for register');
+    // Simulate a delay like a real API call would have
+    return new Observable(observer => {
+      setTimeout(() => {
+        try {
+          // Check for required fields
+          if (!userData.email || !userData.password) {
+            throw new Error('Email and password are required');
+          }
+          
+          // Validate email format
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(userData.email)) {
+            throw new Error('Invalid email format');
+          }
+          
+          // Validate password strength
+          if (userData.password.length < 8) {
+            throw new Error('Password must be at least 8 characters long');
+          }
+          
+          // Simulate a successful response
+          const mockUser: User = {
+            id: Math.floor(Math.random() * 1000) + 1, // Random ID
+            email: userData.email,
+            firstName: userData.firstName || 'John',
+            lastName: userData.lastName || 'Doe',
+            emailVerified: false, // Default to false for new registrations
+            roles: ['user'],
+            createdAt: new Date(), // Current date
+            updatedAt: new Date()  // Current date
+          };
+          
+          const mockResponse: AuthResponse = { 
+            accessToken: `mock-access-token-${Date.now()}`,
+            refreshToken: `mock-refresh-token-${Date.now()}`,
+            user: mockUser,
+            csrfToken: `mock-csrf-token-${Date.now()}`,
+            expiresIn: 3600, // 1 hour expiration
+            requiresVerification: true // Require email verification
+          };
+          
+          console.log('Mock register response:', {
+            ...mockResponse,
+            accessToken: '******',
+            refreshToken: '******',
+            csrfToken: '******'
+          });
+          
+          // Save auth state to storage
+          this.handleAuthResponse(mockResponse);
+          
+          observer.next(mockResponse);
+          observer.complete();
+        } catch (error: any) {
+          console.error('Error in mock register implementation:', error);
+          observer.error({
+            error: {
+              message: error.message || 'Registration failed'
+            },
+            status: 400,
+            statusText: 'Bad Request'
+          });
+        }
+      }, 1000); // 1 second delay to simulate network latency
+    });
   }
 
   // Logout
@@ -154,6 +224,133 @@ export class AuthService {
   // Validate CSRF token
   validateCsrfToken(): Observable<any> {
     return this.http.post(`${this.API_URL}/validate-csrf`, {});
+  }
+
+  // Verify email
+  verifyEmail(token: string, email: string): Observable<VerificationResponse> {
+    console.log('AuthService.verifyEmail called with token:', token, 'and email:', email);
+    
+    if (!token) {
+      return throwError(() => new Error('Verification token is required'));
+    }
+    
+    if (!email) {
+      return throwError(() => new Error('Email is required for verification'));
+    }
+    
+    // Mock implementation for testing when backend is not available
+    if (true) { // Change to 'if (true)' to use mock, 'if (false)' to use real API
+      console.log('Using mock implementation for email verification');
+      
+      return new Observable(observer => {
+        setTimeout(() => {
+          try {
+            // Validate token (in a real app, this would be done on the server)
+            if (token.length < 5) {
+              throw new Error('Invalid verification token');
+            }
+            
+            // Simulate a successful response
+            const mockUser: User = {
+              id: Math.floor(Math.random() * 1000) + 1, // Random ID
+              email: email,
+              firstName: email.split('@')[0], // Use part of email as first name for mock
+              lastName: 'User',
+              emailVerified: true, // Mark as verified
+              roles: ['user'],
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+            
+            // Create tokens that are guaranteed to be strings
+            const accessToken = `mock-access-token-${Date.now()}`;
+            const refreshToken = `mock-refresh-token-${Date.now()}`;
+            const csrfToken = `mock-csrf-token-${Date.now()}`;
+            
+            const mockResponse: VerificationResponse = {
+              user: mockUser,
+              success: true,
+              message: 'Email verified successfully.',
+              accessToken: accessToken,
+              refreshToken: refreshToken,
+              csrfToken: csrfToken
+            };
+            
+            // Update auth state with the verified user
+            this.handleAuthResponse({
+              user: mockUser,
+              accessToken: accessToken,
+              refreshToken: refreshToken,
+              csrfToken: csrfToken,
+              expiresIn: 3600,
+              requiresVerification: false
+            });
+            
+            console.log('Mock verification response:', {
+              ...mockResponse,
+              accessToken: '******',
+              refreshToken: '******',
+              csrfToken: '******'
+            });
+            
+            observer.next(mockResponse);
+            observer.complete();
+          } catch (error: any) {
+            console.error('Error in mock email verification:', error);
+            observer.error({
+              error: {
+                message: error.message || 'Email verification failed'
+              },
+              status: 400,
+              statusText: 'Bad Request'
+            });
+          }
+        }, 1500); // 1.5 second delay to simulate network latency
+      });
+    }
+    
+    // Real implementation when backend is available
+    return this.http.post<VerificationResponse>(`${this.API_URL}/verify-email`, { token, email }).pipe(
+      tap(response => {
+        // Update auth state with the verified user if all required properties are present
+        if (response.success && response.accessToken && response.refreshToken && response.csrfToken) {
+          this.handleAuthResponse({
+            user: response.user,
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+            csrfToken: response.csrfToken,
+            expiresIn: response.expiresIn || 3600, // Default expiry if not provided
+            requiresVerification: false
+          });
+        }
+      })
+    );
+  }
+
+  // Delete account
+  deleteAccount(): Observable<any> {
+    console.log('AuthService.deleteAccount called');
+    
+    // Mock implementation for testing when backend is not available
+    if (true) { // Change to 'if (true)' to use mock, 'if (false)' to use real API
+      console.log('Using mock implementation for account deletion');
+      
+      return new Observable(observer => {
+        setTimeout(() => {
+          // Simulate a successful response
+          const mockResponse = {
+            success: true,
+            message: 'Account deleted successfully.'
+          };
+          
+          console.log('Mock account deletion response:', mockResponse);
+          observer.next(mockResponse);
+          observer.complete();
+        }, 1500);
+      });
+    }
+    
+    return this.http.delete<any>(`${this.API_URL}/delete-account`);
   }
 
   // Private helper methods

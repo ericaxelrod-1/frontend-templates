@@ -1,5 +1,11 @@
 <div class="dashboard-container">
-  <h1>Dashboard</h1>
+  <div class="dashboard-header">
+    <div class="logo-container">
+      <img *ngIf="headerLogo" [src]="headerLogo" alt="{{appName}} Logo" class="dashboard-logo">
+      <h1 *ngIf="!headerLogo">{{appName}}</h1>
+    </div>
+    <h1>Dashboard</h1>
+  </div>
   
   <div class="dashboard-grid">
     <mat-card class="dashboard-card">

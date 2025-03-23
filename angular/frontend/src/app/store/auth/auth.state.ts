@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Action, Selector, State, StateContext } from '@ngxs/store';
 import { Navigate } from '@ngxs/router-plugin';
 import { AuthService } from '../../core/services';
-import { User } from '../../models';
+import { User, UserRegistration } from '../../models';
 import { catchError, tap } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 
@@ -29,8 +29,19 @@ export namespace AuthActions {
       public email: string, 
       public password: string, 
       public firstName?: string, 
-      public lastName?: string
+      public lastName?: string,
+      public privacyConsent?: boolean
     ) {}
+  }
+
+  export class RegisterSuccess {
+    static readonly type = '[Auth] Register Success';
+    constructor(public message: string) {}
+  }
+
+  export class RegisterFailure {
+    static readonly type = '[Auth] Register Failure';
+    constructor(public error: string) {}
   }
 
   export class ForgotPassword {
@@ -72,6 +83,21 @@ export namespace AuthActions {
   export class GetProfile {
     static readonly type = '[Auth] Get Profile';
   }
+
+  export class VerifyEmail {
+    static readonly type = '[Auth] Verify Email';
+    constructor(public token: string, public email: string) {}
+  }
+
+  export class VerifyEmailSuccess {
+    static readonly type = '[Auth] Verify Email Success';
+    constructor(public user: User) {}
+  }
+
+  export class VerifyEmailFailure {
+    static readonly type = '[Auth] Verify Email Failure';
+    constructor(public error: string) {}
+  }
 }
 
 // Auth state model
@@ -82,6 +108,8 @@ export interface AuthStateModel {
   loading: boolean;
   passwordResetSuccess: boolean;
   forgotPasswordSuccess: boolean;
+  registrationSuccess: boolean;
+  verificationSuccess: boolean;
 }
 
 // Default state
@@ -91,7 +119,9 @@ const defaults: AuthStateModel = {
   error: null,
   loading: false,
   passwordResetSuccess: false,
-  forgotPasswordSuccess: false
+  forgotPasswordSuccess: false,
+  registrationSuccess: false,
+  verificationSuccess: false
 };
 
 @State<AuthStateModel>({
@@ -130,6 +160,16 @@ export class AuthState {
   @Selector()
   static forgotPasswordSuccess(state: AuthStateModel): boolean {
     return state.forgotPasswordSuccess;
+  }
+
+  @Selector()
+  static registrationSuccess(state: AuthStateModel): boolean {
+    return state.registrationSuccess;
+  }
+
+  @Selector()
+  static verificationSuccess(state: AuthStateModel): boolean {
+    return state.verificationSuccess;
   }
 
   @Action(AuthActions.Login)
@@ -172,23 +212,53 @@ export class AuthState {
 
   @Action(AuthActions.Register)
   register(ctx: StateContext<AuthStateModel>, action: AuthActions.Register) {
-    ctx.patchState({ loading: true, error: null });
+    ctx.patchState({ loading: true, error: null, registrationSuccess: false });
     
-    return this.authService.register({
+    // Create registration data object
+    const userData: UserRegistration = {
       email: action.email,
       password: action.password,
       firstName: action.firstName,
       lastName: action.lastName
-    }).pipe(
+    };
+    
+    // Add privacy consent if provided
+    if (typeof action.privacyConsent !== 'undefined') {
+      userData.privacyConsent = action.privacyConsent;
+    }
+    
+    return this.authService.register(userData).pipe(
       tap(response => {
-        ctx.dispatch(new AuthActions.LoginSuccess(response.user));
+        if (response.requiresVerification) {
+          ctx.dispatch(new AuthActions.RegisterSuccess('Registration successful! Please check your email to verify your account.'));
+        } else {
+          ctx.dispatch(new AuthActions.LoginSuccess(response.user));
+        }
       }),
       catchError(error => {
         const message = error?.error?.message || 'Registration failed. Please try again.';
-        ctx.dispatch(new AuthActions.LoginFailure(message));
+        ctx.dispatch(new AuthActions.RegisterFailure(message));
         return throwError(() => error);
       })
     );
+  }
+
+  @Action(AuthActions.RegisterSuccess)
+  registerSuccess(ctx: StateContext<AuthStateModel>, action: AuthActions.RegisterSuccess) {
+    ctx.patchState({
+      loading: false,
+      error: null,
+      registrationSuccess: true
+    });
+  }
+
+  @Action(AuthActions.RegisterFailure)
+  registerFailure(ctx: StateContext<AuthStateModel>, action: AuthActions.RegisterFailure) {
+    ctx.patchState({
+      loading: false,
+      error: action.error,
+      registrationSuccess: false
+    });
   }
 
   @Action(AuthActions.ForgotPassword)
@@ -295,8 +365,8 @@ export class AuthState {
         ctx.setState(defaults);
         return ctx.dispatch(new Navigate(['/login']));
       }),
-      catchError(() => {
-        // Even if the API call fails, we still clear the local state
+      catchError(error => {
+        // Even if there's an error, clear state anyway for security
         ctx.setState(defaults);
         return ctx.dispatch(new Navigate(['/login']));
       })
@@ -305,23 +375,70 @@ export class AuthState {
 
   @Action(AuthActions.GetProfile)
   getProfile(ctx: StateContext<AuthStateModel>) {
-    // Only fetch if authenticated
     const state = ctx.getState();
-    if (!state.isAuthenticated) {
+    
+    // If user is already loaded, no need to fetch again
+    if (state.user) {
       return;
     }
     
     return this.authService.getUserProfile().pipe(
       tap(user => {
-        ctx.patchState({ user });
+        ctx.patchState({
+          user,
+          isAuthenticated: true
+        });
       }),
       catchError(error => {
-        if (error?.status === 401) {
-          // If unauthorized, log out
+        // If we get a 401, logout the user
+        if (error.status === 401) {
           ctx.dispatch(new AuthActions.Logout());
         }
         return throwError(() => error);
       })
     );
+  }
+
+  @Action(AuthActions.VerifyEmail)
+  verifyEmail(ctx: StateContext<AuthStateModel>, action: AuthActions.VerifyEmail) {
+    ctx.patchState({ 
+      loading: true, 
+      error: null,
+      verificationSuccess: false
+    });
+    
+    return this.authService.verifyEmail(action.token, action.email).pipe(
+      tap(response => {
+        ctx.dispatch(new AuthActions.VerifyEmailSuccess(response.user));
+      }),
+      catchError(error => {
+        const message = error?.error?.message || 'Email verification failed. Please try again.';
+        ctx.dispatch(new AuthActions.VerifyEmailFailure(message));
+        return throwError(() => error);
+      })
+    );
+  }
+
+  @Action(AuthActions.VerifyEmailSuccess)
+  verifyEmailSuccess(ctx: StateContext<AuthStateModel>, action: AuthActions.VerifyEmailSuccess) {
+    ctx.patchState({
+      loading: false,
+      error: null,
+      user: action.user,
+      isAuthenticated: true,
+      verificationSuccess: true
+    });
+    
+    // Redirect to home page after successful verification
+    return ctx.dispatch(new Navigate(['/']));
+  }
+
+  @Action(AuthActions.VerifyEmailFailure)
+  verifyEmailFailure(ctx: StateContext<AuthStateModel>, action: AuthActions.VerifyEmailFailure) {
+    ctx.patchState({
+      loading: false,
+      error: action.error,
+      verificationSuccess: false
+    });
   }
 } 

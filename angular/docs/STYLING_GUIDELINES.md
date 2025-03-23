@@ -7,6 +7,75 @@ The template follows a clean, modern, and minimalist design approach focusing on
 - **Responsiveness**: Mobile-first approach ensuring compatibility across devices
 - **Consistency**: Unified look and feel throughout the application
 - **Accessibility**: Ensuring all users can interact with the application
+- **Branding**: Consistent application of logo and brand identity
+
+## Application Branding
+
+The application provides a flexible branding system through the `AppConfigService`, allowing for easy customization of:
+- Application name
+- Logo images (landing, header, footer)
+- Theme colors
+
+### Logo Implementation Guidelines
+
+#### Logo Placement
+- **Authentication Pages**: Centered at the top of the auth card
+- **Dashboard**: Left-aligned in the header
+- **Footer**: Small logo version
+
+#### Logo Dimensions
+- **Landing/Auth Pages Logo**: Maximum dimensions of 180px × 70px
+- **Header Logo**: 40px height (width auto)
+- **Footer Logo**: 30px height (width auto)
+
+#### Logo HTML Structure
+Use the following standard structure for logo containers:
+```html
+<div class="logo-container">
+  <img *ngIf="logoPath" [src]="logoPath" alt="{{appName}} Logo" class="app-logo">
+  <h1 *ngIf="!logoPath">{{appName}}</h1>
+</div>
+```
+
+#### Logo Styling Standards
+```scss
+.logo-container {
+  display: flex;
+  justify-content: center; // or flex-start for left alignment
+  align-items: center;
+  margin-bottom: 24px;
+
+  h1 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 28px;
+  }
+  
+  .app-logo {
+    max-width: 180px;
+    max-height: 70px;
+    object-fit: contain;
+  }
+}
+```
+
+### Branding Configuration
+Application branding is configured in `app-config.ts`:
+```typescript
+export const appConfig = {
+  appName: 'My Custom App',
+  logos: {
+    landingLogo: 'assets/logos/logo-large.svg',
+    headerLogo: 'assets/logos/logo-header.svg',
+    footerLogo: 'assets/logos/logo-small.svg',
+    favicon: 'assets/logos/favicon.svg'
+  },
+  theme: {
+    primary: '#3f51b5',
+    secondary: '#ff4081',
+  }
+};
+```
 
 ## Color Palette
 
