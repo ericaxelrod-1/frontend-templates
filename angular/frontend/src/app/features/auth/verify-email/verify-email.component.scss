@@ -1,17 +1,13 @@
+@use '../../../../styles/abstracts' as abstracts;
+
 .verify-email-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  @include abstracts.flex-center;
   min-height: 80vh;
-  padding: 20px;
+  padding: abstracts.$spacing-lg;
 }
 
 .verify-email-card {
-  background-color: var(--background-card);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  padding: 30px;
-  width: 100%;
+  @include abstracts.auth-card;
   max-width: 500px;
   text-align: center;
 }
@@ -43,16 +39,16 @@ h2 {
 
 .verification-content {
   p {
-    margin-bottom: 16px;
-    color: var(--text-secondary);
-    font-size: 16px;
+    margin-bottom: abstracts.$spacing-md;
+    color: abstracts.$text-secondary;
+    font-size: abstracts.$font-size-base;
     line-height: 1.5;
   }
   
   a {
-    color: var(--primary);
+    color: abstracts.$primary;
     text-decoration: none;
-    font-weight: 500;
+    font-weight: abstracts.$font-weight-medium;
     
     &:hover {
       text-decoration: underline;
@@ -66,9 +62,9 @@ h2 {
   height: 50px;
   border: 4px solid rgba(0, 0, 0, 0.1);
   border-radius: 50%;
-  border-top-color: var(--primary);
+  border-top-color: abstracts.$primary;
   animation: spin 1s linear infinite;
-  margin: 20px 0;
+  margin: abstracts.$spacing-md 0;
 }
 
 @keyframes spin {
@@ -76,29 +72,29 @@ h2 {
 }
 
 .verification-success, .verification-error {
-  margin-top: 24px;
-  padding: 16px;
-  border-radius: 4px;
+  margin-top: abstracts.$spacing-lg;
+  padding: abstracts.$spacing-md;
+  border-radius: abstracts.$border-radius-sm;
 }
 
 .verification-success {
   background-color: rgba(76, 175, 80, 0.1);
-  border-left: 4px solid #4caf50;
+  border-left: 4px solid abstracts.$success;
   
   .success-icon {
-    color: #4caf50;
+    color: abstracts.$success;
     font-size: 36px;
-    margin-bottom: 16px;
+    margin-bottom: abstracts.$spacing-md;
   }
 }
 
 .verification-error {
   background-color: rgba(244, 67, 54, 0.1);
-  border-left: 4px solid #f44336;
+  border-left: 4px solid abstracts.$error;
   
   .error-icon {
-    color: #f44336;
+    color: abstracts.$error;
     font-size: 36px;
-    margin-bottom: 16px;
+    margin-bottom: abstracts.$spacing-md;
   }
 } 

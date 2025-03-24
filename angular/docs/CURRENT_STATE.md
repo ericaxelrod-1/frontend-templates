@@ -179,10 +179,18 @@ Test scenarios covered:
 - ✅ Passing: 3
 - ❌ Failing: 0
 
-Test scenarios covered:
+Test scenarios:
 1. ✅ Layout nesting validation
-2. ✅ Angular Material theme validation
-3. ✅ CSS duplication check
+2. ✅ Material theme validation
+3. ✅ CSS duplication check (after fixes)
+
+#### Debug Tools Tests
+- Total Tests: 2
+- ❌ Failing: 2
+
+Test scenarios:
+1. ❌ DebugLogsComponent integration
+2. ❌ Debug mode configuration
 
 ### Test Script Status
 
@@ -280,9 +288,18 @@ npm run check:duplicate-css   # ✅ Passed
 5. ~~Database migrations not configured~~ (Resolved)
 6. ~~User/Group management partially implemented but missing core functionality~~ (Resolved)
 7. ~~CSS duplication across multiple SCSS files~~ (Resolved)
-8. SASS errors with Material theme functions
-9. Dynamic import warnings during build
-10. DebugLogsComponent is imported but not used in the AppComponent template, causing compile warning
+8. Material Theme Issues:
+   - ~~SASS errors with Material theme functions~~ (Resolved)
+   - ~~Theme validation failing in some components~~ (Resolved)
+   - ~~Inconsistent theme application~~ (Resolved)
+   - ~~SCSS color function errors with CSS variables~~ (Resolved)
+9. Debug Tools Issues:
+   - DebugLogsComponent imported but not used in AppComponent template
+   - Debug mode configuration incomplete
+10. Build/Compilation Issues:
+    - Dynamic import warnings during HMR (Hot Module Replacement)
+    - Development server performance degradation with HMR enabled
+    - ~~Material theme compilation warnings~~ (Resolved)
 
 ## Blockers
 
@@ -291,6 +308,9 @@ npm run check:duplicate-css   # ✅ Passed
 3. ~~Frontend development (blocked by: backend APIs for authentication)~~ (Resolved)
 4. ~~Component development (blocked by: CSS architecture issues)~~ (Resolved)
 5. Production build (blocked by: build/compilation issues)
+6. ~~Material theme deployment (blocked by: SASS/Material theme function errors)~~ (Resolved)
+7. Debug tools implementation (blocked by: DebugLogsComponent integration)
+8. Test coverage reporting (blocked by: E2E and unit test implementation)
 
 ## Environment Setup Status
 

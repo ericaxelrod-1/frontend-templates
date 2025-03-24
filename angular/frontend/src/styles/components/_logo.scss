@@ -1,0 +1,19 @@
+@use '../abstracts' as abstracts;
+
+.logo-container {
+  @include abstracts.logo-container;
+  
+  &--left {
+    @include abstracts.logo-container(left);
+  }
+  
+  &--right {
+    @include abstracts.logo-container(right);
+  }
+  
+  h1 {
+    margin: 0;
+    color: abstracts.$primary;
+    font-size: abstracts.$font-size-xl;
+  }
+} 

@@ -1,0 +1,33 @@
+@use '../abstracts' as abstracts;
+
+.container {
+  width: 100%;
+  padding-right: abstracts.$spacing-md;
+  padding-left: abstracts.$spacing-md;
+  margin-right: auto;
+  margin-left: auto;
+  
+  @include abstracts.respond-to(sm) {
+    max-width: 540px;
+  }
+  
+  @include abstracts.respond-to(md) {
+    max-width: 720px;
+  }
+  
+  @include abstracts.respond-to(lg) {
+    max-width: 960px;
+  }
+  
+  @include abstracts.respond-to(xl) {
+    max-width: 1140px;
+  }
+}
+
+.container-fluid {
+  width: 100%;
+  padding-right: abstracts.$spacing-md;
+  padding-left: abstracts.$spacing-md;
+  margin-right: auto;
+  margin-left: auto;
+} 

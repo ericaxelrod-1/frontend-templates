@@ -19,27 +19,164 @@ This project serves as a template for deploying new Angular applications with a 
 - **Deployment**: Docker containers
 
 ## Getting Started
-1. Clone this repository
-2. Install dependencies
-   ```
-   # Frontend
-   cd frontend
-   npm install
 
-   # Backend
-   cd ../backend
-   npm install
-   ```
-3. Start the development servers
-   ```
-   # Frontend
-   cd frontend
-   npm start
+### 1. Installing Dependencies
 
-   # Backend
-   cd ../backend
-   npm run start:dev
-   ```
+From the project root, install dependencies for both frontend and backend:
+
+```bash
+# Frontend dependencies
+cd angular/frontend
+npm install
+
+# Backend dependencies
+cd angular/backend
+npm install
+```
+
+### 2. Starting the Servers
+
+Both servers need to be running simultaneously in separate terminal windows:
+
+#### Frontend Modes
+
+1. **Standard Development Mode**
+```bash
+cd angular/frontend
+npm start
+# or
+ng serve
+```
+- Use for: Regular development work
+- Features:
+  - Live reload on file changes
+  - Basic error reporting
+  - Default development configuration
+
+2. **Debug Mode**
+```bash
+cd angular/frontend
+npm start -- --configuration=development
+# or
+ng serve --configuration=development
+```
+- Use for: Debugging application issues
+- Features:
+  - More detailed console output
+  - Source maps for browser dev tools
+  - Angular's debug tools for component inspection
+  - Enhanced error reporting
+
+3. **Verbose Mode**
+```bash
+cd angular/frontend
+npm start -- --verbose
+# or
+ng serve --verbose
+```
+- Use for: Build troubleshooting
+- Features:
+  - Full compilation process logs
+  - Webpack configuration details
+  - Build performance analysis
+
+4. **Production Simulation Mode**
+```bash
+cd angular/frontend
+npm start -- --configuration=production
+# or
+ng serve --configuration=production
+```
+- Use for: Testing production behavior
+- Features:
+  - Production optimization (bundling, minification)
+  - Disabled debug tools
+  - Disabled verbose logging
+  - Performance testing environment
+
+5. **Hot Module Replacement (HMR) Mode**
+```bash
+cd angular/frontend
+npm start -- --hmr
+# or
+ng serve --hmr
+```
+- Use for: Rapid UI development
+- Features:
+  - Updates modules without page refresh
+  - Preserves application state
+  - Faster development workflow
+
+6. **Combined Options**
+```bash
+cd angular/frontend && ng serve --configuration=development --verbose --hmr
+```
+- Use for: Advanced development needs
+- Combines multiple features for specific use cases
+
+#### Backend Modes
+
+1. **Standard Development Mode**
+```bash
+cd angular/backend
+npm run start:dev
+```
+- Use for: Regular backend development
+- Features:
+  - Basic development configuration
+  - Standard logging
+
+2. **Debug Mode**
+```bash
+cd angular/backend && npm run start:dev -- --debug
+```
+- Use for: Backend troubleshooting
+- Features:
+  - Detailed logging enabled
+  - Enhanced error information
+  - Debug-level messages
+
+3. **Watch Mode**
+```bash
+cd angular/backend
+npm run start:debug
+```
+- Use for: Active backend development
+- Features:
+  - Automatic restart on file changes
+  - Enhanced debugging capabilities
+  - Ideal for rapid development
+
+### 3. Configuration Modes
+
+The `--configuration` flag in Angular determines which environment settings to use:
+
+1. **Development Configuration** (`--configuration=development`)
+- Environment: development
+- Debugging: enabled
+- Optimization: disabled
+- Source maps: enabled
+- Use when: Developing and debugging
+
+2. **Production Configuration** (`--configuration=production`)
+- Environment: production
+- Debugging: disabled
+- Optimization: enabled
+- Source maps: disabled
+- Use when: Testing production builds
+
+### 4. Access Points
+
+- Frontend: http://localhost:4200
+- Backend: http://localhost:3000
+- API Documentation: http://localhost:3000/api
+
+### 5. Additional Features
+
+- Interactive API documentation available at http://localhost:3000/api
+- SQLite database used by default (file: `angular/backend/db.sqlite`)
+- Comprehensive logging in debug mode
+- Frontend options can be combined for specific needs
 
 ## Development Server Modes
 

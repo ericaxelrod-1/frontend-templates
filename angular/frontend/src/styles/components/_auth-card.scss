@@ -1,0 +1,29 @@
+@use '../abstracts' as abstracts;
+
+.auth-container {
+  @include abstracts.flex-center;
+  min-height: 80vh;
+  padding: abstracts.$spacing-lg;
+}
+
+.auth-card {
+  @include abstracts.auth-card;
+  
+  h2 {
+    text-align: center;
+    margin-bottom: abstracts.$spacing-lg;
+    color: abstracts.$text-primary;
+  }
+  
+  form {
+    width: 100%;
+  }
+  
+  .text-center {
+    text-align: center;
+  }
+  
+  p {
+    margin: abstracts.$spacing-xs 0;
+  }
+} 

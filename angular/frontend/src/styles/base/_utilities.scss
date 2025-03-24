@@ -1,0 +1,55 @@
+@use '../abstracts' as abstracts;
+
+// Spacing utilities
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: abstracts.$spacing-xs; }
+.mt-2 { margin-top: abstracts.$spacing-sm; }
+.mt-3 { margin-top: abstracts.$spacing-md; }
+.mt-4 { margin-top: abstracts.$spacing-lg; }
+.mt-5 { margin-top: abstracts.$spacing-xl; }
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: abstracts.$spacing-xs; }
+.mb-2 { margin-bottom: abstracts.$spacing-sm; }
+.mb-3 { margin-bottom: abstracts.$spacing-md; }
+.mb-4 { margin-bottom: abstracts.$spacing-lg; }
+.mb-5 { margin-bottom: abstracts.$spacing-xl; }
+
+.my-0 { margin-top: 0; margin-bottom: 0; }
+.my-1 { margin-top: abstracts.$spacing-xs; margin-bottom: abstracts.$spacing-xs; }
+.my-2 { margin-top: abstracts.$spacing-sm; margin-bottom: abstracts.$spacing-sm; }
+.my-3 { margin-top: abstracts.$spacing-md; margin-bottom: abstracts.$spacing-md; }
+.my-4 { margin-top: abstracts.$spacing-lg; margin-bottom: abstracts.$spacing-lg; }
+.my-5 { margin-top: abstracts.$spacing-xl; margin-bottom: abstracts.$spacing-xl; }
+
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+// Text utilities
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.text-primary { color: abstracts.$primary; }
+.text-accent { color: abstracts.$accent; }
+.text-error { color: abstracts.$error; }
+.text-success { color: abstracts.$success; }
+.text-warning { color: abstracts.$warning; }
+.text-info { color: abstracts.$info; }
+
+// Display utilities
+.d-flex { display: flex; }
+.d-block { display: block; }
+.d-inline-block { display: inline-block; }
+.d-none { display: none; }
+
+// Flex utilities
+.flex-column { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.flex-wrap { flex-wrap: wrap; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.align-center { align-items: center; }
+
+// Width & height
+.w-100 { width: 100%; }
+.h-100 { height: 100%; } 

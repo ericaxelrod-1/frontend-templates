@@ -564,3 +564,265 @@ For global styles, use the styles.scss file in the src folder:
 5. Prioritize classes over element selectors
 6. Write mobile-first media queries
 7. Comment complex style blocks 
+
+## Angular Material Theme Implementation
+
+### Theme Structure and Organization
+
+The application uses Angular Material's theming system, which provides a flexible way to customize the look and feel of Material components. The theme is structured as follows:
+
+```
+styles/
+|-- abstracts/
+|   |-- _variables.scss    # Global SCSS variables
+|   |-- _mixins.scss       # Global mixins
+|   |-- _functions.scss    # Global functions
+|   |-- _colors.scss       # Color definitions
+|   `-- _theme.scss        # Theme configuration
+|-- themes/
+|   |-- _material-theme.scss  # Material theme configuration
+|   |-- _light-theme.scss     # Light theme variant
+|   `-- _dark-theme.scss      # Dark theme variant
+```
+
+### Core Variables and Theme Configuration
+
+All theme variables should be defined in the abstracts directory and imported into component SCSS files as needed:
+
+```scss
+// _variables.scss
+$primary-palette: mat-palette($mat-indigo);
+$accent-palette: mat-palette($mat-pink, A200, A100, A400);
+$warn-palette: mat-palette($mat-red);
+
+// Derived semantic variables
+$background-card: mat-color($primary-palette, 50);
+$spacing-sm: 0.75rem;   // 12px
+$spacing-md: 1rem;      // 16px
+
+// Export theme for components
+$theme: mat-light-theme($primary-palette, $accent-palette, $warn-palette);
+```
+
+### Component Import Pattern
+
+Every component SCSS file that uses theme variables MUST follow this import pattern:
+
+```scss
+// First import Angular Material theming
+@use '@angular/material' as mat;
+
+// Then import our theme abstracts
+@import 'src/styles/abstracts/variables';
+@import 'src/styles/abstracts/mixins';
+
+// Component styling using theme variables
+.my-component {
+  background-color: $background-card;
+  color: mat.get-color-from-palette($primary-palette, 500);
+  padding: $spacing-md;
+}
+```
+
+### Common Theming Mixins
+
+The application provides several mixins to ensure consistent styling across components:
+
+```scss
+// _mixins.scss
+@mixin auth-card() {
+  background-color: $background-card;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: $spacing-md;
+}
+
+@mixin flex-center() {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+```
+
+### Material Component Theming
+
+When customizing Material components, always use the theme mixins provided by Angular Material:
+
+```scss
+// Custom Material button styling
+@include mat.button-theme($theme);
+
+// Typography
+@include mat.typography-hierarchy($theme);
+```
+
+### Common Theme Issues and Solutions
+
+#### Missing Variable Errors
+
+If you see errors like `Undefined variable $background-card`:
+
+✓ **Correct approach**:
+```scss
+@import 'src/styles/abstracts/variables';
+
+.login-card {
+  background-color: $background-card;
+}
+```
+
+✗ **Incorrect approach**:
+```scss
+// Missing import
+.login-card {
+  background-color: $background-card; // Error: Undefined variable
+}
+```
+
+#### Material Function Usage
+
+If using Material color functions:
+
+✓ **Correct approach**:
+```scss
+@use '@angular/material' as mat;
+@import 'src/styles/abstracts/variables';
+
+.my-element {
+  color: mat.get-color-from-palette($primary-palette, 500);
+}
+```
+
+✗ **Incorrect approach**:
+```scss
+// Missing @use directive
+.my-element {
+  color: mat.get-color-from-palette($primary-palette, 500); // Error: Unknown function
+}
+```
+
+### Theme Validation and Testing
+
+All components should pass the theme validation checks:
+
+1. Run the validation with:
+   ```bash
+   npm run check:material-theme
+   ```
+
+2. Common validation failures:
+   - Hardcoded color values instead of theme variables
+   - Missing imports for theme variables
+   - Incorrect usage of Material theme functions
+   - Inconsistent spacing values
+
+### Theme Maintenance Guidelines
+
+1. **Add New Variables Centrally**
+   - Always add new theme variables to the central `_variables.scss` file
+   - Document the purpose of each variable with comments
+
+2. **Test Component Theming**
+   - When creating or modifying a component, test with both light and dark themes
+   - Verify all colors and styles adapt properly to theme changes
+
+3. **Theme Debugging**
+   - Use browser dev tools to inspect computed styles
+   - Verify that color values match expected theme values
+   - Check for any hardcoded values that should use theme variables
+
+### Theme Migration Guidelines
+
+When migrating existing components to use the theme system:
+
+1. Replace all hardcoded colors with theme variables
+2. Replace all hardcoded spacing with spacing variables
+3. Add proper imports at the top of the file
+4. Use mixins for common component patterns
+5. Run theme validation to verify changes
+
+## Best Practices Summary
+
+1. **Single Source of Truth**
+   - Define all theme variables in central files
+   - Never duplicate variable definitions across files
+
+2. **Consistent Imports**
+   - Always use the same import pattern in every SCSS file
+   - Start with Material imports, then application abstracts
+
+3. **Use Mixins for Common Patterns**
+   - Create and use mixins for repeated style patterns
+   - Document mixin parameters and usage
+
+4. **Validate Regularly**
+   - Run theme validation checks before committing code
+   - Address theme issues immediately when detected
+
+5. **Document Theme Usage**
+   - Keep this guide updated with new theme patterns
+   - Document component-specific theme usage 
+
+## CSS Variables and SCSS Color Functions
+
+### The Challenge with CSS Variables and SCSS Functions
+
+CSS variables (custom properties) cannot be directly used with SCSS color functions like `darken()`, `lighten()`, or `mix()`. This is because SCSS processes at compile time, while CSS variables are resolved at runtime.
+
+### Using Color Functions with Our Theme
+
+The application provides utility functions to work with our theme colors when color manipulation is needed:
+
+```scss
+// Instead of this (will fail):
+color: darken($warning, 20%);
+
+// Use this:
+color: abstracts.darken-color('warning', 20%);
+
+// For lightening colors:
+color: abstracts.lighten-color('primary', 10%);
+
+// To just get the HEX value of a color:
+color: abstracts.get-color('accent');
+```
+
+### Implementation Details
+
+These functions use a color map that mirrors our CSS variables, allowing SCSS to apply color transformations at compile time:
+
+```scss
+$color-map: (
+  'primary': #7b1fa2,
+  'primary-light': #ae52d4,
+  'primary-dark': #4a0072,
+  'accent': #69f0ae,
+  // etc.
+);
+```
+
+### When to Use
+
+Use these functions when you need to:
+- Darken a theme color for hover states
+- Lighten a theme color for backgrounds
+- Mix colors together
+- Apply any SCSS color transformation to theme colors
+
+### Example Usage
+
+```scss
+.button {
+  background-color: $primary; // Use CSS variable directly
+  
+  &:hover {
+    // Use the color function for transformations
+    background-color: abstracts.darken-color('primary', 10%);
+  }
+  
+  &.subtle {
+    // Use the color function for transformations
+    background-color: abstracts.lighten-color('primary', 40%);
+  }
+}
+``` 

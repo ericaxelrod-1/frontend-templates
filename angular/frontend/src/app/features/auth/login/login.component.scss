@@ -1,90 +1,13 @@
+@use '../../../../styles/abstracts' as abstracts;
+
 .login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  @include abstracts.flex-center;
   min-height: 80vh;
-  padding: 20px;
+  padding: abstracts.$spacing-lg;
 }
 
 .login-card {
-  background-color: var(--background-card);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  padding: 30px;
-  width: 100%;
-  max-width: 400px;
+  @include abstracts.auth-card;
 }
 
-.logo-container {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.app-logo {
-  max-width: 180px;
-  height: auto;
-}
-
-h2 {
-  text-align: center;
-  margin-bottom: 24px;
-  color: var(--text-primary);
-}
-
-form {
-  width: 100%;
-}
-
-.form-group {
-  width: 100%;
-  margin-bottom: 20px;
-}
-
-a {
-  color: var(--accent-color);
-  text-decoration: none;
-  transition: color 0.2s ease;
-  cursor: pointer;
-}
-
-a:hover {
-  text-decoration: underline;
-  opacity: 0.9;
-}
-
-.btn-primary {
-  background-color: var(--primary-color);
-  color: var(--text-on-primary);
-}
-
-.btn-primary:hover {
-  background-color: var(--primary-light);
-}
-
-.mt-3 {
-  margin-top: 16px;
-}
-
-.text-center {
-  text-align: center;
-}
-
-p {
-  margin: 8px 0;
-}
-
-.btn-link {
-  background: none;
-  border: none;
-  color: var(--accent-color);
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.btn-link:hover {
-  text-decoration: underline;
-  opacity: 0.9;
-} 
+// Component-specific styles only - everything else comes from shared styles

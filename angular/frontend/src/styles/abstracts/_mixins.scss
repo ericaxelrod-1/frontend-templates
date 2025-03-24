@@ -1,0 +1,133 @@
+@use '@angular/material' as mat;
+@use 'variables' as var;
+
+// Flexbox mixins
+@mixin flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@mixin flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+@mixin flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+@mixin flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+// Responsive mixins
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == sm {
+    @media (min-width: var.$breakpoint-sm) { @content; }
+  } @else if $breakpoint == md {
+    @media (min-width: var.$breakpoint-md) { @content; }
+  } @else if $breakpoint == lg {
+    @media (min-width: var.$breakpoint-lg) { @content; }
+  } @else if $breakpoint == xl {
+    @media (min-width: var.$breakpoint-xl) { @content; }
+  }
+}
+
+// Typography mixins
+@mixin heading-1 {
+  font-size: 2.5rem;
+  font-weight: var.$font-weight-bold;
+  margin-bottom: var.$spacing-lg;
+  color: var.$text-primary;
+}
+
+@mixin heading-2 {
+  font-size: 2rem;
+  font-weight: var.$font-weight-bold;
+  margin-bottom: var.$spacing-md;
+  color: var.$text-primary;
+}
+
+@mixin heading-3 {
+  font-size: 1.5rem;
+  font-weight: var.$font-weight-medium;
+  margin-bottom: var.$spacing-md;
+  color: var.$text-primary;
+}
+
+// Card mixins
+@mixin card-base {
+  background-color: var.$background-card;
+  border-radius: var.$border-radius-md;
+  box-shadow: var.$shadow-md;
+  padding: var.$spacing-lg;
+}
+
+// Form control mixins
+@mixin form-control {
+  width: 100%;
+  padding: var.$spacing-sm var.$spacing-md;
+  border: 1px solid #666;
+  border-radius: var.$border-radius-sm;
+  background-color: var.$background-card;
+  color: var.$text-primary;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  
+  &:focus {
+    border-color: var.$primary-light;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(174, 82, 212, 0.25);
+  }
+  
+  &.is-invalid {
+    border-color: var.$error;
+  }
+}
+
+// Button mixins
+@mixin button-base {
+  padding: var.$spacing-sm var.$spacing-md;
+  border-radius: var.$border-radius-sm;
+  cursor: pointer;
+  transition: var.$transition-base;
+  border: none;
+  font-weight: var.$font-weight-medium;
+}
+
+@mixin button-primary {
+  @include button-base;
+  background-color: var.$primary;
+  color: var.$text-on-primary;
+  
+  &:hover {
+    background-color: var.$primary-light;
+  }
+  
+  &:disabled {
+    background-color: rgba(123, 31, 162, 0.5);
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+}
+
+// Logo container mixin
+@mixin logo-container($alignment: center) {
+  text-align: $alignment;
+  margin-bottom: var.$spacing-lg;
+  
+  .app-logo {
+    max-width: 180px;
+    height: auto;
+  }
+}
+
+// Authentication card mixin
+@mixin auth-card {
+  @include card-base;
+  width: 100%;
+  max-width: 400px;
+} 

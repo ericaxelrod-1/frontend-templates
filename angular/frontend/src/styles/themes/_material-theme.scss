@@ -1,0 +1,38 @@
+@use '@angular/material' as mat;
+@use 'sass:map';
+
+// Import and include material core styles first
+@include mat.core();
+
+// Define material palettes using predefined mat palettes
+$primary-palette: mat.define-palette(mat.$purple-palette, 700, 300, 900);
+$accent-palette: mat.define-palette(mat.$green-palette, A200, A100, A400);
+$warn-palette: mat.define-palette(mat.$red-palette);
+
+// Create the theme
+$theme: mat.define-light-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  ),
+  typography: mat.define-typography-config(),
+  density: 0,
+));
+
+// Export material color functions that convert our theme to CSS variables
+@function get-primary-color($weight: 500) {
+  @return mat.get-color-from-palette($primary-palette, $weight);
+}
+
+@function get-accent-color($weight: 500) {
+  @return mat.get-color-from-palette($accent-palette, $weight);
+}
+
+@function get-warn-color($weight: 500) {
+  @return mat.get-color-from-palette($warn-palette, $weight);
+}
+
+// Include all component themes
+@include mat.all-component-themes($theme);
+@include mat.all-component-typographies($theme); 

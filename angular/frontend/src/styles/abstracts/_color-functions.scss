@@ -1,0 +1,57 @@
+@use 'sass:color';
+@use 'sass:map';
+
+// Color manipulation utilities for CSS variables
+// These work around the limitation that CSS variables can't be directly used 
+// with Sass color functions like darken() or lighten()
+
+// Hard-coded color values that match our CSS variables
+// This is necessary because Sass can't apply color functions to CSS variables
+$color-map: (
+  'primary': #7b1fa2,
+  'primary-light': #ae52d4,
+  'primary-dark': #4a0072,
+  'accent': #69f0ae,
+  'text-on-primary': #ffffff,
+  'text-primary': #e0e0e0,
+  'text-secondary': #a0a0a0,
+  'background-dark': #303030,
+  'background-card': #424242,
+  'surface': #484848,
+  'error': #f44336,
+  'success': #4caf50,
+  'warning': #ff9800,
+  'info': #2196f3
+);
+
+// Function to darken a color from our palette
+@function darken-color($color-name, $amount) {
+  @if map.has-key($color-map, $color-name) {
+    $color: map.get($color-map, $color-name);
+    @return color.adjust($color, $lightness: -$amount);
+  } @else {
+    @error "Color '#{$color-name}' not found in $color-map.";
+    @return #000000;
+  }
+}
+
+// Function to lighten a color from our palette
+@function lighten-color($color-name, $amount) {
+  @if map.has-key($color-map, $color-name) {
+    $color: map.get($color-map, $color-name);
+    @return color.adjust($color, $lightness: $amount);
+  } @else {
+    @error "Color '#{$color-name}' not found in $color-map.";
+    @return #ffffff;
+  }
+}
+
+// Function to get a color from our palette
+@function get-color($color-name) {
+  @if map.has-key($color-map, $color-name) {
+    @return map.get($color-map, $color-name);
+  } @else {
+    @error "Color '#{$color-name}' not found in $color-map.";
+    @return #000000;
+  }
+} 

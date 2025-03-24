@@ -1,6 +1,11 @@
-/* You can add global styles to this file, and also import other style files */
+/* Import Material theme directly */
+@use 'styles/themes/material-theme' as theme;
+
+/* Import shared styles */
 @use 'styles/shared/index' as shared;
-@import '@angular/material/prebuilt-themes/purple-green.css';
+
+/* Remove the pre-built theme and use our custom one instead */
+/* @import '@angular/material/prebuilt-themes/purple-green.css'; */
 
 /* CSS Variables for custom components */
 :root {

@@ -1,19 +1,15 @@
+@use '../../../../styles/abstracts' as abstracts;
+
 .register-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  @include abstracts.flex-center;
   min-height: 80vh;
-  padding: 20px;
+  padding: abstracts.$spacing-lg;
   position: relative;
-  z-index: 1000; /* Ensure it's above other elements */
+  z-index: 1000;
 }
 
 .register-card {
-  background-color: var(--background-card);
-  border-radius: 8px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-  padding: 30px;
-  width: 100%;
+  @include abstracts.auth-card;
   max-width: 500px;
   position: relative;
   opacity: 1;
@@ -57,20 +53,10 @@ h2 {
   color: var(--text-primary);
 }
 
-.form-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.form-row .form-group {
-  flex: 1;
-  min-width: 0; /* Required for proper flex shrinking */
-}
-
+// Password field specific styles
 .password-field {
   position: relative;
-  margin-bottom: 26px;
+  margin-bottom: abstracts.$spacing-lg;
 }
 
 .input-with-icon {
@@ -79,39 +65,32 @@ h2 {
 
 .visibility-icon {
   position: absolute;
-  right: 10px;
+  right: abstracts.$spacing-sm;
   top: 50%;
   transform: translateY(-50%);
   cursor: pointer;
-  color: var(--text-secondary);
+  color: abstracts.$text-secondary;
   font-size: 20px;
   height: 20px;
   width: 20px;
 }
 
+// Password strength styles
 .password-strength-container {
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: abstracts.$spacing-xs;
+  margin-bottom: abstracts.$spacing-xs;
 }
 
 .strength-text {
   display: block;
-  font-size: 12px;
-  margin-top: 4px;
+  font-size: abstracts.$font-size-sm;
+  margin-top: abstracts.$spacing-xs;
   text-align: right;
 }
 
-.weak {
-  color: #f44336;
-}
-
-.medium {
-  color: #ff9800;
-}
-
-.strong {
-  color: #4caf50;
-}
+.weak { color: abstracts.$error; }
+.medium { color: abstracts.$warning; }
+.strong { color: abstracts.$success; }
 
 ::ng-deep {
   .password-strength-container {
@@ -121,15 +100,15 @@ h2 {
     }
     
     .weak .mdc-linear-progress__bar-inner {
-      border-color: #f44336 !important;
+      border-color: abstracts.$error !important;
     }
     
     .medium .mdc-linear-progress__bar-inner {
-      border-color: #ff9800 !important;
+      border-color: abstracts.$warning !important;
     }
     
     .strong .mdc-linear-progress__bar-inner {
-      border-color: #4caf50 !important;
+      border-color: abstracts.$success !important;
     }
   }
 }
@@ -139,7 +118,19 @@ h2 {
   opacity: 0.7;
 }
 
-@media (max-width: 576px) {
+// Form layout
+.form-row {
+  @include abstracts.flex-row;
+  flex-wrap: wrap;
+  gap: abstracts.$spacing-md;
+  
+  .form-group {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (max-width: abstracts.$breakpoint-sm) {
   .form-row {
     flex-direction: column;
     gap: 0;
@@ -148,49 +139,49 @@ h2 {
 
 // GDPR Consent styles
 .gdpr-consent {
-  margin-bottom: 20px;
+  margin-bottom: abstracts.$spacing-md;
 }
 
 .checkbox-container {
-  display: flex;
+  @include abstracts.flex-row;
   align-items: flex-start;
-  margin-bottom: 5px;
-}
-
-.checkbox-container input[type="checkbox"] {
-  margin-right: 10px;
-  margin-top: 3px;
+  margin-bottom: abstracts.$spacing-xs;
+  
+  input[type="checkbox"] {
+    margin-right: abstracts.$spacing-sm;
+    margin-top: 3px;
+  }
 }
 
 .consent-label {
-  font-size: 14px;
+  font-size: abstracts.$font-size-sm;
   line-height: 1.4;
-  color: var(--text-secondary);
-}
-
-.consent-label a {
-  color: var(--primary);
-  text-decoration: none;
+  color: abstracts.$text-secondary;
   
-  &:hover {
-    text-decoration: underline;
+  a {
+    color: abstracts.$primary;
+    text-decoration: none;
+    
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 
 // Email verification notice
 .email-verification-notice {
-  display: flex;
+  @include abstracts.flex-row;
   align-items: flex-start;
   background-color: rgba(33, 150, 243, 0.1);
-  border-left: 3px solid var(--primary);
-  padding: 12px;
-  margin-bottom: 20px;
-  border-radius: 4px;
+  border-left: 3px solid abstracts.$primary;
+  padding: abstracts.$spacing-sm;
+  margin-bottom: abstracts.$spacing-md;
+  border-radius: abstracts.$border-radius-sm;
 }
 
 .info-icon {
-  color: var(--primary);
-  margin-right: 10px;
+  color: abstracts.$primary;
+  margin-right: abstracts.$spacing-sm;
   font-size: 20px;
   min-width: 20px;
 }
@@ -204,28 +195,28 @@ h2 {
 // Registration success message
 .registration-success {
   text-align: center;
-  padding: 20px 0;
+  padding: abstracts.$spacing-md 0;
   
   .success-icon {
     font-size: 64px;
     height: 64px;
     width: 64px;
-    color: #4caf50;
-    margin: 0 auto 24px;
+    color: abstracts.$success;
+    margin: 0 auto abstracts.$spacing-lg;
     display: block;
   }
   
   h2 {
-    color: #4caf50;
-    margin-bottom: 24px;
-    font-weight: 500;
+    color: abstracts.$success;
+    margin-bottom: abstracts.$spacing-lg;
+    font-weight: abstracts.$font-weight-medium;
     font-size: 28px;
   }
   
   p {
-    color: var(--text-primary);
-    margin-bottom: 12px;
-    font-size: 16px;
+    color: abstracts.$text-primary;
+    margin-bottom: abstracts.$spacing-sm;
+    font-size: abstracts.$font-size-base;
     line-height: 1.5;
     max-width: 450px;
     margin-left: auto;
@@ -234,107 +225,60 @@ h2 {
   
   .note {
     font-style: italic;
-    color: var(--text-secondary);
-    font-size: 14px;
-    margin: 20px 0;
+    color: abstracts.$text-secondary;
+    font-size: abstracts.$font-size-sm;
+    margin: abstracts.$spacing-md 0;
   }
 }
 
 // Verification form styling
 .verification-form {
-  margin-top: 32px;
-  padding: 24px;
+  margin-top: abstracts.$spacing-xl;
+  padding: abstracts.$spacing-lg;
   background-color: rgba(0, 0, 0, 0.03);
-  border-radius: 8px;
+  border-radius: abstracts.$border-radius-md;
   border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: abstracts.$shadow-sm;
   max-width: 450px;
   margin-left: auto;
   margin-right: auto;
   
   h3 {
-    font-size: 20px;
-    margin-bottom: 16px;
-    color: var(--text-primary);
-    font-weight: 500;
+    font-size: abstracts.$font-size-lg;
+    margin-bottom: abstracts.$spacing-md;
+    color: abstracts.$text-primary;
+    font-weight: abstracts.$font-weight-medium;
     text-align: center;
   }
   
   p {
-    margin-bottom: 20px;
-    font-size: 15px;
-    color: var(--text-secondary);
+    margin-bottom: abstracts.$spacing-md;
+    font-size: abstracts.$font-size-base;
+    color: abstracts.$text-secondary;
     text-align: center;
   }
   
   .token-form {
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: abstracts.$spacing-md;
     }
     
     label {
       display: block;
-      margin-bottom: 8px;
-      font-weight: 500;
-      color: var(--text-primary);
+      margin-bottom: abstracts.$spacing-xs;
+      font-weight: abstracts.$font-weight-medium;
+      color: abstracts.$text-primary;
       text-align: left;
     }
     
     input {
-      width: 100%;
-      padding: 12px 15px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 16px;
+      @include abstracts.form-control;
       letter-spacing: 1px;
-      transition: all 0.2s ease;
-      background-color: white;
-      color: var(--text-primary);
       
       &:focus {
-        border-color: var(--primary);
+        border-color: abstracts.$primary;
         outline: none;
         box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
-      }
-      
-      &.is-invalid {
-        border-color: #dc3545;
-        background-color: rgba(220, 53, 69, 0.05);
-      }
-    }
-    
-    .invalid-feedback {
-      color: #dc3545;
-      font-size: 13px;
-      margin-top: 6px;
-      text-align: left;
-    }
-    
-    button {
-      margin-top: 10px;
-      width: 100%;
-      padding: 12px;
-      font-size: 16px;
-      font-weight: 500;
-      background-color: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-      
-      &:hover {
-        background-color: var(--primary-dark, #3949ab);
-        filter: brightness(90%);
-      }
-      
-      &:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-      }
-      
-      .spinner-border {
-        margin-right: 8px;
       }
     }
   }
@@ -401,51 +345,51 @@ h2 {
 
 // Development token display styling
 .dev-test-section {
-  margin-top: 32px;
-  margin-bottom: 16px;
-  padding: 16px;
+  margin-top: abstracts.$spacing-xl;
+  margin-bottom: abstracts.$spacing-md;
+  padding: abstracts.$spacing-md;
   background-color: rgba(255, 152, 0, 0.1);
-  border: 1px dashed #ff9800;
-  border-radius: 8px;
+  border: 1px dashed abstracts.$warning;
+  border-radius: abstracts.$border-radius-md;
   
   h3 {
-    color: #e65100;
-    font-size: 18px;
-    margin-bottom: 8px;
-    font-weight: 500;
+    color: abstracts.darken-color('warning', 20%);
+    font-size: abstracts.$font-size-lg;
+    margin-bottom: abstracts.$spacing-xs;
+    font-weight: abstracts.$font-weight-medium;
   }
   
   p {
-    color: #555;
-    font-size: 14px;
-    margin-bottom: 16px;
+    color: abstracts.$text-secondary;
+    font-size: abstracts.$font-size-sm;
+    margin-bottom: abstracts.$spacing-md;
   }
   
   .token-display {
     background-color: rgba(255, 255, 255, 0.8);
-    padding: 12px;
-    border-radius: 6px;
+    padding: abstracts.$spacing-sm;
+    border-radius: abstracts.$border-radius-sm;
     
     label {
       display: block;
-      font-weight: 500;
-      margin-bottom: 8px;
-      color: #333;
+      font-weight: abstracts.$font-weight-medium;
+      margin-bottom: abstracts.$spacing-xs;
+      color: abstracts.$text-primary;
     }
     
     .token-value {
-      display: flex;
+      @include abstracts.flex-row;
       align-items: center;
       background-color: #f5f5f5;
       border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 8px 12px;
+      border-radius: abstracts.$border-radius-sm;
+      padding: abstracts.$spacing-xs abstracts.$spacing-sm;
       
       code {
         flex: 1;
         font-family: monospace;
-        font-size: 14px;
-        color: #333;
+        font-size: abstracts.$font-size-sm;
+        color: abstracts.$text-primary;
         overflow-x: auto;
         white-space: nowrap;
       }
@@ -453,15 +397,15 @@ h2 {
       .copy-button {
         background: none;
         border: none;
-        color: #666;
+        color: abstracts.$text-secondary;
         cursor: pointer;
-        padding: 4px;
-        margin-left: 8px;
-        border-radius: 4px;
+        padding: abstracts.$spacing-xs;
+        margin-left: abstracts.$spacing-xs;
+        border-radius: abstracts.$border-radius-sm;
         
         &:hover {
           background-color: rgba(0, 0, 0, 0.05);
-          color: #333;
+          color: abstracts.$text-primary;
         }
         
         mat-icon {
@@ -473,22 +417,22 @@ h2 {
     }
     
     .token-info {
-      display: flex;
+      @include abstracts.flex-row;
       align-items: center;
-      margin-top: 12px;
-      color: #555;
-      font-size: 13px;
+      margin-top: abstracts.$spacing-sm;
+      color: abstracts.$text-secondary;
+      font-size: abstracts.$font-size-sm;
       
       mat-icon {
         font-size: 16px;
         height: 16px;
         width: 16px;
-        margin-right: 6px;
-        color: #1976d2;
+        margin-right: abstracts.$spacing-xs;
+        color: abstracts.$primary;
       }
       
       strong {
-        color: #333;
+        color: abstracts.$text-primary;
       }
     }
   }

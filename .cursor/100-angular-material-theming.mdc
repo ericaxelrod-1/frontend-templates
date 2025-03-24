@@ -1,0 +1,157 @@
+---
+description: 
+globs: *.scss,*.ts
+alwaysApply: false
+---
+---
+description: "Angular Material theme implementation guidelines"
+globs: ["*.scss", "*.ts"]
+tags: ["angular", "material", "theme", "scss"]
+priority: 4
+---
+
+# Angular Material Theme Guidelines
+
+## CRITICAL PRACTICES - ALWAYS DO
+
+⚠️ **STOP**: You **MUST** follow these guidelines when working with component SCSS files:
+
+### 1. Required Imports
+
+Every component SCSS file MUST include these imports at the top:
+```scss
+// First import Angular Material theming
+@use '@angular/material' as mat;
+
+// Then import our theme abstracts
+@import 'src/styles/abstracts/variables';
+@import 'src/styles/abstracts/mixins';
+```
+
+### 2. Theme Variable Usage
+
+- Always use theme variables for colors:
+  - `$primary-color` instead of hardcoded hex values
+  - `$background-card` for card backgrounds
+  - `$spacing-sm`, `$spacing-md`, etc. for consistent spacing
+
+### 3. Material Function Usage
+
+- Always use Material's function with proper namespace:
+  - `mat.get-color-from-palette($primary-palette, 500)`
+  - `mat.get-contrast-color-from-palette($primary-palette, 500)`
+
+### 4. Common Component Patterns
+
+- Use provided mixins for common patterns:
+  - `@include auth-card()` for authentication cards
+  - `@include flex-center()` for centered flex containers
+
+### 5. Validation Requirements
+
+- Run theme validation before submitting changes:
+  - `npm run check:material-theme`
+- Fix all theme-related warnings and errors
+
+## PROHIBITED PRACTICES - ALWAYS AVOID
+
+⚠️ **WARNING: NEVER use these patterns in your SCSS code:**
+
+1. **NEVER** use hardcoded color values:
+   ```scss
+   /* PROHIBITED */
+   .my-component {
+     background-color: #f5f5f5; /* Hardcoded value */
+     color: #3f51b5; /* Hardcoded value */
+   }
+   ```
+
+2. **NEVER** skip required imports:
+   ```scss
+   /* PROHIBITED */
+   .my-component {
+     background-color: $background-card; /* Missing imports */
+   }
+   ```
+
+3. **NEVER** use Material functions without proper namespace:
+   ```scss
+   /* PROHIBITED */
+   .my-element {
+     color: get-color-from-palette($primary-palette, 500); /* Missing namespace */
+   }
+   ```
+
+4. **NEVER** duplicate theme variable definitions in component files:
+   ```scss
+   /* PROHIBITED */
+   $primary-color: #3f51b5; /* Should come from variables.scss */
+   ```
+
+5. **NEVER** use direct element selectors instead of classes:
+   ```scss
+   /* PROHIBITED */
+   button {
+     background-color: $primary-color;
+   }
+   /* Instead use */
+   .btn-primary {
+     background-color: $primary-color;
+   }
+   ```
+
+## Verification Process
+
+Before submitting SCSS changes:
+1. Check that all color values use theme variables
+2. Verify all spacing uses $spacing-* variables
+3. Ensure all files have the required imports
+4. Run the theme validation check
+5. Test components with both light and dark themes
+
+## Examples of Compliant Code
+
+```scss
+@use '@angular/material' as mat;
+@import 'src/styles/abstracts/variables';
+@import 'src/styles/abstracts/mixins';
+
+.auth-container {
+  @include flex-center();
+  min-height: 80vh;
+
+  .auth-card {
+    @include auth-card();
+    width: 400px;
+    max-width: 90%;
+
+    .card-title {
+      color: mat.get-color-from-palette($primary-palette, 700);
+      margin-bottom: $spacing-md;
+    }
+
+    .form-group {
+      margin-bottom: $spacing-sm;
+    }
+  }
+}
+```
+```
+
+This rule should help enforce proper Angular Material theming practices and prevent the issues we're experiencing. The key points to emphasize are:
+
+## Always Do:
+1. Include all required imports at the top of each SCSS file
+2. Use theme variables for colors and spacing
+3. Use Material functions with proper namespace
+4. Use provided mixins for common patterns
+5. Run theme validation checks before submission
+
+## Always Avoid:
+1. Hardcoded color values
+2. Missing imports
+3. Incorrect Material function usage
+4. Duplicating variable definitions
+5. Using direct element selectors instead of classes
+
+Would you like me to elaborate on any specific part of this rule template?

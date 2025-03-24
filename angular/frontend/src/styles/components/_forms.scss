@@ -1,0 +1,25 @@
+@use '../abstracts' as abstracts;
+
+.form-group {
+  margin-bottom: abstracts.$spacing-md;
+  width: 100%;
+}
+
+label {
+  display: block;
+  margin-bottom: abstracts.$spacing-xs;
+  font-weight: abstracts.$font-weight-medium;
+  color: abstracts.$text-primary;
+}
+
+.form-control {
+  @include abstracts.form-control;
+  margin-bottom: abstracts.$spacing-xs;
+}
+
+.invalid-feedback {
+  color: abstracts.$error;
+  font-size: abstracts.$font-size-sm;
+  margin-top: abstracts.$spacing-xs;
+  margin-bottom: abstracts.$spacing-xs;
+} 
