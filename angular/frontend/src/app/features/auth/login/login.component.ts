@@ -108,16 +108,39 @@ export class LoginComponent implements OnInit, OnDestroy {
 
     // Stop here if form is invalid
     if (this.loginForm.invalid) {
-      this.logger.warn('Form is invalid:', this.loginForm.errors);
+      this.logger.warn('Form is invalid');
+      
+      // Log which controls are invalid and why
+      Object.keys(this.loginForm.controls).forEach(key => {
+        const control = this.loginForm.get(key);
+        if (control?.invalid) {
+          this.logger.warn(`Control ${key} is invalid:`, control.errors);
+        }
+      });
+      
       return;
     }
 
     this.logger.info('Dispatching Login action with email:', this.f['email'].value);
     
+    // Create a structured data object for better code clarity
+    const loginData = {
+      email: this.f['email'].value,
+      password: this.f['password'].value
+    };
+    
+    // Dispatch login action
     this.store.dispatch(new AuthActions.Login(
-      this.f['email'].value,
-      this.f['password'].value
-    ));
+      loginData.email,
+      loginData.password
+    )).subscribe({
+      next: () => {
+        this.logger.info('Login action dispatched successfully');
+      },
+      error: (err) => {
+        this.logger.error('Error dispatching login action:', err);
+      }
+    });
   }
   
   // Navigate to forgot password page

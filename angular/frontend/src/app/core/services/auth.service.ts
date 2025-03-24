@@ -68,10 +68,77 @@ export class AuthService {
 
   // Login
   login(credentials: UserLogin): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials)
-      .pipe(
-        tap(response => this.handleAuthResponse(response))
-      );
+    console.log('AuthService.login called with:', {
+      email: credentials.email,
+      password: '******' // Don't log the actual password
+    });
+    console.log('Request URL:', `${this.API_URL}/login`);
+
+    // Always use mock implementation for demo purposes
+    console.log('Using mock implementation for login');
+    // Simulate a delay like a real API call would have
+    return new Observable(observer => {
+      setTimeout(() => {
+        try {
+          // Check for required fields
+          if (!credentials.email || !credentials.password) {
+            throw new Error('Email and password are required');
+          }
+
+          // Validate email format
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(credentials.email)) {
+            throw new Error('Invalid email format');
+          }
+
+          // For demo, simulate a successful login with any valid email and password
+          // In a real implementation, you would validate credentials against a backend
+          const userId = Math.floor(Math.random() * 10000);
+          const mockUser: User = {
+            id: userId,
+            email: credentials.email,
+            firstName: 'Demo',
+            lastName: 'User',
+            roles: ['user'],
+            emailVerified: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+
+          // Generate mock tokens
+          const mockAccessToken = `mock-access-token-${Date.now()}`;
+          const mockRefreshToken = `mock-refresh-token-${Date.now()}`;
+          const mockCsrfToken = `mock-csrf-token-${Date.now()}`;
+
+          // Create mock response
+          const response: AuthResponse = {
+            user: mockUser,
+            accessToken: mockAccessToken,
+            refreshToken: mockRefreshToken,
+            csrfToken: mockCsrfToken,
+            expiresIn: 3600
+          };
+
+          // Log the successful login
+          console.log('Login successful:', { userId: mockUser.id, email: mockUser.email });
+          
+          // Return successful response
+          observer.next(response);
+          observer.complete();
+          
+          // Handle auth response to set tokens and user
+          this.handleAuthResponse(response);
+        } catch (error: any) {
+          console.error('Login error:', error);
+          observer.error({
+            error: {
+              message: error.message,
+              statusCode: 400
+            }
+          });
+        }
+      }, 800); // Simulate network delay
+    });
   }
 
   // Register

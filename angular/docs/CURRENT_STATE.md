@@ -282,6 +282,7 @@ npm run check:duplicate-css   # ✅ Passed
 7. ~~CSS duplication across multiple SCSS files~~ (Resolved)
 8. SASS errors with Material theme functions
 9. Dynamic import warnings during build
+10. DebugLogsComponent is imported but not used in the AppComponent template, causing compile warning
 
 ## Blockers
 

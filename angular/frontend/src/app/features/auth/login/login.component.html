@@ -39,8 +39,15 @@
       </div>
       
       <div class="form-group">
-        <button [disabled]="loading" class="btn btn-primary btn-block">
-          <span *ngIf="loading" class="spinner-border spinner-border-sm mr-1"></span>
+        <button
+          type="submit"
+          class="btn btn-primary btn-block"
+          [disabled]="loading"
+          id="login-button">
+          <span
+            *ngIf="loading"
+            class="spinner-border spinner-border-sm mr-1">
+          </span>
           Login
         </button>
       </div>
