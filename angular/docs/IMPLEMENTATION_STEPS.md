@@ -307,7 +307,7 @@
 - **Issues**:
   1. ~~Material Theme function errors in SCSS files~~ (Resolved)
   2. ~~SCSS Color function issues with CSS variables~~ (Resolved)
-  3. DebugLogsComponent not properly integrated in AppComponent
+  3. ~~DebugLogsComponent not properly integrated in AppComponent~~
   4. Dynamic import warnings during HMR
   5. CSS duplication across components
 1. Configure Stylelint for SCSS files
@@ -407,3 +407,39 @@
 3. Material theme customization for consistent look and feel
 4. Clear naming conventions for CSS classes
 5. Minimized CSS duplication across components 
+
+### Remaining Issues
+
+1. E2E tests not implemented
+2. Coverage reports not generated
+3. ~~DebugLogsComponent not properly integrated in AppComponent~~ (Resolved)
+4. Dynamic import warnings during HMR
+5. CSS duplication across components
+
+### Tasks Planned for Next Iteration
+
+1. Implement E2E tests for critical workflows
+2. Generate and visualize coverage reports
+3. Set up comprehensive testing strategy
+4. Apply production optimization techniques
+5. Enhance documentation with more usage examples
+6. ~~Fix DebugLogsComponent integration in AppComponent template~~ (Completed)
+7. Refactor CSS to eliminate duplication
+
+### DebugLogsComponent Integration
+
+1. ~~DebugLogsComponent not properly integrated in AppComponent~~ (Resolved)
+2. ~~Fix DebugLogsComponent integration in AppComponent template~~ (Completed)
+3. ~~Resolve Material theme SCSS function errors~~ (Completed)
+4. ~~Create workaround for SCSS color functions with CSS variables~~ (Completed)
+5. Document and validate HMR warnings 
+
+### HMR Configuration
+
+1. ~~Dynamic import warnings during HMR~~ (Resolved)
+2. Implementation of proper HMR configuration:
+   - Added HMR flag to environment configurations
+   - Created HMR-specific handling in main.ts
+   - Set up proper module hot reload handling
+   - Added state preservation support via NgxsModule configuration
+3. ~~Document and validate HMR warnings~~ (Completed) 

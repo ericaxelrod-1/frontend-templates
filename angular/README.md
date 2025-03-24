@@ -138,8 +138,7 @@ cd angular/backend && npm run start:dev -- --debug
 
 3. **Watch Mode**
 ```bash
-cd angular/backend
-npm run start:debug
+cd angular/backend && npm run start:debug
 ```
 - Use for: Active backend development
 - Features:

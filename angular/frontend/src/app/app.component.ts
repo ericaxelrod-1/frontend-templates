@@ -12,6 +12,10 @@ import { environment } from '../environments/environment';
   template: `
     <router-outlet></router-outlet>
     <app-debug-button *ngIf="showDebugTools"></app-debug-button>
+    <app-debug-logs *ngIf="showDebugTools && showLogs" 
+                    (closed)="showLogs = false"
+                    (logsCountChanged)="updateLogsCount($event)">
+    </app-debug-logs>
   `,
   styles: [`
     :host {
@@ -24,4 +28,10 @@ import { environment } from '../environments/environment';
 export class AppComponent {
   title = 'frontend';
   showDebugTools = !environment.production && environment.logging?.enabled;
+  showLogs = false;
+  logsCount = 0;
+
+  updateLogsCount(count: number): void {
+    this.logsCount = count;
+  }
 }
