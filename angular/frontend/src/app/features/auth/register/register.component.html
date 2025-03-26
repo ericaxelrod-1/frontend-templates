@@ -228,7 +228,15 @@
         </div>
         
         <!-- General error message -->
-        <div *ngIf="error" class="alert alert-danger mt-3">{{error}}</div>
+        <div *ngIf="error" class="alert" [ngClass]="{'alert-danger': !emailExists, 'alert-info': emailExists}">
+          <div class="d-flex align-items-center">
+            <mat-icon class="mr-2">{{emailExists ? 'info' : 'error'}}</mat-icon>
+            <span>{{error}}</span>
+          </div>
+          <div *ngIf="emailExists" class="mt-2">
+            <button class="btn btn-primary btn-sm" (click)="navigateToLogin()">Go to Login</button>
+          </div>
+        </div>
         
         <div class="mt-3 text-center">
           <p>Already have an account? <button class="btn-link" (click)="navigateToLogin()">Login</button></p>

@@ -359,6 +359,91 @@ EMAIL_VERIFICATION_BASE_URL=https://your-production-domain.com/verify-email
 EMAIL_VERIFICATION_TOKEN_EXPIRY=86400000
 ```
 
+## Environment Configuration Files
+
+The application uses different environment files for various stages of development and deployment. Below is a breakdown of each file and its purpose:
+
+### 1. `.env` (Default/Production Environment)
+- **Location**: `angular/backend/.env`
+- **Purpose**: Default configuration used in production environments
+- **Usage**: 
+  - Used when running in production mode: `npm run start:prod`
+  - Contains production database settings, security keys, etc.
+- **Key Settings**:
+  - `DATABASE_FILE`: Path to database file
+  - `DATABASE_SYNCHRONIZE`: Should be `false` for production
+  - `JWT_SECRET`: Secure secret key for JWT tokens
+  - `PORT`: API server port (default: 3000)
+
+### 2. `.env.development` (Development Environment)
+- **Location**: `angular/backend/.env.development`
+- **Purpose**: Configuration specific to development environments
+- **Usage**:
+  - Used when running: `npm run start:dev`
+  - Used when running: `npm run start:debug`
+- **Key Settings**:
+  - `DATABASE_WRITE_ENABLED`: Set to `true` to enable database writes during development
+  - `DATABASE_SYNCHRONIZE`: Set to `true` for automatic schema updates
+  - `DEBUG`: Set to `true` for enhanced logging
+  - `THROTTLE_LIMIT`: Higher value for easier development
+
+### 3. `.env.test` (Testing Environment)
+- **Location**: `angular/backend/.env.test`
+- **Purpose**: Configuration specific to automated tests
+- **Usage**:
+  - Used when running: `npm run test`
+  - Used when running: `npm run test:e2e`
+- **Key Settings**:
+  - `DATABASE_NAME`: Set to `:memory:` for in-memory testing database
+  - `PORT`: Different from development (3001) to avoid conflicts
+  - `DATABASE_SYNCHRONIZE`: Set to `true` for clean test environment
+
+### Environment Variables Reference
+
+Below is a complete reference of all environment variables used in the application:
+
+| Variable | Description | Default | Used In |
+|----------|-------------|---------|---------|
+| `NODE_ENV` | Environment mode | `development` | All modes |
+| `PORT` | API server port | `3000` | All modes |
+| `DATABASE_FILE` | SQLite database file path | `db.sqlite` | Development/Production |
+| `DATABASE_SYNCHRONIZE` | Auto-update database schema | `false` | All modes |
+| `DATABASE_WRITE_ENABLED` | Enable database writes | `true` in dev, `true` in prod | Development |
+| `MIGRATIONS_RUN` | Run migrations on startup | `true` | Development/Production |
+| `JWT_SECRET` | Secret for JWT signing | varies by environment | All modes |
+| `JWT_EXPIRES_IN` | JWT expiration time | `1d` | All modes |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token expiration | `7d` | Development/Production |
+| `FRONTEND_URL` | URL of the frontend application | `http://localhost:4200` | All modes |
+| `THROTTLE_TTL` | Rate limiting time window (seconds) | `60` | All modes |
+| `THROTTLE_LIMIT` | Maximum requests per time window | `10` in prod, `100` in dev | All modes |
+| `DEBUG` | Enable debug mode | `true` in dev, `false` in prod | Development |
+| `DEBUG_LOG_LEVEL` | Logging verbosity | `debug` | Development |
+
+### Overriding Environment Variables
+
+You can override any environment variable by:
+
+1. Setting it directly when running a command:
+   ```bash
+   DATABASE_WRITE_ENABLED=true npm run start:dev
+   ```
+
+2. Creating a custom `.env.local` file (not tracked by Git) with your personal overrides
+
+### Database Writes in Development Mode
+
+By default, the application now includes the `DATABASE_WRITE_ENABLED=true` setting in the development environment file. This enables database writes during development, allowing you to:
+
+- Create and register user accounts
+- Test the full email verification flow
+- Add and modify data in development
+- Test role assignments and group memberships
+
+If you need to work without persisting data, you can override this setting:
+```bash
+DATABASE_WRITE_ENABLED=false npm run start:dev
+```
+
 ## Deployment to Server
 
 ### Traditional Server Deployment
@@ -478,4 +563,39 @@ In case of critical issues after deployment:
 - [Email Configuration Guide](./email-configuration-guide.md)
 - [GDPR Compliance Documentation](./gdpr-compliance.md)
 - [Security Best Practices](https://angular.io/guide/security)
-- [Performance Optimization Guide](https://web.dev/angular) 
+- [Performance Optimization Guide](https://web.dev/angular)
+
+### Environment Files vs. CLI Flags
+
+It's important to understand the difference between environment files and CLI flags:
+
+#### Environment Files (`.env`, `.env.development`, `.env.test`)
+- Control application behavior and runtime configuration
+- Define variables like database connections, API URLs, feature flags
+- Loaded by the server process during startup
+- Accessed through `process.env` in the backend code
+
+#### Angular CLI Flags (--verbose, --hmr, --configuration)
+- Control how the Angular CLI builds and serves the application
+- Do not directly interact with environment files
+- Applied during the build/serve process
+- Examples:
+  - `--verbose`: Increases build process logging, showing detailed webpack output
+  - `--hmr`: Enables Hot Module Replacement for faster frontend development
+  - `--configuration`: Selects which Angular environment file to use (not related to backend `.env` files)
+
+#### Using Both Together
+
+When developing, you often use both systems in tandem:
+
+```bash
+# Start backend with environment file
+cd angular/backend
+npm run start:dev  # Uses .env.development
+
+# In another terminal, start frontend with CLI flags
+cd angular/frontend
+ng serve --verbose --hmr  # Uses Angular CLI flags
+```
+
+This combination gives you detailed build logs and fast frontend updates while also enabling the proper backend configuration for development. 

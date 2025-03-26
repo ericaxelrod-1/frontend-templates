@@ -97,6 +97,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
   appName = 'Angular Template';
   landingLogo = 'assets/logos/logo-large.svg';
   
+  // Add emailExists property to the class
+  emailExists = false;
+  
   constructor(
     private formBuilder: FormBuilder,
     private router: Router,
@@ -329,61 +332,44 @@ export class RegisterComponent implements OnInit, OnDestroy {
     console.log('RegisterComponent onSubmit called');
     this.submitted = true;
 
-    // Dump form values and validation state for debugging
-    console.log('Form values:', this.registerForm.value);
+    console.log('Form values:', {
+      ...this.registerForm.value,
+      password: '******',
+      confirmPassword: '******'
+    });
     console.log('Form valid:', this.registerForm.valid);
     console.log('Form validation errors:', this.registerForm.errors);
-    
-    // Stop here if form is invalid
+
+    // stop here if form is invalid
     if (this.registerForm.invalid) {
       console.log('Form is invalid, preventing submission');
-      
-      // Find all invalid controls and log their issues
-      Object.keys(this.f).forEach(key => {
-        const control = this.f[key];
-        if (control.invalid) {
-          console.error(`Control ${key} is invalid:`, control.errors);
-        }
-      });
-      
-      // Mark all fields as touched to show validation errors
-      this.registerForm.markAllAsTouched();
-      
-      // Scroll to the first invalid element if in browser environment
-      if (isPlatformBrowser(this.platformId)) {
-        setTimeout(() => {
-          const invalidElement = this.el.nativeElement.querySelector('.ng-invalid');
-          if (invalidElement) {
-            invalidElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            invalidElement.focus();
-          }
-        });
-      }
-      
       return;
     }
 
     console.log('Form is valid, proceeding with registration');
-    
-    // Create the registration data
+
+    // Store email for verification step
+    this.registeredEmail = this.registerForm.get('email')?.value;
+
+    // Persist registration state
+    this.persistRegistrationState();
+
+    // Create registration data object
     const registrationData = {
-      email: this.f['email'].value,
-      password: this.f['password'].value,
-      firstName: this.f['firstName'].value,
-      lastName: this.f['lastName'].value,
-      privacyConsent: this.f['privacyConsent'].value
+      email: this.registerForm.get('email')?.value,
+      password: this.registerForm.get('password')?.value,
+      firstName: this.registerForm.get('firstName')?.value,
+      lastName: this.registerForm.get('lastName')?.value,
+      privacyConsent: this.registerForm.get('privacyConsent')?.value
     };
-    
-    // Store the email for verification purposes
-    this.registeredEmail = registrationData.email;
-    
+
     console.log('Dispatching Register action with data:', {
       ...registrationData,
-      password: '******' // Don't log actual password
+      password: '******'
     });
-    
+
     try {
-      // Ensure we're properly subscribing to the dispatch result
+      // Dispatch registration action
       this.store.dispatch(new AuthActions.Register(
         registrationData.email,
         registrationData.password,
@@ -391,18 +377,20 @@ export class RegisterComponent implements OnInit, OnDestroy {
         registrationData.lastName,
         registrationData.privacyConsent
       )).subscribe({
-        next: (result) => {
-          console.log('Register action completed successfully with state:', result);
-          // Save registration state for persistence
-          this.persistRegistrationState();
+        next: () => {
+          console.log('Register action dispatched successfully');
         },
         error: (error) => {
-          console.error('Error occurred during registration:', error);
-          this.error = error?.message || 'Registration failed. Please try again.';
+          console.log('Error occurred during registration:', error);
+          if (error?.error?.message === 'Email already exists') {
+            this.error = 'This email is already registered. Please log in instead.';
+            this.emailExists = true;
+          } else {
+            this.error = error?.error?.message || 'Registration failed. Please try again.';
+            this.emailExists = false;
+          }
         }
       });
-      
-      console.log('Register action dispatched successfully');
     } catch (error) {
       console.error('Error dispatching Register action:', error);
       this.error = 'An unexpected error occurred. Please try again.';

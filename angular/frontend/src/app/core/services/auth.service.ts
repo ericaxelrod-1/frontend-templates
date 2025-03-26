@@ -74,71 +74,18 @@ export class AuthService {
     });
     console.log('Request URL:', `${this.API_URL}/login`);
 
-    // Always use mock implementation for demo purposes
-    console.log('Using mock implementation for login');
-    // Simulate a delay like a real API call would have
-    return new Observable(observer => {
-      setTimeout(() => {
-        try {
-          // Check for required fields
-          if (!credentials.email || !credentials.password) {
-            throw new Error('Email and password are required');
-          }
-
-          // Validate email format
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(credentials.email)) {
-            throw new Error('Invalid email format');
-          }
-
-          // For demo, simulate a successful login with any valid email and password
-          // In a real implementation, you would validate credentials against a backend
-          const userId = Math.floor(Math.random() * 10000);
-          const mockUser: User = {
-            id: userId,
-            email: credentials.email,
-            firstName: 'Demo',
-            lastName: 'User',
-            roles: ['user'],
-            emailVerified: true,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          };
-
-          // Generate mock tokens
-          const mockAccessToken = `mock-access-token-${Date.now()}`;
-          const mockRefreshToken = `mock-refresh-token-${Date.now()}`;
-          const mockCsrfToken = `mock-csrf-token-${Date.now()}`;
-
-          // Create mock response
-          const response: AuthResponse = {
-            user: mockUser,
-            accessToken: mockAccessToken,
-            refreshToken: mockRefreshToken,
-            csrfToken: mockCsrfToken,
-            expiresIn: 3600
-          };
-
-          // Log the successful login
-          console.log('Login successful:', { userId: mockUser.id, email: mockUser.email });
-          
-          // Return successful response
-          observer.next(response);
-          observer.complete();
-          
-          // Handle auth response to set tokens and user
+    // Use real HTTP implementation
+    return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials)
+      .pipe(
+        tap(response => {
+          console.log('Login successful');
           this.handleAuthResponse(response);
-        } catch (error: any) {
-          console.error('Login error:', error);
-          observer.error({
-            error: {
-              message: error.message,
-              statusCode: 400
-            }
-          });
-        }
-      }, 800); // Simulate network delay
-    });
+        }),
+        catchError(error => {
+          console.error('Login HTTP error:', error);
+          return throwError(() => error);
+        })
+      );
   }
 
   // Register
@@ -149,93 +96,18 @@ export class AuthService {
     });
     console.log('Request URL:', `${this.API_URL}/register`);
     
-    // Always use mock implementation for demo purposes
-    console.log('Using mock implementation for register');
-    // Simulate a delay like a real API call would have
-    return new Observable(observer => {
-      setTimeout(() => {
-        try {
-          // Check for required fields
-          if (!userData.email || !userData.password) {
-            throw new Error('Email and password are required');
-          }
-          
-          // Validate email format
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(userData.email)) {
-            throw new Error('Invalid email format');
-          }
-          
-          // Validate password strength
-          if (userData.password.length < 8) {
-            throw new Error('Password must be at least 8 characters long');
-          }
-          
-          // Generate a test verification token for development purposes
-          const testToken = `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}-${Date.now().toString().substring(8)}`;
-          
-          // Store the test token for verification purposes
-          this.testVerificationTokenSubject.next(testToken);
-          // Also store in localStorage for persistence
-          if (isPlatformBrowser(this.platformId)) {
-            localStorage.setItem('testVerificationToken', testToken);
-          }
-          
-          console.log('[DEVELOPMENT ONLY] Generated verification token:', testToken);
-          
-          // Simulate a successful response
-          const mockUser: User = {
-            id: Math.floor(Math.random() * 1000) + 1, // Random ID
-            email: userData.email,
-            firstName: userData.firstName || 'John',
-            lastName: userData.lastName || 'Doe',
-            emailVerified: false, // Default to false for new registrations
-            roles: ['user'],
-            createdAt: new Date(), // Current date
-            updatedAt: new Date()  // Current date
-          };
-          
-          const mockResponse: AuthResponse = { 
-            accessToken: `mock-access-token-${Date.now()}`,
-            refreshToken: `mock-refresh-token-${Date.now()}`,
-            user: mockUser,
-            csrfToken: `mock-csrf-token-${Date.now()}`,
-            expiresIn: 3600, // 1 hour expiration
-            requiresVerification: true, // Require email verification
-            // Include verification details in development mode
-            debugInfo: {
-              verificationToken: testToken,
-              emailSent: true,
-              emailSender: 'noreply@angular-template.com',
-              emailSubject: 'Verify Your Email Address',
-              sent: new Date().toISOString()
-            }
-          };
-          
-          console.log('Mock register response:', {
-            ...mockResponse,
-            accessToken: '******',
-            refreshToken: '******',
-            csrfToken: '******'
-          });
-          
-          // Save auth state to storage
-          this.handleAuthResponse(mockResponse);
-          
-          observer.next(mockResponse);
-          observer.complete();
-        } catch (error: any) {
-          console.error('Error in mock register implementation:', error);
-          observer.error({
-            error: {
-              message: error.message || 'Registration failed'
-            },
-            status: 400,
-            statusText: 'Bad Request'
-          });
-        }
-      }, 1000); // 1 second delay to simulate network latency
-    });
+    // Use real HTTP implementation
+    return this.http.post<AuthResponse>(`${this.API_URL}/register`, userData)
+      .pipe(
+        tap(response => {
+          console.log('Registration successful');
+          this.handleAuthResponse(response);
+        }),
+        catchError(error => {
+          console.error('Registration HTTP error:', error);
+          return throwError(() => error);
+        })
+      );
   }
 
   // Logout
@@ -278,7 +150,7 @@ export class AuthService {
     console.log('Full API_URL value:', this.API_URL);
     
     // Mock implementation for testing when backend is not available
-    if (true) { // Change to 'if (true)' to use mock, 'if (false)' to use real API
+    if (false) { // Changed to use the real API implementation
       console.log('Using mock implementation for forgotPassword');
       // Simulate a delay like a real API call would have
       return new Observable(observer => {
@@ -334,7 +206,7 @@ export class AuthService {
     }
     
     // Mock implementation for testing when backend is not available
-    if (true) { // Change to 'if (true)' to use mock, 'if (false)' to use real API
+    if (false) { // Changed to use the real API implementation
       console.log('Using mock implementation for email verification');
       
       return new Observable(observer => {
@@ -427,7 +299,7 @@ export class AuthService {
     console.log('AuthService.deleteAccount called');
     
     // Mock implementation for testing when backend is not available
-    if (true) { // Change to 'if (true)' to use mock, 'if (false)' to use real API
+    if (false) { // Changed to use the real API implementation
       console.log('Using mock implementation for account deletion');
       
       return new Observable(observer => {
@@ -479,28 +351,39 @@ export class AuthService {
   private loadAuthStateFromStorage(): void {
     // Check for browser environment before accessing localStorage
     if (isPlatformBrowser(this.platformId)) {
-      const userJson = localStorage.getItem('user');
-      const accessToken = localStorage.getItem('accessToken');
-      const refreshToken = localStorage.getItem('refreshToken');
-      const csrfToken = localStorage.getItem('csrfToken');
-      const testToken = localStorage.getItem('testVerificationToken');
+      try {
+        const userJson = localStorage.getItem('user');
+        const accessToken = localStorage.getItem('accessToken');
+        const refreshToken = localStorage.getItem('refreshToken');
+        const csrfToken = localStorage.getItem('csrfToken');
+        const testToken = localStorage.getItem('testVerificationToken');
 
-      if (userJson && accessToken) {
-        this.currentUserSubject.next(JSON.parse(userJson));
-        this.accessTokenSubject.next(accessToken);
-        
-        if (refreshToken) {
-          this.refreshTokenSubject.next(refreshToken);
+        if (userJson && accessToken) {
+          try {
+            const user = JSON.parse(userJson);
+            this.currentUserSubject.next(user);
+            this.accessTokenSubject.next(accessToken);
+            
+            if (refreshToken) {
+              this.refreshTokenSubject.next(refreshToken);
+            }
+            
+            if (csrfToken) {
+              this.csrfTokenSubject.next(csrfToken);
+            }
+          } catch (error) {
+            console.error('Error parsing user data from localStorage:', error);
+            this.clearAuthState(); // Clear invalid data
+          }
         }
         
-        if (csrfToken) {
-          this.csrfTokenSubject.next(csrfToken);
+        // Load test verification token if available
+        if (testToken) {
+          this.testVerificationTokenSubject.next(testToken);
         }
-      }
-      
-      // Load test verification token if available
-      if (testToken) {
-        this.testVerificationTokenSubject.next(testToken);
+      } catch (error) {
+        console.error('Error accessing localStorage:', error);
+        this.clearAuthState(); // Clear potentially corrupted data
       }
     }
   }

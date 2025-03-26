@@ -34,140 +34,143 @@ cd angular/backend
 npm install
 ```
 
-### 2. Starting the Servers
+## Running the Application
 
-Both servers need to be running simultaneously in separate terminal windows:
+The application consists of two parts - a frontend Angular application and a backend NestJS server. Both need to be running simultaneously.
 
-#### Frontend Modes
+### Development Environment
 
-1. **Standard Development Mode**
-```bash
-cd angular/frontend
-npm start
-# or
-ng serve
-```
-- Use for: Regular development work
-- Features:
-  - Live reload on file changes
-  - Basic error reporting
-  - Default development configuration
+#### Standard Development Mode
 
-2. **Debug Mode**
-```bash
-cd angular/frontend
-npm start -- --configuration=development
-# or
-ng serve --configuration=development
-```
-- Use for: Debugging application issues
-- Features:
-  - More detailed console output
-  - Source maps for browser dev tools
-  - Angular's debug tools for component inspection
-  - Enhanced error reporting
+**When to use:** Day-to-day development work - default for most development tasks
 
-3. **Verbose Mode**
-```bash
-cd angular/frontend
-npm start -- --verbose
-# or
-ng serve --verbose
-```
-- Use for: Build troubleshooting
-- Features:
-  - Full compilation process logs
-  - Webpack configuration details
-  - Build performance analysis
-
-4. **Production Simulation Mode**
-```bash
-cd angular/frontend
-npm start -- --configuration=production
-# or
-ng serve --configuration=production
-```
-- Use for: Testing production behavior
-- Features:
-  - Production optimization (bundling, minification)
-  - Disabled debug tools
-  - Disabled verbose logging
-  - Performance testing environment
-
-5. **Hot Module Replacement (HMR) Mode**
-```bash
-cd angular/frontend
-npm start -- --hmr
-# or
-ng serve --hmr
-```
-- Use for: Rapid UI development
-- Features:
-  - Updates modules without page refresh
-  - Preserves application state
-  - Faster development workflow
-
-6. **Combined Options**
-```bash
-cd angular/frontend && ng serve --configuration=development --verbose --hmr
-```
-- Use for: Advanced development needs
-- Combines multiple features for specific use cases
-
-#### Backend Modes
-
-1. **Standard Development Mode**
+**Terminal 1 - Backend:**
 ```bash
 cd angular/backend
 npm run start:dev
 ```
-- Use for: Regular backend development
-- Features:
-  - Basic development configuration
-  - Standard logging
 
-2. **Debug Mode**
+**Terminal 2 - Frontend:**
+```bash
+cd angular/frontend
+npm start   # or ng serve
+```
+
+**Configuration files used:**
+- Backend: `.env.development` - Enables database writes, sets dev JWT secrets
+- Frontend: `environment.ts` - Default Angular environment
+
+#### Debug Mode
+
+**When to use:** When troubleshooting application logic issues, API integrations, or state management
+
+**Terminal 1 - Backend:**
 ```bash
 cd angular/backend && npm run start:dev -- --debug
 ```
-- Use for: Backend troubleshooting
-- Features:
-  - Detailed logging enabled
-  - Enhanced error information
-  - Debug-level messages
 
-3. **Watch Mode**
+**Terminal 2 - Frontend:**
 ```bash
-cd angular/backend && npm run start:debug
+cd angular/frontend && npm start -- --configuration=development
 ```
-- Use for: Active backend development
-- Features:
-  - Automatic restart on file changes
-  - Enhanced debugging capabilities
-  - Ideal for rapid development
 
-### 3. Configuration Modes
+**Configuration files used:**
+- Backend: `.env.development` (with DEBUG=true) - Enhanced logging 
+- Frontend: `environment.development.ts` - Source maps and debug settings
 
-The `--configuration` flag in Angular determines which environment settings to use:
+#### Verbose Build Mode
 
-1. **Development Configuration** (`--configuration=development`)
-- Environment: development
-- Debugging: enabled
-- Optimization: disabled
-- Source maps: enabled
-- Use when: Developing and debugging
+**When to use:** When debugging build problems, module resolution issues, or optimizing build performance
 
-2. **Production Configuration** (`--configuration=production`)
-- Environment: production
-- Debugging: disabled
-- Optimization: enabled
-- Source maps: disabled
-- Use when: Testing production builds
+**Terminal 1 - Backend:**
+```bash
+cd angular/backend
+npm run start:dev
+```
 
-### 4. Access Points
+**Terminal 2 - Frontend:**
+```bash
+cd angular/frontend
+npm start -- --verbose
+```
+
+**Configuration files used:**
+- Backend: `.env.development` - Standard development settings
+- Frontend: `environment.ts` with verbose Angular CLI output
+
+#### Rapid UI Development Mode (HMR)
+
+**When to use:** When focused on UI/UX changes and front-end component development
+
+**Terminal 1 - Backend:**
+```bash
+cd angular/backend && npm run start:dev -- --hmr
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd angular/frontend && npm start -- --hmr
+```
+
+**Configuration files used:**
+- Backend: `.env.development` - Standard development settings
+- Frontend: `environment.ts` with Hot Module Replacement enabled
+
+### Testing Environment
+
+**When to use:** When running automated tests or creating test data
+
+**Terminal 1 - Backend:**
+```bash
+cd angular/backend
+npm run test
+```
+
+**Terminal 2 - Frontend (if needed):**
+```bash
+cd angular/frontend
+npm run test
+```
+
+**Configuration files used:**
+- Backend: `.env.test` - In-memory DB, test settings
+- Frontend: `environment.ts` with testing configuration
+
+### Production Simulation
+
+**When to use:** When testing production builds, performance, or optimizations
+
+**Terminal 1 - Backend:**
+```bash
+cd angular/backend
+npm run start:prod
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd angular/frontend
+npm start -- --configuration=production
+```
+
+**Configuration files used:**
+- Backend: `.env` - Production configuration
+- Frontend: `environment.production.ts` - Production settings
+
+### Configuration Files Location
+
+- Backend environment files:
+  - `.env` - `angular/backend/.env`
+  - `.env.development` - `angular/backend/.env.development`
+  - `.env.test` - `angular/backend/.env.test`
+
+- Frontend environment files: 
+  - `environment.ts` - `angular/frontend/src/environments/environment.ts`
+  - `environment.development.ts` - `angular/frontend/src/environments/environment.development.ts`
+
+### Access Points
 
 - Frontend: http://localhost:4200
-- Backend: http://localhost:3000
+- Backend API: http://localhost:3000
 - API Documentation: http://localhost:3000/api
 
 ### 5. Additional Features
@@ -216,7 +219,7 @@ Use this when you need detailed build information:
 - Displays webpack configuration details
 - Helpful for troubleshooting build issues or optimizing build performance
 
-### Production Simulation
+### Production Simulation Mode
 ```bash
 # Frontend
 npm start -- --configuration=production
@@ -225,10 +228,11 @@ ng serve --configuration=production
 ```
 Use this to test how your app will behave in production:
 - Applies production optimization (bundling, minification)
-- Disables debug tools and verbose logging
-- Useful for performance testing before deployment
+- Disabled debug tools
+- Disabled verbose logging
+- Performance testing environment
 
-### Hot Module Replacement Mode
+### Hot Module Replacement (HMR) Mode
 ```bash
 # Frontend
 npm start -- --hmr
@@ -358,4 +362,110 @@ The API documentation is available at http://localhost:3000/api when the server 
 - User data portability
 - Bulk import/export functionality
 - Export formats (CSV, JSON, etc.)
-- Scheduled data exports 
+- Scheduled data exports
+
+## Environment Configuration
+
+The application uses different environment configuration files depending on the execution context:
+
+### Environment Files
+
+| File | Purpose | Used By |
+|------|---------|---------|
+| `.env` | Default/Production settings | `npm run start:prod` |
+| `.env.development` | Development settings | `npm run start:dev`, `npm run start:debug` |
+| `.env.test` | Testing environment settings | `npm run test`, `npm run test:e2e` |
+
+### Key Environment Settings
+
+#### Development Mode
+
+When running in development mode, the following important settings are configured:
+
+- `DATABASE_WRITE_ENABLED=true` - Enables database writes during development
+- `DATABASE_SYNCHRONIZE=true` - Automatically updates the database schema
+- `DEBUG=true` - Enables detailed logging
+- `JWT_SECRET=dev-secret-key-not-for-production` - Development JWT secret (not secure for production)
+
+This ensures you can test the full application flow, including:
+- User registration with database persistence
+- Email verification
+- Role assignments and permissions
+- Group creation and membership
+
+#### Testing Mode
+
+In testing mode:
+- In-memory SQLite database (`:memory:`)
+- Automatic schema synchronization
+- Separate port (3001) to avoid conflicts with development server
+
+#### Overriding Environment Variables
+
+You can override any environment variable:
+
+```bash
+# Example: Disable database writes for specific development session
+DATABASE_WRITE_ENABLED=false npm run start:dev
+
+# Example: Use a different database file
+DATABASE_FILE=custom.sqlite npm run start:dev
+```
+
+#### Database Write Behavior
+
+The `DATABASE_WRITE_ENABLED` flag controls database write operations in development:
+
+- When `true` (default in `.env.development`): Full database functionality including creating users, verifying email, assigning roles, etc.
+- When `false`: Database operations are simulated but not persisted 
+
+## Angular CLI Flags vs. Environment Files
+
+This application uses two separate configuration systems:
+
+### 1. Angular CLI Flags
+
+These flags control the frontend build and serve process:
+
+- `--verbose`: Enables detailed build logging
+  ```bash
+  ng serve --verbose
+  ```
+  This shows webpack configuration, module resolution, and compilation details.
+  **Note**: This does not interact with `.env` files - it only affects build output verbosity.
+
+- `--hmr`: Enables Hot Module Replacement
+  ```bash
+  ng serve --hmr
+  ```
+  Allows code changes to be applied without full page reloads.
+
+- `--configuration`: Selects an Angular environment configuration
+  ```bash
+  ng serve --configuration=development
+  ```
+  This selects Angular's environment.development.ts file (frontend), not backend .env files.
+
+### 2. Environment Files (Backend)
+
+These files configure the backend application:
+
+- `.env`: Default/production settings
+- `.env.development`: Development server settings
+- `.env.test`: Testing environment settings
+
+Each file sets environment variables like `DATABASE_WRITE_ENABLED`, `JWT_SECRET`, etc.
+
+### Common Development Workflow
+
+Typically, you'll use both systems together:
+
+```bash
+# Terminal 1: Start backend with development environment
+cd angular/backend
+npm run start:dev  # Uses .env.development for database configuration
+
+# Terminal 2: Start frontend with CLI flags
+cd angular/frontend
+ng serve --verbose --hmr  # Uses CLI flags for build process
+``` 
