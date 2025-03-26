@@ -98,6 +98,15 @@ export namespace AuthActions {
     static readonly type = '[Auth] Verify Email Failure';
     constructor(public error: string) {}
   }
+
+  export class AppInitialize {
+    static readonly type = '[Auth] App Initialize';
+  }
+
+  export class SetInitialAuthState {
+    static readonly type = '[Auth] Set Initial Auth State';
+    constructor(public user: User, public isAuthenticated: boolean) {}
+  }
 }
 
 // Auth state model
@@ -130,7 +139,8 @@ const defaults: AuthStateModel = {
 })
 @Injectable()
 export class AuthState {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) {
+  }
 
   @Selector()
   static user(state: AuthStateModel): User | null {
@@ -439,6 +449,46 @@ export class AuthState {
       loading: false,
       error: action.error,
       verificationSuccess: false
+    });
+  }
+
+  @Action(AuthActions.AppInitialize)
+  appInitialize(ctx: StateContext<AuthStateModel>) {
+    // Only continue if we have stored authentication data
+    if (!this.authService.isAuthenticated) {
+      console.log('AppInitialize: No authentication data found');
+      return;
+    }
+    
+    console.log('AppInitialize: Authentication data found, fetching user profile');
+    
+    return this.authService.getUserProfile().pipe(
+      tap(user => {
+        console.log('AppInitialize: User profile fetched successfully');
+        ctx.patchState({
+          user,
+          isAuthenticated: true
+        });
+      }),
+      catchError(error => {
+        console.error('AppInitialize: Error fetching user profile:', error);
+        // If we get a 401, clear the state
+        ctx.setState(defaults);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  @Action(AuthActions.SetInitialAuthState)
+  setInitialAuthState(ctx: StateContext<AuthStateModel>, action: AuthActions.SetInitialAuthState) {
+    console.log('Setting initial auth state explicitly:', {
+      isAuthenticated: action.isAuthenticated,
+      hasUser: !!action.user
+    });
+    
+    ctx.patchState({
+      user: action.user,
+      isAuthenticated: action.isAuthenticated
     });
   }
 } 

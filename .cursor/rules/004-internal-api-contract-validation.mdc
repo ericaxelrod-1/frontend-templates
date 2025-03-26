@@ -4,7 +4,7 @@ globs: "*.ts", "*.js", "*.jsx", "*.tsx", "*.vue", "*.dart", "*.swift", "*.kt", "
 alwaysApply: false
 ---
 ---
-description: "API Contract Rules for Frontend-Backend Integration"
+description: "API Contract Rules for Frontend-Backend Integration. This should be used anytime you modify a file that calls an API, directly or indirectly, or the API itself"
 globs: ["*.ts", "*.js", "*.jsx", "*.tsx", "*.vue", "*.dart", "*.swift", "*.kt", "*.java", "*.cs", "*.py", "*.rb", "*.php", "*.go", "*.rs", "*.proto", "*.graphql", "*.gql", "*.yaml", "*.yml", "*.json"]
 tags: ["api", "contract", "integration"]
 priority: 1

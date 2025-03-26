@@ -66,6 +66,15 @@ export class AuthService {
     return !!this.accessToken && !!this.currentUser;
   }
 
+  // Public method to refresh auth state from storage
+  refreshAuthStateFromStorage(): void {
+    console.log('Refreshing auth state from storage');
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadAuthStateFromStorage();
+      console.log('Auth state after refresh - isAuthenticated:', this.isAuthenticated);
+    }
+  }
+
   // Login
   login(credentials: UserLogin): Observable<AuthResponse> {
     console.log('AuthService.login called with:', {
@@ -443,12 +452,22 @@ export class AuthService {
         const csrfToken = localStorage.getItem('csrfToken');
         const testToken = localStorage.getItem('testVerificationToken');
 
+        console.log('Loading auth state from storage - found tokens:', { 
+          hasUser: !!userJson, 
+          hasAccessToken: !!accessToken 
+        });
+
         // Only try to parse and set user data if both user and token exist
         if (userJson && accessToken) {
           try {
             const user = JSON.parse(userJson);
+            
+            // Validate token format (simple check)
+            const isValidToken = typeof accessToken === 'string' && accessToken.length > 20;
+            
             // Validate that user object has required fields
-            if (user && user.id && user.email) {
+            if (user && user.id && user.email && isValidToken) {
+              console.log('Valid auth data found in localStorage, setting auth state');
               this.currentUserSubject.next(user);
               this.accessTokenSubject.next(accessToken);
               
@@ -460,7 +479,7 @@ export class AuthService {
                 this.csrfTokenSubject.next(csrfToken);
               }
             } else {
-              console.warn('Invalid user data in localStorage');
+              console.warn('Invalid user data or token format in localStorage');
               this.clearAuthState();
             }
           } catch (error) {

@@ -10,7 +10,12 @@
   
   <span class="spacer"></span>
   
-  <ng-container *ngIf="isAuthenticated; else loginButton">
+  <ng-container *ngIf="isAuthenticated || authService.isAuthenticated; else loginButton">
+    <button mat-button (click)="logout()">
+      <mat-icon>exit_to_app</mat-icon>
+      <span>Logout</span>
+    </button>
+    
     <button mat-icon-button routerLink="/profile">
       <mat-icon>account_circle</mat-icon>
     </button>
@@ -20,9 +25,9 @@
     </button>
     
     <mat-menu #userMenu="matMenu">
-      <div class="user-menu-header" *ngIf="user">
-        <p class="user-name">{{ user.firstName || 'User' }} {{ user.lastName || '' }}</p>
-        <p class="user-email">{{ user.email }}</p>
+      <div class="user-menu-header" *ngIf="user || authService.currentUser">
+        <p class="user-name">{{ (user || authService.currentUser)?.firstName || 'User' }} {{ (user || authService.currentUser)?.lastName || '' }}</p>
+        <p class="user-email">{{ (user || authService.currentUser)?.email }}</p>
       </div>
       <button mat-menu-item routerLink="/profile">
         <mat-icon>person</mat-icon>
