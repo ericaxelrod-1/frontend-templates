@@ -1,6 +1,6 @@
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, throwError, catchError } from 'rxjs';
+import { BehaviorSubject, Observable, tap, throwError, catchError, map, mergeMap } from 'rxjs';
 import { isPlatformBrowser } from '@angular/common';
 import { 
   User, 
@@ -63,7 +63,7 @@ export class AuthService {
   }
 
   get isAuthenticated(): boolean {
-    return !!this.accessToken;
+    return !!this.accessToken && !!this.currentUser;
   }
 
   // Login
@@ -74,15 +74,70 @@ export class AuthService {
     });
     console.log('Request URL:', `${this.API_URL}/login`);
 
-    // Use real HTTP implementation
-    return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials)
+    return this.http.post<any>(`${this.API_URL}/login`, credentials)
       .pipe(
+        map(response => {
+          console.log('Raw login response:', {
+            ...response,
+            access_token: '******',
+            refresh_token: '******',
+            csrf_token: '******'
+          });
+
+          // Validate token response
+          if (!response || !response.access_token || !response.refresh_token) {
+            throw new Error('Invalid login response: missing token data');
+          }
+
+          // Store tokens temporarily
+          const tokens = {
+            accessToken: response.access_token,
+            refreshToken: response.refresh_token,
+            csrfToken: response.csrf_token,
+            expiresIn: response.expires_in || 3600
+          };
+
+          // Return an observable that will fetch the user profile
+          return this.http.get<User>(`${this.API_URL}/profile`, {
+            headers: {
+              'Authorization': `Bearer ${tokens.accessToken}`
+            }
+          }).pipe(
+            map(user => {
+              // Combine tokens with user data
+              const authResponse: AuthResponse = {
+                user: user,
+                ...tokens,
+                requiresVerification: false
+              };
+
+              console.log('Complete login response:', {
+                ...authResponse,
+                accessToken: '******',
+                refreshToken: '******',
+                csrfToken: '******'
+              });
+
+              return authResponse;
+            })
+          );
+        }),
+        mergeMap(observable => observable),
         tap(response => {
-          console.log('Login successful');
+          // Handle the auth response synchronously
           this.handleAuthResponse(response);
+          
+          // Verify the state was updated correctly
+          if (!this.isAuthenticated) {
+            throw new Error('Authentication state not properly updated');
+          }
+          
+          console.log('Auth state updated successfully');
         }),
         catchError(error => {
-          console.error('Login HTTP error:', error);
+          console.error('Login error:', error);
+          // Clear any partial state on error
+          this.clearAuthState();
           return throwError(() => error);
         })
       );
@@ -322,28 +377,58 @@ export class AuthService {
 
   // Private helper methods
   private handleAuthResponse(response: AuthResponse): void {
+    console.log('Handling auth response');
+    
+    // Validate response data
+    if (!response.user || !response.accessToken || !response.refreshToken) {
+      console.error('Invalid auth response:', response);
+      throw new Error('Invalid auth response: missing required data');
+    }
+    
+    // Update state in memory
     this.currentUserSubject.next(response.user);
     this.accessTokenSubject.next(response.accessToken);
     this.refreshTokenSubject.next(response.refreshToken);
     this.csrfTokenSubject.next(response.csrfToken);
     
-    // Only save to storage if in browser environment
+    // Save to storage if in browser environment
     if (isPlatformBrowser(this.platformId)) {
-      this.saveAuthStateToStorage(response);
+      try {
+        this.saveAuthStateToStorage(response);
+        console.log('Auth state saved to storage');
+      } catch (error) {
+        console.error('Error saving auth state to storage:', error);
+        throw error;
+      }
     }
   }
 
   private saveAuthStateToStorage(authResponse: AuthResponse): void {
     // Check for browser environment before accessing localStorage
     if (isPlatformBrowser(this.platformId)) {
-      localStorage.setItem('user', JSON.stringify(authResponse.user));
-      localStorage.setItem('accessToken', authResponse.accessToken);
-      localStorage.setItem('refreshToken', authResponse.refreshToken);
-      localStorage.setItem('csrfToken', authResponse.csrfToken);
-      
-      // Save debug info if available (development only)
-      if (authResponse.debugInfo) {
-        localStorage.setItem('authDebugInfo', JSON.stringify(authResponse.debugInfo));
+      try {
+        localStorage.setItem('user', JSON.stringify(authResponse.user));
+        localStorage.setItem('accessToken', authResponse.accessToken);
+        localStorage.setItem('refreshToken', authResponse.refreshToken);
+        localStorage.setItem('csrfToken', authResponse.csrfToken);
+        
+        // Save debug info if available (development only)
+        if (authResponse.debugInfo) {
+          localStorage.setItem('authDebugInfo', JSON.stringify(authResponse.debugInfo));
+        }
+        
+        // Verify storage was updated correctly
+        const storedUser = localStorage.getItem('user');
+        const storedToken = localStorage.getItem('accessToken');
+        
+        if (!storedUser || !storedToken) {
+          throw new Error('Failed to save auth state to storage');
+        }
+      } catch (error) {
+        console.error('Error saving to localStorage:', error);
+        // Clear any partial state
+        this.clearAuthState();
+        throw error;
       }
     }
   }
@@ -358,23 +443,33 @@ export class AuthService {
         const csrfToken = localStorage.getItem('csrfToken');
         const testToken = localStorage.getItem('testVerificationToken');
 
+        // Only try to parse and set user data if both user and token exist
         if (userJson && accessToken) {
           try {
             const user = JSON.parse(userJson);
-            this.currentUserSubject.next(user);
-            this.accessTokenSubject.next(accessToken);
-            
-            if (refreshToken) {
-              this.refreshTokenSubject.next(refreshToken);
-            }
-            
-            if (csrfToken) {
-              this.csrfTokenSubject.next(csrfToken);
+            // Validate that user object has required fields
+            if (user && user.id && user.email) {
+              this.currentUserSubject.next(user);
+              this.accessTokenSubject.next(accessToken);
+              
+              if (refreshToken) {
+                this.refreshTokenSubject.next(refreshToken);
+              }
+              
+              if (csrfToken) {
+                this.csrfTokenSubject.next(csrfToken);
+              }
+            } else {
+              console.warn('Invalid user data in localStorage');
+              this.clearAuthState();
             }
           } catch (error) {
             console.error('Error parsing user data from localStorage:', error);
             this.clearAuthState(); // Clear invalid data
           }
+        } else {
+          // Clear any partial state if either user or token is missing
+          this.clearAuthState();
         }
         
         // Load test verification token if available

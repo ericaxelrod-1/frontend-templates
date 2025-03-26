@@ -18,12 +18,8 @@ import { LoggerService } from '../../../services/logging/logger.service';
 export class LoginComponent implements OnInit, OnDestroy {
   loginForm!: FormGroup;
   returnUrl: string = '/';
-  private subscription: Subscription = new Subscription();
+  private subscription = new Subscription();
   private platformId = inject(PLATFORM_ID);
-
-  @Select(AuthState.loading) loading$!: Observable<boolean>;
-  @Select(AuthState.error) error$!: Observable<string | null>;
-  @Select(AuthState.isAuthenticated) isAuthenticated$!: Observable<boolean>;
 
   loading = false;
   submitted = false;
@@ -32,6 +28,10 @@ export class LoginComponent implements OnInit, OnDestroy {
   // App configuration properties
   appName = 'Angular Template';
   landingLogo = 'assets/logos/logo-large.svg';
+
+  loading$!: Observable<boolean>;
+  error$!: Observable<string | null>;
+  isAuthenticated$!: Observable<boolean>;
 
   constructor(
     private formBuilder: FormBuilder,
@@ -49,6 +49,11 @@ export class LoginComponent implements OnInit, OnDestroy {
     } catch (error) {
       this.logger.error('Error loading app config in LoginComponent constructor:', error);
     }
+
+    // Initialize store selects
+    this.loading$ = this.store.select(AuthState.loading);
+    this.error$ = this.store.select(AuthState.error);
+    this.isAuthenticated$ = this.store.select(AuthState.isAuthenticated);
   }
 
   ngOnInit(): void {
@@ -68,7 +73,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     // Only subscribe to observables in browser environment
     if (isPlatformBrowser(this.platformId)) {
       this.logger.debug('Browser environment detected, subscribing to state changes');
-      // Subscribe to state changes
+      
+      // Subscribe to loading state
       this.subscription.add(
         this.loading$.subscribe(loading => {
           this.logger.debug('Loading state changed:', loading);
@@ -76,6 +82,7 @@ export class LoginComponent implements OnInit, OnDestroy {
         })
       );
 
+      // Subscribe to error state
       this.subscription.add(
         this.error$.subscribe(error => {
           this.logger.debug('Error state changed:', error);
@@ -83,6 +90,7 @@ export class LoginComponent implements OnInit, OnDestroy {
         })
       );
 
+      // Subscribe to authentication state
       this.subscription.add(
         this.isAuthenticated$.subscribe(isAuthenticated => {
           this.logger.debug('Authentication state changed:', isAuthenticated);

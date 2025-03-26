@@ -8,6 +8,8 @@ import {
 } from '@angular/router';
 import { Observable, of, switchMap } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { Store } from '@ngxs/store';
+import { AuthState } from '../../store/auth/auth.state';
 
 @Injectable({
   providedIn: 'root'
@@ -15,7 +17,8 @@ import { AuthService } from '../services/auth.service';
 export class AuthGuard implements CanActivate {
   constructor(
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private store: Store
   ) {}
 
   canActivate(
@@ -23,14 +26,18 @@ export class AuthGuard implements CanActivate {
     state: RouterStateSnapshot
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
     
-    // Check if user is authenticated
-    if (this.authService.isAuthenticated) {
-      return true;
-    }
-    
-    // Redirect to login page with return URL (updated path without auth prefix)
-    return this.router.createUrlTree(['/login'], { 
-      queryParams: { returnUrl: state.url } 
-    });
+    // Get authentication state from store
+    return this.store.select(AuthState.isAuthenticated).pipe(
+      switchMap(isAuthenticated => {
+        if (isAuthenticated && this.authService.isAuthenticated) {
+          return of(true);
+        }
+        
+        // If not authenticated, redirect to login
+        return of(this.router.createUrlTree(['/login'], { 
+          queryParams: { returnUrl: state.url } 
+        }));
+      })
+    );
   }
 } 
