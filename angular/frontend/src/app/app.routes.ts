@@ -5,7 +5,7 @@ import { AuthGuard } from './core/guards';
 import { LandingComponent } from './pages/landing/landing.component';
 
 export const routes: Routes = [
-  // Landing page route (outside of auth flow/main layout)
+  // Landing page route
   {
     path: '',
     component: LandingComponent,
@@ -13,38 +13,38 @@ export const routes: Routes = [
   },
   {
     path: 'landing',
-    component: LandingComponent,
-    pathMatch: 'full'
+    component: LandingComponent
+  },
+  // Auth routes (without layout wrapper)
+  {
+    path: 'login',
+    loadComponent: () => import('./features/auth/login/login.component').then(c => c.LoginComponent)
   },
   {
-    path: '',
+    path: 'register',
+    loadComponent: () => import('./features/auth/register/register.component').then(c => c.RegisterComponent)
+  },
+  {
+    path: 'forgot-password',
+    loadComponent: () => import('./features/auth/forgot-password/forgot-password.component').then(c => c.ForgotPasswordComponent)
+  },
+  {
+    path: 'reset-password',
+    loadComponent: () => import('./features/auth/reset-password/reset-password.component').then(c => c.ResetPasswordComponent)
+  },
+  {
+    path: 'verify-email',
+    loadComponent: () => import('./features/auth/verify-email/verify-email.component').then(c => c.VerifyEmailComponent)
+  },
+  // Application routes with layout
+  {
+    path: 'app',
     component: MainLayoutComponent,
     children: [
-      // Auth routes (without auth prefix)
       {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full'
-      },
-      {
-        path: 'login',
-        loadComponent: () => import('./features/auth/login/login.component').then(c => c.LoginComponent)
-      },
-      {
-        path: 'register',
-        loadComponent: () => import('./features/auth/register/register.component').then(c => c.RegisterComponent)
-      },
-      {
-        path: 'forgot-password',
-        loadComponent: () => import('./features/auth/forgot-password/forgot-password.component').then(c => c.ForgotPasswordComponent)
-      },
-      {
-        path: 'reset-password',
-        loadComponent: () => import('./features/auth/reset-password/reset-password.component').then(c => c.ResetPasswordComponent)
-      },
-      {
-        path: 'verify-email',
-        loadComponent: () => import('./features/auth/verify-email/verify-email.component').then(c => c.VerifyEmailComponent)
       },
       {
         path: 'profile',

@@ -66,8 +66,8 @@ export class LoginComponent implements OnInit, OnDestroy {
 
     this.logger.debug('LoginForm initialized:', this.loginForm);
 
-    // Get return URL from route parameters or default to home
-    this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
+    // Get return URL from route parameters or default to app dashboard
+    this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/app/dashboard';
     this.logger.debug('Return URL set to:', this.returnUrl);
 
     // Only subscribe to observables in browser environment

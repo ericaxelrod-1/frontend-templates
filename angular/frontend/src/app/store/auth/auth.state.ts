@@ -209,7 +209,7 @@ export class AuthState {
       loading: false,
       error: null
     });
-    return ctx.dispatch(new Navigate(['/']));
+    return ctx.dispatch(new Navigate(['/app/dashboard']));
   }
 
   @Action(AuthActions.LoginFailure)
@@ -440,7 +440,7 @@ export class AuthState {
     });
     
     // Redirect to home page after successful verification
-    return ctx.dispatch(new Navigate(['/']));
+    return ctx.dispatch(new Navigate(['/app/dashboard']));
   }
 
   @Action(AuthActions.VerifyEmailFailure)

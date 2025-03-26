@@ -1,27 +1,29 @@
 @use 'sass:color';
 @use 'sass:map';
 
-// Color manipulation utilities for CSS variables
-// These work around the limitation that CSS variables can't be directly used 
-// with Sass color functions like darken() or lighten()
+// Color manipulation utilities that work with our theme colors
+// These use hardcoded values that match our Material theme
 
-// Hard-coded color values that match our CSS variables
-// This is necessary because Sass can't apply color functions to CSS variables
+// Hard-coded color map that matches our Material palette values
+// We do this to avoid circular dependencies when components import these functions
 $color-map: (
-  'primary': #7b1fa2,
-  'primary-light': #ae52d4,
-  'primary-dark': #4a0072,
-  'accent': #69f0ae,
+  'primary': #7b1fa2, // purple 700
+  'primary-light': #ae52d4, // purple 300
+  'primary-dark': #4a0072, // purple 900
+  'accent': #69f0ae, // green A200
+  'accent-light': #9fffe0, // green A100
+  'accent-dark': #00c853, // green A400
+  'warn': #f44336, // red 500
   'text-on-primary': #ffffff,
   'text-primary': #e0e0e0,
   'text-secondary': #a0a0a0,
   'background-dark': #303030,
   'background-card': #424242,
   'surface': #484848,
-  'error': #f44336,
-  'success': #4caf50,
-  'warning': #ff9800,
-  'info': #2196f3
+  'error': #f44336, // red 500
+  'success': #4caf50, // green 500
+  'warning': #ff9800, // orange 500
+  'info': #2196f3 // blue 500
 );
 
 // Function to darken a color from our palette

@@ -33,9 +33,12 @@ export class AuthGuard implements CanActivate {
           return of(true);
         }
         
-        // If not authenticated, redirect to login
+        // If not authenticated, redirect to login with returnUrl
+        // The returnUrl should include the 'app/' prefix for protected routes
+        const returnUrl = state.url;
+        console.log('AuthGuard redirecting to login with returnUrl:', returnUrl);
         return of(this.router.createUrlTree(['/login'], { 
-          queryParams: { returnUrl: state.url } 
+          queryParams: { returnUrl } 
         }));
       })
     );

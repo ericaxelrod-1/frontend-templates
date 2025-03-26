@@ -60,7 +60,7 @@ Use the following standard structure for logo containers:
 ```
 
 ### Branding Configuration
-Application branding is configured in `app-config.ts`:
+Application branding is configured in [`app-config.ts`](../frontend/src/environments/app-config.ts):
 ```typescript
 export const appConfig = {
   appName: 'My Custom App',
@@ -75,6 +75,175 @@ export const appConfig = {
     secondary: '#ff4081',
   }
 };
+```
+
+## Theme Customization
+
+### How Theme Colors Are Managed
+
+The application uses a synchronized theming system that ensures consistency between Angular Material components and custom UI elements. This is achieved through:
+
+1. **Material Theme Definition**: Core theme palettes are defined in [`_material-theme.scss`](../frontend/src/styles/themes/_material-theme.scss)
+2. **CSS Variables**: Material colors are mapped to CSS variables using the `sync-theme-vars` mixin in [`_mixins.scss`](../frontend/src/styles/abstracts/_mixins.scss)
+3. **SCSS Color Functions**: Color manipulation functions in [`_color-functions.scss`](../frontend/src/styles/abstracts/_color-functions.scss) allow you to transform theme colors
+
+This architecture ensures that changing the theme in one place updates the entire application consistently.
+
+### Changing the Theme Colors
+
+To update the application theme:
+
+1. **Modify Material Palettes** in [`_material-theme.scss`](../frontend/src/styles/themes/_material-theme.scss):
+
+```scss
+// Choose different predefined palettes
+$primary-palette: mat.define-palette(mat.$blue-palette, 700, 300, 900);
+$accent-palette: mat.define-palette(mat.$amber-palette, A200, A100, A400);
+$warn-palette: mat.define-palette(mat.$red-palette);
+
+// Or create custom palettes
+$custom-primary: (
+  50: #e3f2fd,
+  100: #bbdefb,
+  500: #2196f3,
+  700: #1976d2,
+  900: #0d47a1,
+  contrast: (
+    50: rgba(0, 0, 0, 0.87),
+    100: rgba(0, 0, 0, 0.87),
+    500: white,
+    700: white,
+    900: white,
+  )
+);
+$primary-palette: mat.define-palette($custom-primary);
+```
+
+2. **The changes will automatically propagate** to CSS variables and be available throughout your application
+
+### Using Theme Colors
+
+#### In SCSS/CSS
+
+Always use CSS variables for consistent styling:
+
+```scss
+.my-component {
+  background-color: var(--primary-color);
+  color: var(--text-on-primary);
+}
+
+.highlight {
+  color: var(--accent-color);
+}
+
+.warning {
+  color: var(--warn-color);
+}
+```
+
+#### For Color Transformations
+
+Use the color functions from [`_color-functions.scss`](../frontend/src/styles/abstracts/_color-functions.scss):
+
+```scss
+.button {
+  background-color: var(--primary-color);
+  
+  &:hover {
+    // Darken the primary color by 10%
+    background-color: abstracts.darken-color('primary', 10%);
+  }
+  
+  &.subtle {
+    // Lighten the primary color by 40%
+    background-color: abstracts.lighten-color('primary', 40%);
+  }
+}
+
+// To use colors directly from Material palettes
+.custom-element {
+  border-color: abstracts.get-theme-color('primary', 300);
+}
+```
+
+### Theme Switching (Light/Dark)
+
+The application supports both light and dark themes:
+
+1. **Apply Theme Class** to a container:
+
+```html
+<div class="light-theme">
+  <!-- Light theme applied -->
+</div>
+
+<div class="dark-theme">
+  <!-- Dark theme applied -->
+</div>
+```
+
+2. **Toggle Theme Programmatically**:
+
+```typescript
+// In a theme service
+toggleTheme() {
+  const body = document.getElementsByTagName('body')[0];
+  if (body.classList.contains('light-theme')) {
+    body.classList.remove('light-theme');
+    body.classList.add('dark-theme');
+    this.currentTheme = 'dark';
+  } else {
+    body.classList.remove('dark-theme');
+    body.classList.add('light-theme');
+    this.currentTheme = 'light';
+  }
+}
+```
+
+## Typography Customization
+
+### Changing Font Family
+
+To update the application's typography:
+
+1. **Modify Typography Config** in [`_material-theme.scss`](../frontend/src/styles/themes/_material-theme.scss):
+
+```scss
+// Change the default font family
+$typography-config: mat.define-typography-config(
+  $font-family: '"Poppins", sans-serif',
+  $headline-1: mat.define-typography-level(32px, 40px, 500),
+  $headline-2: mat.define-typography-level(24px, 32px, 500),
+  // ...other typography levels
+);
+
+// Apply the typography config to the theme
+$theme: mat.define-light-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  ),
+  typography: $typography-config,
+  density: 0,
+));
+```
+
+2. **Update Base Font** in [`styles.scss`](../frontend/src/styles.scss):
+
+```scss
+body {
+  font-family: 'Poppins', sans-serif;
+  // other styles...
+}
+```
+
+3. **Import Custom Fonts** in [`styles.scss`](../frontend/src/styles.scss) or `index.html`:
+
+```scss
+/* In styles.scss */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap');
 ```
 
 ## Color Palette
@@ -541,7 +710,7 @@ Use Angular's encapsulation for component-specific styles:
 
 ### Global Styles
 
-For global styles, use the styles.scss file in the src folder:
+For global styles, use the [`styles.scss`](../frontend/src/styles.scss) file in the src folder:
 
 ```scss
 // Import the abstracts first (variables, mixins, etc.)
@@ -574,15 +743,12 @@ The application uses Angular Material's theming system, which provides a flexibl
 ```
 styles/
 |-- abstracts/
-|   |-- _variables.scss    # Global SCSS variables
-|   |-- _mixins.scss       # Global mixins
-|   |-- _functions.scss    # Global functions
-|   |-- _colors.scss       # Color definitions
-|   `-- _theme.scss        # Theme configuration
+|   |-- [_variables.scss](../frontend/src/styles/abstracts/_variables.scss)    # Global SCSS variables
+|   |-- [_mixins.scss](../frontend/src/styles/abstracts/_mixins.scss)       # Global mixins
+|   |-- [_color-functions.scss](../frontend/src/styles/abstracts/_color-functions.scss)    # Global functions
+|   `-- [_index.scss](../frontend/src/styles/abstracts/_index.scss)        # Theme configuration
 |-- themes/
-|   |-- _material-theme.scss  # Material theme configuration
-|   |-- _light-theme.scss     # Light theme variant
-|   `-- _dark-theme.scss      # Dark theme variant
+|   |-- [_material-theme.scss](../frontend/src/styles/themes/_material-theme.scss)  # Material theme configuration
 ```
 
 ### Core Variables and Theme Configuration
@@ -590,7 +756,7 @@ styles/
 All theme variables should be defined in the abstracts directory and imported into component SCSS files as needed:
 
 ```scss
-// _variables.scss
+// [_variables.scss](../frontend/src/styles/abstracts/_variables.scss)
 $primary-palette: mat-palette($mat-indigo);
 $accent-palette: mat-palette($mat-pink, A200, A100, A400);
 $warn-palette: mat-palette($mat-red);
@@ -629,7 +795,7 @@ Every component SCSS file that uses theme variables MUST follow this import patt
 The application provides several mixins to ensure consistent styling across components:
 
 ```scss
-// _mixins.scss
+// [_mixins.scss](../frontend/src/styles/abstracts/_mixins.scss)
 @mixin auth-card() {
   background-color: $background-card;
   border-radius: 4px;
@@ -719,7 +885,7 @@ All components should pass the theme validation checks:
 ### Theme Maintenance Guidelines
 
 1. **Add New Variables Centrally**
-   - Always add new theme variables to the central `_variables.scss` file
+   - Always add new theme variables to the central [`_variables.scss`](../frontend/src/styles/abstracts/_variables.scss) file
    - Document the purpose of each variable with comments
 
 2. **Test Component Theming**

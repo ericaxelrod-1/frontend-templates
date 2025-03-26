@@ -1,5 +1,51 @@
 @use '@angular/material' as mat;
+@use 'sass:map';
 @use 'variables' as var;
+
+// Mixin to synchronize CSS variables with Material theme
+@mixin sync-theme-vars($theme-or-color-config) {
+  // Extract color palettes from theme or use directly provided config
+  $color-config: if(map.has-key($theme-or-color-config, color), 
+                    map.get($theme-or-color-config, color), 
+                    $theme-or-color-config);
+  
+  $primary-palette: map.get($color-config, primary);
+  $accent-palette: map.get($color-config, accent);
+  $warn-palette: map.get($color-config, warn);
+  $is-dark-theme: map.get($color-config, is-dark);
+
+  // Set CSS variables from Material palettes
+  --primary-color: #{mat.get-color-from-palette($primary-palette, 500)};
+  --primary-light: #{mat.get-color-from-palette($primary-palette, 300)};
+  --primary-dark: #{mat.get-color-from-palette($primary-palette, 700)};
+  --accent-color: #{mat.get-color-from-palette($accent-palette, 500)};
+  --accent-light: #{mat.get-color-from-palette($accent-palette, 300)};
+  --accent-dark: #{mat.get-color-from-palette($accent-palette, 700)};
+  --warn-color: #{mat.get-color-from-palette($warn-palette, 500)};
+
+  // Set text and background colors based on theme brightness
+  @if $is-dark-theme {
+    --text-on-primary: #{mat.get-color-from-palette($primary-palette, 100)};
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --background-dark: #303030;
+    --background-card: #424242;
+    --surface: #484848;
+  } @else {
+    --text-on-primary: #{mat.get-color-from-palette($primary-palette, 50)};
+    --text-primary: #212121;
+    --text-secondary: #757575;
+    --background-dark: #f5f5f5;
+    --background-card: #ffffff;
+    --surface: #fafafa;
+  }
+
+  // Status colors remain consistent across light/dark themes
+  --error: #{mat.get-color-from-palette($warn-palette, 500)};
+  --success: #4caf50;
+  --warning: #ff9800;
+  --info: #2196f3;
+}
 
 // Flexbox mixins
 @mixin flex-center {
@@ -27,13 +73,13 @@
 // Responsive mixins
 @mixin respond-to($breakpoint) {
   @if $breakpoint == sm {
-    @media (min-width: var.$breakpoint-sm) { @content; }
+    @media (min-width: 576px) { @content; }
   } @else if $breakpoint == md {
-    @media (min-width: var.$breakpoint-md) { @content; }
+    @media (min-width: 768px) { @content; }
   } @else if $breakpoint == lg {
-    @media (min-width: var.$breakpoint-lg) { @content; }
+    @media (min-width: 992px) { @content; }
   } @else if $breakpoint == xl {
-    @media (min-width: var.$breakpoint-xl) { @content; }
+    @media (min-width: 1200px) { @content; }
   }
 }
 
@@ -61,10 +107,10 @@
 
 // Card mixins
 @mixin card-base {
-  background-color: var.$background-card;
-  border-radius: var.$border-radius-md;
-  box-shadow: var.$shadow-md;
-  padding: var.$spacing-lg;
+  background-color: var(--background-card);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  padding: 1rem;
 }
 
 // Form control mixins
