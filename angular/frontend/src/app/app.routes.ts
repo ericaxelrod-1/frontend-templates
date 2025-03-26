@@ -5,17 +5,27 @@ import { AuthGuard } from './core/guards';
 import { LandingComponent } from './pages/landing/landing.component';
 
 export const routes: Routes = [
+  // Landing page route (outside of auth flow/main layout)
+  {
+    path: '',
+    component: LandingComponent,
+    pathMatch: 'full'
+  },
+  {
+    path: 'landing',
+    component: LandingComponent,
+    pathMatch: 'full'
+  },
   {
     path: '',
     component: MainLayoutComponent,
     children: [
-      // Landing page as default route
+      // Auth routes (without auth prefix)
       {
         path: '',
-        component: LandingComponent,
+        redirectTo: 'dashboard',
         pathMatch: 'full'
       },
-      // Auth routes (without auth prefix)
       {
         path: 'login',
         loadComponent: () => import('./features/auth/login/login.component').then(c => c.LoginComponent)
