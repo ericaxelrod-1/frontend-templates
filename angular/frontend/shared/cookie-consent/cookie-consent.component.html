@@ -1,0 +1,71 @@
+<div class="cookie-consent-container" [class.open]="isOpen">
+  <mat-card class="cookie-consent-card">
+    <mat-card-header>
+      <mat-card-title>Cookie Consent</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p>
+        This website uses cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. 
+        By clicking "Accept All", you consent to our use of cookies. You can manage your preferences or reject non-essential cookies by clicking "Customize Settings".
+      </p>
+      
+      <div class="cookie-settings" *ngIf="isOpen">
+        <h3>Cookie Settings</h3>
+        <mat-divider></mat-divider>
+        
+        <div class="cookie-option">
+          <div class="cookie-option-text">
+            <h4>Necessary Cookies</h4>
+            <p>Required for the website to function properly. These cannot be disabled.</p>
+          </div>
+          <mat-slide-toggle [checked]="true" disabled>Required</mat-slide-toggle>
+        </div>
+        
+        <div class="cookie-option">
+          <div class="cookie-option-text">
+            <h4>Preference Cookies</h4>
+            <p>Allow the website to remember your preferences and provide enhanced features.</p>
+          </div>
+          <mat-slide-toggle [(ngModel)]="cookieSettings.preferences">
+            {{ cookieSettings.preferences ? 'Enabled' : 'Disabled' }}
+          </mat-slide-toggle>
+        </div>
+        
+        <div class="cookie-option">
+          <div class="cookie-option-text">
+            <h4>Analytics Cookies</h4>
+            <p>Help us understand how visitors interact with the website to improve its features.</p>
+          </div>
+          <mat-slide-toggle [(ngModel)]="cookieSettings.analytics">
+            {{ cookieSettings.analytics ? 'Enabled' : 'Disabled' }}
+          </mat-slide-toggle>
+        </div>
+        
+        <div class="cookie-option">
+          <div class="cookie-option-text">
+            <h4>Marketing Cookies</h4>
+            <p>Used to deliver advertisements that are relevant to you and your interests.</p>
+          </div>
+          <mat-slide-toggle [(ngModel)]="cookieSettings.marketing">
+            {{ cookieSettings.marketing ? 'Enabled' : 'Disabled' }}
+          </mat-slide-toggle>
+        </div>
+      </div>
+      
+      <p class="cookie-info-text">
+        For more information, please visit our <a href="/cookies" target="_blank">Cookie Policy</a>.
+      </p>
+    </mat-card-content>
+    
+    <mat-card-actions align="end">
+      <button mat-button (click)="acceptNecessary()">Necessary Only</button>
+      <ng-container *ngIf="isOpen">
+        <button mat-button (click)="acceptSelected()">Save Preferences</button>
+      </ng-container>
+      <button mat-raised-button color="primary" (click)="acceptAll()">Accept All</button>
+      <ng-container *ngIf="!isOpen">
+        <button mat-button (click)="openCookieSettings()">Customize Settings</button>
+      </ng-container>
+    </mat-card-actions>
+  </mat-card>
+</div> 

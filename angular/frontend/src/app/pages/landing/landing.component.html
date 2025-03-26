@@ -1,0 +1,87 @@
+<div class="landing-container">
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <h1 class="hero-title">Angular Frontend Template</h1>
+      <p class="hero-subtitle">A production-ready template for building modern web applications</p>
+      <div class="hero-buttons">
+        <a mat-raised-button color="primary" routerLink="/login">Get Started</a>
+        <a mat-stroked-button color="primary" href="https://github.com/yourusername/frontend-templates" target="_blank">
+          <mat-icon>code</mat-icon> View on GitHub
+        </a>
+      </div>
+    </div>
+    <div class="hero-image">
+      <img src="assets/images/hero-illustration.svg" alt="Angular Template Illustration">
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features-section">
+    <div class="section-header">
+      <h2>Features</h2>
+      <p>Everything you need to build your next web application</p>
+    </div>
+    <div class="features-grid">
+      <mat-card class="feature-card" *ngFor="let feature of features">
+        <mat-card-header>
+          <mat-icon class="feature-icon">{{ feature.icon }}</mat-icon>
+          <mat-card-title>{{ feature.title }}</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p>{{ feature.description }}</p>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </section>
+
+  <!-- Tech Stack Section -->
+  <section class="tech-stack-section">
+    <div class="section-header">
+      <h2>Technology Stack</h2>
+      <p>Built with modern technologies for optimal performance and developer experience</p>
+    </div>
+    <div class="tech-categories">
+      <div class="tech-category" *ngFor="let category of techStack">
+        <h3>{{ category.category }}</h3>
+        <div class="tech-list">
+          <div class="tech-item" *ngFor="let tech of category.technologies">
+            <h4>{{ tech.name }}</h4>
+            <p>{{ tech.description }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Documentation Section -->
+  <section class="documentation-section">
+    <div class="section-header">
+      <h2>Documentation</h2>
+      <p>Get started quickly with our comprehensive documentation</p>
+    </div>
+    <div class="docs-links">
+      <a mat-raised-button color="primary" href="README.md" target="_blank">
+        <mat-icon>description</mat-icon> README
+      </a>
+      <a mat-raised-button href="docs/getting-started.md" target="_blank">
+        <mat-icon>play_arrow</mat-icon> Getting Started
+      </a>
+      <a mat-raised-button href="docs/theme-configuration-guide.md" target="_blank">
+        <mat-icon>palette</mat-icon> Theme Guide
+      </a>
+      <a mat-raised-button href="docs/cookies.md" target="_blank">
+        <mat-icon>cookie</mat-icon> Cookie Policy
+      </a>
+    </div>
+  </section>
+
+  <!-- Call to Action -->
+  <section class="cta-section">
+    <div class="cta-content">
+      <h2>Ready to start building?</h2>
+      <p>Create your first application with our template</p>
+      <a mat-raised-button color="primary" routerLink="/register">Sign Up Free</a>
+    </div>
+  </section>
+</div>

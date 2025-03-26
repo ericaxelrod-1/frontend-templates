@@ -2,12 +2,19 @@ import { Routes } from '@angular/router';
 import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
 import { ErrorComponent } from './shared/error/error.component';
 import { AuthGuard } from './core/guards';
+import { LandingComponent } from './pages/landing/landing.component';
 
 export const routes: Routes = [
   {
     path: '',
     component: MainLayoutComponent,
     children: [
+      // Landing page as default route
+      {
+        path: '',
+        component: LandingComponent,
+        pathMatch: 'full'
+      },
       // Auth routes (without auth prefix)
       {
         path: 'login',
@@ -35,11 +42,6 @@ export const routes: Routes = [
         canActivate: [AuthGuard]
       },
       // Main routes
-      {
-        path: '',
-        redirectTo: 'dashboard',
-        pathMatch: 'full'
-      },
       {
         path: 'dashboard',
         loadComponent: () => import('./features/dashboard/dashboard.component').then(c => c.DashboardComponent),

@@ -1,0 +1,72 @@
+<div class="cookie-consent-container" *ngIf="isOpen">
+  <div class="cookie-consent-panel">
+    <div class="cookie-consent-content">
+      <h2>Cookie Consent</h2>
+      <p>
+        We use cookies to enhance your browsing experience, serve personalized ads or content, and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.
+      </p>
+      
+      <div class="cookie-settings" *ngIf="showDetails">
+        <form [formGroup]="consentForm">
+          <div class="cookie-category">
+            <div class="category-header">
+              <h3>Necessary Cookies</h3>
+              <mat-slide-toggle formControlName="necessary" color="primary"></mat-slide-toggle>
+            </div>
+            <p>Required for the website to function properly. These cannot be disabled.</p>
+          </div>
+
+          <mat-divider></mat-divider>
+          
+          <div class="cookie-category">
+            <div class="category-header">
+              <h3>Preference Cookies</h3>
+              <mat-slide-toggle formControlName="preferences" color="primary"></mat-slide-toggle>
+            </div>
+            <p>Allow the website to remember your preferences and settings.</p>
+          </div>
+
+          <mat-divider></mat-divider>
+          
+          <div class="cookie-category">
+            <div class="category-header">
+              <h3>Analytics Cookies</h3>
+              <mat-slide-toggle formControlName="analytics" color="primary"></mat-slide-toggle>
+            </div>
+            <p>Help us understand how visitors interact with our website.</p>
+          </div>
+
+          <mat-divider></mat-divider>
+          
+          <div class="cookie-category">
+            <div class="category-header">
+              <h3>Marketing Cookies</h3>
+              <mat-slide-toggle formControlName="marketing" color="primary"></mat-slide-toggle>
+            </div>
+            <p>Used to track visitors across websites to display relevant advertisements.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <div class="cookie-consent-actions">
+      <button mat-button color="primary" (click)="toggleDetails()">
+        {{ showDetails ? 'Hide Details' : 'Customize Settings' }}
+      </button>
+      <button mat-button (click)="acceptNecessary()">Necessary Only</button>
+      <button mat-raised-button color="primary" (click)="acceptAll()">Accept All</button>
+      <button mat-raised-button color="accent" (click)="saveConsent()" *ngIf="showDetails">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Small floating button to reopen consent dialog if closed -->
+<button 
+  mat-mini-fab 
+  color="primary" 
+  class="cookie-settings-button" 
+  *ngIf="!isOpen"
+  (click)="reopenConsent()" 
+  aria-label="Cookie settings">
+  <mat-icon>cookie</mat-icon>
+</button> 

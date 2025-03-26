@@ -186,6 +186,7 @@ The `--configuration` flag in Angular determines which environment settings to u
 - [ ] Logo assets are properly sized and optimized for web
 - [ ] Email service is configured for production
 - [ ] Any API keys have been updated for production services
+- [ ] Cookie consent configuration is appropriate for target regions
 
 ## Building for Production
 
@@ -265,6 +266,7 @@ Ensure the following security measures are in place:
 - [ ] Email templates are sanitized against injection attacks
 - [ ] API endpoints implement rate limiting
 - [ ] Sensitive data is properly encrypted
+- [ ] Cookie consent is configured properly for compliance
 
 ## Email Verification Configuration
 
@@ -293,6 +295,53 @@ The application includes an email verification system for new user registrations
 - Implement monitoring for unusual verification patterns
 
 For detailed implementation information, refer to the [Email Configuration Guide](./email-configuration-guide.md).
+
+## Cookie Consent Configuration
+
+The application includes a comprehensive cookie consent system that complies with GDPR, CCPA, and other privacy regulations. For production deployment, ensure proper configuration:
+
+### Cookie Consent Requirements
+
+1. Enable the cookie consent system in your production environment:
+   ```
+   ENABLE_COOKIE_CONSENT=true
+   ```
+
+2. Configure default cookie settings based on your application needs:
+   ```
+   COOKIE_NECESSARY_ENABLED=true        # Always true, required cookies
+   COOKIE_PREFERENCES_DEFAULT=false     # Default OFF for conservative compliance
+   COOKIE_ANALYTICS_DEFAULT=false       # Default OFF for conservative compliance
+   COOKIE_MARKETING_DEFAULT=false       # Default OFF for conservative compliance
+   ```
+
+3. Set up appropriate tracking IDs for production:
+   ```
+   ANALYTICS_TRACKING_ID=G-XXXXXXXXXX   # Your Google Analytics ID
+   MARKETING_PIXEL_ID=XXXXXXXXXXXXX     # Your Facebook Pixel ID (if used)
+   ```
+
+### Database Integration
+
+The cookie consent system optionally integrates with user accounts. To enable this feature:
+
+1. Enable user account storage in environment settings:
+   ```
+   STORE_COOKIE_CONSENT_WITH_USER=true
+   ```
+
+2. Ensure your API has the `/api/user/cookie-consent` endpoint properly configured
+
+3. Test the consent storage flow before deployment
+
+### Legal Compliance Considerations
+
+- Include links to your Privacy Policy and Terms of Service
+- Update the cookie banner text to accurately reflect your cookie usage
+- Adapt the cookie categories based on what your site actually uses
+- Test the consent mechanism thoroughly before deployment
+
+For detailed implementation and customization information, refer to the [Cookie Management Guide](./cookies.md).
 
 ## GDPR Compliance Considerations
 
@@ -357,6 +406,11 @@ EMAIL_FROM=your-email-from-address
 DATABASE_URL=your-database-url
 EMAIL_VERIFICATION_BASE_URL=https://your-production-domain.com/verify-email
 EMAIL_VERIFICATION_TOKEN_EXPIRY=86400000
+ENABLE_COOKIE_CONSENT=true
+COOKIE_NECESSARY_ENABLED=true
+COOKIE_PREFERENCES_DEFAULT=false
+COOKIE_ANALYTICS_DEFAULT=false
+COOKIE_MARKETING_DEFAULT=false
 ```
 
 ## Environment Configuration Files
@@ -418,6 +472,14 @@ Below is a complete reference of all environment variables used in the applicati
 | `THROTTLE_LIMIT` | Maximum requests per time window | `10` in prod, `100` in dev | All modes |
 | `DEBUG` | Enable debug mode | `true` in dev, `false` in prod | Development |
 | `DEBUG_LOG_LEVEL` | Logging verbosity | `debug` | Development |
+| `ENABLE_COOKIE_CONSENT` | Enable cookie consent system | `true` | All modes |
+| `COOKIE_NECESSARY_ENABLED` | Enable necessary cookies | `true` | All modes |
+| `COOKIE_PREFERENCES_DEFAULT` | Default for preference cookies | `false` | All modes |
+| `COOKIE_ANALYTICS_DEFAULT` | Default for analytics cookies | `false` | All modes |
+| `COOKIE_MARKETING_DEFAULT` | Default for marketing cookies | `false` | All modes |
+| `ANALYTICS_TRACKING_ID` | Google Analytics ID | - | Production |
+| `MARKETING_PIXEL_ID` | Facebook Pixel ID | - | Production |
+| `STORE_COOKIE_CONSENT_WITH_USER` | Store consent with user accounts | `true` | All modes |
 
 ### Overriding Environment Variables
 
@@ -477,6 +539,7 @@ DATABASE_WRITE_ENABLED=false npm run start:dev
    docker run -d -p 80:4000 \
      -e NODE_ENV=production \
      -e API_URL=https://your-api-url.com \
+     -e ENABLE_COOKIE_CONSENT=true \
      # Add other environment variables here \
      --name angular-app \
      angular-template:latest
@@ -495,6 +558,7 @@ After deployment, perform these checks:
 7. Test on multiple browsers and devices
 8. Verify email verification process works end-to-end
 9. Test the account deletion process (GDPR compliance)
+10. Verify the cookie consent banner appears and functions correctly
 
 ## Monitoring and Maintenance
 
@@ -525,6 +589,13 @@ Set up monitoring for your deployed application:
   DEBUG=true DEBUG_LOG_FILE=true
   ```
 
+### Cookie Consent Issues
+
+- Check browser console for JavaScript errors
+- Verify that cookie consent preferences are saved in localStorage
+- Test cookie storage with different settings combinations
+- Ensure tracking scripts respect consent settings
+
 ### Database Connection Issues
 
 - Verify database connection string
@@ -539,6 +610,7 @@ Set up monitoring for your deployed application:
 - Monitor disk space and server resources
 - Backup database and configuration regularly
 - Review and update security measures
+- Update privacy policies when cookie behavior changes
 
 ## Rollback Plan
 
@@ -561,6 +633,7 @@ In case of critical issues after deployment:
 
 - [Angular Deployment Guide](https://angular.io/guide/deployment)
 - [Email Configuration Guide](./email-configuration-guide.md)
+- [Cookie Management Guide](./cookies.md)
 - [GDPR Compliance Documentation](./gdpr-compliance.md)
 - [Security Best Practices](https://angular.io/guide/security)
 - [Performance Optimization Guide](https://web.dev/angular)
