@@ -1,0 +1,66 @@
+<svg width="400" height="350" viewBox="0 0 400 350" xmlns="http://www.w3.org/2000/svg">
+  <!-- Angular Logo with Bright Colors -->
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF5252" />
+      <stop offset="100%" stop-color="#FF1744" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  
+  <!-- Shield Background Glow -->
+  <path d="M200,30 L70,78 L92,250 L200,310 L308,250 L330,78 L200,30 Z" 
+        fill="#ffffff" opacity="0.15" filter="url(#glow)" />
+        
+  <!-- Main Angular Shield -->
+  <path d="M200,30 L70,78 L92,250 L200,310 L308,250 L330,78 L200,30 Z" 
+        fill="url(#logoGradient)" />
+  <path d="M200,30 L200,310 L308,250 L330,78 L200,30 Z" 
+        fill="#D50000" />
+    
+  <!-- Light A -->
+  <path d="M200,60 L120,240 L150,240 L170,195 L230,195 L250,240 L280,240 L200,60 Z 
+           M215,170 L185,170 L200,130 L215,170 Z" 
+        fill="#FFFFFF" />
+  
+  <!-- Decorative Elements -->
+  <g opacity="0.9">
+    <!-- Circles -->
+    <circle cx="60" cy="130" r="12" fill="#FFEE58" />
+    <circle cx="40" cy="180" r="8" fill="#FFEE58" />
+    <circle cx="340" cy="120" r="15" fill="#FFEE58" />
+    <circle cx="320" cy="190" r="10" fill="#FFEE58" />
+    
+    <!-- Code Lines -->
+    <g stroke="#FFEE58" stroke-width="3" stroke-linecap="round">
+      <line x1="30" y1="110" x2="80" y2="110" />
+      <line x1="20" y1="125" x2="50" y2="125" />
+      <line x1="40" y1="140" x2="90" y2="140" />
+      
+      <line x1="320" y1="80" x2="370" y2="80" />
+      <line x1="330" y1="95" x2="360" y2="95" />
+      <line x1="310" y1="110" x2="350" y2="110" />
+    </g>
+    
+    <!-- Connected Dots -->
+    <g fill="#FFEE58">
+      <circle cx="40" cy="240" r="4" />
+      <circle cx="70" cy="270" r="4" />
+      <circle cx="100" cy="290" r="4" />
+      
+      <circle cx="360" cy="240" r="4" />
+      <circle cx="330" cy="270" r="4" />
+      <circle cx="300" cy="290" r="4" />
+    </g>
+    <g stroke="#FFEE58" stroke-width="2" opacity="0.7">
+      <line x1="40" y1="240" x2="70" y2="270" />
+      <line x1="70" y1="270" x2="100" y2="290" />
+      
+      <line x1="360" y1="240" x2="330" y2="270" />
+      <line x1="330" y1="270" x2="300" y2="290" />
+    </g>
+  </g>
+</svg> 

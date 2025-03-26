@@ -1,4 +1,6 @@
 <div class="landing-container">
+  <app-landing-header></app-landing-header>
+
   <!-- Hero Section -->
   <section class="hero-section">
     <div class="hero-content">
@@ -12,7 +14,11 @@
       </div>
     </div>
     <div class="hero-image">
-      <img src="assets/images/hero-illustration.svg" alt="Angular Template Illustration">
+      <div class="placeholder-image">
+        <h3>Angular</h3>
+        <div class="shield">A</div>
+        <p>Frontend Template</p>
+      </div>
     </div>
   </section>
 
@@ -25,7 +31,9 @@
     <div class="features-grid">
       <mat-card class="feature-card" *ngFor="let feature of features">
         <mat-card-header>
-          <mat-icon class="feature-icon">{{ feature.icon }}</mat-icon>
+          <div class="feature-icon">
+            <mat-icon>{{ feature.icon }}</mat-icon>
+          </div>
           <mat-card-title>{{ feature.title }}</mat-card-title>
         </mat-card-header>
         <mat-card-content>
@@ -61,16 +69,16 @@
       <p>Get started quickly with our comprehensive documentation</p>
     </div>
     <div class="docs-links">
-      <a mat-raised-button color="primary" href="README.md" target="_blank">
+      <a mat-raised-button color="primary" href="angular/docs/README.md" target="_blank">
         <mat-icon>description</mat-icon> README
       </a>
-      <a mat-raised-button href="docs/getting-started.md" target="_blank">
+      <a mat-raised-button href="angular/docs/getting-started.md" target="_blank">
         <mat-icon>play_arrow</mat-icon> Getting Started
       </a>
-      <a mat-raised-button href="docs/theme-configuration-guide.md" target="_blank">
+      <a mat-raised-button href="angular/docs/theme-configuration-guide.md" target="_blank">
         <mat-icon>palette</mat-icon> Theme Guide
       </a>
-      <a mat-raised-button href="docs/cookies.md" target="_blank">
+      <a mat-raised-button href="angular/docs/cookies.md" target="_blank">
         <mat-icon>cookie</mat-icon> Cookie Policy
       </a>
     </div>

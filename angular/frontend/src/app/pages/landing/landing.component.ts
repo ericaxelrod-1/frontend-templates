@@ -4,21 +4,22 @@ import { RouterModule } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { MatDividerModule } from '@angular/material/divider';
+import { LandingHeaderComponent } from './components/landing-header.component';
 
-interface FeatureCard {
+interface Feature {
   title: string;
   description: string;
   icon: string;
 }
 
-interface TechStack {
+interface TechItem {
+  name: string;
+  description: string;
+}
+
+interface TechCategory {
   category: string;
-  technologies: {
-    name: string;
-    description: string;
-    icon?: string;
-  }[];
+  technologies: TechItem[];
 }
 
 @Component({
@@ -30,13 +31,13 @@ interface TechStack {
     MatButtonModule,
     MatCardModule,
     MatIconModule,
-    MatDividerModule
+    LandingHeaderComponent
   ],
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.scss']
 })
 export class LandingComponent {
-  features: FeatureCard[] = [
+  features: Feature[] = [
     {
       title: 'Authentication',
       description: 'Complete authentication system with login, registration, password reset, and email verification',
@@ -54,40 +55,40 @@ export class LandingComponent {
     },
     {
       title: 'NGXS State Management',
-      description: 'Centralized state management using NGXS for predictable application data flow',
-      icon: 'data_object'
+      description: 'Robust state management with NGXS for predictable state transitions',
+      icon: 'sync_alt'
     },
     {
       title: 'Angular Material',
-      description: 'Beautiful, accessible UI components based on Material Design principles',
-      icon: 'design_services'
+      description: 'Built with Angular Material components for a polished, modern UI',
+      icon: 'dashboard'
     },
     {
       title: 'Server-Side Rendering',
-      description: 'Angular Universal for improved SEO and initial page load performance',
+      description: 'Optional server-side rendering for improved SEO and performance',
       icon: 'speed'
     }
   ];
 
-  techStack: TechStack[] = [
+  techStack: TechCategory[] = [
     {
       category: 'Frontend',
       technologies: [
         {
           name: 'Angular',
-          description: 'Latest version with standalone components'
+          description: 'Progressive JavaScript framework for building modern web applications'
         },
         {
           name: 'TypeScript',
-          description: 'For type-safe code and better developer experience'
+          description: 'Typed superset of JavaScript that compiles to plain JavaScript'
         },
         {
           name: 'Angular Material',
-          description: 'UI component library'
+          description: 'Material Design components for Angular'
         },
         {
           name: 'NGXS',
-          description: 'State management solution'
+          description: 'State management pattern + library for Angular'
         }
       ]
     },
@@ -96,32 +97,15 @@ export class LandingComponent {
       technologies: [
         {
           name: 'Node.js',
-          description: 'JavaScript runtime for the backend'
+          description: 'JavaScript runtime built on Chrome\'s V8 JavaScript engine'
         },
         {
           name: 'Express',
-          description: 'Web framework for Node.js'
+          description: 'Fast, unopinionated, minimalist web framework for Node.js'
         },
         {
           name: 'MongoDB',
-          description: 'NoSQL database for flexible data storage'
-        },
-        {
-          name: 'JWT',
-          description: 'JSON Web Tokens for secure authentication'
-        }
-      ]
-    },
-    {
-      category: 'DevOps',
-      technologies: [
-        {
-          name: 'Docker',
-          description: 'Containerization for consistent deployments'
-        },
-        {
-          name: 'GitHub Actions',
-          description: 'CI/CD pipeline automation'
+          description: 'NoSQL document database with the scalability and flexibility'
         }
       ]
     }
