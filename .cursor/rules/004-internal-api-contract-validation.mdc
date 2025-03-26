@@ -1,0 +1,92 @@
+---
+description: 
+globs: "*.ts", "*.js", "*.jsx", "*.tsx", "*.vue", "*.dart", "*.swift", "*.kt", "*.java", "*.cs", "*.py", "*.rb", "*.php", "*.go", "*.rs", "*.proto", "*.graphql", "*.gql", "*.yaml", "*.yml", "*.json"
+alwaysApply: false
+---
+---
+description: "API Contract Rules for Frontend-Backend Integration"
+globs: ["*.ts", "*.js", "*.jsx", "*.tsx", "*.vue", "*.dart", "*.swift", "*.kt", "*.java", "*.cs", "*.py", "*.rb", "*.php", "*.go", "*.rs", "*.proto", "*.graphql", "*.gql", "*.yaml", "*.yml", "*.json"]
+tags: ["api", "contract", "integration"]
+priority: 1
+---
+
+# API Contract Validation Rules
+
+⚠️ **CRITICAL**: Before modifying ANY service that communicates with the backend:
+
+1. **API Response Contract Verification**
+   - Document the expected API response structure
+   - Verify against actual backend response format
+   - Never assume response structure without checking backend code/docs
+   - Log and validate raw API responses before transformation
+
+2. **Request/Response Mapping**
+   - Maintain a clear mapping between backend snake_case and frontend camelCase
+   - Document all field transformations
+   - Never modify property names without verifying backend contract
+   - Keep a reference of the API contract in comments
+
+3. **Endpoint Documentation**
+   For each endpoint modification:
+   ```typescript
+   /**
+    * @endpoint: [METHOD] /api/path
+    * @request: {
+    *   field_name: type // backend format
+    * }
+    * @response: {
+    *   field_name: type // backend format
+    * }
+    * @transforms: {
+    *   frontendField: 'backend_field'
+    * }
+    */
+   ```
+
+4. **Change Validation Checklist**
+   Before submitting any service changes:
+   - [ ] Verified actual API response structure
+   - [ ] Documented all field mappings
+   - [ ] Tested with real backend response
+   - [ ] Added error handling for missing fields
+   - [ ] Updated interface definitions if needed
+
+5. **Testing Requirements**
+   - Must test with actual backend response
+   - Must log raw response before transformation
+   - Must validate all required fields exist
+   - Must handle missing optional fields gracefully
+
+# Example Usage
+
+```typescript
+/**
+ * @endpoint: POST /api/auth/login
+ * @request: {
+ *   email: string,
+ *   password: string
+ * }
+ * @response: {
+ *   access_token: string,
+ *   refresh_token: string,
+ *   csrf_token: string,
+ *   expires_in: string
+ * }
+ * @transforms: {
+ *   accessToken: 'access_token',
+ *   refreshToken: 'refresh_token',
+ *   csrfToken: 'csrf_token',
+ *   expiresIn: 'expires_in'
+ * }
+ */
+```
+
+# Error Prevention
+
+1. Always log raw API responses before transformation
+2. Validate required fields before mapping
+3. Document backend response structure in comments
+4. Keep interfaces synchronized with backend contracts
+5. Never assume optional fields exist
+
+⚠️ **WARNING**: Failure to follow these rules may result in runtime errors and broken API integration
