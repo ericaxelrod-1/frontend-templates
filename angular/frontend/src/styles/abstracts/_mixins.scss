@@ -1,38 +1,51 @@
-@use '@angular/material' as mat;
+@use '@angular/material' as material;
 @use 'sass:map';
 @use 'variables' as var;
+@use '../themes/material-theme' as theme;
 
 // Mixin to synchronize CSS variables with Material theme
-@mixin sync-theme-vars($theme-or-color-config) {
-  // Extract color palettes from theme or use directly provided config
-  $color-config: if(map.has-key($theme-or-color-config, color), 
-                    map.get($theme-or-color-config, color), 
-                    $theme-or-color-config);
+@mixin sync-theme-vars($is-dark: false) {
+  // Set CSS variables from our theme color map
+  // Primary colors
+  --primary-color: #{theme.get-primary-color()};
+  --primary-light: #{theme.get-primary-color('lighter')};
+  --primary-dark: #{theme.get-primary-color('darker')};
   
-  $primary-palette: map.get($color-config, primary);
-  $accent-palette: map.get($color-config, accent);
-  $warn-palette: map.get($color-config, warn);
-  $is-dark-theme: map.get($color-config, is-dark);
-
-  // Set CSS variables from Material palettes
-  --primary-color: #{mat.get-color-from-palette($primary-palette, 500)};
-  --primary-light: #{mat.get-color-from-palette($primary-palette, 300)};
-  --primary-dark: #{mat.get-color-from-palette($primary-palette, 700)};
-  --accent-color: #{mat.get-color-from-palette($accent-palette, 500)};
-  --accent-light: #{mat.get-color-from-palette($accent-palette, 300)};
-  --accent-dark: #{mat.get-color-from-palette($accent-palette, 700)};
-  --warn-color: #{mat.get-color-from-palette($warn-palette, 500)};
+  // Add RGB values for colors to support transparency
+  --primary-rgb: #{theme.get-color-rgb('primary')};
+  --primary-light-rgb: #{theme.get-color-rgb('primary-light')};
+  --primary-dark-rgb: #{theme.get-color-rgb('primary-dark')};
+  
+  // Accent colors
+  --accent-color: #{theme.get-accent-color()};
+  --accent-light: #{theme.get-accent-color('lighter')};
+  --accent-dark: #{theme.get-accent-color('darker')};
+  
+  // Accent RGB values
+  --accent-rgb: #{theme.get-color-rgb('accent')};
+  --accent-light-rgb: #{theme.get-color-rgb('accent-light')};
+  --accent-dark-rgb: #{theme.get-color-rgb('accent-dark')};
+  
+  // Warn/Error colors
+  --warn-color: #{theme.get-warn-color()};
+  --error: #{theme.get-warn-color()};
+  
+  // Warn/Error RGB values
+  --warn-rgb: #{theme.get-color-rgb('warn')};
+  --error-rgb: #{theme.get-color-rgb('warn')};
 
   // Set text and background colors based on theme brightness
-  @if $is-dark-theme {
-    --text-on-primary: #{mat.get-color-from-palette($primary-palette, 100)};
+  @if $is-dark {
+    // Dark theme text and background colors
+    --text-on-primary: #ffffff;
     --text-primary: #e0e0e0;
     --text-secondary: #a0a0a0;
     --background-dark: #303030;
     --background-card: #424242;
     --surface: #484848;
   } @else {
-    --text-on-primary: #{mat.get-color-from-palette($primary-palette, 50)};
+    // Light theme text and background colors
+    --text-on-primary: #ffffff;
     --text-primary: #212121;
     --text-secondary: #757575;
     --background-dark: #f5f5f5;
@@ -41,10 +54,14 @@
   }
 
   // Status colors remain consistent across light/dark themes
-  --error: #{mat.get-color-from-palette($warn-palette, 500)};
-  --success: #4caf50;
-  --warning: #ff9800;
-  --info: #2196f3;
+  --success: #4caf50; // green 500
+  --warning: #ff9800; // orange 500
+  --info: #2196f3;    // blue 500
+  
+  // Status colors RGB values
+  --success-rgb: 76, 175, 80;
+  --warning-rgb: 255, 152, 0;
+  --info-rgb: 33, 150, 243;
 }
 
 // Flexbox mixins

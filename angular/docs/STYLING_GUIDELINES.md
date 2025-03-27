@@ -81,45 +81,59 @@ export const appConfig = {
 
 ### How Theme Colors Are Managed
 
-The application uses a synchronized theming system that ensures consistency between Angular Material components and custom UI elements. This is achieved through:
+The application uses a simplified, robust theming system that ensures consistency between Angular Material components and custom UI elements. This is achieved through:
 
-1. **Material Theme Definition**: Core theme palettes are defined in [`_material-theme.scss`](../frontend/src/styles/themes/_material-theme.scss)
-2. **CSS Variables**: Material colors are mapped to CSS variables using the `sync-theme-vars` mixin in [`_mixins.scss`](../frontend/src/styles/abstracts/_mixins.scss)
-3. **SCSS Color Functions**: Color manipulation functions in [`_color-functions.scss`](../frontend/src/styles/abstracts/_color-functions.scss) allow you to transform theme colors
+1. **Single Source of Truth**: All color definitions are centralized in [`_material-theme.scss`](../frontend/src/styles/themes/_material-theme.scss) - this is the only place where colors are defined
+2. **Angular Material Integration**: Basic Material theme setup with proper imports
+3. **CSS Variables**: Theme colors are exposed as CSS variables using the `sync-theme-vars` mixin
+4. **SCSS Color Functions**: Color manipulation functions in [`_color-functions.scss`](../frontend/src/styles/abstracts/_color-functions.scss) allow you to transform theme colors consistently
 
 This architecture ensures that changing the theme in one place updates the entire application consistently.
 
 ### Changing the Theme Colors
 
-To update the application theme:
-
-1. **Modify Material Palettes** in [`_material-theme.scss`](../frontend/src/styles/themes/_material-theme.scss):
+To update the application theme, modify the central color definitions in [`_material-theme.scss`](../frontend/src/styles/themes/_material-theme.scss):
 
 ```scss
-// Choose different predefined palettes
-$primary-palette: mat.define-palette(mat.$blue-palette, 700, 300, 900);
-$accent-palette: mat.define-palette(mat.$amber-palette, A200, A100, A400);
-$warn-palette: mat.define-palette(mat.$red-palette);
-
-// Or create custom palettes
-$custom-primary: (
-  50: #e3f2fd,
-  100: #bbdefb,
-  500: #2196f3,
-  700: #1976d2,
-  900: #0d47a1,
-  contrast: (
-    50: rgba(0, 0, 0, 0.87),
-    100: rgba(0, 0, 0, 0.87),
-    500: white,
-    700: white,
-    900: white,
-  )
+// Define the color values directly
+$md-colors: (
+  // Primary (purple)
+  'primary': #7b1fa2,  // purple 700
+  'primary-light': #ae52d4,  // purple 300
+  'primary-dark': #4a0072,  // purple 900
+  
+  // Accent (green)
+  'accent': #69f0ae,  // green A200
+  'accent-light': #b9f6ca,  // green A100
+  'accent-dark': #00e676,  // green A400
+  
+  // Warn/Error (red)
+  'warn': #f44336,  // red 500
+  
+  // ... additional colors ...
 );
-$primary-palette: mat.define-palette($custom-primary);
 ```
 
-2. **The changes will automatically propagate** to CSS variables and be available throughout your application
+The changes will automatically propagate to CSS variables and be available throughout your application because of the `sync-theme-vars` mixin used in styles.scss.
+
+### Current Theme Colors
+
+The current color palette uses these Material Design colors:
+
+```
+// Primary: Material Purple
+'primary': #7b1fa2,  // purple 700
+'primary-light': #ae52d4,  // purple 300
+'primary-dark': #4a0072,  // purple 900
+
+// Accent: Material Green
+'accent': #69f0ae,  // green A200 - This is the bright green color
+'accent-light': #b9f6ca,  // green A100
+'accent-dark': #00e676,  // green A400
+
+// Warn/Error: Material Red
+'warn': #f44336,  // red 500
+```
 
 ### Using Theme Colors
 
@@ -161,9 +175,9 @@ Use the color functions from [`_color-functions.scss`](../frontend/src/styles/ab
   }
 }
 
-// To use colors directly from Material palettes
+// To access specific theme colors
 .custom-element {
-  border-color: abstracts.get-theme-color('primary', 300);
+  border-color: abstracts.get-theme-color('primary', 'lighter');
 }
 ```
 

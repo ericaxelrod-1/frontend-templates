@@ -1,7 +1,27 @@
 .alert {
-  padding: 12px;
+  padding: 12px 16px;
   border-radius: 4px;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+  
+  &.alert-error {
+    background-color: rgba(var(--error-rgb), 0.15);
+    color: var(--error);
+  }
+  
+  &.alert-success {
+    background-color: rgba(var(--success-rgb), 0.15);
+    color: var(--success);
+  }
+  
+  &.alert-warning {
+    background-color: rgba(var(--warning-rgb), 0.15);
+    color: var(--warning);
+  }
+  
+  &.alert-info {
+    background-color: rgba(var(--info-rgb), 0.15);
+    color: var(--info);
+  }
 }
 
 .alert-danger {

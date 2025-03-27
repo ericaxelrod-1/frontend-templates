@@ -1,37 +1,14 @@
-/* Import Angular Material core theming and our custom theme */
-@use '@angular/material' as mat;
+/* Import Angular Material and our custom theme */
+@use '@angular/material' as material;
 @use 'styles/themes/material-theme' as theme;
+@use 'styles/abstracts/mixins' as mixins;
 
-/* CSS Variables for custom components */
+/* Apply Angular Material core styles */
+@include material.core();
+
+/* Apply CSS Variables for Light Theme (default) */
 :root {
-  /* Primary Colors */
-  --primary-color: #{theme.get-primary-color(500)};
-  --primary-light: #{theme.get-primary-color(300)};
-  --primary-dark: #{theme.get-primary-color(700)};
-  
-  /* Accent Colors */
-  --accent-color: #{theme.get-accent-color(500)};
-  --accent-light: #{theme.get-accent-color(300)};
-  --accent-dark: #{theme.get-accent-color(700)};
-  
-  /* Warn/Error Colors */
-  --warn-color: #{theme.get-warn-color(500)};
-  --error: #{theme.get-warn-color(500)};
-  
-  /* Text Colors - Light Theme */
-  --text-on-primary: #ffffff;
-  --text-primary: #212121;
-  --text-secondary: #757575;
-  
-  /* Background Colors - Light Theme */
-  --background-dark: #f5f5f5;
-  --background-card: #ffffff;
-  --surface: #fafafa;
-  
-  /* Status Colors */
-  --success: #4caf50;
-  --warning: #ff9800;
-  --info: #2196f3;
+  @include mixins.sync-theme-vars(false);
 }
 
 /* Base styles */
@@ -56,26 +33,10 @@ body {
 
 /* Dark theme class */
 .dark-theme {
-  /* Text Colors - Dark Theme */
-  --text-on-primary: #ffffff;
-  --text-primary: #e0e0e0;
-  --text-secondary: #a0a0a0;
-  
-  /* Background Colors - Dark Theme */
-  --background-dark: #303030;
-  --background-card: #424242;
-  --surface: #484848;
+  @include mixins.sync-theme-vars(true);
 }
 
 /* Light theme class (default) */
 .light-theme {
-  /* Text Colors - Light Theme */
-  --text-on-primary: #ffffff;
-  --text-primary: #212121;
-  --text-secondary: #757575;
-  
-  /* Background Colors - Light Theme */
-  --background-dark: #f5f5f5;
-  --background-card: #ffffff;
-  --surface: #fafafa;
+  @include mixins.sync-theme-vars(false);
 } 

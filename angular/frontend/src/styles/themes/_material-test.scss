@@ -1,0 +1,13 @@
+// Simple test for Angular Material imports
+@use '@angular/material' as material;
+
+// Include common Angular Material styles
+@include material.core();
+
+// Define colors manually (not using functions for now)
+:root {
+  // These are the exact colors from the Material palettes
+  --test-primary: #7b1fa2; // purple 700
+  --test-accent: #69f0ae;  // green A200
+  --test-warn: #f44336;    // red 500
+} 

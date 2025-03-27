@@ -11,8 +11,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 64px 32px;
-  background: linear-gradient(135deg, #8e2de2, #4a00e0);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  color: var(--text-on-primary);
   min-height: 400px;
   
   @media (max-width: 768px) {
@@ -74,7 +74,7 @@
     h3 {
       font-size: 32px;
       margin-bottom: 10px;
-      color: white;
+      color: var(--text-on-primary);
       font-weight: 600;
     }
     
@@ -87,13 +87,13 @@
     .shield {
       width: 120px;
       height: 120px;
-      background: linear-gradient(135deg, #FF5252, #FF1744);
+      background: linear-gradient(135deg, var(--warn-color), var(--error));
       margin: 0 auto;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
+      color: var(--text-on-primary);
       font-size: 60px;
       font-weight: bold;
       box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
@@ -139,12 +139,12 @@ section {
   h2 {
     font-size: 2.5rem;
     margin-bottom: 16px;
-    color: #333;
+    color: var(--text-primary);
   }
   
   p {
     font-size: 1.1rem;
-    color: #555;
+    color: var(--text-secondary);
     max-width: 700px;
     margin: 0 auto;
   }
@@ -153,7 +153,7 @@ section {
 // Features section
 .features-section {
   padding: 64px 32px;
-  background-color: #f8f9fa;
+  background-color: var(--background-dark);
   
   @media (max-width: 768px) {
     padding: 48px 16px;
@@ -190,8 +190,8 @@ section {
   }
   
   .feature-icon {
-    background-color: #8e2de2;
-    color: white;
+    background-color: var(--primary-color);
+    color: var(--text-on-primary);
     width: 60px;
     height: 60px;
     border-radius: 50%;
@@ -246,8 +246,8 @@ section {
   h3 {
     font-size: 1.5rem;
     margin-bottom: 16px;
-    color: #8e2de2;
-    border-bottom: 2px solid #8e2de2;
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
     padding-bottom: 8px;
   }
 }

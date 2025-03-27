@@ -1,57 +1,84 @@
-@use '@angular/material' as mat;
+// Simplified Angular Material Theme file
+// Import using @use statement only
 @use 'sass:map';
+@use 'sass:color';
+@use '@angular/material' as material;
 
-// Import Material theming functions
-@include mat.core();
+// Include common styles
+@include material.core();
 
-// Define custom palettes (this matches previous purple/green theme)
-$primary-palette: mat.define-palette(mat.$purple-palette, 700, 300, 900);
-$accent-palette: mat.define-palette(mat.$green-palette, A200, A100, A400);
-$warn-palette: mat.define-palette(mat.$red-palette);
+// Define the color values directly without using functions for now
+// These are the official Material Design colors 
+$md-colors: (
+  // Primary (purple)
+  'primary': #7b1fa2,  // purple 700
+  'primary-light': #ae52d4,  // purple 300
+  'primary-dark': #4a0072,  // purple 900
+  
+  // Accent (green)
+  'accent': #69f0ae,  // green A200
+  'accent-light': #b9f6ca,  // green A100
+  'accent-dark': #00e676,  // green A400
+  
+  // Warn/Error (red)
+  'warn': #f44336,  // red 500
+  
+  // Status colors (standard Material Design)
+  'error': #f44336,  // Same as warn (red 500)
+  'success': #4caf50,  // green 500
+  'warning': #ff9800,  // orange 500
+  'info': #2196f3,  // blue 500
+  
+  // Light theme text/background
+  'light-text-primary': rgba(0, 0, 0, 0.87),
+  'light-text-secondary': rgba(0, 0, 0, 0.6),
+  'light-bg-card': #ffffff,
+  'light-bg-surface': #fafafa,
+  
+  // Dark theme text/background
+  'dark-text-primary': #ffffff,
+  'dark-text-secondary': rgba(255, 255, 255, 0.7),
+  'dark-bg-card': #424242,
+  'dark-bg-surface': #303030
+);
 
-// Create the light theme (default)
-$theme: mat.define-light-theme((
-  color: (
-    primary: $primary-palette,
-    accent: $accent-palette,
-    warn: $warn-palette,
-  ),
-  typography: mat.define-typography-config(),
-  density: 0,
-));
-
-// Create a dark theme
-$dark-theme: mat.define-dark-theme((
-  color: (
-    primary: $primary-palette,
-    accent: $accent-palette,
-    warn: $warn-palette,
-  ),
-  typography: mat.define-typography-config(),
-  density: 0,
-));
-
-// Include theme for components (default light theme)
-@include mat.all-component-themes($theme);
-
-// Export material color functions that convert our theme to CSS variables
-@function get-primary-color($weight: 500) {
-  @return mat.get-color-from-palette($primary-palette, $weight);
+// Helper function to get a color from our color map
+@function get-color($color-name) {
+  @if map.has-key($md-colors, $color-name) {
+    @return map.get($md-colors, $color-name);
+  } @else {
+    @error "Color '#{$color-name}' not found in $md-colors.";
+    @return #000000;
+  }
 }
 
-@function get-accent-color($weight: 500) {
-  @return mat.get-color-from-palette($accent-palette, $weight);
+// Function to extract RGB values from a color (for use with rgba())
+@function get-color-rgb($color-name) {
+  $color: get-color($color-name);
+  @return "#{color.red($color)}, #{color.green($color)}, #{color.blue($color)}";
 }
 
-@function get-warn-color($weight: 500) {
-  @return mat.get-color-from-palette($warn-palette, $weight);
+// Helper functions to get specific colors
+@function get-primary-color($type: null) {
+  @if $type == 'lighter' {
+    @return get-color('primary-light');
+  } @else if $type == 'darker' {
+    @return get-color('primary-dark');
+  } @else {
+    @return get-color('primary');
+  }
 }
 
-// Helper function to get a color from any palette
-@function get-color-from-theme($theme, $palette, $hue: 500) {
-  $color-config: map.get($theme, color);
-  $specific-palette: map.get($color-config, $palette);
-  @return mat.get-color-from-palette($specific-palette, $hue);
+@function get-accent-color($type: null) {
+  @if $type == 'lighter' {
+    @return get-color('accent-light');
+  } @else if $type == 'darker' {
+    @return get-color('accent-dark');
+  } @else {
+    @return get-color('accent');
+  }
 }
 
-@include mat.all-component-typographies($theme); 
+@function get-warn-color($type: null) {
+  @return get-color('warn');
+} 
