@@ -22,9 +22,9 @@ export class SidebarComponent {
   @Input() opened: boolean = false;
   
   navItems = [
-    { label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
-    { label: 'Users', icon: 'people', route: '/users' },
-    { label: 'Groups', icon: 'group_work', route: '/groups' },
-    { label: 'Tasks', icon: 'assignment', route: '/tasks' }
+    { label: 'Dashboard', icon: 'dashboard', route: '/app/dashboard' },
+    { label: 'Users', icon: 'people', route: '/app/users' },
+    { label: 'Groups', icon: 'group_work', route: '/app/groups' },
+    { label: 'Tasks', icon: 'assignment', route: '/app/tasks' }
   ];
 }

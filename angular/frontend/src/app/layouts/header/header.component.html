@@ -16,7 +16,7 @@
       <span>Logout</span>
     </button>
     
-    <button mat-icon-button routerLink="/profile">
+    <button mat-icon-button routerLink="/app/profile">
       <mat-icon>account_circle</mat-icon>
     </button>
     
@@ -29,7 +29,7 @@
         <p class="user-name">{{ (user || authService.currentUser)?.firstName || 'User' }} {{ (user || authService.currentUser)?.lastName || '' }}</p>
         <p class="user-email">{{ (user || authService.currentUser)?.email }}</p>
       </div>
-      <button mat-menu-item routerLink="/profile">
+      <button mat-menu-item routerLink="/app/profile">
         <mat-icon>person</mat-icon>
         <span>Profile</span>
       </button>
