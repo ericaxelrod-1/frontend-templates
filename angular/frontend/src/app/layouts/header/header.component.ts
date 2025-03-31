@@ -132,10 +132,21 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.sidebarToggle.emit();
   }
   
-  async logout(): Promise<void> {
-    console.log('Logging out user...');
-    this.store.dispatch(new AuthActions.Logout());
-    this.router.navigate(['/login']);
+  logout(): void {
+    console.log('HeaderComponent: Initiating logout sequence');
+    
+    // Dispatch the logout action and wait for it to complete
+    this.store.dispatch(new AuthActions.Logout()).subscribe({
+      next: () => {
+        console.log('HeaderComponent: Logout action completed successfully, navigating to login page');
+        this.router.navigate(['/login']);
+      },
+      error: (error) => {
+        console.error('HeaderComponent: Error during logout:', error);
+        // Still navigate to login even on error
+        this.router.navigate(['/login']);
+      }
+    });
   }
   
   /**

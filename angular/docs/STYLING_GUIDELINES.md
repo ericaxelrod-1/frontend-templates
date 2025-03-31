@@ -135,6 +135,196 @@ The current color palette uses these Material Design colors:
 'warn': #f44336,  // red 500
 ```
 
+### Implementing Dark and Light Themes
+
+Our theming system supports both dark and light modes through CSS variables that change based on the active theme:
+
+#### 1. CSS Variable System
+
+All theme colors are exposed as CSS variables in two formats:
+- Direct color values: `--primary-color`, `--accent-color`, etc.
+- RGB color values: `--primary-rgb`, `--accent-rgb`, etc. (for use with opacity/alpha)
+
+The RGB values enable proper transparency operations:
+
+```css
+/* Example using RGB format with transparency */
+background-color: rgba(var(--primary-rgb), 0.2);
+```
+
+#### 2. Theme Switching Mechanism
+
+The `sync-theme-vars` mixin in `_mixins.scss` manages theme switching:
+
+```scss
+@mixin sync-theme-vars($is-dark: false) {
+  // Primary, accent and warn colors remain consistent across themes
+  --primary-color: #{theme.get-primary-color()};
+  --accent-color: #{theme.get-accent-color()};
+  
+  // But text and background colors change based on theme
+  @if $is-dark {
+    // Dark theme values
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --background-dark: #303030;
+    --background-card: #424242;
+    --surface: #484848;
+  } @else {
+    // Light theme values
+    --text-primary: #212121;
+    --text-secondary: #757575;
+    --background-dark: #f5f5f5;
+    --background-card: #ffffff;
+    --surface: #fafafa;
+  }
+}
+```
+
+#### 3. Theme Classes
+
+To apply a theme, add the appropriate class to a container:
+
+```html
+<!-- Light theme (default) -->
+<div class="light-theme">...</div>
+
+<!-- Dark theme -->
+<div class="dark-theme">...</div>
+```
+
+These classes are defined in `styles.scss`:
+
+```scss
+.dark-theme {
+  @include mixins.sync-theme-vars(true);
+}
+
+.light-theme {
+  @include mixins.sync-theme-vars(false);
+}
+```
+
+#### 4. Programmatic Theme Switching
+
+To toggle themes programmatically:
+
+```typescript
+// In a theme service
+toggleTheme() {
+  const body = document.getElementsByTagName('body')[0];
+  body.classList.toggle('dark-theme');
+  body.classList.toggle('light-theme');
+  
+  // Store preference in localStorage
+  const isDarkTheme = body.classList.contains('dark-theme');
+  localStorage.setItem('darkTheme', isDarkTheme.toString());
+}
+```
+
+### Ensuring Text Readability in Both Themes
+
+A common issue with dark themes is poor text readability when component styles use hardcoded colors instead of theme variables.
+
+#### Common Issues and Solutions
+
+1. **Hardcoded Text Colors**
+   
+   ❌ **Problem**:
+   ```scss
+   .component-text {
+     color: #333; // Hardcoded dark color - will be unreadable on dark backgrounds
+   }
+   ```
+   
+   ✅ **Solution**:
+   ```scss
+   .component-text {
+     color: var(--text-primary); // Adapts to current theme
+   }
+   ```
+
+2. **Hardcoded Background Colors**
+   
+   ❌ **Problem**:
+   ```scss
+   .component-container {
+     background-color: white; // Hardcoded - doesn't adapt to theme
+   }
+   ```
+   
+   ✅ **Solution**:
+   ```scss
+   .component-container {
+     background-color: var(--background-card);
+   }
+   ```
+
+3. **Insufficient Contrast**
+   
+   ❌ **Problem**:
+   ```scss
+   .subtle-text {
+     color: rgba(0, 0, 0, 0.6); // Hardcoded with opacity - poor contrast in dark theme
+   }
+   ```
+   
+   ✅ **Solution**:
+   ```scss
+   .subtle-text {
+     color: var(--text-secondary); // Secondary text color adapts to theme
+   }
+   ```
+
+4. **Inconsistent Use of Variables**
+   
+   ❌ **Problem**:
+   ```scss
+   // Mixing direct theme colors with variables
+   .button {
+     background-color: var(--primary-color);
+     color: white; // Hardcoded - should use theme variable
+   }
+   ```
+   
+   ✅ **Solution**:
+   ```scss
+   .button {
+     background-color: var(--primary-color);
+     color: var(--text-on-primary);
+   }
+   ```
+
+#### Checking for Theme Compatibility
+
+To verify if a component is correctly using theme variables:
+
+1. Apply both themes to the component
+2. Inspect the element's computed styles to verify:
+   - Text color adapts to theme (light vs dark)
+   - Background color adapts to theme
+   - Contrast is sufficient in both themes (4.5:1 minimum)
+3. Check for hardcoded values in component SCSS
+
+#### Debugging Theme Issues
+
+If a component doesn't look right in a specific theme:
+
+1. **Inspect the Element**: Use browser dev tools to identify which CSS property is causing the issue
+2. **Check Variable Usage**: Ensure the component is using theme variables
+3. **Verify Contrast**: Ensure text has sufficient contrast against its background
+4. **Look for Hardcoded Values**: Replace any hardcoded colors with theme variables
+
+#### Theme Variables Reference
+
+| Purpose | Light Theme | Dark Theme | Variable |
+|---------|-------------|------------|----------|
+| Text (primary) | #212121 | #e0e0e0 | `--text-primary` |
+| Text (secondary) | #757575 | #a0a0a0 | `--text-secondary` |
+| Background | #f5f5f5 | #303030 | `--background-dark` |
+| Card/Surface | #ffffff | #424242 | `--background-card` |
+| Surface | #fafafa | #484848 | `--surface` |
+
 ### Using Theme Colors
 
 #### In SCSS/CSS

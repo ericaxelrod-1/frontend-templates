@@ -1,6 +1,6 @@
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, throwError, catchError, map, mergeMap } from 'rxjs';
+import { BehaviorSubject, Observable, tap, throwError, catchError, map, mergeMap, of } from 'rxjs';
 import { isPlatformBrowser } from '@angular/common';
 import { 
   User, 
@@ -64,6 +64,15 @@ export class AuthService {
 
   get isAuthenticated(): boolean {
     return !!this.accessToken && !!this.currentUser;
+  }
+
+  /**
+   * Check if the current user has a specific role
+   * @param role The role to check for
+   * @returns True if the user has the specified role, false otherwise
+   */
+  hasRole(role: string): boolean {
+    return !!this.currentUser?.roles?.includes(role);
   }
 
   // Public method to refresh auth state from storage
@@ -176,15 +185,29 @@ export class AuthService {
 
   // Logout
   logout(): Observable<any> {
+    console.log('AuthService.logout called, refresh token available:', !!this.refreshToken);
+    
     if (!this.refreshToken) {
+      console.warn('No refresh token available for logout, clearing auth state only');
       this.clearAuthState();
-      return throwError(() => new Error('No refresh token available'));
+      return of({ success: true, message: 'Logged out successfully (local only)' });
     }
 
     const request: RefreshTokenRequest = { refreshToken: this.refreshToken };
+    console.log('Sending logout request to backend');
+    
     return this.http.post(`${this.API_URL}/logout`, request)
       .pipe(
-        tap(() => this.clearAuthState())
+        tap((response) => {
+          console.log('Logout successful, clearing auth state', response);
+          this.clearAuthState();
+        }),
+        catchError(error => {
+          console.error('Error during logout API call:', error);
+          // Still clear auth state locally even if API call fails
+          this.clearAuthState();
+          return of({ success: true, message: 'Logged out locally despite API error' });
+        })
       );
   }
 
@@ -194,10 +217,27 @@ export class AuthService {
       return throwError(() => new Error('No refresh token available'));
     }
 
+    // Ensure refresh token is a string and properly formatted
+    if (typeof this.refreshToken !== 'string' || this.refreshToken.trim() === '') {
+      console.error('Invalid refresh token format:', this.refreshToken);
+      this.clearAuthState();
+      return throwError(() => new Error('Invalid refresh token format'));
+    }
+
     const request: RefreshTokenRequest = { refreshToken: this.refreshToken };
+    console.log('Sending refresh token request with token type:', typeof this.refreshToken);
+    
     return this.http.post<AuthResponse>(`${this.API_URL}/refresh`, request)
       .pipe(
-        tap(response => this.handleAuthResponse(response))
+        tap(response => this.handleAuthResponse(response)),
+        catchError(error => {
+          console.error('Token refresh error:', error);
+          // If we get an invalid token error, clear the auth state
+          if (error.status === 400) {
+            this.clearAuthState();
+          }
+          return throwError(() => error);
+        })
       );
   }
 
@@ -448,13 +488,14 @@ export class AuthService {
       try {
         const userJson = localStorage.getItem('user');
         const accessToken = localStorage.getItem('accessToken');
-        const refreshToken = localStorage.getItem('refreshToken');
+        let refreshToken = localStorage.getItem('refreshToken');
         const csrfToken = localStorage.getItem('csrfToken');
         const testToken = localStorage.getItem('testVerificationToken');
 
         console.log('Loading auth state from storage - found tokens:', { 
           hasUser: !!userJson, 
-          hasAccessToken: !!accessToken 
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken
         });
 
         // Only try to parse and set user data if both user and token exist
@@ -462,11 +503,24 @@ export class AuthService {
           try {
             const user = JSON.parse(userJson);
             
-            // Validate token format (simple check)
-            const isValidToken = typeof accessToken === 'string' && accessToken.length > 20;
+            // Validate tokens format (simple check)
+            const isValidAccessToken = typeof accessToken === 'string' && accessToken.length > 20;
+            const isValidRefreshToken = typeof refreshToken === 'string' && refreshToken.length > 20;
+            
+            if (!isValidAccessToken) {
+              console.warn('Invalid access token format in localStorage, clearing auth state');
+              this.clearAuthState();
+              return;
+            }
+            
+            if (!isValidRefreshToken && refreshToken !== null) {
+              console.warn('Invalid refresh token format in localStorage, clearing refresh token');
+              localStorage.removeItem('refreshToken');
+              refreshToken = null;
+            }
             
             // Validate that user object has required fields
-            if (user && user.id && user.email && isValidToken) {
+            if (user && user.id && user.email && isValidAccessToken) {
               console.log('Valid auth data found in localStorage, setting auth state');
               this.currentUserSubject.next(user);
               this.accessTokenSubject.next(accessToken);
@@ -479,7 +533,7 @@ export class AuthService {
                 this.csrfTokenSubject.next(csrfToken);
               }
             } else {
-              console.warn('Invalid user data or token format in localStorage');
+              console.warn('Invalid user data in localStorage, clearing auth state');
               this.clearAuthState();
             }
           } catch (error) {
@@ -488,6 +542,7 @@ export class AuthService {
           }
         } else {
           // Clear any partial state if either user or token is missing
+          console.log('Incomplete auth data in localStorage, clearing auth state');
           this.clearAuthState();
         }
         

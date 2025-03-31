@@ -4,6 +4,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { RouterModule } from '@angular/router';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -25,6 +26,17 @@ export class SidebarComponent {
     { label: 'Dashboard', icon: 'dashboard', route: '/app/dashboard' },
     { label: 'Users', icon: 'people', route: '/app/users' },
     { label: 'Groups', icon: 'group_work', route: '/app/groups' },
-    { label: 'Tasks', icon: 'assignment', route: '/app/tasks' }
+    { label: 'Roles', icon: 'admin_panel_settings', route: '/app/roles' }
   ];
+
+  adminItems = [
+    { label: 'Login Monitoring', icon: 'security', route: '/admin/login-monitoring' }
+  ];
+  
+  constructor(public authService: AuthService) {}
+  
+  // Determines if the user has superadmin role
+  get isSuperAdmin(): boolean {
+    return this.authService.hasRole('SUPERADMIN');
+  }
 }

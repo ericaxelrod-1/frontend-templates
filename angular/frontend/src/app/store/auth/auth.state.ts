@@ -4,7 +4,7 @@ import { Navigate } from '@ngxs/router-plugin';
 import { AuthService } from '../../core/services';
 import { User, UserRegistration } from '../../models';
 import { catchError, tap } from 'rxjs/operators';
-import { throwError } from 'rxjs';
+import { throwError, of } from 'rxjs';
 
 // Auth actions
 export namespace AuthActions {
@@ -368,17 +368,19 @@ export class AuthState {
 
   @Action(AuthActions.Logout)
   logout(ctx: StateContext<AuthStateModel>) {
+    console.log('AuthState: Logout action dispatched');
     ctx.patchState({ loading: true });
     
     return this.authService.logout().pipe(
-      tap(() => {
+      tap((response) => {
+        console.log('AuthState: Logout successful:', response);
         ctx.setState(defaults);
-        return ctx.dispatch(new Navigate(['/login']));
       }),
       catchError(error => {
+        console.error('AuthState: Error in logout:', error);
         // Even if there's an error, clear state anyway for security
         ctx.setState(defaults);
-        return ctx.dispatch(new Navigate(['/login']));
+        return of(null); // Return observable that completes successfully
       })
     );
   }

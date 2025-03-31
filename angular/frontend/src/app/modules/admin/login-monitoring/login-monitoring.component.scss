@@ -1,0 +1,338 @@
+.login-monitoring-container {
+  padding: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+  
+  h1 {
+    margin-bottom: 24px;
+    color: var(--primary-color);
+  }
+}
+
+// Statistics cards
+.stats-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stats-card {
+  border-radius: 8px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+  
+  &.success {
+    border-left: 4px solid #4caf50;
+  }
+  
+  &.warning {
+    border-left: 4px solid #ff9800;
+  }
+  
+  &.danger {
+    border-left: 4px solid #f44336;
+  }
+  
+  &.info {
+    border-left: 4px solid #2196f3;
+  }
+  
+  mat-card-header {
+    padding: 16px 16px 0;
+  }
+  
+  .stats-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+  
+  .stats-number {
+    font-size: 32px;
+    font-weight: 500;
+  }
+  
+  .stats-percent {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.6);
+    margin-top: 8px;
+  }
+}
+
+// Section cards
+.section-card {
+  margin-bottom: 24px;
+  border-radius: 8px;
+  
+  mat-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 16px 0;
+    
+    .mat-card-title {
+      display: flex;
+      align-items: center;
+      
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 24px;
+        border-radius: 12px;
+        padding: 0 8px;
+        margin-left: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        
+        &.danger {
+          background-color: #f44336;
+          color: white;
+        }
+      }
+    }
+    
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      
+      button {
+        display: flex;
+        align-items: center;
+        
+        mat-icon {
+          margin-right: 4px;
+        }
+      }
+    }
+  }
+  
+  mat-card-content {
+    padding: 16px;
+  }
+}
+
+// Tables
+mat-table {
+  width: 100%;
+  
+  .mat-header-row {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  
+  .mat-column-id {
+    max-width: 80px;
+  }
+  
+  .mat-column-actions {
+    max-width: 120px;
+  }
+}
+
+// Badges
+.severity-badge, .status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.severity-high {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.severity-medium {
+  background-color: #fff8e1;
+  color: #ff8f00;
+}
+
+.severity-low {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-failed {
+  background-color: #fff8e1;
+  color: #ff8f00;
+}
+
+.status-blocked {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.status-captcha_required, .status-captcha_failed {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+// IP link
+.ip-link {
+  color: var(--primary-color);
+  text-decoration: underline;
+  cursor: pointer;
+  
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+// Loading placeholder
+.loading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  
+  span {
+    margin-top: 16px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+// Empty state
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+  color: rgba(0, 0, 0, 0.5);
+  
+  .empty-icon {
+    font-size: 48px;
+    height: 48px;
+    width: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+  
+  p {
+    font-size: 16px;
+  }
+}
+
+// Filters
+.filters-form {
+  margin-bottom: 16px;
+  
+  .filters-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    
+    mat-form-field {
+      flex: 1;
+    }
+    
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      padding-top: 4px;
+    }
+  }
+}
+
+// IP Reputation Dialog
+.ip-reputation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.ip-reputation-card {
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  
+  mat-card-header {
+    position: relative;
+    
+    .close-button {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+  }
+  
+  .reputation-stats {
+    margin: 16px 0;
+    
+    .reputation-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      
+      &:last-child {
+        border-bottom: none;
+      }
+      
+      .reputation-label {
+        font-weight: 500;
+      }
+      
+      .reputation-value {
+        &.status-blocked {
+          color: #c62828;
+          font-weight: 500;
+        }
+        
+        &.status-allowed {
+          color: #2e7d32;
+          font-weight: 500;
+        }
+        
+        &.score-good {
+          color: #2e7d32;
+          font-weight: 500;
+        }
+        
+        &.score-medium {
+          color: #ff8f00;
+          font-weight: 500;
+        }
+        
+        &.score-bad {
+          color: #c62828;
+          font-weight: 500;
+        }
+      }
+    }
+  }
+  
+  .ip-actions {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
+    
+    button {
+      min-width: 120px;
+    }
+  }
+} 

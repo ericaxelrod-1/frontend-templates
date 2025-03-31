@@ -41,12 +41,40 @@ Follow these steps to set up the project for development:
    npm install
    ```
 
+### Default Admin Account
+
+For security purposes, the application comes with a default admin account:
+
+- **Username**: admin@example.com
+- **Password**: Admin123!
+
+⚠️ **IMPORTANT**: The application enforces strict security measures for the default admin account:
+
+1. **Mandatory Password Change**:
+   - You will be required to change the password on first login
+   - No admin features will be accessible until the password is changed
+   - The new password must meet enhanced security requirements:
+     - Minimum 12 characters
+     - Must include uppercase, lowercase, numbers, and special characters
+     - Cannot be similar to the default password
+     - Cannot contain common patterns or dictionary words
+
+2. **Login Protection**:
+   - Strict rate limiting is enforced:
+     - 3 failed attempts: 15-minute lockout
+     - 5 failed attempts: 1-hour lockout
+     - 10 failed attempts: 24-hour lockout
+   - IP addresses will be temporarily blocked after failed attempts
+   - Suspicious access patterns will trigger additional verification
+   - All login attempts are logged and monitored
+
+For complete security documentation, including all implemented protections and best practices, see the [Security Guide](./docs/security.md).
+
 ### Development Server
 
 1. Start the backend server:
    ```bash
-   cd backend
-   npm run start:dev
+   cd angular/backend &&  npm run start:dev
    ```
 2. In a new terminal, start the frontend server:
    ```bash
@@ -61,16 +89,14 @@ Follow these steps to set up the project for development:
 
 1. **Standard Development Mode**
 ```bash
-cd frontend
-npm start
+cd frontend npm start
 # or
 ng serve
 ```
 
 2. **Debug Mode**
 ```bash
-cd frontend
-npm start -- --configuration=development
+cd angular/frontend && npm start -- --configuration=development
 # or
 ng serve --configuration=development
 ```
@@ -101,8 +127,7 @@ npm run start:dev
 
 2. **Debug Mode**
 ```bash
-cd backend
-npm run start:dev -- --debug
+cd angular\backend && npm run start:dev -- --debug
 ```
 
 3. **Watch Mode**
@@ -125,6 +150,17 @@ The application can be configured through environment files:
 - `.env` - Default/Production environment variables
 - `.env.development` - Development environment variables
 - `.env.test` - Testing environment variables
+
+## Logging System
+
+The application implements comprehensive logging across both frontend and backend components:
+
+- **Frontend Logs**: Daily rotating logs for component lifecycle events, user interactions, and API calls
+- **Backend Logs**: Application events, audit trails, and error tracking with automatic rotation
+- **Log Levels**: ERROR, WARN, INFO, DEBUG, and TRACE with configurable verbosity
+- **Development Tools**: Built-in debugging components and logging middleware
+
+For detailed information about the logging system, debugging tools, and best practices, see the [Debugging and Logging Guide](./docs/DEBUGGING_LOGGING.md).
 
 ## Cookie Consent System
 

@@ -11,6 +11,23 @@
     <span matListItemTitle>{{ item.label }}</span>
   </a>
   
+  <!-- Admin Section (only visible to superadmins) -->
+  <ng-container *ngIf="isSuperAdmin">
+    <mat-divider class="section-divider"></mat-divider>
+    
+    <div class="sidebar-section">
+      <h3>Admin</h3>
+    </div>
+    
+    <a mat-list-item 
+       *ngFor="let item of adminItems" 
+       [routerLink]="item.route" 
+       routerLinkActive="active-link">
+      <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+      <span matListItemTitle>{{ item.label }}</span>
+    </a>
+  </ng-container>
+  
   <mat-divider class="section-divider"></mat-divider>
   
   <div class="sidebar-section">
