@@ -1,21 +1,25 @@
-import { Component, OnInit, OnDestroy, inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, PLATFORM_ID, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, ActivatedRoute, RouterModule } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { Store, Select } from '@ngxs/store';
 import { Observable, Subscription } from 'rxjs';
 import { AuthState, AuthActions } from '../../../store/auth/auth.state';
-import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { AppConfigService } from '../../../core/services';
 import { LoggerService } from '../../../services/logging/logger.service';
+import { CaptchaService } from '../../../core/services/captcha.service';
+import { CaptchaComponent } from '../../../shared/components/captcha/captcha.component';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule]
+  imports: [CommonModule, ReactiveFormsModule, CaptchaComponent]
 })
 export class LoginComponent implements OnInit, OnDestroy {
+  @ViewChild(CaptchaComponent) captchaComponent!: CaptchaComponent;
+  
   loginForm!: FormGroup;
   returnUrl: string = '/';
   private subscription = new Subscription();
@@ -39,7 +43,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     private router: Router,
     private store: Store,
     private appConfig: AppConfigService,
-    private logger: LoggerService
+    private logger: LoggerService,
+    private captchaService: CaptchaService
   ) {
     this.logger.info('LoginComponent constructor called');
     try {
@@ -61,7 +66,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     // Initialize form with validation
     this.loginForm = this.formBuilder.group({
       email: ['', [Validators.required, Validators.email]],
-      password: ['', Validators.required]
+      password: ['', Validators.required],
+      captcha: [null, Validators.required]
     });
 
     this.logger.debug('LoginForm initialized:', this.loginForm);
@@ -113,6 +119,12 @@ export class LoginComponent implements OnInit, OnDestroy {
   onSubmit(): void {
     this.logger.info('LoginComponent onSubmit called');
     this.submitted = true;
+    
+    // Mark fields as touched for validation
+    this.loginForm.markAllAsTouched();
+    if (this.captchaComponent) {
+      this.captchaComponent.markAsTouched();
+    }
 
     // Stop here if form is invalid
     if (this.loginForm.invalid) {
@@ -129,6 +141,41 @@ export class LoginComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Get CAPTCHA data directly from the form value
+    const captchaValue = this.f['captcha'].value;
+    if (!captchaValue || !captchaValue.captchaId || !captchaValue.userInput) {
+      this.logger.warn('CAPTCHA data is missing or invalid:', captchaValue);
+      return;
+    }
+
+    this.logger.info('Verifying CAPTCHA before login:', captchaValue);
+    this.loading = true;
+
+    // Verify CAPTCHA first
+    this.captchaService.verifyCaptcha(captchaValue.captchaId, captchaValue.userInput)
+      .subscribe({
+        next: (response) => {
+          this.logger.info('CAPTCHA verification response:', response);
+          if (response.success) {
+            this.logger.info('CAPTCHA verification successful, proceeding with login');
+            this.dispatchLogin();
+          } else {
+            this.logger.warn('CAPTCHA verification failed');
+            this.error = 'CAPTCHA verification failed. Please try again.';
+            this.loading = false;
+            this.captchaComponent.refreshCaptcha();
+          }
+        },
+        error: (err) => {
+          this.logger.error('Error verifying CAPTCHA:', err);
+          this.error = 'An error occurred while verifying CAPTCHA. Please try again.';
+          this.loading = false;
+          this.captchaComponent.refreshCaptcha();
+        }
+      });
+  }
+
+  private dispatchLogin(): void {
     this.logger.info('Dispatching Login action with email:', this.f['email'].value);
     
     // Create a structured data object for better code clarity
@@ -147,6 +194,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.logger.error('Error dispatching login action:', err);
+        this.captchaComponent.refreshCaptcha();
       }
     });
   }

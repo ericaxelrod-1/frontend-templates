@@ -12,6 +12,7 @@ export interface User {
 export interface UserLogin {
   email: string;
   password: string;
+  recaptchaToken?: string;
 }
 
 export interface UserRegistration {

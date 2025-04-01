@@ -18,6 +18,7 @@ import { AuthService } from './core/services/auth.service';
 import { Store } from '@ngxs/store';
 import { AuthActions } from './store/auth/auth.state';
 import { firstValueFrom } from 'rxjs';
+import { CaptchaService } from './core/services/captcha.service';
 
 // Function to initialize the logger
 export function initializeLogging(logger: LoggerService) {
@@ -74,6 +75,7 @@ export const appConfig: ApplicationConfig = {
     { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { appearance: 'outline' } },
     AppConfigService,
     LoggerService,
+    CaptchaService,
     {
       provide: APP_INITIALIZER,
       useFactory: initializeLogging,

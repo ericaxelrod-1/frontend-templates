@@ -407,4 +407,81 @@ When developing or extending this application:
 
 This security guide provides an overview of the security measures implemented in the Angular Template Application and recommendations for secure deployment. Following these guidelines will help maintain a strong security posture for your application.
 
-For specific configuration details related to email security, refer to the [Email Configuration Guide](./email-configuration-guide.md). 
+For specific configuration details related to email security, refer to the [Email Configuration Guide](./email-configuration-guide.md).
+
+### Self-Hosted CAPTCHA System
+
+The application implements a secure, self-hosted CAPTCHA system that operates independently of external services:
+
+1. **CAPTCHA Generation**:
+   - Custom image generation using Node Canvas
+   - Random text generation with configurable complexity
+   - Visual noise and distortion for enhanced security
+   - Base64 image encoding for secure transmission
+   - Configurable refresh rate and expiration
+
+2. **Security Features**:
+   - Server-side CAPTCHA storage with secure tokens
+   - Time-based expiration for unused CAPTCHAs
+   - Rate limiting for CAPTCHA generation requests
+   - Prevention of brute force attempts
+   - Case-sensitive validation with configurable retry limits
+
+3. **Progressive Security**:
+   - Dynamic difficulty adjustment based on:
+     - User's IP reputation
+     - Recent failed attempts
+     - Geographic location anomalies
+     - Time-based patterns
+   - Multiple CAPTCHA types (planned):
+     - Text-based CAPTCHA (implemented)
+     - Math problems (planned)
+     - Image selection (planned)
+     - Puzzle-based verification (planned)
+
+4. **Implementation Architecture**:
+   - Backend Components:
+     - CaptchaService for CAPTCHA generation and validation
+     - Secure token management
+     - Database storage for CAPTCHA records
+     - Cleanup service for expired CAPTCHAs
+   - Frontend Components:
+     - Reusable CAPTCHA component
+     - Form control integration
+     - Automatic refresh capability
+     - Accessibility considerations
+
+5. **Integration Points**:
+   - Login process
+   - Registration form
+   - Password reset requests
+   - Suspicious activity detection
+   - Rate limit exceeded scenarios
+
+6. **Current Implementation Status**:
+   - Backend Implementation: Complete
+     - Image generation service
+     - Validation endpoints
+     - Token management
+     - Rate limiting
+   - Frontend Implementation: Partially Complete
+     - Service layer complete
+     - UI component designed
+     - Integration issues pending resolution:
+       - Module import configuration
+       - Component template bindings
+       - Form control setup
+
+7. **Security Considerations**:
+   - No external service dependencies
+   - No data sent to third parties
+   - Complete control over security parameters
+   - Customizable validation rules
+   - Audit logging of all CAPTCHA events
+
+8. **Future Enhancements**:
+   - Audio CAPTCHA for accessibility
+   - Multiple CAPTCHA types
+   - Machine learning-based difficulty adjustment
+   - Enhanced visual distortion techniques
+   - Behavioral analysis integration 

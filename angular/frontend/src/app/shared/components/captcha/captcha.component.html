@@ -1,0 +1,51 @@
+<form [formGroup]="captchaForm" class="captcha-container">
+  <div class="captcha-image-container">
+    <img 
+      *ngIf="captchaData?.imageBase64 && !isLoading"
+      [src]="captchaData?.imageBase64"
+      alt="CAPTCHA"
+      class="captcha-image"
+    />
+    <div *ngIf="isLoading" class="captcha-loader">
+      <div class="spinner"></div>
+    </div>
+    <div *ngIf="error" class="captcha-error">
+      {{ error }}
+      <button type="button" class="btn btn-link" (click)="refreshCaptcha()">Try again</button>
+    </div>
+  </div>
+
+  <div class="captcha-controls">
+    <div class="form-group">
+      <label for="captchaInput">Enter the text shown above</label>
+      <input
+        type="text"
+        id="captchaInput"
+        formControlName="userInput"
+        class="form-control"
+        [class.is-invalid]="userInput?.invalid && userInput?.touched"
+        placeholder="Enter CAPTCHA text"
+      />
+      <div 
+        class="invalid-feedback"
+        *ngIf="userInput?.invalid && userInput?.touched"
+      >
+        Please enter the CAPTCHA text
+      </div>
+    </div>
+
+    <button 
+      type="button"
+      class="btn btn-secondary"
+      (click)="refreshCaptcha()"
+      [disabled]="isLoading"
+    >
+      <span *ngIf="!isLoading">Refresh CAPTCHA</span>
+      <span *ngIf="isLoading">Loading...</span>
+    </button>
+  </div>
+
+  <div *ngIf="captchaData?.text" class="debug-info">
+    <small>Debug: The CAPTCHA text is "{{ captchaData?.text }}"</small>
+  </div>
+</form> 

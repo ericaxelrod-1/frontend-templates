@@ -445,3 +445,37 @@ npm run check:duplicate-css   # ✅ Passed
 - ✅ IPReputationService
 - ✅ IP Allowlist Service and Middleware
 - IP management interface 
+
+## Known Issues
+
+### CAPTCHA Implementation Issues
+1. Module Import Issues:
+   - CommonModule not properly imported in components using *ngIf directives
+   - ReactiveFormsModule not properly imported causing formGroup binding errors
+   - NgClass directive not recognized in components
+
+2. Component Integration Issues:
+   - app-captcha component not recognized in LoginComponent
+   - CaptchaComponent template has null safety issues with captchaData object
+   - Form control bindings not properly set up in CaptchaComponent
+
+3. Template Binding Issues:
+   - formGroup binding not working in both LoginComponent and CaptchaComponent
+   - ngClass bindings failing on input elements and app-captcha component
+   - Null safety warnings for captchaData access in template
+
+4. Build/Compilation Errors:
+   - Multiple NG8103 warnings about missing CommonModule imports
+   - NG8002 errors for formGroup and ngClass bindings
+   - NG8001 error for unrecognized app-captcha element
+   - NG1 errors for potential null object access
+
+### Current Status
+
+1. CAPTCHA System Development:
+   - ✅ Backend CAPTCHA service implementation complete
+   - ✅ Frontend CAPTCHA service implementation complete
+   - ✅ CAPTCHA component UI design complete
+   - ❌ Frontend module integration issues (Blocking)
+   - ❌ Component template binding issues (Blocking)
+   - ❌ Form control integration issues (Blocking)

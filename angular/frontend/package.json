@@ -45,6 +45,7 @@
     "@ngxs/store": "19.0.0",
     "express": "4.21.2",
     "express-rate-limit": "7.1.5",
+    "ng-recaptcha": "^13.2.1",
     "ngx-toastr": "17.0.2",
     "nodemailer": "6.9.12",
     "rxjs": "7.8.1",

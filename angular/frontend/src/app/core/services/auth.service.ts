@@ -88,7 +88,8 @@ export class AuthService {
   login(credentials: UserLogin): Observable<AuthResponse> {
     console.log('AuthService.login called with:', {
       email: credentials.email,
-      password: '******' // Don't log the actual password
+      password: '******', // Don't log the actual password
+      recaptchaVerified: !!credentials.recaptchaToken
     });
     console.log('Request URL:', `${this.API_URL}/login`);
 

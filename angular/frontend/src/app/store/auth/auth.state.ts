@@ -10,7 +10,11 @@ import { throwError, of } from 'rxjs';
 export namespace AuthActions {
   export class Login {
     static readonly type = '[Auth] Login';
-    constructor(public email: string, public password: string) {}
+    constructor(
+      public email: string, 
+      public password: string,
+      public recaptchaToken?: string
+    ) {}
   }
 
   export class LoginSuccess {
@@ -188,7 +192,8 @@ export class AuthState {
     
     return this.authService.login({
       email: action.email,
-      password: action.password
+      password: action.password,
+      recaptchaToken: action.recaptchaToken
     }).pipe(
       tap(response => {
         ctx.dispatch(new AuthActions.LoginSuccess(response.user));
