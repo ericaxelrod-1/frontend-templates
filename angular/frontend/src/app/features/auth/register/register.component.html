@@ -206,6 +206,19 @@
           </div>
         </div>
 
+        <!-- CAPTCHA verification -->
+        <div class="form-group captcha-container">
+          <label>Verify you're human</label>
+          <app-captcha-selector 
+            #captchaSelector
+            formControlName="captcha"
+            [ngClass]="{ 'is-invalid': submitted && f['captcha'].errors }">
+          </app-captcha-selector>
+          <div *ngIf="submitted && f['captcha'].errors" class="invalid-feedback">
+            <div *ngIf="f['captcha'].errors['required']">CAPTCHA verification is required</div>
+          </div>
+        </div>
+
         <!-- Email verification notice -->
         <div class="email-verification-notice">
           <mat-icon class="info-icon">info</mat-icon>

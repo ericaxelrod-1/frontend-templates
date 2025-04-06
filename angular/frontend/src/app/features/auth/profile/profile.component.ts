@@ -6,7 +6,7 @@ import { finalize } from 'rxjs';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-profile',
@@ -32,10 +32,19 @@ export class ProfileComponent implements OnInit {
   constructor(
     private formBuilder: FormBuilder,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) { }
 
   ngOnInit(): void {
+    // Check if redirected from password change
+    this.route.queryParams.subscribe(params => {
+      if (params['passwordChanged'] === 'true') {
+        this.isError = false;
+        this.message = 'Password changed successfully!';
+      }
+    });
+    
     // Initialize form with empty values
     this.profileForm = this.formBuilder.group({
       firstName: ['', Validators.required],

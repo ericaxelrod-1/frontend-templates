@@ -10,7 +10,8 @@ import {
   RefreshTokenRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
-  VerificationResponse
+  VerificationResponse,
+  PasswordChangeRequest
 } from '../../models';
 import { environment } from '../../../environments/environment';
 
@@ -86,35 +87,34 @@ export class AuthService {
 
   // Login
   login(credentials: UserLogin): Observable<AuthResponse> {
-    console.log('AuthService.login called with:', {
-      email: credentials.email,
-      password: '******', // Don't log the actual password
-      recaptchaVerified: !!credentials.recaptchaToken
-    });
+    console.log('AuthService.login called');
     console.log('Request URL:', `${this.API_URL}/login`);
 
     return this.http.post<any>(`${this.API_URL}/login`, credentials)
       .pipe(
         map(response => {
-          console.log('Raw login response:', {
-            ...response,
-            access_token: '******',
-            refresh_token: '******',
-            csrf_token: '******'
-          });
+          console.log('Raw login response received');
 
           // Validate token response
           if (!response || !response.access_token || !response.refresh_token) {
+            console.error('Invalid login response - missing token data');
             throw new Error('Invalid login response: missing token data');
           }
 
-          // Store tokens temporarily
+          // Store tokens immediately for subsequent requests
           const tokens = {
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
             csrfToken: response.csrf_token,
             expiresIn: response.expires_in || 3600
           };
+
+          // Set token immediately for subsequent requests
+          this.accessTokenSubject.next(tokens.accessToken);
+          this.refreshTokenSubject.next(tokens.refreshToken);
+          if (tokens.csrfToken) {
+            this.csrfTokenSubject.next(tokens.csrfToken);
+          }
 
           // Return an observable that will fetch the user profile
           return this.http.get<User>(`${this.API_URL}/profile`, {
@@ -130,14 +130,25 @@ export class AuthService {
                 requiresVerification: false
               };
 
-              console.log('Complete login response:', {
-                ...authResponse,
-                accessToken: '******',
-                refreshToken: '******',
-                csrfToken: '******'
-              });
-
+              console.log('Complete login process successful');
               return authResponse;
+            }),
+            catchError(profileError => {
+              console.error('Error fetching user profile after login:', profileError);
+              
+              // If profile fetch fails, still return partial response
+              // This will allow the interceptor to use the token for future requests
+              const partialResponse: AuthResponse = {
+                user: {
+                  id: 0,
+                  email: credentials.email,
+                  roles: []
+                },
+                ...tokens,
+                requiresVerification: false
+              };
+              
+              return of(partialResponse);
             })
           );
         }),
@@ -148,6 +159,7 @@ export class AuthService {
           
           // Verify the state was updated correctly
           if (!this.isAuthenticated) {
+            console.error('Authentication state not properly updated after login');
             throw new Error('Authentication state not properly updated');
           }
           
@@ -399,6 +411,38 @@ export class AuthService {
     );
   }
 
+  // Change password
+  changePassword(passwordChangeRequest: PasswordChangeRequest): Observable<any> {
+    console.log('AuthService.changePassword called');
+    
+    return this.http.post<any>(`${this.API_URL}/change-password`, passwordChangeRequest).pipe(
+      tap(response => {
+        console.log('Password change response:', response);
+        
+        // If the response includes updated user data, update the current user
+        if (response.user) {
+          const currentUser = this.currentUserSubject.value;
+          if (currentUser) {
+            // Update the user with any changed fields, particularly requiresPasswordChange
+            this.currentUserSubject.next({
+              ...currentUser,
+              ...response.user
+            });
+            
+            // Update the stored user data
+            if (isPlatformBrowser(this.platformId)) {
+              localStorage.setItem('user', JSON.stringify(this.currentUserSubject.value));
+            }
+          }
+        }
+      }),
+      catchError(error => {
+        console.error('Password change error:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+
   // Delete account
   deleteAccount(): Observable<any> {
     console.log('AuthService.deleteAccount called');
@@ -558,7 +602,7 @@ export class AuthService {
     }
   }
 
-  private clearAuthState(): void {
+  public clearAuthState(): void {
     this.currentUserSubject.next(null);
     this.accessTokenSubject.next(null);
     this.refreshTokenSubject.next(null);

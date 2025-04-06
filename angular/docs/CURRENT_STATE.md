@@ -29,6 +29,15 @@ Last Updated: March 23, 2023
       - Filtering system
       - Geographic visualization
       - IP management interface
+12. User Management Enhancements (In Progress)
+    - ✅ Password Change Requirement
+      - ✅ Add requiresPasswordChange flag to User entity
+      - ✅ Create password change component
+      - ✅ Implement redirect logic for first-time logins
+    - ✅ User Creation Paths
+      - ✅ Self-registration workflow
+      - ✅ Admin-created accounts workflow
+      - Testing coverage for both paths
 
 ## Future Enhancements
 
@@ -69,6 +78,21 @@ Last Updated: March 23, 2023
    - Custom report generation
    - Export capabilities
    - Trend analysis
+
+### User Management Enhancements
+1. Welcome Email with Login Token
+   - One-time secure login links for new users
+   - Direct redirection to password change screen
+   - Configurable email templates
+   - Token expiration handling
+   - Audit logging for token usage
+
+2. Advanced User Management
+   - Bulk user import via CSV
+   - User activity monitoring
+   - Automated account cleanup
+   - Session management
+   - Last activity tracking
 
 ## Recent Accomplishments
 1. Completed Login Monitoring System backend implementation

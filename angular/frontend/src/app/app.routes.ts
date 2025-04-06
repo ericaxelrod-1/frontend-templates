@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
 import { ErrorComponent } from './shared/error/error.component';
-import { AuthGuard } from './core/guards';
+import { AuthGuard, RoleGuard, PasswordChangeGuard } from './core/guards';
 import { LandingComponent } from './pages/landing/landing.component';
 
 export const routes: Routes = [
@@ -40,6 +40,7 @@ export const routes: Routes = [
   {
     path: 'app',
     component: MainLayoutComponent,
+    canActivate: [AuthGuard, PasswordChangeGuard],
     children: [
       {
         path: '',
@@ -48,29 +49,44 @@ export const routes: Routes = [
       },
       {
         path: 'profile',
-        loadComponent: () => import('./features/auth/profile/profile.component').then(c => c.ProfileComponent),
-        canActivate: [AuthGuard]
+        loadComponent: () => import('./features/auth/profile/profile.component').then(c => c.ProfileComponent)
+      },
+      {
+        path: 'profile/change-password',
+        loadComponent: () => import('./features/auth/profile/change-password.component').then(c => c.ChangePasswordComponent)
       },
       // Main routes
       {
         path: 'dashboard',
-        loadComponent: () => import('./features/dashboard/dashboard.component').then(c => c.DashboardComponent),
-        canActivate: [AuthGuard]
+        loadComponent: () => import('./features/dashboard/dashboard.component').then(c => c.DashboardComponent)
       },
       {
         path: 'users',
-        loadComponent: () => import('./features/users/users.component').then(c => c.UsersComponent),
-        canActivate: [AuthGuard]
+        loadComponent: () => import('./features/users/users.component').then(c => c.UsersComponent)
+      },
+      {
+        path: 'users/create',
+        loadComponent: () => import('./features/users/create-user.component').then(c => c.CreateUserComponent),
+        canActivate: [RoleGuard],
+        data: {
+          roles: ['ADMIN', 'PROJECT_MANAGER']
+        }
       },
       {
         path: 'groups',
         loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent),
-        canActivate: [AuthGuard]
+        canActivate: [RoleGuard],
+        data: {
+          roles: ['ADMIN', 'PROJECT_MANAGER']
+        }
       },
       {
         path: 'roles',
         loadComponent: () => import('./features/roles/roles.component').then(c => c.RolesComponent),
-        canActivate: [AuthGuard]
+        canActivate: [RoleGuard],
+        data: {
+          roles: ['ADMIN', 'PROJECT_MANAGER']
+        }
       }
     ]
   },

@@ -17,6 +17,65 @@ This project is a template application for Angular, designed to provide a solid 
 - State management with NGXS
 - Comprehensive validation tools
 
+## Advanced CAPTCHA System
+
+The application implements a sophisticated CAPTCHA system with multiple challenge types:
+
+1. **Text-based CAPTCHA**: Traditional text recognition challenge
+2. **Visual Reasoning CAPTCHA**: Challenges that require understanding patterns, sequences, and visual elements
+3. **Physical World CAPTCHA**: Challenges based on real-world understanding (weather, time of day, seasons)
+
+### Key Features
+
+- **Random CAPTCHA Selection**: The system randomly selects one of the three CAPTCHA types when loading the login page
+- **Adaptive Difficulty**: Each CAPTCHA type has its own validation logic and complexity
+- **Form Integration**: Fully integrated with Angular's Reactive Forms for seamless validation
+- **Accessibility**: Designed with accessibility in mind, providing clear instructions and feedback
+
+### Implementation Details
+
+The CAPTCHA system consists of the following components:
+
+- `CaptchaSelectorComponent`: Manages the random selection of different CAPTCHA types
+- `CaptchaComponent`: Standard text-based CAPTCHA implementation
+- `VisualReasoningCaptchaComponent`: Implements visual pattern recognition challenges
+- `PhysicalWorldCaptchaComponent`: Implements real-world understanding challenges
+- `AdvancedCaptchaService`: Backend service interface for verifying different CAPTCHA types
+
+### How It Works
+
+1. When a user visits the login page, the `CaptchaSelectorComponent` randomly chooses a CAPTCHA type
+2. The corresponding CAPTCHA component is displayed to the user
+3. User completes the CAPTCHA challenge
+4. On form submission, the `AdvancedCaptchaService` verifies the CAPTCHA response
+5. If verification succeeds, the login process continues; otherwise, a new CAPTCHA is generated
+
+### Directory Structure
+
+```
+angular/frontend/src/
+├── app/
+│   ├── core/
+│   │   └── services/
+│   │       ├── captcha.service.ts              # Standard CAPTCHA service
+│   │       └── advanced-captcha.service.ts     # Advanced CAPTCHA verification
+│   ├── features/
+│   │   └── auth/
+│   │       └── login/                          # Login component using CAPTCHA
+│   └── shared/
+│       └── components/
+│           └── captcha/
+│               ├── captcha.component.ts        # Standard text CAPTCHA
+│               └── advanced/                   # Advanced CAPTCHA components
+│                   ├── captcha-selector.component.ts
+│                   ├── visual-reasoning-captcha.component.ts
+│                   └── physical-world-captcha.component.ts
+└── assets/
+    └── captcha/                                # CAPTCHA images
+        ├── visual-reasoning/
+        └── physical-world/
+```
+
 ## Deployment
 
 For detailed instructions on deploying this application to a production environment, please refer to our [Deployment Guide](../docs/deployment-guide.md). This guide covers:

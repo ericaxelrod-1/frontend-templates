@@ -9,34 +9,58 @@ import {
 import { Observable, throwError, BehaviorSubject } from 'rxjs';
 import { catchError, filter, switchMap, take, finalize } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
+import { Router } from '@angular/router';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
   private isRefreshing = false;
   private refreshTokenSubject: BehaviorSubject<any> = new BehaviorSubject<any>(null);
 
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private router: Router
+  ) {}
 
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    // Log request details in development
+    console.log(`Intercepting request to: ${request.url}`);
+    
     // Skip interceptor for auth endpoints (except profile)
     if (this.isAuthRequest(request) && !request.url.includes('/profile')) {
+      console.log('Skipping auth header for auth request');
       return next.handle(request);
     }
 
     // Add auth header if user is authenticated
     if (this.authService.accessToken) {
+      console.log('Adding auth header');
       request = this.addAuthHeader(request, this.authService.accessToken);
+    } else {
+      console.log('No access token available');
     }
 
     // Add CSRF token if available
     if (this.authService.csrfToken) {
+      console.log('Adding CSRF header');
       request = this.addCsrfHeader(request, this.authService.csrfToken);
     }
 
     return next.handle(request).pipe(
       catchError(error => {
-        if (error instanceof HttpErrorResponse && error.status === 401) {
-          return this.handle401Error(request, next);
+        if (error instanceof HttpErrorResponse) {
+          console.log(`Error response: ${error.status} from ${request.url}`);
+          
+          if (error.status === 401) {
+            console.log('401 Unauthorized error - attempting to refresh token');
+            // Only try to refresh if not already refreshing and we have a refresh token
+            if (this.authService.refreshToken) {
+              return this.handle401Error(request, next);
+            } else {
+              console.log('No refresh token available, redirecting to login');
+              this.authService.clearAuthState();
+              this.router.navigateByUrl('/login');
+            }
+          }
         }
         return throwError(() => error);
       })
@@ -73,14 +97,20 @@ export class AuthInterceptor implements HttpInterceptor {
       this.isRefreshing = true;
       this.refreshTokenSubject.next(null);
 
+      console.log('Attempting to refresh access token');
       return this.authService.refreshAccessToken().pipe(
         switchMap(response => {
+          this.isRefreshing = false;
           this.refreshTokenSubject.next(response.accessToken);
+          console.log('Token refresh successful, retrying request with new token');
           return next.handle(this.addAuthHeader(request, response.accessToken));
         }),
         catchError(error => {
+          this.isRefreshing = false;
+          console.error('Token refresh failed:', error);
           // Force logout on refresh error
-          this.authService.logout();
+          this.authService.clearAuthState();
+          this.router.navigateByUrl('/login');
           return throwError(() => error);
         }),
         finalize(() => {
@@ -92,7 +122,10 @@ export class AuthInterceptor implements HttpInterceptor {
     return this.refreshTokenSubject.pipe(
       filter(token => token !== null),
       take(1),
-      switchMap(token => next.handle(this.addAuthHeader(request, token)))
+      switchMap(token => {
+        console.log('Using newly refreshed token for request');
+        return next.handle(this.addAuthHeader(request, token));
+      })
     );
   }
 } 

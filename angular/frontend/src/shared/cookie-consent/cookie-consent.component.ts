@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, PLATFORM_ID, inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -44,6 +44,7 @@ export class CookieConsentComponent implements OnInit {
   consentForm: FormGroup;
   isOpen = true;
   showDetails = false;
+  private platformId = inject(PLATFORM_ID);
 
   constructor(private fb: FormBuilder) {
     this.consentForm = this.fb.group({
@@ -54,7 +55,16 @@ export class CookieConsentComponent implements OnInit {
     });
   }
 
+  private isBrowser(): boolean {
+    return isPlatformBrowser(this.platformId);
+  }
+
   ngOnInit(): void {
+    // Skip localStorage access during SSR
+    if (!this.isBrowser()) {
+      return;
+    }
+    
     // Check if user already made a choice
     const savedConsent = localStorage.getItem(this.STORAGE_KEY);
     if (savedConsent) {
@@ -98,7 +108,11 @@ export class CookieConsentComponent implements OnInit {
       }
     };
 
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(consent));
+    // Skip localStorage access during SSR
+    if (this.isBrowser()) {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(consent));
+    }
+    
     // Optional: send to backend if user is authenticated
     // this.sendConsentToBackend(consent);
     this.isOpen = false;

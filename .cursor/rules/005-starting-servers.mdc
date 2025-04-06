@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+⚠️ **STOP**: You **MUST** follow instruction in this section **before starting ANY servers**
+
+Assume the servers are already running. Ask the user to stop any running servers before starting them.

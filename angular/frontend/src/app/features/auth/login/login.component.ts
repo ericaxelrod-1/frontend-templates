@@ -8,17 +8,18 @@ import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { AppConfigService } from '../../../core/services';
 import { LoggerService } from '../../../services/logging/logger.service';
 import { CaptchaService } from '../../../core/services/captcha.service';
-import { CaptchaComponent } from '../../../shared/components/captcha/captcha.component';
+import { CaptchaSelectorComponent } from '../../../shared/components/captcha/advanced/captcha-selector.component';
+import { AdvancedCaptchaService } from '../../../core/services/advanced-captcha.service';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, CaptchaComponent]
+  imports: [CommonModule, ReactiveFormsModule, CaptchaSelectorComponent]
 })
 export class LoginComponent implements OnInit, OnDestroy {
-  @ViewChild(CaptchaComponent) captchaComponent!: CaptchaComponent;
+  @ViewChild('captchaSelector') captchaSelector!: CaptchaSelectorComponent;
   
   loginForm!: FormGroup;
   returnUrl: string = '/';
@@ -44,7 +45,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     private store: Store,
     private appConfig: AppConfigService,
     private logger: LoggerService,
-    private captchaService: CaptchaService
+    private captchaService: CaptchaService,
+    private advancedCaptchaService: AdvancedCaptchaService
   ) {
     this.logger.info('LoginComponent constructor called');
     try {
@@ -122,8 +124,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     
     // Mark fields as touched for validation
     this.loginForm.markAllAsTouched();
-    if (this.captchaComponent) {
-      this.captchaComponent.markAsTouched();
+    if (this.captchaSelector) {
+      this.captchaSelector.markAsTouched();
     }
 
     // Stop here if form is invalid
@@ -141,60 +143,116 @@ export class LoginComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Get CAPTCHA data directly from the form value
-    const captchaValue = this.f['captcha'].value;
-    if (!captchaValue || !captchaValue.captchaId || !captchaValue.userInput) {
-      this.logger.warn('CAPTCHA data is missing or invalid:', captchaValue);
+    // Get CAPTCHA data directly from the selector component
+    const captchaData = this.captchaSelector.getCaptchaData();
+    if (!captchaData) {
+      this.logger.warn('CAPTCHA data is missing');
       return;
     }
 
-    this.logger.info('Verifying CAPTCHA before login:', captchaValue);
+    this.logger.info('Verifying CAPTCHA before login:', captchaData);
     this.loading = true;
 
-    // Verify CAPTCHA first
-    this.captchaService.verifyCaptcha(captchaValue.captchaId, captchaValue.userInput)
-      .subscribe({
-        next: (response) => {
-          this.logger.info('CAPTCHA verification response:', response);
-          if (response.success) {
-            this.logger.info('CAPTCHA verification successful, proceeding with login');
-            this.dispatchLogin();
-          } else {
-            this.logger.warn('CAPTCHA verification failed');
-            this.error = 'CAPTCHA verification failed. Please try again.';
-            this.loading = false;
-            this.captchaComponent.refreshCaptcha();
-          }
-        },
-        error: (err) => {
-          this.logger.error('Error verifying CAPTCHA:', err);
-          this.error = 'An error occurred while verifying CAPTCHA. Please try again.';
+    // Determine CAPTCHA type and verify with the appropriate service
+    const captchaType = this.determineCaptchaType(captchaData);
+    
+    this.advancedCaptchaService.verifyAdvancedCaptcha(
+      captchaData.challengeId, 
+      captchaData.selectedAnswer,
+      captchaType
+    ).subscribe({
+      next: (response) => {
+        this.logger.info('CAPTCHA verification response:', response);
+        if (response.success) {
+          this.logger.info('CAPTCHA verification successful, proceeding with login');
+          this.dispatchLogin();
+        } else {
+          this.logger.warn('CAPTCHA verification failed');
+          this.error = 'CAPTCHA verification failed. Please try again.';
           this.loading = false;
-          this.captchaComponent.refreshCaptcha();
+          // Refresh the captcha
+          const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+          if (activeCaptcha?.refreshChallenge) {
+            activeCaptcha.refreshChallenge();
+          }
         }
-      });
+      },
+      error: (err) => {
+        this.logger.error('Error verifying CAPTCHA:', err);
+        this.error = 'An error occurred while verifying CAPTCHA. Please try again.';
+        this.loading = false;
+        // Refresh the captcha
+        const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+        if (activeCaptcha?.refreshChallenge) {
+          activeCaptcha.refreshChallenge();
+        }
+      }
+    });
+  }
+
+  // Determine the CAPTCHA type based on the captcha data structure
+  private determineCaptchaType(captchaData: any): string {
+    if (captchaData.challengeId && captchaData.challengeId.startsWith('vr_')) {
+      return 'visual-reasoning';
+    } else if (captchaData.challengeId && captchaData.challengeId.startsWith('pw_')) {
+      return 'physical-world';
+    }
+    return 'visual-reasoning'; // Default to visual-reasoning captcha
   }
 
   private dispatchLogin(): void {
-    this.logger.info('Dispatching Login action with email:', this.f['email'].value);
+    this.logger.info('Dispatching Login action');
     
     // Create a structured data object for better code clarity
     const loginData = {
       email: this.f['email'].value,
-      password: this.f['password'].value
+      password: this.f['password'].value,
+      recaptchaToken: 'verified-via-advanced-captcha' // Add a token to indicate captcha was verified
     };
+    
+    this.logger.debug('About to dispatch login action');
     
     // Dispatch login action
     this.store.dispatch(new AuthActions.Login(
       loginData.email,
-      loginData.password
+      loginData.password,
+      loginData.recaptchaToken
     )).subscribe({
-      next: () => {
+      next: (result) => {
         this.logger.info('Login action dispatched successfully');
+        // Check if the result contains any error information
+        if (result.auth && result.auth.error) {
+          this.error = result.auth.error;
+          this.loading = false;
+          
+          // Refresh captcha on error
+          const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+          if (activeCaptcha?.refreshChallenge) {
+            activeCaptcha.refreshChallenge();
+          }
+        }
       },
       error: (err) => {
         this.logger.error('Error dispatching login action:', err);
-        this.captchaComponent.refreshCaptcha();
+        
+        // Set a more specific error message based on the error type
+        if (err.status === 401) {
+          this.error = 'Invalid email or password. Please try again.';
+        } else if (err.status === 403) {
+          this.error = 'Your account is locked. Please contact an administrator.';
+        } else if (err.status === 400) {
+          this.error = err.error?.message || 'Invalid login request. Please check your credentials.';
+        } else {
+          this.error = 'An error occurred during login. Please try again later.';
+        }
+        
+        this.loading = false;
+        
+        // Refresh captcha on error
+        const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+        if (activeCaptcha?.refreshChallenge) {
+          activeCaptcha.refreshChallenge();
+        }
       }
     });
   }

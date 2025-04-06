@@ -115,10 +115,33 @@
   - Basic Controller/Service Setup: In Progress
   - CRUD Operations: Not Started
   - Role-based Authorization: Not Started
+  - Password Change Requirement: In Progress
+  - User Creation Workflows: In Progress
 - **Dependencies**: 2.1 Database Setup, 2.2 Authentication System
 1. Implement user CRUD operations
 2. Create role-based authorization
 3. Implement password rules validation
+4. Implement user creation workflows
+   - Self-registration path
+     - ✅ Registration form with validation
+     - ✅ Email verification requirement
+     - ✅ Basic permissions assignment
+     - ✅ Explicitly set requiresPasswordChange=false
+   - Admin-created accounts
+     - ✅ Admin user creation interface
+     - ✅ Role and group assignment
+     - ✅ Password change requirement flag
+     - Welcome email with credentials
+5. Implement password change requirement
+   - ✅ Add requiresPasswordChange flag to User entity
+   - ✅ Create password change component
+   - ✅ Implement redirect after login for users requiring password change
+   - ✅ Update lastPasswordChange timestamp
+   - Add password history for preventing reuse
+6. Implement automated testing
+   - Unit tests for password validation
+   - Integration tests for user creation flows
+   - E2E tests for password change requirement
 
 ### 3.2 Group Management
 - **Status**: Complete
@@ -410,6 +433,17 @@
 2. Add IP-based login restrictions
 3. Create suspicious activity detection (In Progress)
 4. Implement advanced password policies
+
+### 8.3 Welcome Email with Login Token
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 3.1 User Management, 3.5 Email Verification System
+1. Generate secure one-time login tokens
+2. Create welcome email templates
+3. Implement token validation system
+4. Create direct-to-password-change workflow
+5. Add audit logging for token usage
+6. Implement token expiration handling
 
 ## Feature Implementation Details
 

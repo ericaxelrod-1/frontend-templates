@@ -6,7 +6,7 @@ A modern Angular template application for quickly building new projects. This te
 
 - **Authentication**: Login, registration, and password reset
 - **Email Verification**: Verify new user accounts via email
-- **User Management**: User profile, account settings
+- **User Management**: User profile, account settings, [detailed documentation](./docs/user-management.md)
 - **Role-Based Authorization**: Control access with user roles
 - **Admin Dashboard**: Manage users, roles, and permissions
 - **Modern Angular**: Built with the latest Angular version
@@ -193,6 +193,8 @@ Users can:
 - Change their password
 - Manage email preferences
 - Delete their account
+
+For detailed information about user management, including password requirements and account creation workflows, see the [User Management Guide](./docs/user-management.md).
 
 ## Admin Features
 

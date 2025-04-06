@@ -190,17 +190,35 @@ export class AuthState {
   login(ctx: StateContext<AuthStateModel>, action: AuthActions.Login) {
     ctx.patchState({ loading: true, error: null });
     
+    console.log('AuthState: Login action dispatched');
+    
     return this.authService.login({
       email: action.email,
       password: action.password,
       recaptchaToken: action.recaptchaToken
     }).pipe(
       tap(response => {
+        console.log('AuthState: Login successful');
         ctx.dispatch(new AuthActions.LoginSuccess(response.user));
       }),
       catchError(error => {
-        const message = error?.error?.message || 'Login failed. Please try again.';
-        ctx.dispatch(new AuthActions.LoginFailure(message));
+        console.error('AuthState: Login failed with error:', {
+          status: error?.status,
+          statusText: error?.statusText
+        });
+        
+        // Build a descriptive error message
+        let errorMessage = 'Login failed. Please try again.';
+        
+        if (error?.status === 401) {
+          errorMessage = 'Invalid email or password. Please try again.';
+        } else if (error?.status === 403) {
+          errorMessage = 'Your account is locked. Please contact an administrator.';
+        } else if (error?.error?.message) {
+          errorMessage = error.error.message;
+        }
+        
+        ctx.dispatch(new AuthActions.LoginFailure(errorMessage));
         return throwError(() => error);
       })
     );

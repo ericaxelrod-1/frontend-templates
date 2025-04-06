@@ -1,20 +1,105 @@
 @use '../../../../styles/abstracts' as abstracts;
 
 .login-container {
-  @include abstracts.flex-center;
-  min-height: 80vh;
-  padding: abstracts.$spacing-lg;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: var(--background-dark);
+  padding: abstracts.$spacing-md;
 }
 
 .login-card {
-  @include abstracts.auth-card;
+  width: 100%;
+  max-width: 450px;
+  background-color: var(--background-card);
+  border-radius: abstracts.$border-radius-md;
+  box-shadow: abstracts.$shadow-md;
+  padding: abstracts.$spacing-xl;
+  color: var(--text-primary);
+}
+
+.logo-container {
+  text-align: center;
+  margin-bottom: abstracts.$spacing-lg;
+}
+
+.logo-image {
+  max-width: 150px;
+  height: auto;
+}
+
+.login-title {
+  font-size: abstracts.$font-size-xl;
+  font-weight: abstracts.$font-weight-medium;
+  text-align: center;
+  margin-bottom: abstracts.$spacing-xl;
+  color: var(--text-primary);
+}
+
+.login-form {
+  .form-group {
+    margin-bottom: abstracts.$spacing-lg;
+  }
+
+  .form-control {
+    background-color: var(--surface);
+    border: 1px solid var(--text-secondary);
+    color: var(--text-primary);
+    
+    &::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.7;
+    }
+    
+    &:focus {
+      background-color: var(--surface);
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+    }
+  }
+  
+  label {
+    color: var(--text-primary);
+    margin-bottom: abstracts.$spacing-xs;
+    display: block;
+  }
+  
+  .btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    
+    &:hover {
+      background-color: var(--primary-dark);
+      border-color: var(--primary-dark);
+    }
+  }
+  
+  .btn-link {
+    color: var(--primary-light);
+    
+    &:hover {
+      color: var(--primary-color);
+    }
+  }
+}
+
+.help-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: abstracts.$spacing-md;
+}
+
+.captcha-container {
+  margin-top: abstracts.$spacing-lg;
+  margin-bottom: abstracts.$spacing-lg;
 }
 
 .recaptcha-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 20px 0;
+  margin: abstracts.$spacing-lg 0;
   
   re-captcha {
     width: 100%;
@@ -25,11 +110,25 @@
   .invalid-feedback {
     width: 100%;
     text-align: center;
-    margin-top: 8px;
+    margin-top: abstracts.$spacing-sm;
   }
 }
 
-// Show invalid feedback messages as block elements
+.alert-danger {
+  background-color: rgba(var(--error-rgb), 0.1);
+  border-color: var(--error);
+  color: var(--error);
+  padding: abstracts.$spacing-md;
+  border-radius: abstracts.$border-radius-sm;
+  margin-bottom: abstracts.$spacing-md;
+}
+
+.invalid-feedback {
+  color: var(--error);
+  font-size: abstracts.$font-size-sm;
+  margin-top: abstracts.$spacing-xs;
+}
+
 .d-block {
   display: block !important;
 }

@@ -3,13 +3,25 @@
     <h2>Menu</h2>
   </div>
   
+  <!-- Common navigation items available to all users -->
   <a mat-list-item 
-     *ngFor="let item of navItems" 
+     *ngFor="let item of commonNavItems" 
      [routerLink]="item.route" 
      routerLinkActive="active-link">
     <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
     <span matListItemTitle>{{ item.label }}</span>
   </a>
+  
+  <!-- Admin/Project Manager specific navigation items -->
+  <ng-container *ngIf="isAdminOrProjectManager">
+    <a mat-list-item 
+       *ngFor="let item of adminNavItems" 
+       [routerLink]="item.route" 
+       routerLinkActive="active-link">
+      <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+      <span matListItemTitle>{{ item.label }}</span>
+    </a>
+  </ng-container>
   
   <!-- Admin Section (only visible to superadmins) -->
   <ng-container *ngIf="isSuperAdmin">

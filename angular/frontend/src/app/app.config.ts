@@ -19,6 +19,7 @@ import { Store } from '@ngxs/store';
 import { AuthActions } from './store/auth/auth.state';
 import { firstValueFrom } from 'rxjs';
 import { CaptchaService } from './core/services/captcha.service';
+import { AdvancedCaptchaService } from './core/services/advanced-captcha.service';
 
 // Function to initialize the logger
 export function initializeLogging(logger: LoggerService) {
@@ -76,6 +77,7 @@ export const appConfig: ApplicationConfig = {
     AppConfigService,
     LoggerService,
     CaptchaService,
+    AdvancedCaptchaService,
     {
       provide: APP_INITIALIZER,
       useFactory: initializeLogging,

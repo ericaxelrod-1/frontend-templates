@@ -10,14 +10,15 @@ if (environment.production) {
 
 function bootstrap() {
   bootstrapApplication(AppComponent, appConfig)
-    .catch(err => console.error(err));
+    .catch(err => console.error('Error bootstrapping app:', err));
 }
 
-// Enable HMR properly
+// Handle HMR properly
 if (environment.hmr) {
   if ((module as any).hot) {
     (module as any).hot.accept();
     (module as any).hot.dispose(() => {
+      console.log('HMR disposing app...');
       // Store application state if needed before reloading
       const rootElement = document.querySelector('app-root');
       if (rootElement) {

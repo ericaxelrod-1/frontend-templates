@@ -7,6 +7,9 @@ export interface User {
   createdAt?: Date;
   updatedAt?: Date;
   roles?: string[];
+  requiresPasswordChange?: boolean;
+  lastPasswordChange?: Date;
+  groups?: { id: number; name: string }[];
 }
 
 export interface UserLogin {
@@ -62,4 +65,20 @@ export interface ResetPasswordRequest {
   token: string;
   password: string;
   passwordConfirmation: string;
+}
+
+export interface AdminUserCreation {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  password?: string;
+  roles?: string[];
+  groups?: number[];
+  requiresPasswordChange: boolean;
+}
+
+export interface PasswordChangeRequest {
+  currentPassword?: string;
+  newPassword: string;
+  confirmPassword: string;
 } 

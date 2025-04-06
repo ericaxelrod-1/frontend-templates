@@ -22,13 +22,19 @@ import { AuthService } from '../../core/services/auth.service';
 export class SidebarComponent {
   @Input() opened: boolean = false;
   
-  navItems = [
+  // Common navigation items for all users
+  commonNavItems = [
     { label: 'Dashboard', icon: 'dashboard', route: '/app/dashboard' },
     { label: 'Users', icon: 'people', route: '/app/users' },
+  ];
+
+  // Navigation items only for admin and project manager
+  adminNavItems = [
     { label: 'Groups', icon: 'group_work', route: '/app/groups' },
     { label: 'Roles', icon: 'admin_panel_settings', route: '/app/roles' }
   ];
 
+  // Admin section items (only for superadmin)
   adminItems = [
     { label: 'Login Monitoring', icon: 'security', route: '/admin/login-monitoring' }
   ];
@@ -38,5 +44,10 @@ export class SidebarComponent {
   // Determines if the user has superadmin role
   get isSuperAdmin(): boolean {
     return this.authService.hasRole('SUPERADMIN');
+  }
+
+  // Determines if the user has admin or project manager role
+  get isAdminOrProjectManager(): boolean {
+    return this.authService.hasRole('ADMIN') || this.authService.hasRole('PROJECT_MANAGER');
   }
 }

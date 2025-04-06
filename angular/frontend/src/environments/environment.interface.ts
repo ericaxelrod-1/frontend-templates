@@ -4,13 +4,21 @@ export interface Environment {
   hmr: boolean;
   logging: {
     enabled: boolean;
+    logLevel: 'debug' | 'info' | 'warn' | 'error';
     logToConsole: boolean;
     logToFile: boolean;
-    logLevel: string;
-    logDir: string;
+    colorize: boolean;
+    timestampFormat: string;
   };
-  recaptcha?: {
-    siteKey: string;
+  auth: {
+    jwtExpirationTime: number;
+    refreshTokenExpirationTime: number;
+    loginAttempts: number;
+    lockoutTime: number;
+  };
+  captcha: {
     enabled: boolean;
+    difficulty: 'easy' | 'medium' | 'hard';
   };
+  debugMode: boolean;
 } 

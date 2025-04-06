@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, PLATFORM_ID, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, PLATFORM_ID, ElementRef, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { Store, Select } from '@ngxs/store';
@@ -10,6 +10,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { AppConfigService } from '../../../core/services';
 import { AuthService } from '../../../core/services/auth.service';
+import { CaptchaSelectorComponent } from '../../../shared/components/captcha/advanced/captcha-selector.component';
+import { CaptchaService } from '../../../core/services/captcha.service';
+import { AdvancedCaptchaService } from '../../../core/services/advanced-captcha.service';
+import { LoggerService } from '../../../services/logging/logger.service';
 
 // Custom validator for password strength
 export function passwordStrengthValidator(): ValidatorFn {
@@ -54,10 +58,13 @@ export function passwordMatchValidator(): ValidatorFn {
     RouterModule,
     MatTooltipModule,
     MatIconModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    CaptchaSelectorComponent
   ]
 })
 export class RegisterComponent implements OnInit, OnDestroy {
+  @ViewChild('captchaSelector') captchaSelector!: CaptchaSelectorComponent;
+  
   // Pre-initialize all properties to avoid undefined issues
   registerForm: FormGroup;
   verificationForm: FormGroup;
@@ -106,7 +113,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
     private store: Store,
     private appConfig: AppConfigService,
     private authService: AuthService,
-    private el: ElementRef
+    private el: ElementRef,
+    private captchaService: CaptchaService,
+    private advancedCaptchaService: AdvancedCaptchaService,
+    private logger: LoggerService
   ) {
     // Pre-initialize the form to avoid undefined issues
     this.registerForm = this.formBuilder.group({
@@ -119,7 +129,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
         passwordStrengthValidator()
       ]],
       confirmPassword: ['', [Validators.required]],
-      privacyConsent: [false, [Validators.requiredTrue]]
+      privacyConsent: [false, [Validators.requiredTrue]],
+      captcha: [null, Validators.required]
     }, {
       validators: passwordMatchValidator()
     });
@@ -166,7 +177,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
         passwordStrengthValidator()
       ]],
       confirmPassword: ['', [Validators.required]],
-      privacyConsent: [false, [Validators.requiredTrue]]
+      privacyConsent: [false, [Validators.requiredTrue]],
+      captcha: [null, Validators.required]
     }, {
       validators: passwordMatchValidator()
     });
@@ -329,72 +341,155 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   onSubmit(): void {
-    console.log('RegisterComponent onSubmit called');
+    console.log('Register form submit started');
     this.submitted = true;
-
-    console.log('Form values:', {
-      ...this.registerForm.value,
-      password: '******',
-      confirmPassword: '******'
-    });
-    console.log('Form valid:', this.registerForm.valid);
-    console.log('Form validation errors:', this.registerForm.errors);
-
-    // stop here if form is invalid
+    
+    // Mark fields as touched for validation
+    this.registerForm.markAllAsTouched();
+    if (this.captchaSelector) {
+      this.captchaSelector.markAsTouched();
+    }
+    
+    // Log the form values (excluding password for security)
+    const formValuesForLogging = { ...this.registerForm.value };
+    delete formValuesForLogging.password;
+    delete formValuesForLogging.confirmPassword;
+    console.log('Form values (excluding password):', formValuesForLogging);
+    
+    // Stop here if form is invalid
     if (this.registerForm.invalid) {
-      console.log('Form is invalid, preventing submission');
+      console.warn('Form is invalid');
+      
+      // Log which controls are invalid and why
+      Object.keys(this.registerForm.controls).forEach(key => {
+        const control = this.registerForm.get(key);
+        if (control?.invalid) {
+          console.warn(`Control ${key} is invalid:`, control.errors);
+        }
+      });
+      
+      // Scroll to the first invalid element
+      const firstInvalidElement = this.el.nativeElement.querySelector('.ng-invalid');
+      if (firstInvalidElement) {
+        console.log('Scrolling to first invalid element:', firstInvalidElement);
+        firstInvalidElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
+      return;
+    }
+    
+    // Get CAPTCHA data directly from the selector component
+    const captchaData = this.captchaSelector.getCaptchaData();
+    if (!captchaData) {
+      console.warn('CAPTCHA data is missing');
+      this.error = 'CAPTCHA verification is required. Please complete the CAPTCHA.';
       return;
     }
 
-    console.log('Form is valid, proceeding with registration');
+    console.log('Verifying CAPTCHA before registration');
+    this.loading = true;
 
-    // Store email for verification step
-    this.registeredEmail = this.registerForm.get('email')?.value;
-
-    // Persist registration state
-    this.persistRegistrationState();
+    // Determine CAPTCHA type and verify with the appropriate service
+    const captchaType = this.determineCaptchaType(captchaData);
+    
+    this.advancedCaptchaService.verifyAdvancedCaptcha(
+      captchaData.challengeId, 
+      captchaData.selectedAnswer,
+      captchaType
+    ).subscribe({
+      next: (response) => {
+        console.log('CAPTCHA verification response:', response);
+        if (response.success) {
+          console.log('CAPTCHA verification successful, proceeding with registration');
+          this.handleRegistration();
+        } else {
+          console.warn('CAPTCHA verification failed');
+          this.error = 'CAPTCHA verification failed. Please try again.';
+          this.loading = false;
+          // Refresh the captcha
+          const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+          if (activeCaptcha?.refreshChallenge) {
+            activeCaptcha.refreshChallenge();
+          }
+        }
+      },
+      error: (err) => {
+        console.error('Error verifying CAPTCHA:', err);
+        this.error = 'An error occurred while verifying CAPTCHA. Please try again.';
+        this.loading = false;
+        // Refresh the captcha
+        const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+        if (activeCaptcha?.refreshChallenge) {
+          activeCaptcha.refreshChallenge();
+        }
+      }
+    });
+  }
+  
+  // Determine the CAPTCHA type based on the captcha data structure
+  private determineCaptchaType(captchaData: any): string {
+    if (captchaData.challengeId && captchaData.challengeId.startsWith('vr_')) {
+      return 'visual-reasoning';
+    } else if (captchaData.challengeId && captchaData.challengeId.startsWith('pw_')) {
+      return 'physical-world';
+    }
+    return 'visual-reasoning'; // Default to visual-reasoning captcha
+  }
+  
+  private handleRegistration() {
+    // Set loading state
+    this.loading = true;
+    this.logger.info('Submitting registration form');
 
     // Create registration data object
     const registrationData = {
-      email: this.registerForm.get('email')?.value,
-      password: this.registerForm.get('password')?.value,
-      firstName: this.registerForm.get('firstName')?.value,
-      lastName: this.registerForm.get('lastName')?.value,
-      privacyConsent: this.registerForm.get('privacyConsent')?.value
+      email: this.f['email'].value,
+      password: this.f['password'].value,
+      // Never set requiresPasswordChange for self-registered users
+      requiresPasswordChange: false,
+      firstName: this.f['firstName']?.value || '',
+      lastName: this.f['lastName']?.value || '',
+      recaptchaToken: this.f['captcha'].value || 'verified-via-advanced-captcha'
     };
 
-    console.log('Dispatching Register action with data:', {
-      ...registrationData,
-      password: '******'
-    });
+    this.logger.debug('Registration data prepared', registrationData);
 
-    try {
-      // Dispatch registration action
-      this.store.dispatch(new AuthActions.Register(
-        registrationData.email,
-        registrationData.password,
-        registrationData.firstName,
-        registrationData.lastName,
-        registrationData.privacyConsent
-      )).subscribe({
-        next: () => {
-          console.log('Register action dispatched successfully');
+    // Submit registration
+    this.authService.register(registrationData)
+      .subscribe({
+        next: (response) => {
+          this.loading = false;
+          this.logger.info('Registration successful');
+          
+          // If verification is required, show verification message
+          if (response.requiresVerification) {
+            this.router.navigate(['/verify-email'], { 
+              queryParams: { 
+                email: this.f['email'].value,
+                showInstructions: true
+              } 
+            });
+          } else {
+            // If no verification required, redirect to login with message
+            this.router.navigate(['/login'], { 
+              queryParams: { 
+                registered: 'true',
+                email: this.f['email'].value
+              } 
+            });
+          }
         },
         error: (error) => {
-          console.log('Error occurred during registration:', error);
-          if (error?.error?.message === 'Email already exists') {
-            this.error = 'This email is already registered. Please log in instead.';
-            this.emailExists = true;
-          } else {
-            this.error = error?.error?.message || 'Registration failed. Please try again.';
-            this.emailExists = false;
+          this.loading = false;
+          this.error = error?.error?.message || 'Registration failed. Please try again.';
+          this.logger.error('Registration failed', { error });
+          
+          // Refresh the captcha
+          if (this.captchaSelector?.getActiveCaptchaComponent()?.refreshChallenge) {
+            this.captchaSelector.getActiveCaptchaComponent().refreshChallenge();
           }
         }
       });
-    } catch (error) {
-      console.error('Error dispatching Register action:', error);
-      this.error = 'An unexpected error occurred. Please try again.';
-    }
   }
   
   // Handle manual email verification

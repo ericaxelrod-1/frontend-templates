@@ -3,18 +3,23 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
+// Exported for backwards compatibility
 export interface CaptchaResult {
   captchaId: string;
   imageBase64: string;
-  text?: string; // Only included in debug mode
 }
 
-export interface CaptchaVerifyRequest {
+interface CaptchaResponse {
+  captchaId: string;
+  imageBase64: string;
+}
+
+interface VerifyCaptchaRequest {
   captchaId: string;
   userInput: string;
 }
 
-export interface CaptchaVerifyResponse {
+interface VerifyCaptchaResponse {
   success: boolean;
   message: string;
 }
@@ -23,25 +28,29 @@ export interface CaptchaVerifyResponse {
   providedIn: 'root'
 })
 export class CaptchaService {
-  private readonly API_URL = `${environment.apiUrl}/captcha`;
+  private apiUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
 
   /**
    * Generate a new CAPTCHA
+   * @returns Observable with captcha id and base64 image
    */
-  generateCaptcha(debug: boolean = false): Observable<CaptchaResult> {
-    const url = debug ? `${this.API_URL}/generate?debug=true` : `${this.API_URL}/generate`;
-    return this.http.get<CaptchaResult>(url);
+  generateCaptcha(): Observable<CaptchaResponse> {
+    return this.http.get<CaptchaResponse>(`${this.apiUrl}/captcha/generate`);
   }
 
   /**
-   * Verify a CAPTCHA response
+   * Verify a CAPTCHA
+   * @param captchaId The CAPTCHA ID
+   * @param userInput The user's input
+   * @returns Observable with success status
    */
-  verifyCaptcha(captchaId: string, userInput: string): Observable<CaptchaVerifyResponse> {
-    return this.http.post<CaptchaVerifyResponse>(`${this.API_URL}/verify`, {
+  verifyCaptcha(captchaId: string, userInput: string): Observable<VerifyCaptchaResponse> {
+    const payload: VerifyCaptchaRequest = {
       captchaId,
       userInput
-    });
+    };
+    return this.http.post<VerifyCaptchaResponse>(`${this.apiUrl}/captcha/verify`, payload);
   }
 } 

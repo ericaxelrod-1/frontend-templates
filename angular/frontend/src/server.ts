@@ -1,5 +1,5 @@
 import { APP_BASE_HREF } from '@angular/common';
-import { CommonEngine, isMainModule } from '@angular/ssr/node';
+import { CommonEngine } from '@angular/ssr';
 import express from 'express';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -296,7 +296,7 @@ app.get(
 /**
  * Handle all other requests by rendering the Angular application.
  */
-app.get('**', (req, res, next) => {
+app.get('*', (req: express.Request, res: express.Response) => {
   const { protocol, originalUrl, baseUrl, headers } = req;
 
   commonEngine
@@ -307,19 +307,17 @@ app.get('**', (req, res, next) => {
       publicPath: browserDistFolder,
       providers: [{ provide: APP_BASE_HREF, useValue: baseUrl }],
     })
-    .then((html) => res.send(html))
-    .catch((err) => next(err));
+    .then((html: string) => res.send(html))
+    .catch((err: Error) => {
+      console.error(err);
+      res.status(500).send('Server error');
+    });
 });
 
-/**
- * Start the server if this module is the main entry point.
- * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
- */
-if (isMainModule(import.meta.url)) {
-  const port = process.env['PORT'] || 4000;
-  app.listen(port, () => {
-    console.log(`Node Express server listening on http://localhost:${port}`);
-  });
-}
+// Start the server
+const port = process.env['PORT'] || 4000;
+app.listen(port, () => {
+  console.log(`Node Express server listening on http://localhost:${port}`);
+});
 
 export default app;
