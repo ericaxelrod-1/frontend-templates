@@ -69,7 +69,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/users/create-user.component').then(c => c.CreateUserComponent),
         canActivate: [RoleGuard],
         data: {
-          roles: ['ADMIN', 'PROJECT_MANAGER']
+          roles: ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN']
         }
       },
       {
@@ -77,7 +77,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent),
         canActivate: [RoleGuard],
         data: {
-          roles: ['ADMIN', 'PROJECT_MANAGER']
+          roles: ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN']
         }
       },
       {
@@ -85,10 +85,18 @@ export const routes: Routes = [
         loadComponent: () => import('./features/roles/roles.component').then(c => c.RolesComponent),
         canActivate: [RoleGuard],
         data: {
-          roles: ['ADMIN', 'PROJECT_MANAGER']
+          roles: ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN']
         }
       }
     ]
+  },
+  // Admin module routes
+  {
+    path: 'admin',
+    component: MainLayoutComponent,
+    canActivate: [AuthGuard, PasswordChangeGuard, RoleGuard],
+    data: { roles: ['ADMIN', 'SUPERADMIN'] },
+    loadChildren: () => import('./modules/admin/admin.module').then(m => m.AdminModule)
   },
   {
     path: '**',

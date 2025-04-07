@@ -17,6 +17,18 @@ A modern Angular template application for quickly building new projects. This te
 - **State Management**: NGXS state management
 - **Cookie Consent**: GDPR-compliant cookie consent system with customizable preferences
 
+## Dashboard Features
+
+The application dashboard presents actionable cards based on user roles:
+
+| Card     | Description                               | Required Roles                            |
+|----------|-------------------------------------------|-------------------------------------------|
+| Users    | View and manage user accounts             | USER, PROJECT_MANAGER, ADMIN, SUPERADMIN  |
+| Groups   | Manage user groups and assignments        | PROJECT_MANAGER, ADMIN, SUPERADMIN        |
+| Activity | Access security monitoring and login logs | ADMIN, SUPERADMIN                         |
+
+For detailed information about user roles and permissions, see the [User Management documentation](./docs/user-management.md).
+
 ## Getting Started
 
 Follow these steps to set up the project for development:
@@ -41,14 +53,35 @@ Follow these steps to set up the project for development:
    npm install
    ```
 
-### Default Admin Account
+### Default User Accounts
 
-For security purposes, the application comes with a default admin account:
+The application comes with three default user accounts for different permission levels:
+
+#### 1. Superadmin Account (Full Administrative Access)
 
 - **Username**: admin@example.com
 - **Password**: Admin123!
+- **Role**: SUPERADMIN
+- **Access**: All features, including Users, Groups, Activity, and all admin functions
+- **Permissions**: Can create/delete users, assign any role, access security features
 
-⚠️ **IMPORTANT**: The application enforces strict security measures for the default admin account:
+#### 2. Project Manager Account
+
+- **Username**: manager@example.com
+- **Password**: Manager123!
+- **Role**: PROJECT_MANAGER
+- **Access**: Users, Groups, and management features
+- **Permissions**: Can manage groups and regular users
+
+#### 3. Regular User Account
+
+- **Username**: user@example.com
+- **Password**: User123!
+- **Role**: USER
+- **Access**: Basic user features only
+- **Permissions**: Can only manage own profile
+
+⚠️ **IMPORTANT**: The application enforces strict security measures for the admin accounts:
 
 1. **Mandatory Password Change**:
    - You will be required to change the password on first login

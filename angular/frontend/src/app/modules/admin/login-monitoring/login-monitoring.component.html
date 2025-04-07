@@ -1,304 +1,331 @@
 <div class="login-monitoring-container">
   <h1 class="mat-headline-2">Login Monitoring Dashboard</h1>
 
-  <!-- Statistics Cards -->
-  <div class="stats-container" *ngIf="statistics">
-    <mat-card class="stats-card">
-      <mat-card-header>
-        <mat-card-title>Total Attempts</mat-card-title>
-      </mat-card-header>
-      <mat-card-content class="stats-content">
-        <div class="stats-number">{{ statistics.total }}</div>
-      </mat-card-content>
-    </mat-card>
-    
-    <mat-card class="stats-card success">
-      <mat-card-header>
-        <mat-card-title>Successful</mat-card-title>
-      </mat-card-header>
-      <mat-card-content class="stats-content">
-        <div class="stats-number">{{ statistics.successful }}</div>
-        <div class="stats-percent" *ngIf="statistics.total > 0">
-          {{ (statistics.successful / statistics.total * 100).toFixed(1) }}%
-        </div>
-      </mat-card-content>
-    </mat-card>
-    
-    <mat-card class="stats-card warning">
-      <mat-card-header>
-        <mat-card-title>Failed</mat-card-title>
-      </mat-card-header>
-      <mat-card-content class="stats-content">
-        <div class="stats-number">{{ statistics.failed }}</div>
-        <div class="stats-percent" *ngIf="statistics.total > 0">
-          {{ (statistics.failed / statistics.total * 100).toFixed(1) }}%
-        </div>
-      </mat-card-content>
-    </mat-card>
-    
-    <mat-card class="stats-card danger">
-      <mat-card-header>
-        <mat-card-title>Blocked</mat-card-title>
-      </mat-card-header>
-      <mat-card-content class="stats-content">
-        <div class="stats-number">{{ statistics.blocked }}</div>
-        <div class="stats-percent" *ngIf="statistics.total > 0">
-          {{ (statistics.blocked / statistics.total * 100).toFixed(1) }}%
-        </div>
-      </mat-card-content>
-    </mat-card>
-    
-    <mat-card class="stats-card info">
-      <mat-card-header>
-        <mat-card-title>CAPTCHA Required</mat-card-title>
-      </mat-card-header>
-      <mat-card-content class="stats-content">
-        <div class="stats-number">{{ statistics.captchaRequired }}</div>
-        <div class="stats-percent" *ngIf="statistics.total > 0">
-          {{ (statistics.captchaRequired / statistics.total * 100).toFixed(1) }}%
-        </div>
+  <!-- Permission error message -->
+  <div *ngIf="!hasPermission" class="permission-error">
+    <mat-card>
+      <mat-card-content>
+        <h2>Access Denied</h2>
+        <p>You do not have permission to view the Login Monitoring Dashboard.</p>
+        <button mat-raised-button color="primary" (click)="goToDashboard()">Go to Dashboard</button>
       </mat-card-content>
     </mat-card>
   </div>
-  
-  <div class="loading-placeholder" *ngIf="loading.stats">
-    <mat-spinner diameter="40"></mat-spinner>
-    <span>Loading statistics...</span>
-  </div>
 
-  <!-- Security Alerts Section -->
-  <mat-card class="section-card patterns-section">
-    <mat-card-header>
-      <mat-card-title>
-        Detected Security Patterns
-        <span class="badge danger" *ngIf="detectedPatterns.length > 0">{{ detectedPatterns.length }}</span>
-      </mat-card-title>
-      <div class="header-actions">
-        <button mat-stroked-button color="primary" (click)="detectPatterns()" [disabled]="loading.patterns">
-          <mat-icon>refresh</mat-icon> Detect Patterns
-        </button>
-        <button mat-stroked-button color="warn" (click)="sendTestAlert()">
-          <mat-icon>notifications</mat-icon> Test Alert
-        </button>
-      </div>
-    </mat-card-header>
-    
-    <mat-card-content>
-      <div class="loading-placeholder" *ngIf="loading.patterns">
-        <mat-spinner diameter="40"></mat-spinner>
-        <span>Detecting patterns...</span>
-      </div>
+  <!-- Main content - only shown if user has permission -->
+  <ng-container *ngIf="hasPermission">
+    <!-- Statistics Cards -->
+    <div class="stats-container" *ngIf="statistics">
+      <mat-card class="stats-card">
+        <mat-card-header>
+          <mat-card-title>Total Attempts</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="stats-content">
+          <div class="stats-number">{{ statistics.total }}</div>
+        </mat-card-content>
+      </mat-card>
       
-      <div *ngIf="!loading.patterns && detectedPatterns.length === 0" class="empty-state">
-        <mat-icon class="empty-icon">security</mat-icon>
-        <p>No suspicious patterns detected</p>
-      </div>
-      
-      <mat-table [dataSource]="detectedPatterns" *ngIf="!loading.patterns && detectedPatterns.length > 0">
-        <!-- Type Column -->
-        <ng-container matColumnDef="type">
-          <mat-header-cell *matHeaderCellDef>Type</mat-header-cell>
-          <mat-cell *matCellDef="let pattern">
-            {{ pattern.type | titlecase }}
-          </mat-cell>
-        </ng-container>
-        
-        <!-- Severity Column -->
-        <ng-container matColumnDef="severity">
-          <mat-header-cell *matHeaderCellDef>Severity</mat-header-cell>
-          <mat-cell *matCellDef="let pattern">
-            <span class="severity-badge" [ngClass]="getSeverityClass(pattern.severity)">
-              {{ pattern.severity | uppercase }}
-            </span>
-          </mat-cell>
-        </ng-container>
-        
-        <!-- Details Column -->
-        <ng-container matColumnDef="details">
-          <mat-header-cell *matHeaderCellDef>Details</mat-header-cell>
-          <mat-cell *matCellDef="let pattern">{{ pattern.details }}</mat-cell>
-        </ng-container>
-        
-        <!-- Timestamp Column -->
-        <ng-container matColumnDef="timestamp">
-          <mat-header-cell *matHeaderCellDef>Detected</mat-header-cell>
-          <mat-cell *matCellDef="let pattern">{{ pattern.timestamp | date:'medium' }}</mat-cell>
-        </ng-container>
-        
-        <!-- Actions Column -->
-        <ng-container matColumnDef="actions">
-          <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
-          <mat-cell *matCellDef="let pattern">
-            <button mat-icon-button color="primary" 
-                    *ngIf="pattern.ipAddresses && pattern.ipAddresses.length > 0"
-                    (click)="getIPReputation(pattern.ipAddresses[0])" 
-                    matTooltip="View IP">
-              <mat-icon>visibility</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" 
-                    *ngIf="pattern.ipAddresses && pattern.ipAddresses.length > 0"
-                    (click)="blockIP(pattern.ipAddresses[0])" 
-                    matTooltip="Block IP">
-              <mat-icon>block</mat-icon>
-            </button>
-          </mat-cell>
-        </ng-container>
-        
-        <mat-header-row *matHeaderRowDef="patternColumns"></mat-header-row>
-        <mat-row *matRowDef="let row; columns: patternColumns;"></mat-row>
-      </mat-table>
-    </mat-card-content>
-  </mat-card>
-
-  <!-- Login Attempts Section -->
-  <mat-card class="section-card attempts-section">
-    <mat-card-header>
-      <mat-card-title>Recent Login Attempts</mat-card-title>
-      <div class="header-actions">
-        <button mat-stroked-button color="primary" (click)="loadRecentAttempts()" [disabled]="loading.attempts">
-          <mat-icon>refresh</mat-icon> Refresh
-        </button>
-      </div>
-    </mat-card-header>
-    
-    <mat-card-content>
-      <!-- Filters -->
-      <form [formGroup]="filterForm" class="filters-form">
-        <div class="filters-row">
-          <mat-form-field appearance="outline">
-            <mat-label>Email</mat-label>
-            <input matInput formControlName="email" placeholder="Filter by email">
-          </mat-form-field>
-          
-          <mat-form-field appearance="outline">
-            <mat-label>IP Address</mat-label>
-            <input matInput formControlName="ipAddress" placeholder="Filter by IP">
-          </mat-form-field>
-          
-          <mat-form-field appearance="outline">
-            <mat-label>Status</mat-label>
-            <mat-select formControlName="status">
-              <mat-option value="">All</mat-option>
-              <mat-option value="success">Success</mat-option>
-              <mat-option value="failed">Failed</mat-option>
-              <mat-option value="blocked">Blocked</mat-option>
-              <mat-option value="captcha_required">CAPTCHA Required</mat-option>
-              <mat-option value="captcha_failed">CAPTCHA Failed</mat-option>
-            </mat-select>
-          </mat-form-field>
-        </div>
-        
-        <div class="filters-row">
-          <mat-form-field appearance="outline">
-            <mat-label>From Date</mat-label>
-            <input matInput [matDatepicker]="pickerFrom" formControlName="dateFrom">
-            <mat-datepicker-toggle matSuffix [for]="pickerFrom"></mat-datepicker-toggle>
-            <mat-datepicker #pickerFrom></mat-datepicker>
-          </mat-form-field>
-          
-          <mat-form-field appearance="outline">
-            <mat-label>To Date</mat-label>
-            <input matInput [matDatepicker]="pickerTo" formControlName="dateTo">
-            <mat-datepicker-toggle matSuffix [for]="pickerTo"></mat-datepicker-toggle>
-            <mat-datepicker #pickerTo></mat-datepicker>
-          </mat-form-field>
-          
-          <div class="filter-actions">
-            <button mat-raised-button color="primary" (click)="applyFilters()">
-              <mat-icon>search</mat-icon> Apply Filters
-            </button>
-            <button mat-stroked-button (click)="resetFilters()">
-              <mat-icon>clear</mat-icon> Reset
-            </button>
+      <mat-card class="stats-card success">
+        <mat-card-header>
+          <mat-card-title>Successful</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="stats-content">
+          <div class="stats-number">{{ statistics.successful }}</div>
+          <div class="stats-percent" *ngIf="statistics.total > 0">
+            {{ (statistics.successful / statistics.total * 100).toFixed(1) }}%
           </div>
+        </mat-card-content>
+      </mat-card>
+      
+      <mat-card class="stats-card warning">
+        <mat-card-header>
+          <mat-card-title>Failed</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="stats-content">
+          <div class="stats-number">{{ statistics.failed }}</div>
+          <div class="stats-percent" *ngIf="statistics.total > 0">
+            {{ (statistics.failed / statistics.total * 100).toFixed(1) }}%
+          </div>
+        </mat-card-content>
+      </mat-card>
+      
+      <mat-card class="stats-card danger">
+        <mat-card-header>
+          <mat-card-title>Blocked</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="stats-content">
+          <div class="stats-number">{{ statistics.blocked }}</div>
+          <div class="stats-percent" *ngIf="statistics.total > 0">
+            {{ (statistics.blocked / statistics.total * 100).toFixed(1) }}%
+          </div>
+        </mat-card-content>
+      </mat-card>
+      
+      <mat-card class="stats-card info">
+        <mat-card-header>
+          <mat-card-title>CAPTCHA Required</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="stats-content">
+          <div class="stats-number">{{ statistics.captchaRequired }}</div>
+          <div class="stats-percent" *ngIf="statistics.total > 0">
+            {{ (statistics.captchaRequired / statistics.total * 100).toFixed(1) }}%
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+    
+    <!-- Loading spinner for stats -->
+    <div *ngIf="!statistics && loading.stats" class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading statistics...</p>
+    </div>
+
+    <!-- Stats Error Message -->
+    <div *ngIf="!statistics && !loading.stats" class="error-message">
+      <mat-card>
+        <mat-card-content>
+          <p>Unable to load statistics. Please try again later.</p>
+          <button mat-button color="primary" (click)="loadStats()">
+            <mat-icon>refresh</mat-icon> Retry
+          </button>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    <!-- Security Alerts Section -->
+    <mat-card class="section-card patterns-section">
+      <mat-card-header>
+        <mat-card-title>
+          Detected Security Patterns
+          <span class="badge danger" *ngIf="detectedPatterns.length > 0">{{ detectedPatterns.length }}</span>
+        </mat-card-title>
+        <div class="header-actions">
+          <button mat-stroked-button color="primary" (click)="detectPatterns()" [disabled]="loading.patterns">
+            <mat-icon>refresh</mat-icon> Detect Patterns
+          </button>
+          <button mat-stroked-button color="warn" (click)="sendTestAlert()">
+            <mat-icon>notifications</mat-icon> Test Alert
+          </button>
         </div>
-      </form>
+      </mat-card-header>
       
-      <div class="loading-placeholder" *ngIf="loading.attempts">
-        <mat-spinner diameter="40"></mat-spinner>
-        <span>Loading login attempts...</span>
-      </div>
+      <mat-card-content>
+        <div class="loading-placeholder" *ngIf="loading.patterns">
+          <mat-spinner diameter="40"></mat-spinner>
+          <span>Detecting patterns...</span>
+        </div>
+        
+        <div *ngIf="!loading.patterns && detectedPatterns.length === 0" class="empty-state">
+          <mat-icon class="empty-icon">security</mat-icon>
+          <p>No suspicious patterns detected</p>
+        </div>
+        
+        <mat-table [dataSource]="detectedPatterns" *ngIf="!loading.patterns && detectedPatterns.length > 0">
+          <!-- Type Column -->
+          <ng-container matColumnDef="type">
+            <mat-header-cell *matHeaderCellDef>Type</mat-header-cell>
+            <mat-cell *matCellDef="let pattern">
+              {{ pattern.type | titlecase }}
+            </mat-cell>
+          </ng-container>
+          
+          <!-- Severity Column -->
+          <ng-container matColumnDef="severity">
+            <mat-header-cell *matHeaderCellDef>Severity</mat-header-cell>
+            <mat-cell *matCellDef="let pattern">
+              <span class="severity-badge" [ngClass]="getSeverityClass(pattern.severity)">
+                {{ pattern.severity | uppercase }}
+              </span>
+            </mat-cell>
+          </ng-container>
+          
+          <!-- Details Column -->
+          <ng-container matColumnDef="details">
+            <mat-header-cell *matHeaderCellDef>Details</mat-header-cell>
+            <mat-cell *matCellDef="let pattern">{{ pattern.details }}</mat-cell>
+          </ng-container>
+          
+          <!-- Timestamp Column -->
+          <ng-container matColumnDef="timestamp">
+            <mat-header-cell *matHeaderCellDef>Detected</mat-header-cell>
+            <mat-cell *matCellDef="let pattern">{{ pattern.timestamp | date:'medium' }}</mat-cell>
+          </ng-container>
+          
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
+            <mat-cell *matCellDef="let pattern">
+              <button mat-icon-button color="primary" 
+                      *ngIf="pattern.ipAddresses && pattern.ipAddresses.length > 0"
+                      (click)="getIPReputation(pattern.ipAddresses[0])" 
+                      matTooltip="View IP">
+                <mat-icon>visibility</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" 
+                      *ngIf="pattern.ipAddresses && pattern.ipAddresses.length > 0"
+                      (click)="blockIP(pattern.ipAddresses[0])" 
+                      matTooltip="Block IP">
+                <mat-icon>block</mat-icon>
+              </button>
+            </mat-cell>
+          </ng-container>
+          
+          <mat-header-row *matHeaderRowDef="patternColumns"></mat-header-row>
+          <mat-row *matRowDef="let row; columns: patternColumns;"></mat-row>
+        </mat-table>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Login Attempts Section -->
+    <mat-card class="section-card attempts-section">
+      <mat-card-header>
+        <mat-card-title>Recent Login Attempts</mat-card-title>
+        <div class="header-actions">
+          <button mat-stroked-button color="primary" (click)="loadRecentAttempts()" [disabled]="loading.attempts">
+            <mat-icon>refresh</mat-icon> Refresh
+          </button>
+        </div>
+      </mat-card-header>
       
-      <div *ngIf="!loading.attempts && recentAttempts.length === 0" class="empty-state">
-        <mat-icon class="empty-icon">history</mat-icon>
-        <p>No login attempts found</p>
-      </div>
-      
-      <!-- Attempts Table -->
-      <mat-table [dataSource]="recentAttempts" *ngIf="!loading.attempts && recentAttempts.length > 0">
-        <!-- ID Column -->
-        <ng-container matColumnDef="id">
-          <mat-header-cell *matHeaderCellDef>ID</mat-header-cell>
-          <mat-cell *matCellDef="let attempt">{{ attempt.id }}</mat-cell>
-        </ng-container>
+      <mat-card-content>
+        <!-- Filters -->
+        <form [formGroup]="filterForm" class="filters-form">
+          <div class="filters-row">
+            <mat-form-field appearance="outline">
+              <mat-label>Email</mat-label>
+              <input matInput formControlName="email" placeholder="Filter by email">
+            </mat-form-field>
+            
+            <mat-form-field appearance="outline">
+              <mat-label>IP Address</mat-label>
+              <input matInput formControlName="ipAddress" placeholder="Filter by IP">
+            </mat-form-field>
+            
+            <mat-form-field appearance="outline">
+              <mat-label>Status</mat-label>
+              <mat-select formControlName="status">
+                <mat-option value="">All</mat-option>
+                <mat-option value="success">Success</mat-option>
+                <mat-option value="failed">Failed</mat-option>
+                <mat-option value="blocked">Blocked</mat-option>
+                <mat-option value="captcha_required">CAPTCHA Required</mat-option>
+                <mat-option value="captcha_failed">CAPTCHA Failed</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          
+          <div class="filters-row">
+            <mat-form-field appearance="outline">
+              <mat-label>From Date</mat-label>
+              <input matInput [matDatepicker]="pickerFrom" formControlName="dateFrom">
+              <mat-datepicker-toggle matSuffix [for]="pickerFrom"></mat-datepicker-toggle>
+              <mat-datepicker #pickerFrom></mat-datepicker>
+            </mat-form-field>
+            
+            <mat-form-field appearance="outline">
+              <mat-label>To Date</mat-label>
+              <input matInput [matDatepicker]="pickerTo" formControlName="dateTo">
+              <mat-datepicker-toggle matSuffix [for]="pickerTo"></mat-datepicker-toggle>
+              <mat-datepicker #pickerTo></mat-datepicker>
+            </mat-form-field>
+            
+            <div class="filter-actions">
+              <button mat-raised-button color="primary" (click)="applyFilters()">
+                <mat-icon>search</mat-icon> Apply Filters
+              </button>
+              <button mat-stroked-button (click)="resetFilters()">
+                <mat-icon>clear</mat-icon> Reset
+              </button>
+            </div>
+          </div>
+        </form>
         
-        <!-- Timestamp Column -->
-        <ng-container matColumnDef="timestamp">
-          <mat-header-cell *matHeaderCellDef>Timestamp</mat-header-cell>
-          <mat-cell *matCellDef="let attempt">{{ attempt.createdAt | date:'medium' }}</mat-cell>
-        </ng-container>
+        <div class="loading-placeholder" *ngIf="loading.attempts">
+          <mat-spinner diameter="40"></mat-spinner>
+          <span>Loading login attempts...</span>
+        </div>
         
-        <!-- Email Column -->
-        <ng-container matColumnDef="email">
-          <mat-header-cell *matHeaderCellDef>Email</mat-header-cell>
-          <mat-cell *matCellDef="let attempt">{{ attempt.email }}</mat-cell>
-        </ng-container>
+        <div *ngIf="!loading.attempts && recentAttempts.length === 0" class="empty-state">
+          <mat-icon class="empty-icon">history</mat-icon>
+          <p>No login attempts found</p>
+        </div>
         
-        <!-- IP Address Column -->
-        <ng-container matColumnDef="ipAddress">
-          <mat-header-cell *matHeaderCellDef>IP Address</mat-header-cell>
-          <mat-cell *matCellDef="let attempt">
-            <a (click)="getIPReputation(attempt.ipAddress)" class="ip-link">
-              {{ attempt.ipAddress }}
-            </a>
-          </mat-cell>
-        </ng-container>
+        <!-- Attempts Table -->
+        <mat-table [dataSource]="recentAttempts" *ngIf="!loading.attempts && recentAttempts.length > 0">
+          <!-- ID Column -->
+          <ng-container matColumnDef="id">
+            <mat-header-cell *matHeaderCellDef>ID</mat-header-cell>
+            <mat-cell *matCellDef="let attempt">{{ attempt.id }}</mat-cell>
+          </ng-container>
+          
+          <!-- Timestamp Column -->
+          <ng-container matColumnDef="timestamp">
+            <mat-header-cell *matHeaderCellDef>Timestamp</mat-header-cell>
+            <mat-cell *matCellDef="let attempt">{{ attempt.createdAt | date:'medium' }}</mat-cell>
+          </ng-container>
+          
+          <!-- Email Column -->
+          <ng-container matColumnDef="email">
+            <mat-header-cell *matHeaderCellDef>Email</mat-header-cell>
+            <mat-cell *matCellDef="let attempt">{{ attempt.email }}</mat-cell>
+          </ng-container>
+          
+          <!-- IP Address Column -->
+          <ng-container matColumnDef="ipAddress">
+            <mat-header-cell *matHeaderCellDef>IP Address</mat-header-cell>
+            <mat-cell *matCellDef="let attempt">
+              <a (click)="getIPReputation(attempt.ipAddress)" class="ip-link">
+                {{ attempt.ipAddress }}
+              </a>
+            </mat-cell>
+          </ng-container>
+          
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <mat-header-cell *matHeaderCellDef>Status</mat-header-cell>
+            <mat-cell *matCellDef="let attempt">
+              <span class="status-badge" [ngClass]="'status-' + attempt.status">
+                {{ attempt.status | titlecase }}
+              </span>
+            </mat-cell>
+          </ng-container>
+          
+          <!-- Details Column -->
+          <ng-container matColumnDef="details">
+            <mat-header-cell *matHeaderCellDef>Details</mat-header-cell>
+            <mat-cell *matCellDef="let attempt">
+              {{ attempt.failureReason || '-' }}
+            </mat-cell>
+          </ng-container>
+          
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
+            <mat-cell *matCellDef="let attempt">
+              <button mat-icon-button color="primary" (click)="getIPReputation(attempt.ipAddress)" matTooltip="View IP Details">
+                <mat-icon>visibility</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="blockIP(attempt.ipAddress)" matTooltip="Block IP">
+                <mat-icon>block</mat-icon>
+              </button>
+            </mat-cell>
+          </ng-container>
+          
+          <mat-header-row *matHeaderRowDef="attemptColumns"></mat-header-row>
+          <mat-row *matRowDef="let row; columns: attemptColumns;"></mat-row>
+        </mat-table>
         
-        <!-- Status Column -->
-        <ng-container matColumnDef="status">
-          <mat-header-cell *matHeaderCellDef>Status</mat-header-cell>
-          <mat-cell *matCellDef="let attempt">
-            <span class="status-badge" [ngClass]="'status-' + attempt.status">
-              {{ attempt.status | titlecase }}
-            </span>
-          </mat-cell>
-        </ng-container>
-        
-        <!-- Details Column -->
-        <ng-container matColumnDef="details">
-          <mat-header-cell *matHeaderCellDef>Details</mat-header-cell>
-          <mat-cell *matCellDef="let attempt">
-            {{ attempt.failureReason || '-' }}
-          </mat-cell>
-        </ng-container>
-        
-        <!-- Actions Column -->
-        <ng-container matColumnDef="actions">
-          <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
-          <mat-cell *matCellDef="let attempt">
-            <button mat-icon-button color="primary" (click)="getIPReputation(attempt.ipAddress)" matTooltip="View IP Details">
-              <mat-icon>visibility</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" (click)="blockIP(attempt.ipAddress)" matTooltip="Block IP">
-              <mat-icon>block</mat-icon>
-            </button>
-          </mat-cell>
-        </ng-container>
-        
-        <mat-header-row *matHeaderRowDef="attemptColumns"></mat-header-row>
-        <mat-row *matRowDef="let row; columns: attemptColumns;"></mat-row>
-      </mat-table>
-      
-      <!-- Pagination -->
-      <mat-paginator
-        *ngIf="!loading.attempts && totalAttempts > 0"
-        [length]="totalAttempts"
-        [pageSize]="pageSize"
-        [pageSizeOptions]="[5, 10, 25, 50]"
-        (page)="pageChange($event)">
-      </mat-paginator>
-    </mat-card-content>
-  </mat-card>
+        <!-- Pagination -->
+        <mat-paginator
+          *ngIf="!loading.attempts && totalAttempts > 0"
+          [length]="totalAttempts"
+          [pageSize]="pageSize"
+          [pageSizeOptions]="[5, 10, 25, 50]"
+          (page)="pageChange($event)">
+        </mat-paginator>
+      </mat-card-content>
+    </mat-card>
+  </ng-container>
   
   <!-- IP Reputation Dialog -->
   <div *ngIf="selectedIpReputation" class="ip-reputation-overlay">

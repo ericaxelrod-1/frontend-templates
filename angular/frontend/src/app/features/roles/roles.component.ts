@@ -10,6 +10,7 @@ import { RoleService, Role } from '../../services/role.service';
 import { RoleDialogComponent } from './role-dialog/role-dialog.component';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
+import { PermissionService } from '../../core/services/permission.service';
 
 @Component({
   selector: 'app-roles',
@@ -128,23 +129,28 @@ export class RolesComponent implements OnInit {
   roles: Role[] = [];
   hasPermission = false;
   loading = true;
+  
+  // Define the required roles - these should match the ones in the route configuration
+  private requiredRoles = ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN'];
 
   constructor(
     private roleService: RoleService,
     private authService: AuthService,
     private snackBar: MatSnackBar,
     private router: Router,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private permissionService: PermissionService
   ) {}
 
   ngOnInit(): void {
-    // Check if user has admin role
-    this.authService.currentUser$.subscribe(user => {
-      if (user?.roles?.includes('admin')) {
-        this.hasPermission = true;
+    // Use the permission service to standardize permission checking
+    this.permissionService.hasPermission$(this.requiredRoles).subscribe(hasPermission => {
+      console.log('[RolesComponent] Permission check result:', hasPermission);
+      this.hasPermission = hasPermission;
+      
+      if (hasPermission) {
         this.loadRoles();
       } else {
-        this.hasPermission = false;
         this.loading = false;
         this.snackBar.open('You do not have permission to access this page', 'Close', { duration: 5000 });
       }

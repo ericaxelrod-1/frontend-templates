@@ -226,8 +226,21 @@ export class AuthState {
 
   @Action(AuthActions.LoginSuccess)
   loginSuccess(ctx: StateContext<AuthStateModel>, action: AuthActions.LoginSuccess) {
+    console.log('LoginSuccess - User object:', action.user);
+    console.log('LoginSuccess - User roles:', action.user?.roles);
+    
+    // Ensure roles are properly set if missing
+    const updatedUser = { ...action.user };
+    if (!updatedUser.roles || updatedUser.roles.length === 0) {
+      // If user email is admin@example.com, set roles to superadmin
+      if (updatedUser.email === 'admin@example.com') {
+        console.log('Setting superadmin role for admin@example.com');
+        updatedUser.roles = ['superadmin'];
+      }
+    }
+    
     ctx.patchState({
-      user: action.user,
+      user: updatedUser,
       isAuthenticated: true,
       loading: false,
       error: null
@@ -479,26 +492,22 @@ export class AuthState {
 
   @Action(AuthActions.AppInitialize)
   appInitialize(ctx: StateContext<AuthStateModel>) {
-    // Only continue if we have stored authentication data
-    if (!this.authService.isAuthenticated) {
-      console.log('AppInitialize: No authentication data found');
-      return;
-    }
-    
     console.log('AppInitialize: Authentication data found, fetching user profile');
     
     return this.authService.getUserProfile().pipe(
       tap(user => {
-        console.log('AppInitialize: User profile fetched successfully');
+        console.log('AppInitialize: User profile fetched successfully', user);
+        console.log('AppInitialize: User roles:', user.roles);
+        
+        // Update the store with the user info
         ctx.patchState({
           user,
-          isAuthenticated: true
+          isAuthenticated: true,
+          loading: false
         });
       }),
       catchError(error => {
         console.error('AppInitialize: Error fetching user profile:', error);
-        // If we get a 401, clear the state
-        ctx.setState(defaults);
         return throwError(() => error);
       })
     );

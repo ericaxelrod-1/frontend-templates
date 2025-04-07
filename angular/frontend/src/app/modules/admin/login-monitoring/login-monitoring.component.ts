@@ -1,8 +1,12 @@
 import { Component, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { environment } from '../../../../environments/environment';
+import { PermissionService } from '../../../core/services/permission.service';
+import { Router } from '@angular/router';
+import { catchError } from 'rxjs/operators';
+import { of, throwError } from 'rxjs';
 
 interface LoginAttempt {
   id: number;
@@ -71,6 +75,9 @@ export class LoginMonitoringComponent implements OnInit {
   pageSize = 10;
   currentPage = 0;
   
+  // Permission state
+  hasPermission = false;
+  
   // Loading state
   loading = {
     attempts: false,
@@ -82,7 +89,9 @@ export class LoginMonitoringComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private fb: FormBuilder,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private permissionService: PermissionService,
+    private router: Router
   ) {
     this.filterForm = this.fb.group({
       email: [''],
@@ -94,12 +103,24 @@ export class LoginMonitoringComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadStats();
-    this.loadRecentAttempts();
-    this.detectPatterns();
+    // Check permission first
+    this.permissionService.hasPermission$(['ADMIN', 'SUPERADMIN']).subscribe(hasPermission => {
+      this.hasPermission = hasPermission;
+      
+      if (hasPermission) {
+        this.loadStats();
+        this.loadRecentAttempts();
+        this.detectPatterns();
+      } else {
+        this.snackBar.open('You do not have permission to view this page.', 'Close', { duration: 5000 });
+        this.router.navigate(['/app/dashboard']);
+      }
+    });
   }
 
   loadRecentAttempts(): void {
+    if (!this.hasPermission) return;
+    
     this.loading.attempts = true;
     
     const filters = this.filterForm.value;
@@ -127,94 +148,118 @@ export class LoginMonitoringComponent implements OnInit {
       url += `&dateTo=${dateTo.toISOString()}`;
     }
     
-    this.http.get<any>(url).subscribe({
-      next: (data) => {
-        this.recentAttempts = data.items || [];
-        this.totalAttempts = data.total || 0;
-        this.loading.attempts = false;
-      },
-      error: (error) => {
-        this.snackBar.open('Error loading login attempts', 'Close', { duration: 3000 });
-        console.error('Error loading login attempts:', error);
-        this.loading.attempts = false;
-      }
-    });
+    this.http.get<any>(url)
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          this.handleApiError('login attempts', error);
+          return of({ items: [], total: 0 });
+        })
+      )
+      .subscribe({
+        next: (data) => {
+          this.recentAttempts = data.items || [];
+          this.totalAttempts = data.total || 0;
+          this.loading.attempts = false;
+        }
+      });
   }
 
   loadStats(): void {
+    if (!this.hasPermission) return;
+    
     this.loading.stats = true;
     
-    this.http.get<Statistics>(`${this.apiUrl}/stats`).subscribe({
-      next: (data) => {
-        this.statistics = data;
-        this.loading.stats = false;
-      },
-      error: (error) => {
-        this.snackBar.open('Error loading statistics', 'Close', { duration: 3000 });
-        console.error('Error loading statistics:', error);
-        this.loading.stats = false;
-      }
-    });
+    this.http.get<Statistics>(`${this.apiUrl}/stats`)
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          this.handleApiError('statistics', error);
+          return of(null);
+        })
+      )
+      .subscribe({
+        next: (data) => {
+          this.statistics = data;
+          this.loading.stats = false;
+        }
+      });
   }
 
   detectPatterns(): void {
+    if (!this.hasPermission) return;
+    
     this.loading.patterns = true;
     
-    this.http.get<Pattern[]>(`${this.apiUrl}/patterns/detect`).subscribe({
-      next: (data) => {
-        this.detectedPatterns = data;
-        this.loading.patterns = false;
-      },
-      error: (error) => {
-        this.snackBar.open('Error detecting patterns', 'Close', { duration: 3000 });
-        console.error('Error detecting patterns:', error);
-        this.loading.patterns = false;
-      }
-    });
+    this.http.get<Pattern[]>(`${this.apiUrl}/patterns/detect`)
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          this.handleApiError('patterns', error);
+          return of([]);
+        })
+      )
+      .subscribe({
+        next: (data) => {
+          this.detectedPatterns = data || [];
+          this.loading.patterns = false;
+        }
+      });
   }
 
   getIPReputation(ipAddress: string): void {
+    if (!this.hasPermission) return;
+    
     this.loading.ipReputation = true;
     
     this.http.get<{ reputation: IPReputation, recentAttempts: LoginAttempt[] }>(
       `${this.apiUrl}/ip/${encodeURIComponent(ipAddress)}`
-    ).subscribe({
+    )
+    .pipe(
+      catchError((error: HttpErrorResponse) => {
+        this.handleApiError(`IP reputation for ${ipAddress}`, error);
+        return of({ reputation: null, recentAttempts: [] });
+      })
+    )
+    .subscribe({
       next: (data) => {
         this.selectedIpReputation = data.reputation;
-        this.loading.ipReputation = false;
-      },
-      error: (error) => {
-        this.snackBar.open(`Error loading IP reputation for ${ipAddress}`, 'Close', { duration: 3000 });
-        console.error('Error loading IP reputation:', error);
         this.loading.ipReputation = false;
       }
     });
   }
 
   blockIP(ipAddress: string): void {
-    this.http.post(`${this.apiUrl}/ip/${encodeURIComponent(ipAddress)}/block`, {}).subscribe({
-      next: () => {
-        this.snackBar.open(`IP ${ipAddress} has been blocked`, 'Close', { duration: 3000 });
-        this.getIPReputation(ipAddress);
-      },
-      error: (error) => {
-        this.snackBar.open(`Error blocking IP ${ipAddress}`, 'Close', { duration: 3000 });
-        console.error('Error blocking IP:', error);
-      }
-    });
+    if (!this.hasPermission) return;
+    
+    this.http.post(`${this.apiUrl}/ip/${encodeURIComponent(ipAddress)}/block`, {})
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          this.handleApiError(`blocking IP ${ipAddress}`, error);
+          return throwError(() => error);
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.snackBar.open(`IP ${ipAddress} has been blocked`, 'Close', { duration: 3000 });
+          this.getIPReputation(ipAddress);
+        }
+      });
   }
 
   unblockIP(ipAddress: string): void {
-    this.http.post(`${this.apiUrl}/ip/${encodeURIComponent(ipAddress)}/unblock`, {}).subscribe({
-      next: () => {
-        this.snackBar.open(`IP ${ipAddress} has been unblocked`, 'Close', { duration: 3000 });
-        this.getIPReputation(ipAddress);
-      },
-      error: (error) => {
-        this.snackBar.open(`Error unblocking IP ${ipAddress}`, 'Close', { duration: 3000 });
-        console.error('Error unblocking IP:', error);
-      }
-    });
+    if (!this.hasPermission) return;
+    
+    this.http.post(`${this.apiUrl}/ip/${encodeURIComponent(ipAddress)}/unblock`, {})
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          this.handleApiError(`unblocking IP ${ipAddress}`, error);
+          return throwError(() => error);
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.snackBar.open(`IP ${ipAddress} has been unblocked`, 'Close', { duration: 3000 });
+          this.getIPReputation(ipAddress);
+        }
+      });
   }
 
   resetFilters(): void {
@@ -234,18 +279,23 @@ export class LoginMonitoringComponent implements OnInit {
   }
 
   sendTestAlert(): void {
+    if (!this.hasPermission) return;
+    
     const message = prompt('Enter test alert message:');
     if (!message) return;
     
-    this.http.post(`${this.apiUrl}/alert/test`, { message }).subscribe({
-      next: () => {
-        this.snackBar.open('Test alert sent successfully', 'Close', { duration: 3000 });
-      },
-      error: (error) => {
-        this.snackBar.open('Error sending test alert', 'Close', { duration: 3000 });
-        console.error('Error sending test alert:', error);
-      }
-    });
+    this.http.post(`${this.apiUrl}/alert/test`, { message })
+      .pipe(
+        catchError((error: HttpErrorResponse) => {
+          this.handleApiError('sending test alert', error);
+          return throwError(() => error);
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.snackBar.open('Test alert sent successfully', 'Close', { duration: 3000 });
+        }
+      });
   }
 
   getSeverityClass(severity: string): string {
@@ -260,5 +310,26 @@ export class LoginMonitoringComponent implements OnInit {
       default:
         return '';
     }
+  }
+  
+  goToDashboard(): void {
+    this.router.navigate(['/app/dashboard']);
+  }
+  
+  // Common error handler
+  private handleApiError(action: string, error: HttpErrorResponse): void {
+    console.error(`Error ${action}:`, error);
+    
+    if (error.status === 403) {
+      this.snackBar.open(`You don't have permission to view login monitoring data.`, 'Close', { duration: 5000 });
+      this.hasPermission = false;
+    } else {
+      this.snackBar.open(`Error ${action}`, 'Close', { duration: 3000 });
+    }
+    
+    this.loading.attempts = false;
+    this.loading.stats = false;
+    this.loading.patterns = false;
+    this.loading.ipReputation = false;
   }
 } 

@@ -39,6 +39,13 @@
 
 .dashboard-card {
   min-height: 150px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  }
 }
 
 h1 {

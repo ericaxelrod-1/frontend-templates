@@ -76,12 +76,14 @@ import { LoggerService } from '../../services/logging/logger.service';
                 No groups
               </div>
               <mat-chip-listbox *ngIf="user.groups && user.groups.length > 0">
-                <mat-chip *ngFor="let group of user.groups">
-                  {{ group.name }}
-                  <button *ngIf="canManageGroups(user)" matChipRemove (click)="removeFromGroup(user, group)">
-                    <mat-icon>cancel</mat-icon>
-                  </button>
-                </mat-chip>
+                <ng-container *ngFor="let group of user.groups">
+                  <mat-chip *ngIf="group">
+                    {{ group.name }}
+                    <button *ngIf="canManageGroups(user)" matChipRemove (click)="removeFromGroup(user, group)">
+                      <mat-icon>cancel</mat-icon>
+                    </button>
+                  </mat-chip>
+                </ng-container>
               </mat-chip-listbox>
               <button *ngIf="canManageGroups(user)" mat-icon-button [matMenuTriggerFor]="groupMenu">
                 <mat-icon>add_circle</mat-icon>
@@ -200,19 +202,27 @@ export class UsersComponent implements OnInit {
     });
   }
 
-  // Convert auth user to our User model since they might have different structures
-  convertAuthUserToUserModel(authUser: any): User {
+  // Method to convert auth user to our User model
+  private convertAuthUserToUserModel(authUser: any): User {
     return {
-      id: authUser.id,
-      name: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() || authUser.email,
-      email: authUser.email,
-      role: authUser.roles ? authUser.roles[0] : 'User', // Just use first role for display
-      groups: [] // Groups will be populated when we load user data
+      id: authUser.id || 0,
+      name: authUser.displayName || authUser.name || '',
+      email: authUser.email || '',
+      role: authUser.role || 'User',
+      groups: []
     };
   }
 
+  // Property to check if current user is admin or project manager
   get isAdminOrProjectManager(): boolean {
-    return this.authService.hasRole('ADMIN') || this.authService.hasRole('PROJECT_MANAGER');
+    return this.currentUser?.role === 'ADMIN' || 
+           this.currentUser?.role === 'PROJECT_MANAGER' ||
+           this.currentUser?.role === 'SUPERADMIN';
+  }
+
+  // Check if the current user can manage groups for a given user
+  canManageGroups(user: User): boolean {
+    return this.isAdminOrProjectManager || user.id === this.currentUser?.id;
   }
 
   loadData(): void {
@@ -236,7 +246,12 @@ export class UsersComponent implements OnInit {
           })
         )
       }).subscribe(result => {
-        this.users = result.users;
+        this.users = result.users.map(user => {
+          if (!user.groups) {
+            user.groups = [];
+          }
+          return user;
+        });
         this.availableGroups = result.groups;
         this.loading = false;
       });
@@ -254,6 +269,10 @@ export class UsersComponent implements OnInit {
         ).subscribe(userProfile => {
           // If we got a profile, update the user in our list
           if (userProfile) {
+            // Ensure userProfile has a groups array
+            if (!userProfile.groups) {
+              userProfile.groups = [];
+            }
             this.users[0] = userProfile;
             
             // If the user has groups, update currentUserGroups
@@ -300,11 +319,11 @@ export class UsersComponent implements OnInit {
     ).subscribe(groups => {
       // Update current user's groups
       if (this.users[0]) {
-        this.users[0].groups = groups;
+        this.users[0].groups = groups || [];
       }
       
       // Store groups for filtering and access control
-      this.currentUserGroups = groups.map(group => ({
+      this.currentUserGroups = (groups || []).map(group => ({
         id: group.id,
         name: group.name,
         description: '',
@@ -316,7 +335,7 @@ export class UsersComponent implements OnInit {
       this.availableGroups = this.currentUserGroups;
       
       // Try to load members from groups
-      if (groups.length > 0) {
+      if (groups && groups.length > 0) {
         this.loadGroupMembers();
       } else {
         this.loading = false;
@@ -347,6 +366,10 @@ export class UsersComponent implements OnInit {
         members.forEach(member => {
           if (!allMembers.some(m => m.id === member.id) && 
               member.id !== this.currentUser?.id) {
+            // Ensure member has a groups array
+            if (!member.groups) {
+              member.groups = [];
+            }
             allMembers.push(member);
           }
         });
@@ -361,71 +384,42 @@ export class UsersComponent implements OnInit {
     });
   }
 
-  // Determine if the user can manage groups for a given user
-  canManageGroups(user: User): boolean {
-    if (this.isAdminOrProjectManager) {
-      return true;
-    }
-    
-    // Regular users can only manage their own groups
-    return this.currentUser?.id === user.id;
-  }
-
-  // Get available groups for a specific user
-  getAvailableGroupsForUser(user: User): Group[] {
-    if (!user.groups) {
-      user.groups = [];
-    }
-    
-    if (this.isAdminOrProjectManager) {
-      // Admins/PMs can add users to any group
-      // Filter out groups that user is already in
-      return this.availableGroups.filter(group => 
-        !user.groups?.some(userGroup => userGroup.id === group.id)
-      );
-    } else if (this.currentUser?.id === user.id) {
-      // Regular users can only add themselves to their available groups
-      // For now, regular users can't add themselves to groups
-      // If you want to allow this, you'd need to implement logic to 
-      // determine which groups they can join
-      return [];
-    } else {
-      // Regular users can add other users to their groups
-      // Filter to show only groups the current user is in
-      // and the target user is not in
-      return this.currentUserGroups.filter(group => 
-        !user.groups?.some(userGroup => userGroup.id === group.id)
-      );
-    }
-  }
-
-  goToDashboard(): void {
-    this.router.navigate(['/app/dashboard']);
-  }
-
   createUser(): void {
-    this.logger.info('Navigating to create user page');
-    this.router.navigate(['/app/users/create']);
+    // Navigate to create user component
+    this.router.navigate(['/users/create']);
   }
 
   editUser(user: User): void {
-    // Implement user edit logic
-    console.log('Edit user clicked', user);
+    // Navigate to edit user component
+    this.router.navigate(['/users/edit', user.id]);
   }
 
   deleteUser(user: User): void {
-    if (confirm(`Are you sure you want to delete ${user.name}?`)) {
+    if (confirm(`Are you sure you want to delete user: ${user.name}?`)) {
       this.userService.deleteUser(user.id).subscribe({
         next: () => {
           this.users = this.users.filter(u => u.id !== user.id);
           this.snackBar.open('User deleted successfully', 'Close', { duration: 3000 });
         },
-        error: (error: any) => {
+        error: (error) => {
           console.error('Error deleting user:', error);
           this.snackBar.open('Error deleting user', 'Close', { duration: 3000 });
         }
       });
     }
+  }
+
+  // Get list of available groups for a user (groups they're not already in)
+  getAvailableGroupsForUser(user: User): Group[] {
+    // If no groups defined for user, return all available groups
+    if (!user.groups) {
+      return this.availableGroups;
+    }
+    
+    // Otherwise, filter out groups the user is already a member of
+    return this.availableGroups.filter(group => 
+      !user.groups.some(userGroup => userGroup.id === group.id)
+    );
   }
 
   addToGroup(user: User, group: Group): void {
@@ -450,7 +444,9 @@ export class UsersComponent implements OnInit {
   removeFromGroup(user: User, group: any): void {
     this.userService.removeUserFromGroup(user.id, group.id).subscribe({
       next: () => {
-        user.groups = user.groups.filter(g => g.id !== group.id);
+        if (user.groups) {
+          user.groups = user.groups.filter(g => g.id !== group.id);
+        }
         this.snackBar.open(`Removed ${user.name} from ${group.name}`, 'Close', { duration: 3000 });
       },
       error: (error: any) => {

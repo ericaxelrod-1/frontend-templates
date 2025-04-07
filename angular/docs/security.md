@@ -192,7 +192,7 @@ The authentication module includes these security features:
 
 ### Login Monitoring System
 
-The application implements a comprehensive login monitoring and security system:
+The application implements a comprehensive login monitoring and security system, accessible via the **Activity** dashboard card for admin users:
 
 1. **Login Attempt Tracking**:
    - All login attempts (successful and failed) are recorded in the database
@@ -272,6 +272,16 @@ The application implements a comprehensive login monitoring and security system:
      - Bypass security restrictions for trusted IPs
      - Detailed logging of allowlist decisions
      - See [IP Allowlist Guide](./ip-allowlist-guide.md) for details
+
+8. **Activity Dashboard Card**:
+   - **Access Requirements**: Available to users with ADMIN or SUPERADMIN roles
+   - **Real-time Monitoring**: Live view of login attempts across the system
+   - **Threat Visualization**: Color-coded indicators of security threats
+   - **Quick Actions**: Ability to block IPs, lock accounts, or trigger additional verification
+   - **Notification Center**: Centralized view of security alerts and system messages
+   - **Export Capabilities**: Download activity logs in various formats (CSV, JSON, PDF)
+   - **Integration**: Connected to the full login monitoring system in the admin module
+   - **Mobile Responsive**: Optimized for both desktop and mobile monitoring
 
 ### Default Admin Account Security
 
@@ -484,4 +494,69 @@ The application implements a secure, self-hosted CAPTCHA system that operates in
    - Multiple CAPTCHA types
    - Machine learning-based difficulty adjustment
    - Enhanced visual distortion techniques
-   - Behavioral analysis integration 
+   - Behavioral analysis integration
+
+### Permission Management System
+
+The application implements a standardized permission management system to ensure consistent access control across both UI components and route navigation:
+
+1. **Centralized Permission Service**:
+   - The `PermissionService` provides a single source of truth for all permission checks
+   - Synchronous and reactive permission checking methods:
+     - `hasPermission()`: For imperative code and guards
+     - `hasPermission$()`: For reactive components using Observables
+   - Consistent special case handling for the admin@example.com user
+   - Detailed logging for permission checks to assist with debugging
+
+2. **Route Guard Integration**:
+   - `RoleGuard` uses the `PermissionService` for route access decisions
+   - Handles appropriate redirects:
+     - To login page when not authenticated
+     - To dashboard when authenticated but lacking required permissions
+   - Route configuration defines required roles as data parameters
+   - Example route configuration:
+     ```typescript
+     {
+       path: 'groups',
+       loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent),
+       canActivate: [RoleGuard],
+       data: {
+         roles: ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN']
+       }
+     }
+     ```
+
+3. **Component Permission Checking**:
+   - Components use the same `PermissionService` as route guards
+   - Permission results reactively update component UI
+   - Conditional rendering based on permission checks:
+     ```html
+     <div *ngIf="!hasPermission" class="permission-error">
+       <p>You do not have permission to view this page.</p>
+       <button mat-raised-button color="primary" (click)="goToDashboard()">Go to Dashboard</button>
+     </div>
+     
+     <ng-container *ngIf="hasPermission">
+       <!-- Protected content -->
+     </ng-container>
+     ```
+   - User-friendly error messages with redirect options
+
+4. **Role Mapping**:
+   - Clear mapping between frontend role names and backend role names
+   - Handling of case sensitivity in role comparison
+   - Special role handling for superadmin users
+
+5. **Permission Debugging**:
+   - Comprehensive logging at each step of the permission checking process
+   - Clear identification of the permission check source (component, guard, etc.)
+   - Detailed information about required roles, user roles, and decision results
+   - Console output for effective troubleshooting
+
+This standardized approach ensures that:
+- Menu items are only visible to users who have permission to access them
+- Routes are protected from direct URL access by unauthorized users
+- Components display appropriate error messages for unauthorized access
+- All permission checks follow the same rules and logic
+- Admin users have consistent access across the application
+- Permission debugging is straightforward and transparent 

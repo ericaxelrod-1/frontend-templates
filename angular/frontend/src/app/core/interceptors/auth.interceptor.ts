@@ -4,128 +4,139 @@ import {
   HttpHandler,
   HttpEvent,
   HttpInterceptor,
-  HttpErrorResponse
+  HttpErrorResponse,
+  HttpResponse
 } from '@angular/common/http';
-import { Observable, throwError, BehaviorSubject } from 'rxjs';
-import { catchError, filter, switchMap, take, finalize } from 'rxjs/operators';
+import { Observable, throwError, BehaviorSubject, from, of } from 'rxjs';
+import { catchError, filter, take, switchMap, finalize, tap } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
-import { Router } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
-  private isRefreshing = false;
-  private refreshTokenSubject: BehaviorSubject<any> = new BehaviorSubject<any>(null);
+  private refreshTokenInProgress = false;
+  private refreshTokenSubject = new BehaviorSubject<string | null>(null);
 
-  constructor(
-    private authService: AuthService,
-    private router: Router
-  ) {}
+  constructor(private authService: AuthService) {}
 
-  intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // Log request details in development
-    console.log(`Intercepting request to: ${request.url}`);
-    
-    // Skip interceptor for auth endpoints (except profile)
-    if (this.isAuthRequest(request) && !request.url.includes('/profile')) {
-      console.log('Skipping auth header for auth request');
+  intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    // Skip token for certain requests
+    if (this.shouldSkipToken(request)) {
       return next.handle(request);
     }
 
-    // Add auth header if user is authenticated
-    if (this.authService.accessToken) {
-      console.log('Adding auth header');
-      request = this.addAuthHeader(request, this.authService.accessToken);
-    } else {
-      console.log('No access token available');
+    // Add auth token if available
+    const accessToken = this.authService.accessToken;
+    const csrfToken = this.authService.csrfToken;
+    
+    if (accessToken) {
+      request = this.addAuthenticationToken(request, accessToken, csrfToken);
     }
 
-    // Add CSRF token if available
-    if (this.authService.csrfToken) {
-      console.log('Adding CSRF header');
-      request = this.addCsrfHeader(request, this.authService.csrfToken);
-    }
-
+    // Handle the request and check for 401 errors
     return next.handle(request).pipe(
-      catchError(error => {
-        if (error instanceof HttpErrorResponse) {
-          console.log(`Error response: ${error.status} from ${request.url}`);
-          
-          if (error.status === 401) {
-            console.log('401 Unauthorized error - attempting to refresh token');
-            // Only try to refresh if not already refreshing and we have a refresh token
-            if (this.authService.refreshToken) {
-              return this.handle401Error(request, next);
-            } else {
-              console.log('No refresh token available, redirecting to login');
-              this.authService.clearAuthState();
-              this.router.navigateByUrl('/login');
-            }
-          }
+      tap(event => {
+        // Optionally handle successful responses if needed
+        if (event instanceof HttpResponse) {
+          // You can do something with successful responses here
         }
+      }),
+      catchError((error: HttpErrorResponse) => {
+        // Special handling for logout - don't retry on 400 errors during logout
+        if (request.url.includes('/api/auth/logout') && error.status === 400) {
+          console.log('Error response: 400 from logout endpoint - ignoring and proceeding with logout');
+          // Return a successful completion for logout 400 errors
+          return of(new HttpResponse({ status: 200, body: { success: true, message: 'Logged out successfully' } }));
+        }
+        
+        // Handle 401 - unauthorized errors
+        if (error.status === 401) {
+          return this.handle401Error(request, next, error);
+        }
+
+        // For all other errors, forward them along
         return throwError(() => error);
       })
     );
   }
 
-  private isAuthRequest(request: HttpRequest<any>): boolean {
-    const apiUrl = this.authService['API_URL']; // Accessing the API_URL from AuthService
-    return request.url.includes(`${apiUrl}/login`) || 
-           request.url.includes(`${apiUrl}/register`) || 
-           request.url.includes(`${apiUrl}/refresh`) || 
-           request.url.includes(`${apiUrl}/forgot-password`) || 
-           request.url.includes(`${apiUrl}/reset-password`);
-  }
-
-  private addAuthHeader(request: HttpRequest<any>, token: string): HttpRequest<any> {
-    return request.clone({
+  private addAuthenticationToken(request: HttpRequest<unknown>, token: string, csrfToken: string | null): HttpRequest<unknown> {
+    let clonedRequest = request.clone({
       setHeaders: {
         Authorization: `Bearer ${token}`
       }
     });
+    
+    // Add CSRF token if available for non-GET requests
+    if (csrfToken && request.method !== 'GET') {
+      clonedRequest = clonedRequest.clone({
+        setHeaders: {
+          'X-CSRF-Token': csrfToken
+        }
+      });
+    }
+    
+    return clonedRequest;
   }
 
-  private addCsrfHeader(request: HttpRequest<any>, token: string): HttpRequest<any> {
-    return request.clone({
-      setHeaders: {
-        'X-CSRF-Token': token
-      }
-    });
+  private shouldSkipToken(request: HttpRequest<unknown>): boolean {
+    // Skip auth token for login, register, and token refresh endpoints
+    const skipUrls = [
+      `${environment.apiUrl}/auth/login`,
+      `${environment.apiUrl}/auth/register`,
+      `${environment.apiUrl}/auth/refresh`
+    ];
+    
+    return skipUrls.some(url => request.url.includes(url));
   }
 
-  private handle401Error(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    if (!this.isRefreshing) {
-      this.isRefreshing = true;
-      this.refreshTokenSubject.next(null);
-
-      console.log('Attempting to refresh access token');
-      return this.authService.refreshAccessToken().pipe(
-        switchMap(response => {
-          this.isRefreshing = false;
-          this.refreshTokenSubject.next(response.accessToken);
-          console.log('Token refresh successful, retrying request with new token');
-          return next.handle(this.addAuthHeader(request, response.accessToken));
-        }),
-        catchError(error => {
-          this.isRefreshing = false;
-          console.error('Token refresh failed:', error);
-          // Force logout on refresh error
-          this.authService.clearAuthState();
-          this.router.navigateByUrl('/login');
-          return throwError(() => error);
-        }),
-        finalize(() => {
-          this.isRefreshing = false;
+  private handle401Error(request: HttpRequest<unknown>, next: HttpHandler, originalError: HttpErrorResponse): Observable<HttpEvent<unknown>> {
+    // Avoid infinite loop of token refresh
+    if (request.url.includes('/api/auth/refresh')) {
+      // Instead of clearAuthState, call logout which will clear the state
+      this.authService.logout().subscribe();
+      return throwError(() => originalError);
+    }
+    
+    // If token refresh is in progress, wait for it to complete
+    if (this.refreshTokenInProgress) {
+      return this.refreshTokenSubject.pipe(
+        filter(token => token !== null),
+        take(1),
+        switchMap(token => {
+          return next.handle(this.addAuthenticationToken(request, token!, this.authService.csrfToken));
         })
       );
     }
-
-    return this.refreshTokenSubject.pipe(
-      filter(token => token !== null),
-      take(1),
-      switchMap(token => {
-        console.log('Using newly refreshed token for request');
-        return next.handle(this.addAuthHeader(request, token));
+    
+    this.refreshTokenInProgress = true;
+    this.refreshTokenSubject.next(null);
+    
+    // Try to refresh the token
+    return from(this.authService.refreshAccessToken().pipe(
+      switchMap(response => {
+        // Token refresh successful - notify waiters and retry the request
+        this.refreshTokenInProgress = false;
+        this.refreshTokenSubject.next(response.accessToken);
+        
+        return next.handle(this.addAuthenticationToken(
+          request, 
+          response.accessToken,
+          response.csrfToken
+        ));
+      }),
+      catchError(error => {
+        // Token refresh failed - proceed to logout
+        this.refreshTokenInProgress = false;
+        this.refreshTokenSubject.next(null);
+        // Instead of clearAuthState, call logout which will clear the state
+        this.authService.logout().subscribe();
+        
+        return throwError(() => originalError);
+      }),
+      finalize(() => {
+        this.refreshTokenInProgress = false;
       })
-    );
+    ));
   }
 } 

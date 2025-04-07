@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Routes } from '@angular/router';
 import { ReactiveFormsModule } from '@angular/forms';
+import { RoleGuard } from '../../core/guards/role.guard';
 
 // Material Modules
 import { MatCardModule } from '@angular/material/card';
@@ -24,7 +25,14 @@ import { LoginMonitoringComponent } from './login-monitoring/login-monitoring.co
 
 // Routes
 const routes: Routes = [
-  { path: 'login-monitoring', component: LoginMonitoringComponent }
+  { 
+    path: 'login-monitoring', 
+    component: LoginMonitoringComponent,
+    canActivate: [RoleGuard],
+    data: { 
+      roles: ['ADMIN', 'SUPERADMIN'] 
+    }
+  }
 ];
 
 @NgModule({

@@ -402,4 +402,185 @@ The user management interface provides administrators with:
    - Only collect necessary user information
    - Provide clear privacy policy and data usage information
    - Implement data protection measures
-   - Support user data export and account deletion 
+   - Support user data export and account deletion
+
+# User Management
+
+This document provides detailed information about user management features in the Angular Template Application, including user creation methods and role-based permissions.
+
+## User Creation Methods
+
+The application supports multiple methods for creating user accounts:
+
+### 1. Self-Registration
+
+Users can create their own accounts through the registration page:
+
+- **Process**:
+  - User fills out the registration form with email, password, and profile information
+  - Email verification is required to activate the account
+  - Initial role assignment: Basic "USER" role
+  - Cannot self-assign administrative privileges
+
+- **Security Measures**:
+  - Email verification prevents unauthorized registrations
+  - CAPTCHA protection prevents automated account creation
+  - Rate limiting prevents abuse of registration endpoint
+  - Domain restrictions can be configured to limit registration to specific email domains
+
+### 2. Admin-Created Accounts
+
+Administrators can create accounts for other users:
+
+- **Process**:
+  - Admin creates account with user's email and temporary password
+  - System generates a secure random password if not provided
+  - Email notification sent to new user with account details
+  - Password change required on first login
+  - Admin can assign appropriate roles during creation
+
+- **Security Measures**:
+  - Admin audit logs track all account creations
+  - Temporary passwords expire after first use
+  - Mandatory password change with enhanced security requirements
+  - Rate limiting on admin account creation to prevent abuse
+
+### 3. Bulk Account Import
+
+For organizational deployments, bulk user import is available:
+
+- **Process**:
+  - Admin uploads CSV/JSON file with user details
+  - System validates all entries before processing
+  - Invalid entries are rejected with detailed error reports
+  - Successfully imported users receive welcome emails
+  - Rate limiting enforced on bulk operations
+
+- **Security Measures**:
+  - Input validation for all imported data
+  - Limits on batch size to prevent system overload
+  - Admin approval required for large imports
+  - Complete audit logging of all import activities
+
+## Role-Based Permissions
+
+The application implements role-based access control (RBAC) with the following predefined roles:
+
+### 1. USER (Default)
+
+The basic role assigned to all registered users:
+
+- **Permissions**:
+  - Access personal dashboard
+  - View and edit own profile
+  - View shared resources
+  - Participate in assigned groups
+  - Cannot access administrative features
+
+- **Assignment**:
+  - Auto-assigned during self-registration
+  - Can be assigned by admins
+
+### 2. PROJECT_MANAGER
+
+Mid-level administrative role for managing projects and teams:
+
+- **Permissions**:
+  - All USER permissions
+  - Create and manage groups
+  - Add/remove users from groups
+  - Assign tasks to users
+  - View basic user reports
+
+- **Assignment**:
+  - Can only be assigned by ADMIN or SUPERADMIN
+  - Requires additional verification
+
+### 3. ADMIN
+
+Primary administrative role for general system management:
+
+- **Permissions**:
+  - All PROJECT_MANAGER permissions
+  - Create user accounts
+  - Manage user roles (except SUPERADMIN)
+  - Access security monitoring features
+  - View system logs
+  - Configure application settings
+  - Manage role-based access
+  - Access login monitoring system
+
+- **Assignment**:
+  - Can only be assigned by SUPERADMIN
+  - Requires strong authentication
+  - Assignment is logged and audited
+
+### 4. SUPERADMIN
+
+Highest level administrative role with complete system access:
+
+- **Permissions**:
+  - All ADMIN permissions
+  - Assign and revoke ADMIN role
+  - Configure critical system settings
+  - Access all security features
+  - View all audit logs and security reports
+  - Override security restrictions (with proper logging)
+  - Full access to all features
+
+- **Assignment**:
+  - Reserved for primary system administrators
+  - Usually assigned during initial system setup
+  - Additional SUPERADMIN accounts require existing SUPERADMIN approval
+  - Assignment requires two-factor authentication
+  - All activities extensively logged
+
+## Role Assignment Rules
+
+The following rules govern who can assign different roles:
+
+| Role to Assign | Can be Assigned By |
+|----------------|-------------------|
+| USER           | Self-registration, PROJECT_MANAGER, ADMIN, SUPERADMIN |
+| PROJECT_MANAGER| ADMIN, SUPERADMIN |
+| ADMIN          | SUPERADMIN |
+| SUPERADMIN     | SUPERADMIN (with additional verification) |
+
+## Dashboard Access Permissions
+
+The dashboard provides access to different cards based on user roles:
+
+| Dashboard Card | Required Roles |
+|----------------|----------------|
+| Users          | USER, PROJECT_MANAGER, ADMIN, SUPERADMIN |
+| Groups         | PROJECT_MANAGER, ADMIN, SUPERADMIN |
+| Activity       | ADMIN, SUPERADMIN |
+
+## User Management Best Practices
+
+When managing users in the application, follow these best practices:
+
+1. **Principle of Least Privilege**:
+   - Assign the minimum role required for a user's job function
+   - Regularly review and audit role assignments
+   - Remove unnecessary permissions when no longer needed
+
+2. **Regular Access Reviews**:
+   - Conduct quarterly reviews of user access
+   - Verify that departing employees have accounts deactivated
+   - Check for dormant accounts with elevated privileges
+
+3. **Separation of Duties**:
+   - Distribute administrative responsibilities among multiple people
+   - Use approval workflows for critical actions
+   - Require additional verification for sensitive operations
+
+4. **Documentation**:
+   - Maintain records of role assignments
+   - Document reasons for elevated privilege assignments
+   - Keep an audit trail of permission changes
+
+5. **Security Awareness**:
+   - Train users on security best practices
+   - Educate administrators on security implications of role assignments
+   - Provide clear guidelines for secure user management 

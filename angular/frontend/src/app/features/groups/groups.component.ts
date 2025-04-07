@@ -8,11 +8,12 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { GroupService, Group } from '../../services/group.service';
+import { GroupService, Group, Member } from '../../services/group.service';
 import { GroupDialogComponent } from './group-dialog/group-dialog.component';
 import { AddMemberDialogComponent } from './add-member-dialog/add-member-dialog.component';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
+import { PermissionService } from '../../core/services/permission.service';
 
 @Component({
   selector: 'app-groups',
@@ -58,11 +59,11 @@ import { Router } from '@angular/router';
               <p>{{ group.description }}</p>
               
               <div class="members-section">
-                <h3>Members ({{ group.members.length }})</h3>
-                <mat-list>
+                <h3>Members ({{ group.members ? group.members.length : 0 }})</h3>
+                <mat-list *ngIf="group.members && group.members.length > 0">
                   <mat-list-item *ngFor="let member of group.members">
                     <span matListItemTitle>{{ member.name }}</span>
-                    <span matListItemLine>{{ member.role }}</span>
+                    <span matListItemLine>{{ member.role || 'Member' }}</span>
                     <button mat-icon-button [matMenuTriggerFor]="memberMenu" matListItemMeta>
                       <mat-icon>more_vert</mat-icon>
                     </button>
@@ -78,6 +79,9 @@ import { Router } from '@angular/router';
                     </mat-menu>
                   </mat-list-item>
                 </mat-list>
+                <div *ngIf="!group.members || group.members.length === 0" class="no-members">
+                  No members in this group.
+                </div>
                 
                 <button mat-button color="primary" (click)="addMember(group)">
                   <mat-icon>person_add</mat-icon> Add Member
@@ -142,29 +146,40 @@ import { Router } from '@angular/router';
       text-align: center;
       padding: 20px;
     }
+    
+    .no-members {
+      font-style: italic;
+      color: #666;
+      margin: 16px 0;
+    }
   `]
 })
 export class GroupsComponent implements OnInit {
   groups: Group[] = [];
   hasPermission = false;
   loading = true;
+  
+  // Define the required roles - these should match the ones in the route configuration
+  private requiredRoles = ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN'];
 
   constructor(
     private groupService: GroupService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private permissionService: PermissionService
   ) {}
 
   ngOnInit(): void {
-    // Check if user has admin role
-    this.authService.currentUser$.subscribe(user => {
-      if (user?.roles?.includes('admin')) {
-        this.hasPermission = true;
+    // Use the permission service to standardize permission checking
+    this.permissionService.hasPermission$(this.requiredRoles).subscribe(hasPermission => {
+      console.log('[GroupsComponent] Permission check result:', hasPermission);
+      this.hasPermission = hasPermission;
+      
+      if (hasPermission) {
         this.loadGroups();
       } else {
-        this.hasPermission = false;
         this.loading = false;
         this.snackBar.open('You do not have permission to access this page', 'Close', { duration: 5000 });
       }
@@ -175,7 +190,13 @@ export class GroupsComponent implements OnInit {
     this.loading = true;
     this.groupService.getGroups().subscribe({
       next: (groups) => {
-        this.groups = groups;
+        this.groups = groups.map(group => {
+          // Ensure members is an array
+          if (!group.members) {
+            group.members = [];
+          }
+          return group;
+        });
         this.loading = false;
       },
       error: (error) => {
@@ -200,6 +221,9 @@ export class GroupsComponent implements OnInit {
       if (result) {
         this.groupService.createGroup(result).subscribe({
           next: (group) => {
+            if (!group.members) {
+              group.members = [];
+            }
             this.groups.push(group);
             this.snackBar.open('Group created successfully', 'Close', { duration: 3000 });
           },
@@ -273,11 +297,13 @@ export class GroupsComponent implements OnInit {
     });
   }
 
-  removeMember(group: Group, member: any): void {
+  removeMember(group: Group, member: Member): void {
     if (confirm(`Are you sure you want to remove ${member.name} from the group?`)) {
       this.groupService.removeMember(group.id, member.id).subscribe({
         next: () => {
-          group.members = group.members.filter(m => m.id !== member.id);
+          if (group.members) {
+            group.members = group.members.filter(m => m.id !== member.id);
+          }
           this.snackBar.open('Member removed successfully', 'Close', { duration: 3000 });
         },
         error: (error) => {
@@ -288,7 +314,7 @@ export class GroupsComponent implements OnInit {
     }
   }
 
-  makeAdmin(group: Group, member: any): void {
+  makeAdmin(group: Group, member: Member): void {
     this.groupService.updateMemberRole(group.id, member.id, 'Admin').subscribe({
       next: () => {
         member.role = 'Admin';
