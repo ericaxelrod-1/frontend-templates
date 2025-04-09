@@ -1,0 +1,58 @@
+---
+description: 
+globs: *.ts,*.tsx,*.html
+alwaysApply: false
+---
+---
+description: "Strict requirements for implementing dynamic access control without hardcoding roles"
+globs: ["**/*.ts", "**/*.html"]
+tags: ["security", "access-control", "permissions"]
+priority: 5
+---
+
+# Dynamic Access Control Implementation Rules
+
+## CORE PRINCIPLE
+All permission checks MUST be resource-action based, NEVER role-based. Permissions are defined as 'resource:action' strings that are checked against the database-stored permission mappings.
+
+## PROHIBITED PATTERNS - NEVER DO THESE
+
+❌ **NEVER hardcode role names anywhere - even with a 'role:' prefix:**
+```typescript
+// PROHIBITED - Still hardcodes role names
+private requiredPermissions = ['role:ADMIN', 'role:MANAGER'];
+this.permissionService.hasAnyPermission(['role:ADMIN', 'role:SUPERADMIN'])
+```
+
+❌ **NEVER reference specific roles in route guards:**
+```typescript
+// PROHIBITED - Uses role names instead of permissions
+{ path: 'admin', data: { roles: ['ADMIN'] } }
+```
+
+## REQUIRED PATTERNS - ALWAYS DO THESE
+
+✅ **ALWAYS use resource-action based permissions:**
+```typescript
+// Component access check
+this.permissionService.hasPermission('groups:view')
+
+// Multiple permission check
+this.permissionService.hasAnyPermission(['groups:create', 'groups:admin'])
+
+// Route guard
+{ path: 'groups', data: { permissionRule: 'groups:view' } }
+
+// Directive
+<button *hasPermission="'users:create'">Create User</button>
+```
+
+## PERMISSION NAMING CONVENTION
+- `resource:action` format ONLY
+- Resources are plural nouns (users, groups, reports)
+- Actions are verbs (view, create, update, delete, admin)
+- Example: 'users:create', 'reports:export', 'settings:admin'
+
+## ROLE ASSIGNMENT PROCESS
+Roles and their permissions are defined in the database ONLY.
+Frontend and backend only check for permissions, not roles.

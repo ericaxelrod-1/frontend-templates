@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
+import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -17,9 +18,10 @@ import { PermissionService } from '../../core/services/permission.service';
   standalone: true,
   imports: [
     CommonModule,
-    MatTableModule,
+    MatCardModule,
     MatButtonModule,
     MatIconModule,
+    MatTableModule,
     MatChipsModule,
     MatDialogModule
   ],
@@ -61,9 +63,20 @@ import { PermissionService } from '../../core/services/permission.service';
             <th mat-header-cell *matHeaderCellDef>Permissions</th>
             <td mat-cell *matCellDef="let role">
               <mat-chip-set>
-                <mat-chip *ngFor="let permission of role.permissions">
-                  {{ permission.name }}
-                </mat-chip>
+                <!-- Use keyvalue pipe when permissions is an object -->
+                <ng-container *ngIf="!Array.isArray(role.permissions); else permissionArray">
+                  <mat-chip *ngFor="let permission of role.permissions | keyvalue" 
+                           [color]="permission.value ? 'primary' : undefined">
+                    {{ permission.key }}
+                  </mat-chip>
+                </ng-container>
+                
+                <!-- Use regular iteration when permissions is an array -->
+                <ng-template #permissionArray>
+                  <mat-chip *ngFor="let permission of role.permissions">
+                    {{ permission.name }}
+                  </mat-chip>
+                </ng-template>
               </mat-chip-set>
             </td>
           </ng-container>
@@ -130,9 +143,9 @@ export class RolesComponent implements OnInit {
   hasPermission = false;
   loading = true;
   
-  // Define the required roles - these should match the ones in the route configuration
-  private requiredRoles = ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN'];
-
+  // Make Array available in the template
+  protected Array = Array;
+  
   constructor(
     private roleService: RoleService,
     private authService: AuthService,
@@ -143,8 +156,8 @@ export class RolesComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Use the permission service to standardize permission checking
-    this.permissionService.hasPermission$(this.requiredRoles).subscribe(hasPermission => {
+    // Check permission to view roles using resource:action format
+    this.permissionService.hasPermission('roles:view').subscribe(hasPermission => {
       console.log('[RolesComponent] Permission check result:', hasPermission);
       this.hasPermission = hasPermission;
       
@@ -224,7 +237,7 @@ export class RolesComponent implements OnInit {
   }
 
   deleteRole(role: Role): void {
-    if (role.userCount > 0) {
+    if (role.userCount && role.userCount > 0) {
       this.snackBar.open('Cannot delete role with assigned users', 'Close', { duration: 3000 });
       return;
     }

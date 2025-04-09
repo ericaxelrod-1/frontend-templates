@@ -3,19 +3,11 @@
     <h2>Menu</h2>
   </div>
   
-  <!-- Common navigation items available to all users -->
-  <a mat-list-item 
-     *ngFor="let item of commonNavItems" 
-     [routerLink]="item.route" 
-     routerLinkActive="active-link">
-    <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-    <span matListItemTitle>{{ item.label }}</span>
-  </a>
-  
-  <!-- Admin/Project Manager specific navigation items -->
-  <ng-container *ngIf="isAdminOrProjectManager">
+  <!-- Common navigation items -->
+  <ng-container *ngFor="let item of commonNavItems">
+    <!-- Show item if it has no permission requirement or if user has the required permission -->
     <a mat-list-item 
-       *ngFor="let item of adminNavItems" 
+       *ngIf="!item.permission || hasPermission(item.permission)" 
        [routerLink]="item.route" 
        routerLinkActive="active-link">
       <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
@@ -23,21 +15,36 @@
     </a>
   </ng-container>
   
-  <!-- Admin Section (only visible to superadmins) -->
-  <ng-container *ngIf="isSuperAdmin">
+  <!-- Admin navigation items for users with management permissions -->
+  <ng-container *ngIf="isAdminOrManager">
+    <ng-container *ngFor="let item of adminNavItems">
+      <a mat-list-item 
+         *ngIf="hasPermission(item.permission)" 
+         [routerLink]="item.route" 
+         routerLinkActive="active-link">
+        <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+        <span matListItemTitle>{{ item.label }}</span>
+      </a>
+    </ng-container>
+  </ng-container>
+  
+  <!-- Admin Section (only visible to users with admin access) -->
+  <ng-container *ngIf="hasAdminAccess()">
     <mat-divider class="section-divider"></mat-divider>
     
     <div class="sidebar-section">
       <h3>Admin</h3>
     </div>
     
-    <a mat-list-item 
-       *ngFor="let item of adminItems" 
-       [routerLink]="item.route" 
-       routerLinkActive="active-link">
-      <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-      <span matListItemTitle>{{ item.label }}</span>
-    </a>
+    <ng-container *ngFor="let item of adminItems">
+      <a mat-list-item 
+         *ngIf="hasPermission(item.permission)" 
+         [routerLink]="item.route" 
+         routerLinkActive="active-link">
+        <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+        <span matListItemTitle>{{ item.label }}</span>
+      </a>
+    </ng-container>
   </ng-container>
   
   <mat-divider class="section-divider"></mat-divider>

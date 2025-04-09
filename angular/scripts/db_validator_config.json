@@ -1,0 +1,14 @@
+{
+  "entities_path": "angular/backend/src/modules",
+  "db_path": "angular/backend/data/dev.sqlite",
+  "schema_file": "angular/scripts/expected_schema.json",
+  "debug": false,
+  "ignore_tables": ["migrations", "typeorm_metadata"],
+  "ignore_columns": {
+    "*": ["created_at", "updated_at"]
+  },
+  "sync_options": {
+    "auto_sync": false,
+    "backup_before_sync": true
+  }
+} 

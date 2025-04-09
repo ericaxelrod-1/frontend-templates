@@ -583,4 +583,320 @@ When managing users in the application, follow these best practices:
 5. **Security Awareness**:
    - Train users on security best practices
    - Educate administrators on security implications of role assignments
-   - Provide clear guidelines for secure user management 
+   - Provide clear guidelines for secure user management
+
+# Hierarchical Access Control Architecture
+
+## Overview
+
+The Angular Template Application implements a sophisticated hierarchical access control system that combines both role-based and group-based permissions. This dynamic approach provides granular security without requiring code changes when permission rules change.
+
+## Core Principles
+
+The access control system is built on these fundamental principles:
+
+1. **Dynamic Authorization**: All permission rules are stored in the database, not hardcoded in the application code
+2. **Hierarchical Structure**: Both roles and groups support parent-child relationships with inheritance
+3. **Combined Evaluation**: Authorization decisions consider both role AND group membership
+4. **Principle of Least Privilege**: Child entities can only restrict permissions, not expand them
+
+## Database Schema
+
+### Role Hierarchy Schema
+
+```sql
+CREATE TABLE roles (
+  id INTEGER PRIMARY KEY,
+  name VARCHAR(50) NOT NULL UNIQUE,
+  description TEXT,
+  parent_id INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (parent_id) REFERENCES roles(id)
+);
+
+CREATE TABLE permissions (
+  id INTEGER PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  description TEXT,
+  resource VARCHAR(100) NOT NULL,
+  action VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(resource, action)
+);
+
+CREATE TABLE role_permissions (
+  role_id INTEGER NOT NULL,
+  permission_id INTEGER NOT NULL,
+  granted BOOLEAN NOT NULL DEFAULT true,
+  override BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (role_id, permission_id),
+  FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+  FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+);
+```
+
+Key aspects:
+- `roles.parent_id` establishes the hierarchy relationship
+- `role_permissions.granted` indicates if the permission is granted or denied
+- `role_permissions.override` indicates if this permission should override the parent's setting
+
+### Group Hierarchy Schema
+
+```sql
+CREATE TABLE groups (
+  id INTEGER PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  description TEXT,
+  parent_id INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (parent_id) REFERENCES groups(id)
+);
+
+CREATE TABLE group_permissions (
+  group_id INTEGER NOT NULL,
+  permission_id INTEGER NOT NULL,
+  granted BOOLEAN NOT NULL DEFAULT true,
+  override BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (group_id, permission_id),
+  FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE user_groups (
+  user_id INTEGER NOT NULL,
+  group_id INTEGER NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, group_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+);
+```
+
+Key aspects:
+- `groups.parent_id` establishes the group hierarchy
+- Groups can have the same permissions model as roles
+- Users can belong to multiple groups via `user_groups`
+
+### Resource Permission Rules
+
+```sql
+CREATE TABLE permission_rules (
+  id INTEGER PRIMARY KEY,
+  resource VARCHAR(100) NOT NULL,
+  roles_required TEXT, -- JSON array of role IDs
+  groups_required TEXT, -- JSON array of group IDs
+  roles_group_logic VARCHAR(10) NOT NULL DEFAULT 'AND', -- 'AND' or 'OR'
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Key aspects:
+- Maps resources to required roles and groups
+- Supports complex logic with AND/OR operations
+- Completely database-driven, no hardcoded rules
+
+## Permission Inheritance Logic
+
+### Role Permission Inheritance
+
+1. **Default Inheritance**: A child role inherits all permissions from its parent
+2. **Permission Override**: Child roles can explicitly override parent permissions
+   - If `override = true` and `granted = false`, the permission is denied regardless of parent
+   - If `override = true` and `granted = true`, the permission is granted regardless of parent
+3. **Permission Resolution**: When checking if a role has a permission:
+   - Check if the role has an explicit override for the permission
+   - If no override, traverse up the hierarchy until a permission setting is found
+   - If no setting is found in the entire hierarchy, the permission is denied
+
+### Group Permission Inheritance
+
+Group permissions follow the same inheritance pattern as roles:
+1. Subgroups inherit parent group permissions
+2. Explicit overrides in subgroups take precedence
+3. Resolution follows the hierarchy chain
+
+### Combined Role-Group Resolution
+
+When both roles and groups are considered:
+1. Determine the effective permissions granted by the user's roles
+2. Determine the effective permissions granted by the user's groups
+3. Apply the logic specified in `permission_rules`:
+   - `AND`: Require both role and group permission
+   - `OR`: Require either role or group permission
+
+## Authorization Flow
+
+The complete authorization process follows these steps:
+
+1. **Permission Registration**:
+   - System resources register their required permissions in the database
+   - Each permission has a `resource` and `action` (e.g., "users:create")
+
+2. **Permission Assignment**:
+   - Administrators assign permissions to roles and groups
+   - Permissions can be explicitly granted or denied
+   - Inheritance rules are configured
+
+3. **Authorization Request**:
+   - When a user attempts to access a resource, the system checks:
+     a. User's roles (including inherited permissions from parent roles)
+     b. User's groups (including inherited permissions from parent groups)
+     c. The permission rule for the resource
+     d. Applies AND/OR logic as specified in the rule
+
+4. **Authorization Decision**:
+   - Permission is granted only if the combined logic evaluates to true
+   - Decision is cached for performance (with appropriate invalidation)
+
+## Implementation Components
+
+### Backend Components
+
+1. **PermissionService**:
+   - Manages permission definitions
+   - Provides CRUD operations for permissions
+
+2. **RoleHierarchyService**:
+   - Manages role hierarchy relationships
+   - Resolves effective permissions for roles
+
+3. **GroupHierarchyService**:
+   - Manages group hierarchy relationships
+   - Resolves effective permissions for groups
+
+4. **PermissionResolverService**:
+   - Core authorization service
+   - Combines role and group permissions
+   - Applies rule logic
+   - Implements caching strategy
+
+5. **AuthorizationGuard**:
+   - NestJS guard for protecting API endpoints
+   - Uses PermissionResolverService for decisions
+
+### Frontend Components
+
+1. **PermissionService**:
+   - Client-side service for permission checks
+   - Caches permission decisions
+
+2. **HasPermissionDirective**:
+   - Angular directive for conditional UI rendering
+   - Example: `*appHasPermission="'users:create'"`
+
+3. **PermissionGuard**:
+   - Angular route guard for protecting routes
+   - Checks permissions before allowing navigation
+
+4. **Permission Management Components**:
+   - Role hierarchy editor
+   - Group hierarchy editor
+   - Permission matrix interface
+   - Rule configuration component
+
+## Usage Examples
+
+### Backend Authorization
+
+```typescript
+// Controller with permission check
+@Controller('users')
+export class UsersController {
+  constructor(private permissionService: PermissionResolverService) {}
+
+  @Post()
+  @UseGuards(AuthorizationGuard)
+  @RequirePermission('users:create')
+  createUser(@Body() userData: CreateUserDto) {
+    // Implementation
+  }
+}
+```
+
+### Frontend Template Authorization
+
+```html
+<!-- Show/hide elements based on permissions -->
+<button *appHasPermission="'users:create'">Create User</button>
+
+<!-- Complex permission check -->
+<div *appHasPermission="{ resource: 'reports', action: 'view', requiresGroups: true }">
+  <!-- Report content -->
+</div>
+```
+
+### Frontend Route Protection
+
+```typescript
+// Route configuration with permission guard
+const routes: Routes = [
+  {
+    path: 'admin/users',
+    component: UserManagementComponent,
+    canActivate: [PermissionGuard],
+    data: {
+      permissionRule: 'users:manage'
+    }
+  }
+];
+```
+
+## Admin Interface for Permission Management
+
+The application provides comprehensive interfaces for managing the permission system:
+
+1. **Role Hierarchy Management**:
+   - Visual tree representation of role hierarchy
+   - Drag-and-drop interface for restructuring
+   - Permission inheritance visualization
+
+2. **Group Hierarchy Management**:
+   - Similar interface for managing group hierarchy
+   - Group membership management
+   - Permission assignment interface
+
+3. **Permission Matrix**:
+   - Grid view of roles/groups vs. permissions
+   - Clearly indicates inherited vs. explicit permissions
+   - Highlights permission overrides
+
+4. **Resource Rules Configuration**:
+   - Interface for configuring resource access rules
+   - AND/OR logic configuration
+   - Rule testing and validation
+
+## Best Practices
+
+1. **Never Hardcode Permissions**:
+   - All access checks should use the dynamic permission system
+   - Resource access rules should be stored in the database
+   - Use directives and guards consistently
+
+2. **Hierarchical Design**:
+   - Design role hierarchies from most general to most specific
+   - Follow organizational structure for group hierarchies
+   - Keep hierarchies reasonably flat to avoid performance issues
+
+3. **Clear Permission Naming**:
+   - Use consistent `resource:action` format
+   - Choose descriptive names for permissions
+   - Document the purpose of each permission
+
+4. **Regular Auditing**:
+   - Review role and group hierarchies periodically
+   - Audit permission assignments
+   - Test complex permission scenarios
+
+5. **Performance Considerations**:
+   - Implement effective caching strategies
+   - Limit hierarchy depth to prevent performance issues
+   - Consider denormalized permission tables for critical paths 

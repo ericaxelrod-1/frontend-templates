@@ -10,6 +10,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { UserService } from '../../services/user.service';
 import { LoggerService } from '../../services/logging/logger.service';
+import { RoleService, Role } from '../../services/role.service';
+import { PermissionService } from '../../core/services/permission.service';
 
 @Component({
   selector: 'app-create-user',
@@ -27,7 +29,12 @@ import { LoggerService } from '../../services/logging/logger.service';
     <div class="create-user-container">
       <h1>Create New User</h1>
 
-      <form [formGroup]="userForm" (ngSubmit)="onSubmit()">
+      <div *ngIf="!hasPermission" class="permission-error">
+        <p>You do not have permission to create users.</p>
+        <button mat-raised-button color="primary" (click)="cancel()">Back to Users</button>
+      </div>
+
+      <form [formGroup]="userForm" (ngSubmit)="onSubmit()" *ngIf="hasPermission">
         <mat-form-field class="form-field" appearance="outline">
           <mat-label>Email</mat-label>
           <input matInput type="email" formControlName="email" required>
@@ -57,10 +64,10 @@ import { LoggerService } from '../../services/logging/logger.service';
 
         <mat-form-field class="form-field" appearance="outline">
           <mat-label>Role</mat-label>
-          <mat-select formControlName="role">
-            <mat-option value="USER">User</mat-option>
-            <mat-option value="ADMIN">Admin</mat-option>
-            <mat-option value="PROJECT_MANAGER">Project Manager</mat-option>
+          <mat-select formControlName="roleId">
+            <mat-option *ngFor="let role of availableRoles" [value]="role.id">
+              {{ role.name }}
+            </mat-option>
           </mat-select>
         </mat-form-field>
 
@@ -106,15 +113,27 @@ import { LoggerService } from '../../services/logging/logger.service';
       gap: 16px;
       margin-top: 24px;
     }
+    
+    .permission-error {
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
   `]
 })
 export class CreateUserComponent implements OnInit {
   userForm: FormGroup;
+  availableRoles: Role[] = [];
   loading = false;
+  hasPermission = false;
 
   constructor(
     private formBuilder: FormBuilder,
     private userService: UserService,
+    private roleService: RoleService,
+    private permissionService: PermissionService,
     private router: Router,
     private snackBar: MatSnackBar,
     private logger: LoggerService
@@ -128,13 +147,42 @@ export class CreateUserComponent implements OnInit {
         Validators.minLength(8),
         Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/)
       ]],
-      role: ['USER'],
+      roleId: [null, Validators.required],
       requiresPasswordChange: [true]
     });
   }
 
   ngOnInit(): void {
     this.logger.info('CreateUserComponent initialized');
+    
+    // Check if user has permission to create users
+    this.permissionService.hasPermission('users:create').subscribe(hasPermission => {
+      this.hasPermission = hasPermission;
+      
+      if (hasPermission) {
+        this.loadRoles();
+      } else {
+        this.snackBar.open('You do not have permission to create users', 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  loadRoles(): void {
+    this.roleService.getRoles().subscribe({
+      next: (roles) => {
+        this.availableRoles = roles;
+        
+        // Set default role if available
+        if (roles.length > 0) {
+          const defaultRole = roles.find(r => r.name === 'User') || roles[0];
+          this.userForm.get('roleId')?.setValue(defaultRole.id);
+        }
+      },
+      error: (error) => {
+        this.logger.error('Error loading roles', { error });
+        this.snackBar.open('Error loading roles', 'Close', { duration: 3000 });
+      }
+    });
   }
 
   // Convenience getter for form fields
@@ -154,7 +202,7 @@ export class CreateUserComponent implements OnInit {
       firstName: this.f['firstName'].value,
       lastName: this.f['lastName'].value,
       password: this.f['password'].value,
-      role: this.f['role'].value,
+      roleId: this.f['roleId'].value,
       requiresPasswordChange: this.f['requiresPasswordChange'].value
     };
 

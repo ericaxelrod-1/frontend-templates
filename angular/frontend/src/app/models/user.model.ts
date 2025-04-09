@@ -1,15 +1,44 @@
+import { Group, Permission as GroupPermission } from './group.model';
+
+export interface Permission {
+  id: string;
+  name: string;
+  description: string;
+  resourceName: string;
+  actionName: string;
+}
+
+export interface UserPreferences {
+  sidebarCollapsed?: boolean;
+  theme?: 'light' | 'dark' | 'system';
+  language?: string;
+  notifications?: {
+    email?: boolean;
+    push?: boolean;
+    desktop?: boolean;
+  };
+}
+
 export interface User {
   id: number;
   email: string;
   firstName?: string;
   lastName?: string;
-  emailVerified?: boolean;
+  isActive?: boolean;
+  isVerified?: boolean;
+  lastLogin?: Date;
   createdAt?: Date;
   updatedAt?: Date;
+  permissions: Permission[];
+  /**
+   * @deprecated Use permissions instead
+   */
   roles?: string[];
+  emailVerified?: boolean;
   requiresPasswordChange?: boolean;
   lastPasswordChange?: Date;
-  groups?: { id: number; name: string }[];
+  groups?: Partial<Group>[];
+  preferences?: UserPreferences;
 }
 
 export interface UserLogin {
@@ -72,7 +101,16 @@ export interface AdminUserCreation {
   firstName?: string;
   lastName?: string;
   password?: string;
+  /**
+   * @deprecated Use permissions instead. Roles are being phased out in favor of permissions.
+   */
   roles?: string[];
+  permissions?: {
+    id: string;
+    resource: string;
+    action: string;
+    granted: boolean;
+  }[];
   groups?: number[];
   requiresPasswordChange: boolean;
 }

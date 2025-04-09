@@ -1,46 +1,24 @@
 import { Routes } from '@angular/router';
-import { MainLayoutComponent } from './layouts/main-layout/main-layout.component';
-import { ErrorComponent } from './shared/error/error.component';
-import { AuthGuard, RoleGuard, PasswordChangeGuard } from './core/guards';
-import { LandingComponent } from './pages/landing/landing.component';
+import { AuthGuard, PasswordChangeGuard } from './core/guards';
+import { PermissionGuard } from './core/guards/permission.guard';
 
+// Layout components
+import { DefaultLayoutComponent } from './layouts/default/default.component';
+import { AdminLayoutComponent } from './layouts/admin/admin.component';
+
+/**
+ * Main application routes
+ * 
+ * Permission-based routes should use the following format for data:
+ * { permissions: 'resource:action' } OR
+ * { permissions: ['resource1:action1', 'resource2:action2'] } OR 
+ * { permissions: { all: ['resource1:action1', 'resource2:action2'] } }
+ */
 export const routes: Routes = [
-  // Landing page route
-  {
-    path: '',
-    component: LandingComponent,
-    pathMatch: 'full'
-  },
-  {
-    path: 'landing',
-    component: LandingComponent
-  },
-  // Auth routes (without layout wrapper)
-  {
-    path: 'login',
-    loadComponent: () => import('./features/auth/login/login.component').then(c => c.LoginComponent)
-  },
-  {
-    path: 'register',
-    loadComponent: () => import('./features/auth/register/register.component').then(c => c.RegisterComponent)
-  },
-  {
-    path: 'forgot-password',
-    loadComponent: () => import('./features/auth/forgot-password/forgot-password.component').then(c => c.ForgotPasswordComponent)
-  },
-  {
-    path: 'reset-password',
-    loadComponent: () => import('./features/auth/reset-password/reset-password.component').then(c => c.ResetPasswordComponent)
-  },
-  {
-    path: 'verify-email',
-    loadComponent: () => import('./features/auth/verify-email/verify-email.component').then(c => c.VerifyEmailComponent)
-  },
-  // Application routes with layout
   {
     path: 'app',
-    component: MainLayoutComponent,
-    canActivate: [AuthGuard, PasswordChangeGuard],
+    component: DefaultLayoutComponent,
+    canActivate: [AuthGuard],
     children: [
       {
         path: '',
@@ -48,64 +26,69 @@ export const routes: Routes = [
         pathMatch: 'full'
       },
       {
+        path: 'dashboard',
+        loadChildren: () => import('./features/dashboard/dashboard.routes').then(m => m.routes),
+        canActivate: [AuthGuard]
+      },
+      {
         path: 'profile',
-        loadComponent: () => import('./features/auth/profile/profile.component').then(c => c.ProfileComponent)
+        loadChildren: () => import('./features/profile/profile.routes').then(m => m.routes),
+        canActivate: [AuthGuard]
       },
       {
         path: 'profile/change-password',
-        loadComponent: () => import('./features/auth/profile/change-password.component').then(c => c.ChangePasswordComponent)
-      },
-      // Main routes
-      {
-        path: 'dashboard',
-        loadComponent: () => import('./features/dashboard/dashboard.component').then(c => c.DashboardComponent)
+        loadComponent: () => import('./features/profile/password-change/password-change.component').then(c => c.PasswordChangeComponent),
+        canActivate: [AuthGuard]
       },
       {
         path: 'users',
-        loadComponent: () => import('./features/users/users.component').then(c => c.UsersComponent)
+        loadChildren: () => import('./features/users/users.routes').then(m => m.routes),
+        canActivate: [PermissionGuard],
+        data: { 
+          permissions: 'users:list'
+        }
       },
       {
         path: 'users/create',
         loadComponent: () => import('./features/users/create-user.component').then(c => c.CreateUserComponent),
-        canActivate: [RoleGuard],
-        data: {
-          roles: ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN']
+        canActivate: [PermissionGuard],
+        data: { 
+          permissions: 'users:create'
         }
       },
       {
         path: 'groups',
         loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent),
-        canActivate: [RoleGuard],
-        data: {
-          roles: ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN']
+        canActivate: [PermissionGuard],
+        data: { 
+          permissions: 'groups:list'
         }
       },
       {
         path: 'roles',
         loadComponent: () => import('./features/roles/roles.component').then(c => c.RolesComponent),
-        canActivate: [RoleGuard],
-        data: {
-          roles: ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN']
+        canActivate: [PermissionGuard],
+        data: { 
+          permissions: 'roles:list'
         }
       }
     ]
   },
-  // Admin module routes
   {
     path: 'admin',
-    component: MainLayoutComponent,
-    canActivate: [AuthGuard, PasswordChangeGuard, RoleGuard],
-    data: { roles: ['ADMIN', 'SUPERADMIN'] },
+    component: AdminLayoutComponent,
+    canActivate: [AuthGuard, PasswordChangeGuard, PermissionGuard],
+    data: { 
+      permissions: 'admin:access'
+    },
     loadChildren: () => import('./modules/admin/admin.module').then(m => m.AdminModule)
   },
   {
+    path: '',
+    loadChildren: () => import('./features/auth/auth.routes').then(m => m.routes)
+  },
+  {
     path: '**',
-    component: ErrorComponent,
-    data: {
-      errorTitle: 'Page Not Found',
-      errorMessage: 'The page you are looking for does not exist.',
-      showHomeButton: true,
-      showBackButton: true
-    }
+    redirectTo: '/login'
   }
 ];

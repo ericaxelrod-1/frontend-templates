@@ -1,22 +1,32 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { AccessDeniedComponent } from './components/access-denied/access-denied.component';
+import { PermissionsModule } from './modules/permissions.module';
 
+/**
+ * Shared module for common components, directives, and pipes.
+ * This module can be imported by any feature module.
+ */
 @NgModule({
   declarations: [
+    AccessDeniedComponent
   ],
   imports: [
     CommonModule,
-    ReactiveFormsModule,
+    RouterModule,
     FormsModule,
-    RouterModule
+    ReactiveFormsModule,
+    PermissionsModule
   ],
   exports: [
     CommonModule,
-    ReactiveFormsModule,
+    RouterModule,
     FormsModule,
-    RouterModule
+    ReactiveFormsModule,
+    PermissionsModule,
+    AccessDeniedComponent
   ]
 })
 export class SharedModule { } 

@@ -3,15 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { tap } from 'rxjs/operators';
-
-export interface User {
-  id: number;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  emailVerified: boolean;
-  roles: string[];
-}
+import { User } from '../../models/user.model';
 
 export interface AuthResponse {
   accessToken: string;

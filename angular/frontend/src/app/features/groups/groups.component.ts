@@ -8,7 +8,8 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { GroupService, Group, Member } from '../../services/group.service';
+import { GroupService } from '../../services/group.service';
+import { Group, Member } from '../../models/group.model';
 import { GroupDialogComponent } from './group-dialog/group-dialog.component';
 import { AddMemberDialogComponent } from './add-member-dialog/add-member-dialog.component';
 import { AuthService } from '../../core/services/auth.service';
@@ -159,9 +160,6 @@ export class GroupsComponent implements OnInit {
   hasPermission = false;
   loading = true;
   
-  // Define the required roles - these should match the ones in the route configuration
-  private requiredRoles = ['ADMIN', 'PROJECT_MANAGER', 'SUPERADMIN'];
-
   constructor(
     private groupService: GroupService,
     private dialog: MatDialog,
@@ -172,8 +170,8 @@ export class GroupsComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Use the permission service to standardize permission checking
-    this.permissionService.hasPermission$(this.requiredRoles).subscribe(hasPermission => {
+    // Check permission to view groups using resource:action format
+    this.permissionService.hasPermission('groups:view').subscribe(hasPermission => {
       console.log('[GroupsComponent] Permission check result:', hasPermission);
       this.hasPermission = hasPermission;
       

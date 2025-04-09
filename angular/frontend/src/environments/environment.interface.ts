@@ -1,10 +1,17 @@
 export interface Environment {
   production: boolean;
   apiUrl: string;
+  debug: boolean;
+  mockBackend: boolean;
+  logLevel: string;
+  tokenLifespan: number;
+  refreshTokenLifespan: number;
+  authTokenKey: string;
+  refreshTokenKey: string;
   hmr: boolean;
   logging: {
     enabled: boolean;
-    logLevel: 'debug' | 'info' | 'warn' | 'error';
+    logLevel: string;
     logToConsole: boolean;
     logToFile: boolean;
     colorize: boolean;
@@ -18,7 +25,7 @@ export interface Environment {
   };
   captcha: {
     enabled: boolean;
-    difficulty: 'easy' | 'medium' | 'hard';
+    difficulty: string;
   };
   debugMode: boolean;
 } 

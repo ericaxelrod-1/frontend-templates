@@ -2,7 +2,9 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Routes } from '@angular/router';
 import { ReactiveFormsModule } from '@angular/forms';
-import { RoleGuard } from '../../core/guards/role.guard';
+import { PermissionGuard } from '../../core/guards/permission.guard';
+import { LoginMonitoringComponent } from './login-monitoring/login-monitoring.component';
+import { HttpClientModule } from '@angular/common/http';
 
 // Material Modules
 import { MatCardModule } from '@angular/material/card';
@@ -20,17 +22,27 @@ import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
 
-// Components
-import { LoginMonitoringComponent } from './login-monitoring/login-monitoring.component';
-
 // Routes
 const routes: Routes = [
-  { 
-    path: 'login-monitoring', 
+  {
+    path: '',
+    redirectTo: 'login-monitoring',
+    pathMatch: 'full'
+  },
+  {
+    path: 'login-monitoring',
     component: LoginMonitoringComponent,
-    canActivate: [RoleGuard],
-    data: { 
-      roles: ['ADMIN', 'SUPERADMIN'] 
+    canActivate: [PermissionGuard],
+    data: {
+      permissions: 'monitoring:access'
+    }
+  },
+  {
+    path: 'permissions',
+    loadChildren: () => import('../../features/admin/permissions-management/permissions-management.module').then(m => m.PermissionsManagementModule),
+    canActivate: [PermissionGuard],
+    data: {
+      permissions: 'permissions:manage'
     }
   }
 ];
@@ -41,8 +53,9 @@ const routes: Routes = [
   ],
   imports: [
     CommonModule,
-    RouterModule.forChild(routes),
     ReactiveFormsModule,
+    HttpClientModule,
+    RouterModule.forChild(routes),
     
     // Material Modules
     MatCardModule,

@@ -1,0 +1,180 @@
+<div class="container">
+  <header class="d-flex justify-content-between align-items-center mb-4">
+    <h1>User Management</h1>
+    
+    <!-- Create user button - only visible with users:create permission -->
+    <button 
+      *appHasPermission="'users:create'" 
+      class="btn btn-primary"
+      (click)="openCreateUserModal()">
+      <i class="bi bi-plus-circle me-2"></i>
+      Create User
+    </button>
+  </header>
+
+  <!-- Search and filters -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input 
+              type="text" 
+              class="form-control" 
+              placeholder="Search users..."
+              [(ngModel)]="searchQuery"
+              (ngModelChange)="applyFilters()">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <select 
+            class="form-select" 
+            [(ngModel)]="roleFilter"
+            (ngModelChange)="applyFilters()">
+            <option value="">All Roles</option>
+            <option *ngFor="let role of roles" [value]="role.id">{{ role.name }}</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select 
+            class="form-select" 
+            [(ngModel)]="statusFilter"
+            (ngModelChange)="applyFilters()">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button 
+            class="btn btn-outline-secondary w-100"
+            (click)="resetFilters()">
+            <i class="bi bi-x-circle me-2"></i>
+            Reset
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Users table -->
+  <div class="card">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Last Login</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let user of filteredUsers">
+              <td>{{ user.firstName }} {{ user.lastName }}</td>
+              <td>{{ user.email }}</td>
+              <td>{{ user.role?.name }}</td>
+              <td>
+                <span 
+                  class="badge"
+                  [ngClass]="user.emailVerified ? 'bg-success' : 'bg-warning'">
+                  {{ user.emailVerified ? 'Active' : 'Pending Verification' }}
+                </span>
+              </td>
+              <td>{{ user.lastLogin | date:'medium' }}</td>
+              <td>
+                <div class="btn-group">
+                  <!-- Edit button - requires users:update permission -->
+                  <button 
+                    *appHasPermission="'users:update'" 
+                    class="btn btn-sm btn-outline-primary"
+                    (click)="editUser(user)">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  
+                  <!-- Permissions button - requires users:permissions permission -->
+                  <button 
+                    *appHasPermission="'users:permissions'" 
+                    class="btn btn-sm btn-outline-success"
+                    (click)="managePermissions(user)">
+                    <i class="bi bi-shield"></i>
+                  </button>
+                  
+                  <!-- Delete button - requires users:delete permission -->
+                  <button 
+                    *appHasPermission="'users:delete'" 
+                    class="btn btn-sm btn-outline-danger"
+                    (click)="deleteUser(user)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                  
+                  <!-- Alternative when no permissions -->
+                  <div *appHasPermission="'users:view'; else noActions">
+                    <!-- User has at least view permission -->
+                  </div>
+                  <ng-template #noActions>
+                    <span class="text-muted">No available actions</span>
+                  </ng-template>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="filteredUsers.length === 0">
+              <td colspan="6" class="text-center py-4">
+                <p class="text-muted">No users found matching your criteria.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Pagination -->
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div>
+          <span class="text-muted">Showing {{ filteredUsers.length }} of {{ users.length }} users</span>
+        </div>
+        <nav aria-label="User pagination">
+          <ul class="pagination mb-0">
+            <li class="page-item" [class.disabled]="currentPage === 1">
+              <a class="page-link" href="javascript:void(0)" (click)="changePage(currentPage - 1)">Previous</a>
+            </li>
+            <li class="page-item" *ngFor="let page of pages" [class.active]="page === currentPage">
+              <a class="page-link" href="javascript:void(0)" (click)="changePage(page)">{{ page }}</a>
+            </li>
+            <li class="page-item" [class.disabled]="currentPage === totalPages">
+              <a class="page-link" href="javascript:void(0)" (click)="changePage(currentPage + 1)">Next</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal for Delete -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm Deletion</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete this user? This action cannot be undone.</p>
+        <p *ngIf="selectedUser"><strong>{{ selectedUser.email }}</strong></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button 
+          type="button" 
+          class="btn btn-danger"
+          (click)="confirmDeleteUser()">
+          Delete User
+        </button>
+      </div>
+    </div>
+  </div>
+</div> 

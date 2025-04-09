@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { Action, Selector, State, StateContext } from '@ngxs/store';
 import { Navigate } from '@ngxs/router-plugin';
-import { AuthService } from '../../core/services';
+import { AuthService, AuthStatus } from '../../core/services/auth.service';
+import { PermissionService } from '../../core/services/permission.service';
 import { User, UserRegistration } from '../../models';
 import { catchError, tap } from 'rxjs/operators';
 import { throwError, of } from 'rxjs';
@@ -111,6 +112,21 @@ export namespace AuthActions {
     static readonly type = '[Auth] Set Initial Auth State';
     constructor(public user: User, public isAuthenticated: boolean) {}
   }
+
+  // New action for loading user permissions
+  export class LoadUserPermissions {
+    static readonly type = '[Auth] Load User Permissions';
+  }
+  
+  export class LoadUserPermissionsSuccess {
+    static readonly type = '[Auth] Load User Permissions Success';
+    constructor(public permissions: string[]) {}
+  }
+  
+  export class LoadUserPermissionsFailure {
+    static readonly type = '[Auth] Load User Permissions Failure';
+    constructor(public error: string) {}
+  }
 }
 
 // Auth state model
@@ -123,6 +139,8 @@ export interface AuthStateModel {
   forgotPasswordSuccess: boolean;
   registrationSuccess: boolean;
   verificationSuccess: boolean;
+  permissions: string[]; // Added permissions array
+  permissionsLoaded: boolean; // Track if permissions are loaded
 }
 
 // Default state
@@ -134,7 +152,9 @@ const defaults: AuthStateModel = {
   passwordResetSuccess: false,
   forgotPasswordSuccess: false,
   registrationSuccess: false,
-  verificationSuccess: false
+  verificationSuccess: false,
+  permissions: [], // Initialize with empty array
+  permissionsLoaded: false
 };
 
 @State<AuthStateModel>({
@@ -143,8 +163,10 @@ const defaults: AuthStateModel = {
 })
 @Injectable()
 export class AuthState {
-  constructor(private authService: AuthService) {
-  }
+  constructor(
+    private authService: AuthService,
+    private permissionService: PermissionService
+  ) {}
 
   @Selector()
   static user(state: AuthStateModel): User | null {
@@ -184,6 +206,46 @@ export class AuthState {
   @Selector()
   static verificationSuccess(state: AuthStateModel): boolean {
     return state.verificationSuccess;
+  }
+
+  @Selector()
+  static permissions(state: AuthStateModel): string[] {
+    return state.permissions;
+  }
+
+  @Selector()
+  static permissionsLoaded(state: AuthStateModel): boolean {
+    return state.permissionsLoaded;
+  }
+
+  @Selector()
+  static hasPermission(state: AuthStateModel): (permission: string) => boolean {
+    return (permission: string) => {
+      if (!state.permissionsLoaded || !state.permissions.length) {
+        return false;
+      }
+      return state.permissions.includes(permission);
+    };
+  }
+
+  @Selector()
+  static hasAnyPermission(state: AuthStateModel): (permissions: string[]) => boolean {
+    return (permissions: string[]) => {
+      if (!state.permissionsLoaded || !state.permissions.length) {
+        return false;
+      }
+      return permissions.some(permission => state.permissions.includes(permission));
+    };
+  }
+
+  @Selector()
+  static hasAllPermissions(state: AuthStateModel): (permissions: string[]) => boolean {
+    return (permissions: string[]) => {
+      if (!state.permissionsLoaded || !state.permissions.length) {
+        return false;
+      }
+      return permissions.every(permission => state.permissions.includes(permission));
+    };
   }
 
   @Action(AuthActions.Login)
@@ -227,24 +289,18 @@ export class AuthState {
   @Action(AuthActions.LoginSuccess)
   loginSuccess(ctx: StateContext<AuthStateModel>, action: AuthActions.LoginSuccess) {
     console.log('LoginSuccess - User object:', action.user);
-    console.log('LoginSuccess - User roles:', action.user?.roles);
-    
-    // Ensure roles are properly set if missing
-    const updatedUser = { ...action.user };
-    if (!updatedUser.roles || updatedUser.roles.length === 0) {
-      // If user email is admin@example.com, set roles to superadmin
-      if (updatedUser.email === 'admin@example.com') {
-        console.log('Setting superadmin role for admin@example.com');
-        updatedUser.roles = ['superadmin'];
-      }
-    }
+    console.log('LoginSuccess - User permissions:', action.user?.permissions);
     
     ctx.patchState({
-      user: updatedUser,
+      user: action.user,
       isAuthenticated: true,
       loading: false,
       error: null
     });
+    
+    // Dispatch action to load permissions
+    ctx.dispatch(new AuthActions.LoadUserPermissions());
+    
     return ctx.dispatch(new Navigate(['/app/dashboard']));
   }
 
@@ -408,15 +464,11 @@ export class AuthState {
     ctx.patchState({ loading: true });
     
     return this.authService.logout().pipe(
-      tap((response) => {
-        console.log('AuthState: Logout successful:', response);
-        ctx.setState(defaults);
-      }),
-      catchError(error => {
-        console.error('AuthState: Error in logout:', error);
-        // Even if there's an error, clear state anyway for security
-        ctx.setState(defaults);
-        return of(null); // Return observable that completes successfully
+      tap(() => {
+        ctx.setState({
+          ...defaults
+        });
+        return ctx.dispatch(new Navigate(['/login']));
       })
     );
   }
@@ -492,23 +544,26 @@ export class AuthState {
 
   @Action(AuthActions.AppInitialize)
   appInitialize(ctx: StateContext<AuthStateModel>) {
-    console.log('AppInitialize: Authentication data found, fetching user profile');
-    
-    return this.authService.getUserProfile().pipe(
-      tap(user => {
-        console.log('AppInitialize: User profile fetched successfully', user);
-        console.log('AppInitialize: User roles:', user.roles);
-        
-        // Update the store with the user info
-        ctx.patchState({
-          user,
-          isAuthenticated: true,
-          loading: false
-        });
+    return this.authService.checkAuthStatus().pipe(
+      tap((status: AuthStatus) => {
+        if (status.isAuthenticated && status.user) {
+          ctx.dispatch(new AuthActions.SetInitialAuthState(status.user, true));
+          // Also load permissions
+          ctx.dispatch(new AuthActions.LoadUserPermissions());
+        } else {
+          ctx.patchState({
+            isAuthenticated: false,
+            user: null
+          });
+        }
       }),
       catchError(error => {
-        console.error('AppInitialize: Error fetching user profile:', error);
-        return throwError(() => error);
+        console.error('Error checking auth status:', error);
+        ctx.patchState({
+          isAuthenticated: false,
+          user: null
+        });
+        return of(null);
       })
     );
   }
@@ -523,6 +578,36 @@ export class AuthState {
     ctx.patchState({
       user: action.user,
       isAuthenticated: action.isAuthenticated
+    });
+  }
+
+  @Action(AuthActions.LoadUserPermissions)
+  loadUserPermissions(ctx: StateContext<AuthStateModel>) {
+    return this.permissionService.loadUserPermissions().pipe(
+      tap(permissions => {
+        ctx.dispatch(new AuthActions.LoadUserPermissionsSuccess(permissions));
+      }),
+      catchError(error => {
+        console.error('Error loading user permissions:', error);
+        ctx.dispatch(new AuthActions.LoadUserPermissionsFailure('Failed to load permissions'));
+        return of([]); // Return empty array on error
+      })
+    );
+  }
+
+  @Action(AuthActions.LoadUserPermissionsSuccess)
+  loadUserPermissionsSuccess(ctx: StateContext<AuthStateModel>, action: AuthActions.LoadUserPermissionsSuccess) {
+    ctx.patchState({
+      permissions: action.permissions,
+      permissionsLoaded: true
+    });
+  }
+
+  @Action(AuthActions.LoadUserPermissionsFailure)
+  loadUserPermissionsFailure(ctx: StateContext<AuthStateModel>, action: AuthActions.LoadUserPermissionsFailure) {
+    ctx.patchState({
+      error: action.error,
+      permissionsLoaded: false
     });
   }
 } 

@@ -3,16 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of, map, catchError } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { LoggerService } from './logging/logger.service';
-
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  groups: { id: number; name: string }[];
-  requiresPasswordChange?: boolean;
-  lastPasswordChange?: Date;
-}
+import { User } from '../models/user.model';
+import { Group, Member, Permission } from '../models/group.model';
 
 export interface PasswordChange {
   currentPassword: string;
@@ -25,8 +17,30 @@ export interface CreateUserRequest {
   password: string;
   firstName?: string;
   lastName?: string;
-  role?: string;
+  roleId?: number;
   requiresPasswordChange: boolean;
+}
+
+export interface GroupMembershipResponse {
+  success: boolean;
+  message: string;
+  group?: Group;
+}
+
+export interface PasswordRequirements {
+  minLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireNumbers: boolean;
+  requireSpecialChars: boolean;
+  preventCommonPasswords: boolean;
+  preventPasswordReuse: boolean;
+}
+
+export interface LoginAttemptStatus {
+  remainingAttempts: number;
+  blockDuration?: number;
+  isBlocked: boolean;
 }
 
 @Injectable({
@@ -65,27 +79,56 @@ export class UserService {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
 
-  // Try to get user groups from the user profile if the groups endpoint is not available
-  getUserGroups(id: number): Observable<{ id: number; name: string }[]> {
+  getUserGroups(id: number): Observable<Group[]> {
     return this.getUser(id).pipe(
-      map(user => user.groups || []),
+      map(user => {
+        if (!user.groups || user.groups.length === 0) {
+          this.logger.warn(`No groups found for user ${id}`);
+          return [];
+        }
+        // Ensure we have complete Group objects
+        return user.groups.filter((group): group is Group => {
+          const isValid = group && typeof group.id === 'number' && 
+                         typeof group.name === 'string';
+          if (!isValid) {
+            this.logger.warn(`Invalid group data found for user ${id}`, group);
+          }
+          return isValid;
+        });
+      }),
       catchError(error => {
-        console.error('Error getting user groups from profile:', error);
+        this.logger.error('Error getting user groups from profile:', error);
         return of([]);
       })
     );
   }
 
-  // Method to add a user to a group
-  addUserToGroup(userId: number, groupId: number): Observable<void> {
+  addUserToGroup(userId: number, groupId: number): Observable<GroupMembershipResponse> {
     this.logger.debug(`Adding user ${userId} to group ${groupId}`);
-    return this.http.post<void>(`${this.apiUrl}/${userId}/groups/${groupId}`, {});
+    return this.http.post<GroupMembershipResponse>(`${this.apiUrl}/${userId}/groups/${groupId}`, {}).pipe(
+      map(response => {
+        this.logger.debug(`Successfully added user ${userId} to group ${groupId}`);
+        return response;
+      }),
+      catchError(error => {
+        this.logger.error(`Failed to add user ${userId} to group ${groupId}:`, error);
+        throw error;
+      })
+    );
   }
 
-  // Method to remove a user from a group
-  removeUserFromGroup(userId: number, groupId: number): Observable<void> {
+  removeUserFromGroup(userId: number, groupId: number): Observable<GroupMembershipResponse> {
     this.logger.debug(`Removing user ${userId} from group ${groupId}`);
-    return this.http.delete<void>(`${this.apiUrl}/${userId}/groups/${groupId}`);
+    return this.http.delete<GroupMembershipResponse>(`${this.apiUrl}/${userId}/groups/${groupId}`).pipe(
+      map(response => {
+        this.logger.debug(`Successfully removed user ${userId} from group ${groupId}`);
+        return response;
+      }),
+      catchError(error => {
+        this.logger.error(`Failed to remove user ${userId} from group ${groupId}:`, error);
+        throw error;
+      })
+    );
   }
 
   // Method to change user password with enhanced security requirements
@@ -99,25 +142,13 @@ export class UserService {
   }
 
   // Get password requirements
-  getPasswordRequirements(): Observable<{
-    minLength: number;
-    requireUppercase: boolean;
-    requireLowercase: boolean;
-    requireNumbers: boolean;
-    requireSpecialChars: boolean;
-    preventCommonPasswords: boolean;
-    preventPasswordReuse: boolean;
-  }> {
-    return this.http.get<any>(`${this.apiUrl}/password-requirements`);
+  getPasswordRequirements(): Observable<PasswordRequirements> {
+    return this.http.get<PasswordRequirements>(`${this.apiUrl}/password-requirements`);
   }
 
   // Get login attempt status
-  getLoginAttemptStatus(email: string): Observable<{
-    remainingAttempts: number;
-    blockDuration?: number;
-    isBlocked: boolean;
-  }> {
-    return this.http.get<any>(`${this.apiUrl}/login-attempt-status`, {
+  getLoginAttemptStatus(email: string): Observable<LoginAttemptStatus> {
+    return this.http.get<LoginAttemptStatus>(`${this.apiUrl}/login-attempt-status`, {
       params: { email }
     });
   }

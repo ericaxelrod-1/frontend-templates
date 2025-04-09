@@ -20,11 +20,23 @@ import { AuthActions } from './store/auth/auth.state';
 import { firstValueFrom } from 'rxjs';
 import { CaptchaService } from './core/services/captcha.service';
 import { AdvancedCaptchaService } from './core/services/advanced-captcha.service';
+import { RolesConstantsService } from './core/constants/roles';
 
 // Function to initialize the logger
 export function initializeLogging(logger: LoggerService) {
   return () => {
     return Promise.resolve();
+  };
+}
+
+// Function to initialize roles
+export function initializeRoles(rolesService: RolesConstantsService) {
+  return () => {
+    console.log('Initializing roles from database');
+    return firstValueFrom(rolesService.initialize()).catch(error => {
+      console.error('Error loading roles from backend:', error);
+      return Promise.resolve(); // Continue app initialization even if roles fetch fails
+    });
   };
 }
 
@@ -78,10 +90,17 @@ export const appConfig: ApplicationConfig = {
     LoggerService,
     CaptchaService,
     AdvancedCaptchaService,
+    RolesConstantsService,
     {
       provide: APP_INITIALIZER,
       useFactory: initializeLogging,
       deps: [LoggerService],
+      multi: true
+    },
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initializeRoles,
+      deps: [RolesConstantsService],
       multi: true
     },
     {

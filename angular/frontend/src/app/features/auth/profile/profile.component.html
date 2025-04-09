@@ -60,14 +60,21 @@
       </div>
       
       <div class="form-group">
-        <button type="submit" [disabled]="loading" class="btn btn-primary btn-block">
+        <!-- Only users with either 'users:update' or 'profile:edit' permission can update their profile -->
+        <button *hasPermission="['users:update', 'profile:edit']" 
+                type="submit" 
+                [disabled]="loading" 
+                class="btn btn-primary btn-block">
           <span *ngIf="loading" class="spinner-border spinner-border-sm mr-1"></span>
           Update Profile
         </button>
       </div>
       
       <div class="form-group">
-        <a [routerLink]="['/profile/change-password']" class="btn btn-outline-secondary btn-block">
+        <!-- Only users with 'users:change-password' permission can change their password -->
+        <a *hasPermission="'users:change-password'" 
+           [routerLink]="['/profile/change-password']" 
+           class="btn btn-outline-secondary btn-block">
           Change Password
         </a>
       </div>
@@ -78,30 +85,40 @@
       <h3>Delete Account</h3>
       <p class="warning-text">Warning: This action cannot be undone. All your data will be permanently removed.</p>
       
-      <div *ngIf="showDeleteConfirmation" class="delete-confirmation">
-        <p>Please type <strong>DELETE</strong> to confirm:</p>
-        <input 
-          type="text"
-          [(ngModel)]="deleteConfirmationText"
-          class="form-control"
-          placeholder="Type DELETE here"
-        />
-        
-        <div class="action-buttons">
-          <button 
-            class="btn btn-danger" 
-            [disabled]="deleteConfirmationText !== 'DELETE' || deletingAccount" 
-            (click)="deleteAccount()">
-            <span *ngIf="deletingAccount" class="spinner-border spinner-border-sm mr-1"></span>
-            Permanently Delete Account
-          </button>
-          <button class="btn btn-outline-secondary" (click)="cancelDeleteAccount()">Cancel</button>
+      <!-- Only users with the 'users:delete-own' permission can delete their account -->
+      <div *hasPermission="'users:delete-own'; else noDeletePermission">
+        <div *ngIf="showDeleteConfirmation" class="delete-confirmation">
+          <p>Please type <strong>DELETE</strong> to confirm:</p>
+          <input 
+            type="text"
+            [(ngModel)]="deleteConfirmationText"
+            class="form-control"
+            placeholder="Type DELETE here"
+          />
+          
+          <div class="action-buttons">
+            <button 
+              class="btn btn-danger" 
+              [disabled]="deleteConfirmationText !== 'DELETE' || deletingAccount" 
+              (click)="deleteAccount()">
+              <span *ngIf="deletingAccount" class="spinner-border spinner-border-sm mr-1"></span>
+              Permanently Delete Account
+            </button>
+            <button class="btn btn-outline-secondary" (click)="cancelDeleteAccount()">Cancel</button>
+          </div>
         </div>
+        
+        <button *ngIf="!showDeleteConfirmation" class="btn btn-outline-danger" (click)="showDeleteConfirmation = true">
+          Delete Account
+        </button>
       </div>
       
-      <button *ngIf="!showDeleteConfirmation" class="btn btn-outline-danger" (click)="showDeleteConfirmation = true">
-        Delete Account
-      </button>
+      <!-- Template to show when user doesn't have delete permission -->
+      <ng-template #noDeletePermission>
+        <div class="alert alert-info">
+          You don't have permission to delete your account. Please contact an administrator for assistance.
+        </div>
+      </ng-template>
     </div>
   </div>
 </div> 

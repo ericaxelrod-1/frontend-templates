@@ -1,0 +1,48 @@
+<div class="users-container">
+  <div class="users-list" *ngIf="!loading && !error">
+    <h2>Users</h2>
+    <div class="user-item" *ngFor="let user of users" 
+         [class.selected]="selectedUser?.id === user.id"
+         (click)="selectUser(user)">
+      <div class="user-info">
+        <span class="user-name">{{user.firstName}} {{user.lastName}}</span>
+        <span class="user-email">{{user.email}}</span>
+      </div>
+      <button mat-icon-button color="warn" 
+              *ngIf="canDeleteUser()"
+              (click)="deleteUser(user); $event.stopPropagation()">
+        <mat-icon>delete</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <div class="loading" *ngIf="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+    <span>Loading users...</span>
+  </div>
+
+  <div class="error" *ngIf="error">
+    <mat-icon color="warn">error</mat-icon>
+    <span>{{error}}</span>
+  </div>
+
+  <div class="user-details" *ngIf="selectedUser && canViewUserDetails()">
+    <h3>User Details</h3>
+    <div class="detail-row">
+      <label>Name:</label>
+      <span>{{selectedUser.firstName}} {{selectedUser.lastName}}</span>
+    </div>
+    <div class="detail-row">
+      <label>Email:</label>
+      <span>{{selectedUser.email}}</span>
+    </div>
+    <div class="detail-row" *ngIf="selectedUser.roles?.length">
+      <label>Roles:</label>
+      <span>{{getRoleNames(selectedUser)}}</span>
+    </div>
+    <div class="detail-row" *ngIf="selectedUser.permissions?.length">
+      <label>Permissions:</label>
+      <span>{{selectedUser.permissions.length}} permissions assigned</span>
+    </div>
+  </div>
+</div> 

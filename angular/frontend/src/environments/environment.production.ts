@@ -3,6 +3,13 @@ import { Environment } from './environment.interface';
 export const environment: Environment = {
   production: true,
   apiUrl: '/api', // Will be replaced with actual production API URL
+  debug: false,
+  mockBackend: false,
+  logLevel: 'error',
+  tokenLifespan: 3600, // 1 hour
+  refreshTokenLifespan: 604800, // 7 days
+  authTokenKey: 'auth_token',
+  refreshTokenKey: 'refresh_token',
   hmr: false,
   logging: {
     enabled: false,

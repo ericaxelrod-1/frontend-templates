@@ -1,0 +1,86 @@
+{
+  "missing_tables": [
+    "users",
+    "user_roles",
+    "user_groups",
+    "permissions",
+    "role_permissions",
+    "group_permissions",
+    "user_permissions",
+    "ui_components",
+    "ui_component_permissions",
+    "frontend_routes",
+    "frontend_route_permissions",
+    "api_endpoints",
+    "api_endpoint_permissions",
+    "cache_sync_status"
+  ],
+  "extra_tables": [
+    "migrations",
+    "task_tags_tag",
+    "ip_reputation",
+    "role",
+    "captcha",
+    "group",
+    "login_attempt",
+    "action",
+    "resource",
+    "category",
+    "tag",
+    "user_group",
+    "group_permission",
+    "user_permission",
+    "user",
+    "role_permission",
+    "permission",
+    "task"
+  ],
+  "table_issues": {
+    "roles": {
+      "missing_columns": [],
+      "extra_columns": [
+        "isSystemRole",
+        "isDefault",
+        "parentId",
+        "priority"
+      ],
+      "type_mismatches": [
+        "id: expected TEXT, got INTEGER",
+        "name: expected TEXT, got VARCHAR(50)",
+        "description: expected TEXT, got VARCHAR(255)"
+      ],
+      "constraint_issues": [
+        "id: nullable mismatch",
+        "name: primary key mismatch",
+        "description: primary key mismatch",
+        "createdAt: primary key mismatch",
+        "updatedAt: primary key mismatch"
+      ],
+      "missing_indexes": [],
+      "extra_indexes": []
+    },
+    "groups": {
+      "missing_columns": [],
+      "extra_columns": [
+        "parentId",
+        "isSystemGroup",
+        "settings"
+      ],
+      "type_mismatches": [
+        "id: expected TEXT, got INTEGER",
+        "name: expected TEXT, got VARCHAR(100)",
+        "description: expected TEXT, got VARCHAR(255)"
+      ],
+      "constraint_issues": [
+        "id: nullable mismatch",
+        "name: primary key mismatch",
+        "description: primary key mismatch",
+        "ownerId: primary key mismatch",
+        "createdAt: primary key mismatch",
+        "updatedAt: primary key mismatch"
+      ],
+      "missing_indexes": [],
+      "extra_indexes": []
+    }
+  }
+}

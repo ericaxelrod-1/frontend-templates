@@ -501,6 +501,75 @@ describe('UserCardComponent', () => {
 });
 ```
 
+### Directive Testing
+Directives, especially structural directives like `*hasPermission`, require thorough testing to ensure they properly control UI elements based on permissions:
+
+```typescript
+describe('HasPermissionDirective', () => {
+  let fixture: ComponentFixture<TestComponent>;
+  let permissionService: jasmine.SpyObj<PermissionService>;
+  
+  // Create a test component that uses the directive
+  @Component({
+    template: `
+      <div *hasPermission="'users:read'">Content for users:read</div>
+      <div *hasPermission="'users:write'">Content for users:write</div>
+      <div *hasPermission="'roles:read'; else noAccess">Content for roles:read</div>
+      <ng-template #noAccess>No access template content</ng-template>
+    `
+  })
+  class TestComponent {}
+  
+  beforeEach(() => {
+    // Set up the testing module with mocked permission service
+    permissionService = jasmine.createSpyObj('PermissionService', ['hasPermission', 'hasAnyPermission']);
+    
+    TestBed.configureTestingModule({
+      declarations: [TestComponent, HasPermissionDirective],
+      providers: [{ provide: PermissionService, useValue: permissionService }]
+    });
+    
+    // Default to denying permissions
+    permissionService.hasPermission.and.returnValue(of(false));
+    permissionService.hasAnyPermission.and.returnValue(of(false));
+  });
+  
+  it('should show content when permission is granted', () => {
+    // Grant a specific permission
+    permissionService.hasPermission.and.callFake((permission) => {
+      return of(permission === 'users:read');
+    });
+    
+    // Create component and detect changes
+    fixture = TestBed.createComponent(TestComponent);
+    fixture.detectChanges();
+    
+    // Verify only the permitted content is shown
+    const elements = fixture.debugElement.queryAll(By.css('div'));
+    expect(elements.length).toBe(1);
+    expect(elements[0].nativeElement.textContent).toBe('Content for users:read');
+  });
+  
+  it('should show else template when permission is denied', () => {
+    // Deny all permissions
+    fixture = TestBed.createComponent(TestComponent);
+    fixture.detectChanges();
+    
+    // Verify the else template is shown
+    expect(fixture.nativeElement.textContent).toContain('No access template content');
+  });
+});
+```
+
+To run directive tests specifically:
+
+```bash
+cd angular/frontend
+npm test -- --include=src/app/shared/directives/has-permission.directive.spec.ts
+```
+
+This launches Karma test runner in Chrome, executing only the specified directive tests.
+
 ### E2E Testing
 - Write E2E tests for critical user journeys
 - Use Cypress for E2E testing

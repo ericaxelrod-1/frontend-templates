@@ -7,7 +7,8 @@ This document outlines the database schema design for the Angular Template Appli
 1. User authentication and authorization
 2. Role-based access control
 3. User groups for sharing data
-4. Migration path from SQLite to PostgreSQL
+4. Dynamic permission management for UI components, routes, and API endpoints
+5. Migration path from SQLite to PostgreSQL
 
 ## Entity Relationship Diagram
 
@@ -17,7 +18,7 @@ This document outlines the database schema design for the Angular Template Appli
 ├─────────────┤       ├─────────────┤       ├─────────────┤
 │ id          │       │ id          │       │ id          │
 │ username    │       │ name        │       │ name        │
-│ email       │       │ permissions │       │ description │
+│ email       │       │ description │       │ description │
 │ password    │       │ createdAt   │       │ createdBy   │
 │ firstName   │       │ updatedAt   │       │ createdAt   │
 │ lastName    │       └──────┬──────┘       │ updatedAt   │
@@ -33,21 +34,45 @@ This document outlines the database schema design for the Angular Template Appli
        │           │   Permission    │             │
        │           ├─────────────────┤             │
        │           │ id              │             │
+       │           │ resourceName    │             │
+       │           │ actionName      │             │
        │           │ name            │             │
        │           │ description     │             │
        │           │ createdAt       │             │
        │           │ updatedAt       │             │
-       │           └─────────────────┘             │
-       │                                           │
-       ▼                                           ▼
-┌─────────────────────────────────────────────────────┐
-│                    UserGroup                        │
-├─────────────────────────────────────────────────────┤
-│ userId                                              │
-│ groupId                                             │
-│ isAdmin                                             │
-│ joinedAt                                            │
-└─────────────────────────────────────────────────────┘
+       │           └─────┬───────────┘             │
+       │                 │                         │
+       │                 │                         │
+       │                 ▼                         │
+       │    ┌────────────┬────────────┬────────────┘
+       │    │            │            │
+       │    ▼            ▼            ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ UserGroup   │ │ UiComponent │ │FrontendRoute│
+├─────────────┤ ├─────────────┤ ├─────────────┤
+│ userId      │ │ id          │ │ id          │
+│ groupId     │ │ selector    │ │ path        │
+│ isAdmin     │ │ description │ │ description │
+│ joinedAt    │ │ filePath    │ │ component   │
+└─────────────┘ │ overridePerms│ │ overridePerms│
+                │ lastSynced   │ │ lastSynced   │
+                └─────┬───────┘ └─────┬────────┘
+                      │               │
+                      │               │
+                      ▼               ▼
+               ┌─────────────┐ ┌─────────────────┐
+               │ ApiEndpoint │ │ role_permissions │
+               ├─────────────┤ ├─────────────────┤
+               │ id          │ │ role_id         │
+               │ method      │ │ permission_id   │
+               │ path        │ └─────────────────┘
+               │ description │
+               │ controller  │ ┌─────────────────┐
+               │ handler     │ │group_permissions│
+               │ overridePerms│ ├─────────────────┤
+               │ lastSynced   │ │ group_id        │
+               └─────────────┘ │ permission_id    │
+                               └─────────────────┘
 ```
 
 ## Tables Specification
@@ -77,13 +102,13 @@ Indexes:
 
 ### Role Table
 
-Defines user roles and permissions.
+Defines user roles for authorization.
 
 | Column      | Type         | Constraints                | Description                        |
 |-------------|--------------|----------------------------|------------------------------------|
-| id          | INTEGER      | PRIMARY KEY, AUTOINCREMENT | Unique identifier                  |
-| name        | VARCHAR(50)  | NOT NULL, UNIQUE           | Role name (e.g., Regular, Superuser, Superadmin) |
-| permissions | JSON         | NOT NULL                   | Stored as JSON object with permissions |
+| id          | UUID         | PRIMARY KEY                | Unique identifier                  |
+| name        | VARCHAR(50)  | NOT NULL, UNIQUE           | Role name (e.g., USER, ADMIN, SUPERADMIN) |
+| description | TEXT         | NULL                       | Role description                   |
 | createdAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Creation timestamp                 |
 | updatedAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Last update timestamp              |
 
@@ -97,17 +122,17 @@ Stores information about user groups.
 
 | Column      | Type         | Constraints                | Description                        |
 |-------------|--------------|----------------------------|------------------------------------|
-| id          | INTEGER      | PRIMARY KEY, AUTOINCREMENT | Unique identifier                  |
-| name        | VARCHAR(100) | NOT NULL                   | Group name                         |
+| id          | UUID         | PRIMARY KEY                | Unique identifier                  |
+| name        | VARCHAR(100) | NOT NULL, UNIQUE           | Group name                         |
 | description | TEXT         | NULL                       | Group description                  |
-| createdBy   | INTEGER      | NOT NULL, FOREIGN KEY      | Reference to User who created group |
+| ownerId     | INTEGER      | FOREIGN KEY                | Reference to User who created group |
 | createdAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Creation timestamp                 |
 | updatedAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Last update timestamp              |
 
 Indexes:
 - PRIMARY KEY (id)
-- INDEX (createdBy)
-- INDEX (name)
+- INDEX (ownerId)
+- UNIQUE (name)
 
 ### UserGroup Table
 
@@ -116,7 +141,7 @@ Junction table for many-to-many relationship between users and groups.
 | Column    | Type         | Constraints                           | Description                        |
 |-----------|--------------|---------------------------------------|------------------------------------|
 | userId    | INTEGER      | NOT NULL, FOREIGN KEY                 | Reference to User                  |
-| groupId   | INTEGER      | NOT NULL, FOREIGN KEY                 | Reference to Group                 |
+| groupId   | UUID         | NOT NULL, FOREIGN KEY                 | Reference to Group                 |
 | isAdmin   | BOOLEAN      | NOT NULL, DEFAULT FALSE               | Whether user is admin in this group|
 | joinedAt  | TIMESTAMP    | NOT NULL, DEFAULT NOW()               | When user joined the group         |
 
@@ -127,43 +152,151 @@ Indexes:
 
 ### Permission Table
 
-Defines individual permissions that can be assigned to roles.
+Defines available permissions for the dynamic access control system.
 
-| Column      | Type         | Constraints                | Description                        |
-|-------------|--------------|----------------------------|------------------------------------|
-| id          | INTEGER      | PRIMARY KEY, AUTOINCREMENT | Unique identifier                  |
-| name        | VARCHAR(50)  | NOT NULL, UNIQUE           | Permission name                    |
-| description | TEXT         | NULL                       | Permission description             |
-| createdAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Creation timestamp                 |
-| updatedAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Last update timestamp              |
+| Column        | Type         | Constraints                | Description                            |
+|---------------|--------------|----------------------------|----------------------------------------|
+| id            | UUID         | PRIMARY KEY                | Unique identifier                      |
+| resourceName  | VARCHAR(50)  | NOT NULL                   | Name of resource (users, dashboard, etc.) |
+| actionName    | VARCHAR(50)  | NOT NULL                   | Name of action (view, edit, etc.)      |
+| name          | VARCHAR(100) | NOT NULL, UNIQUE           | Combined resource:action format        |
+| description   | TEXT         | NULL                       | Permission description                 |
+| createdAt     | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Creation timestamp                     |
+| updatedAt     | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Last update timestamp                  |
 
 Indexes:
 - PRIMARY KEY (id)
+- UNIQUE (resourceName, actionName)
 - UNIQUE (name)
 
-## Default Data
+### Role Permissions Table
 
-### Roles
+Junction table for many-to-many relationship between roles and permissions.
 
-```sql
-INSERT INTO Role (name, permissions, createdAt, updatedAt) VALUES
-('Regular', '{"canViewOwnProfile": true, "canJoinGroups": true}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('Superuser', '{"canViewOwnProfile": true, "canJoinGroups": true, "canManageUsers": true, "canCreateGroups": true}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('Superadmin', '{"canViewOwnProfile": true, "canJoinGroups": true, "canManageUsers": true, "canManageSuperusers": true, "canManageSuperadmins": true, "canCreateGroups": true, "canDeleteGroups": true}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-```
+| Column        | Type         | Constraints                 | Description                        |
+|---------------|--------------|-----------------------------|------------------------------------|
+| role_id       | UUID         | NOT NULL, FOREIGN KEY       | Reference to Role                  |
+| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
 
-### Permissions
+Indexes:
+- PRIMARY KEY (role_id, permission_id)
+- INDEX (role_id)
+- INDEX (permission_id)
 
-```sql
-INSERT INTO Permission (name, description, createdAt, updatedAt) VALUES
-('canViewOwnProfile', 'Can view own profile', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('canJoinGroups', 'Can join groups', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('canManageUsers', 'Can manage regular users', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('canManageSuperusers', 'Can manage superusers', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('canManageSuperadmins', 'Can manage superadmins', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('canCreateGroups', 'Can create new groups', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('canDeleteGroups', 'Can delete groups', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-```
+### Group Permissions Table
+
+Junction table for many-to-many relationship between groups and permissions.
+
+| Column        | Type         | Constraints                 | Description                        |
+|---------------|--------------|-----------------------------|------------------------------------|
+| group_id      | UUID         | NOT NULL, FOREIGN KEY       | Reference to Group                 |
+| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
+
+Indexes:
+- PRIMARY KEY (group_id, permission_id)
+- INDEX (group_id)
+- INDEX (permission_id)
+
+### UI Component Table
+
+Stores information about UI components that require permissions.
+
+| Column             | Type         | Constraints                 | Description                                 |
+|--------------------|--------------|------------------------------|---------------------------------------------|
+| id                 | UUID         | PRIMARY KEY                  | Unique identifier                           |
+| selector           | VARCHAR(100) | NOT NULL, UNIQUE             | Component selector/name                     |
+| description        | TEXT         | NULL                         | Component description                       |
+| filePath           | VARCHAR(255) | NULL                         | Location in the codebase                    |
+| overridePermissions| BOOLEAN      | NOT NULL, DEFAULT FALSE      | Flag to override inherited permissions      |
+| lastSynced         | TIMESTAMP    | NULL                         | Timestamp of last component scan            |
+| createdAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Creation timestamp                          |
+| updatedAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Last update timestamp                       |
+
+Indexes:
+- PRIMARY KEY (id)
+- UNIQUE (selector)
+
+### UI Component Permissions Table
+
+Junction table for many-to-many relationship between UI components and permissions.
+
+| Column        | Type         | Constraints                 | Description                        |
+|---------------|--------------|-----------------------------|------------------------------------|
+| component_id  | UUID         | NOT NULL, FOREIGN KEY       | Reference to UI Component          |
+| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
+
+Indexes:
+- PRIMARY KEY (component_id, permission_id)
+- INDEX (component_id)
+- INDEX (permission_id)
+
+### Frontend Route Table
+
+Stores information about frontend routes that require permissions.
+
+| Column             | Type         | Constraints                 | Description                               |
+|--------------------|--------------|------------------------------|-------------------------------------------|
+| id                 | UUID         | PRIMARY KEY                  | Unique identifier                         |
+| path               | VARCHAR(255) | NOT NULL, UNIQUE             | Route path                                |
+| description        | TEXT         | NULL                         | Route description                         |
+| component          | VARCHAR(100) | NULL                         | Associated component name                 |
+| overridePermissions| BOOLEAN      | NOT NULL, DEFAULT FALSE      | Flag to override inherited permissions    |
+| lastSynced         | TIMESTAMP    | NULL                         | Timestamp of last route scan              |
+| createdAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Creation timestamp                        |
+| updatedAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Last update timestamp                     |
+
+Indexes:
+- PRIMARY KEY (id)
+- UNIQUE (path)
+
+### Frontend Route Permissions Table
+
+Junction table for many-to-many relationship between frontend routes and permissions.
+
+| Column        | Type         | Constraints                 | Description                        |
+|---------------|--------------|-----------------------------|------------------------------------|
+| route_id      | UUID         | NOT NULL, FOREIGN KEY       | Reference to Frontend Route        |
+| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
+
+Indexes:
+- PRIMARY KEY (route_id, permission_id)
+- INDEX (route_id)
+- INDEX (permission_id)
+
+### API Endpoint Table
+
+Stores information about API endpoints that require permissions.
+
+| Column             | Type         | Constraints                 | Description                               |
+|--------------------|--------------|------------------------------|-------------------------------------------|
+| id                 | UUID         | PRIMARY KEY                  | Unique identifier                         |
+| method             | VARCHAR(20)  | NOT NULL                     | HTTP method (GET, POST, etc.)             |
+| path               | VARCHAR(255) | NOT NULL                     | API endpoint path                         |
+| description        | TEXT         | NULL                         | Endpoint description                      |
+| controllerName     | VARCHAR(100) | NULL                         | Controller class name                     |
+| handlerName        | VARCHAR(100) | NULL                         | Handler method name                       |
+| overridePermissions| BOOLEAN      | NOT NULL, DEFAULT FALSE      | Flag to override inherited permissions    |
+| lastSynced         | TIMESTAMP    | NULL                         | Timestamp of last endpoint scan           |
+| createdAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Creation timestamp                        |
+| updatedAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Last update timestamp                     |
+
+Indexes:
+- PRIMARY KEY (id)
+- UNIQUE (method, path)
+
+### API Endpoint Permissions Table
+
+Junction table for many-to-many relationship between API endpoints and permissions.
+
+| Column        | Type         | Constraints                 | Description                        |
+|---------------|--------------|-----------------------------|------------------------------------|
+| endpoint_id   | UUID         | NOT NULL, FOREIGN KEY       | Reference to API Endpoint          |
+| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
+
+Indexes:
+- PRIMARY KEY (endpoint_id, permission_id)
+- INDEX (endpoint_id)
+- INDEX (permission_id)
 
 ## TypeORM Entity Definitions
 
@@ -224,21 +357,20 @@ export class User {
 
 ```typescript
 // src/database/entities/role.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { User } from './user.entity';
+import { Permission } from './permission.entity';
 
 @Entity()
 export class Role {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column({ unique: true, length: 50 })
   name: string;
 
-  @Column({ type: 'simple-json' })
-  permissions: {
-    [key: string]: boolean;
-  };
+  @Column({ nullable: true, type: 'text' })
+  description: string;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -248,6 +380,14 @@ export class Role {
 
   @OneToMany(() => User, user => user.role)
   users: User[];
+
+  @ManyToMany(() => Permission)
+  @JoinTable({
+    name: 'role_permissions',
+    joinColumn: { name: 'role_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
+  })
+  permissions: Permission[];
 }
 ```
 
@@ -255,27 +395,28 @@ export class Role {
 
 ```typescript
 // src/database/entities/group.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, ManyToMany, JoinTable, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { User } from './user.entity';
 import { UserGroup } from './user-group.entity';
+import { Permission } from './permission.entity';
 
 @Entity()
 export class Group {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ length: 100 })
+  @Column({ unique: true, length: 100 })
   name: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'createdBy' })
+  @JoinColumn({ name: 'ownerId' })
   createdBy: User;
 
-  @Column()
-  createdById: number;
+  @Column({ nullable: true })
+  ownerId: number;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -285,38 +426,14 @@ export class Group {
 
   @OneToMany(() => UserGroup, userGroup => userGroup.group)
   userGroups: UserGroup[];
-}
-```
 
-### UserGroup Entity
-
-```typescript
-// src/database/entities/user-group.entity.ts
-import { Entity, Column, ManyToOne, JoinColumn, CreateDateColumn, PrimaryColumn } from 'typeorm';
-import { User } from './user.entity';
-import { Group } from './group.entity';
-
-@Entity()
-export class UserGroup {
-  @PrimaryColumn()
-  userId: number;
-
-  @PrimaryColumn()
-  groupId: number;
-
-  @ManyToOne(() => User, user => user.userGroups)
-  @JoinColumn({ name: 'userId' })
-  user: User;
-
-  @ManyToOne(() => Group, group => group.userGroups)
-  @JoinColumn({ name: 'groupId' })
-  group: Group;
-
-  @Column({ default: false })
-  isAdmin: boolean;
-
-  @CreateDateColumn()
-  joinedAt: Date;
+  @ManyToMany(() => Permission)
+  @JoinTable({
+    name: 'group_permissions',
+    joinColumn: { name: 'group_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
+  })
+  permissions: Permission[];
 }
 ```
 
@@ -324,14 +441,25 @@ export class UserGroup {
 
 ```typescript
 // src/database/entities/permission.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Role } from './role.entity';
+import { Group } from './group.entity';
+import { UiComponent } from './ui-component.entity';
+import { FrontendRoute } from './frontend-route.entity';
+import { ApiEndpoint } from './api-endpoint.entity';
 
 @Entity()
 export class Permission {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ unique: true, length: 50 })
+  @Column({ length: 50 })
+  resourceName: string;
+
+  @Column({ length: 50 })
+  actionName: string;
+
+  @Column({ unique: true, length: 100 })
   name: string;
 
   @Column({ type: 'text', nullable: true })
@@ -342,6 +470,156 @@ export class Permission {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @ManyToMany(() => Role, role => role.permissions)
+  roles: Role[];
+
+  @ManyToMany(() => Group, group => group.permissions)
+  groups: Group[];
+
+  @ManyToMany(() => UiComponent, component => component.requiredPermissions)
+  components: UiComponent[];
+
+  @ManyToMany(() => FrontendRoute, route => route.requiredPermissions)
+  routes: FrontendRoute[];
+
+  @ManyToMany(() => ApiEndpoint, endpoint => endpoint.requiredPermissions)
+  endpoints: ApiEndpoint[];
+}
+```
+
+### UI Component Entity
+
+```typescript
+// src/database/entities/ui-component.entity.ts
+import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Permission } from './permission.entity';
+
+@Entity('ui_components')
+export class UiComponent {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ unique: true, length: 100 })
+  selector: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ nullable: true, length: 255 })
+  filePath: string;
+
+  @Column({ default: false })
+  overridePermissions: boolean;
+
+  @Column({ nullable: true })
+  lastSynced: Date;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  @ManyToMany(() => Permission)
+  @JoinTable({
+    name: 'ui_component_permissions',
+    joinColumn: { name: 'component_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
+  })
+  requiredPermissions: Permission[];
+}
+```
+
+### Frontend Route Entity
+
+```typescript
+// src/database/entities/frontend-route.entity.ts
+import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Permission } from './permission.entity';
+
+@Entity('frontend_routes')
+export class FrontendRoute {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ unique: true, length: 255 })
+  path: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ nullable: true, length: 100 })
+  component: string;
+
+  @Column({ default: false })
+  overridePermissions: boolean;
+
+  @Column({ nullable: true })
+  lastSynced: Date;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  @ManyToMany(() => Permission)
+  @JoinTable({
+    name: 'frontend_route_permissions',
+    joinColumn: { name: 'route_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
+  })
+  requiredPermissions: Permission[];
+}
+```
+
+### API Endpoint Entity
+
+```typescript
+// src/database/entities/api-endpoint.entity.ts
+import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Permission } from './permission.entity';
+
+@Entity('api_endpoints')
+export class ApiEndpoint {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ length: 20 })
+  method: string;
+
+  @Column({ length: 255 })
+  path: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ nullable: true, length: 100 })
+  controllerName: string;
+
+  @Column({ nullable: true, length: 100 })
+  handlerName: string;
+
+  @Column({ default: false })
+  overridePermissions: boolean;
+
+  @Column({ nullable: true })
+  lastSynced: Date;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  @ManyToMany(() => Permission)
+  @JoinTable({
+    name: 'api_endpoint_permissions',
+    joinColumn: { name: 'endpoint_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
+  })
+  requiredPermissions: Permission[];
 }
 ```
 
@@ -352,12 +630,12 @@ export class Permission {
 ```typescript
 // src/config/database.config.ts
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { User, Role, Group, UserGroup, Permission } from '../database/entities';
+import { User, Role, Group, UserGroup, Permission, UiComponent, FrontendRoute, ApiEndpoint } from '../database/entities';
 
 export const sqliteConfig: TypeOrmModuleOptions = {
   type: 'sqlite',
   database: 'database.sqlite',
-  entities: [User, Role, Group, UserGroup, Permission],
+  entities: [User, Role, Group, UserGroup, Permission, UiComponent, FrontendRoute, ApiEndpoint],
   synchronize: true, // Set to false in production
   logging: true,
 };
@@ -368,7 +646,7 @@ export const sqliteConfig: TypeOrmModuleOptions = {
 ```typescript
 // src/config/database.config.ts
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { User, Role, Group, UserGroup, Permission } from '../database/entities';
+import { User, Role, Group, UserGroup, Permission, UiComponent, FrontendRoute, ApiEndpoint } from '../database/entities';
 
 export const postgresConfig: TypeOrmModuleOptions = {
   type: 'postgres',
@@ -377,7 +655,7 @@ export const postgresConfig: TypeOrmModuleOptions = {
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'angular_template',
-  entities: [User, Role, Group, UserGroup, Permission],
+  entities: [User, Role, Group, UserGroup, Permission, UiComponent, FrontendRoute, ApiEndpoint],
   synchronize: false, // Always false in production
   migrationsRun: true,
   migrations: ['dist/migrations/*.js'],
@@ -386,39 +664,6 @@ export const postgresConfig: TypeOrmModuleOptions = {
     rejectUnauthorized: false
   } : false,
 };
-```
-
-### Database Configuration Factory
-
-```typescript
-// src/config/database.config.ts
-import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { sqliteConfig } from './sqlite.config';
-import { postgresConfig } from './postgres.config';
-
-export function getDatabaseConfig(): TypeOrmModuleOptions {
-  const dbType = process.env.DB_TYPE || 'sqlite';
-  
-  switch (dbType) {
-    case 'postgres':
-      return postgresConfig;
-    case 'sqlite':
-    default:
-      return sqliteConfig;
-  }
-}
-```
-
-### Migration Generation
-
-To generate migrations when switching from SQLite to PostgreSQL:
-
-```bash
-# Generate a migration file
-npm run typeorm migration:generate -- -n MigrateToPostgres
-
-# Run the migration
-npm run typeorm migration:run
 ```
 
 ## Best Practices

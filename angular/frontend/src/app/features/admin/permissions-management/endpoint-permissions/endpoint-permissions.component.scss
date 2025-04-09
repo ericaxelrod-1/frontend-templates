@@ -1,0 +1,110 @@
+.endpoint-permissions-container {
+  padding: 16px;
+}
+
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filter-field {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.table-container {
+  position: relative;
+  min-height: 200px;
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+}
+
+.mat-column-method {
+  width: 10%;
+}
+
+.mat-column-path {
+  width: 20%;
+}
+
+.mat-column-description {
+  width: 20%;
+}
+
+.mat-column-requiredPermissions {
+  width: 25%;
+}
+
+.mat-column-overridePermissions {
+  width: 10%;
+  text-align: center;
+}
+
+.mat-column-actions {
+  width: 5%;
+  text-align: right;
+}
+
+.method-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-align: center;
+  color: white;
+  font-weight: 500;
+  font-size: 12px;
+  min-width: 60px;
+}
+
+.method-badge.get {
+  background-color: #61affe;
+}
+
+.method-badge.post {
+  background-color: #49cc90;
+}
+
+.method-badge.put {
+  background-color: #fca130;
+}
+
+.method-badge.delete {
+  background-color: #f93e3e;
+}
+
+.method-badge.patch {
+  background-color: #50e3c2;
+}
+
+.method-badge.options {
+  background-color: #9370db;
+}
+
+code {
+  background-color: #f5f5f5;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.permissions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.no-permissions {
+  color: rgba(0, 0, 0, 0.54);
+  font-style: italic;
+}
+
+.no-data {
+  text-align: center;
+  padding: 20px 0;
+  color: rgba(0, 0, 0, 0.54);
+} 

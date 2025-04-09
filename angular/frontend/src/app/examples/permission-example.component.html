@@ -1,0 +1,27 @@
+<div class="permissions-example">
+  <h2>Permissions Example</h2>
+  
+  <div class="permission-card" *appHasPermission="'users:create'">
+    <h3>Create User Permission</h3>
+    <p>You have permission to create users</p>
+    <button class="btn btn-primary">Create User</button>
+  </div>
+  
+  <div class="permission-card" *appHasPermission="'users:list'">
+    <h3>List Users Permission</h3>
+    <p>You have permission to view user list</p>
+    <button class="btn btn-secondary">View Users</button>
+  </div>
+  
+  <div class="permission-card" *appHasPermission="['users:edit', 'users:update']">
+    <h3>Edit User Permission</h3>
+    <p>You have permission to edit users (checks multiple permissions)</p>
+    <button class="btn btn-info">Edit Users</button>
+  </div>
+  
+  <div class="permission-card" *appHasPermission="'users:delete'">
+    <h3>Delete User Permission</h3>
+    <p>You have permission to delete users</p>
+    <button class="btn btn-danger">Delete User</button>
+  </div>
+</div> 

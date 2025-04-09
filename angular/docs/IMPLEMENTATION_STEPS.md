@@ -445,6 +445,171 @@
 5. Add audit logging for token usage
 6. Implement token expiration handling
 
+## Phase 9: Code Audit and Hardcoded Access Control Detection
+
+### 9.1 Hardcoded Access Control Audit
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+1. Automated Scanning
+   - Create scanner script to search for hardcoded role strings
+   - Run grep patterns for common hardcoded access patterns:
+     - `'ADMIN'`, `'USER'`, `'SUPERADMIN'`, `'PROJECT_MANAGER'`, `'SUPERUSER'` 
+     - `role === 'ADMIN'`, `hasRole('ADMIN')`
+     - `roles: ['ADMIN']`, `roles: [SystemRoles.ADMIN]`
+     - `roles.includes('ADMIN')`, `user.role === 'ADMIN'`
+   - Scan backend code including entity definitions (focus on role.entity.ts)
+   - Scan frontend components, guards, and services
+2. Entity Definition Audit
+   - Review role.entity.ts (specifically starting at line 8)
+   - Review user.entity.ts for hardcoded role references
+   - Review group.entity.ts for hardcoded group types
+   - Identify seed data and migrations with hardcoded values
+3. Frontend Component Audit
+   - Check template conditional displays (*ngIf statements)
+   - Review component TypeScript files for role checks
+   - Audit guards and permission services
+   - Examine route definitions for hardcoded role data
+4. Create Comprehensive Report
+   - Document all instances of hardcoded access controls
+   - Categorize by component/file
+   - Prioritize based on impact and usage
+   - Create migration plan for each instance
+
+### 9.2 Migration Planning
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 9.1 Hardcoded Access Control Audit
+1. Establish Database-Driven Pattern Templates
+   - Create code snippets for proper access control patterns
+   - Design transitional patterns for gradual migration
+   - Develop testing strategy for each migration
+2. Dependency Analysis
+   - Identify interdependencies between components
+   - Map role/permission usage across application
+   - Create migration sequence that maintains functionality
+   - Identify potential breaking changes
+3. Create Detailed Migration Plan
+   - Document each required change with specific code examples
+   - Establish validation criteria for each change
+   - Create rollback procedures for each migration step
+   - Set up monitoring for potential issues
+
+## Phase 10: Hierarchical Access Control System
+
+### 10.1 Hierarchical Role Structure
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 9.2 Migration Planning
+1. Update database schema
+   - Add parent_id foreign key to roles table referencing role_id
+   - Add constraints to prevent circular references
+   - Create migration scripts
+2. Update backend services
+   - Extend RolesService to support hierarchical queries
+   - Implement permission inheritance logic
+   - Create API endpoints for managing role hierarchies
+3. Create frontend components
+   - Role hierarchy visualization component
+   - Role hierarchy management interface
+   - Role inheritance editor
+4. Implement testing
+   - Unit tests for inheritance logic
+   - Integration tests for role hierarchy API
+   - E2E tests for role management interface
+
+### 10.2 Hierarchical Group Structure
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 9.2 Migration Planning
+1. Update database schema
+   - Add parent_id foreign key to groups table referencing group_id
+   - Add constraints to prevent circular references
+   - Create migration scripts
+2. Update backend services
+   - Extend GroupsService to support hierarchical queries
+   - Implement group membership inheritance logic
+   - Create API endpoints for managing group hierarchies
+3. Create frontend components
+   - Group hierarchy visualization component
+   - Group hierarchy management interface
+   - Group inheritance editor
+4. Implement testing
+   - Unit tests for inheritance logic
+   - Integration tests for group hierarchy API
+   - E2E tests for group management interface
+
+### 10.3 Combined Role-Group Access Control
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 10.1 Hierarchical Role Structure, 10.2 Hierarchical Group Structure
+1. Implement dynamic permission resolution
+   - Create PermissionResolverService that considers both role and group hierarchies
+   - Build caching mechanism for permission resolution results
+   - Implement permission intersection logic for combined role-group scenarios
+2. Update frontend permission checks
+   - Create HasPermissionDirective for templates
+   - Implement PermissionGuard for routes
+   - Update existing components to use dynamic permission system
+3. Create permission management interface
+   - Permission matrix editor (roles × resources)
+   - Group permission editor
+   - Permission inheritance visualization
+4. Implement testing
+   - Unit tests for permission resolution logic
+   - Integration tests for combined role-group scenarios
+   - E2E tests for permission management interface
+   - Performance tests for permission resolution
+
+### 10.4 Testing and Validation
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 10.3 Combined Role-Group Access Control
+1. Comprehensive test suite
+   - Unit tests
+     - Role hierarchy validation
+     - Group hierarchy validation
+     - Permission inheritance logic
+     - Circular reference prevention
+     - Cache invalidation
+   - Integration tests
+     - API endpoints for hierarchy management
+     - Combined role-group permission resolution
+     - Database constraints and triggers
+   - E2E tests
+     - Role hierarchy management
+     - Group hierarchy management
+     - Permission assignment through hierarchies
+     - UI elements visibility based on permissions
+   - Performance tests
+     - Permission resolution for complex hierarchies
+     - Caching effectiveness measurements
+2. Security validation
+   - Penetration testing of permission system
+   - Verify no permission escalation vectors
+   - Audit logging of permission changes
+3. Documentation
+   - API documentation for hierarchy endpoints
+   - Administrator guide for managing hierarchies
+   - Developer guide for using permission system
+
+### 10.5 Implementation Cleanup
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 10.4 Testing and Validation
+1. Remove temporary migration tools
+   - Delete angular/frontend/migration folder
+   - Remove any temporary scripts
+   - Clean up migration-specific documentation
+2. Code cleanup
+   - Remove deprecated role-based checks
+   - Clean up any redundant components
+   - Finalize documentation updates
+3. Final validation
+   - Verify all access controls use the new system
+   - Confirm no references to old role-based checks remain
+   - Validate performance of new permission system
+
 ## Feature Implementation Details
 
 ### Authentication Flow
@@ -549,3 +714,245 @@ Security Features:
 - IP Allowlist: Passed
   - Basic tests: Passed
   - Detailed middleware tests: Passed 
+
+## Phase 5: Dynamic Access Control Implementation
+
+### Step 1: Finalize Backend Scripts (High Priority)
+- **Status**: In Progress
+- **Testing**: Not Started
+- **Dependencies**: None
+
+1. Update seed-roles.ts:
+   - ✅ Create SeedLogger for proper logging
+   - ✅ Define base permissions structure
+   - ⚠️ Add role-permission mapping logic
+   - ⚠️ Implement permission inheritance
+   - ⚠️ Add validation for circular dependencies
+   - ⚠️ Add rollback capability for failed seeds
+
+2. Validate Database Schema:
+   - ✅ Verify entity relationships
+   - ✅ Check foreign key constraints
+   - ✅ Validate permission table structure
+   - ⚠️ Test schema with large permission sets
+
+### Step 2: Complete Controller Migration (High Priority)
+- **Status**: 25% Complete
+- **Testing**: Not Started
+- **Dependencies**: Step 1
+
+1. Controller Updates:
+   - ✅ RolesController migration completed
+   - ✅ All controllers migrated to @RequirePermission
+   - ✅ Route guards updated
+   - ✅ Permission validation added
+
+2. Migration Validation:
+   - ⚠️ Create validation script
+   - ⚠️ Test each migrated controller
+   - ⚠️ Verify backward compatibility
+   - ⚠️ Document breaking changes
+
+### Step 3: Service Methods Migration (High Priority)
+- **Status**: 15% Complete
+- **Testing**: Not Started
+- **Dependencies**: Step 2
+
+1. Service Updates:
+   - ⚠️ Identify methods using role checks (85% remaining)
+   - ⚠️ Replace with permission service calls
+   - ⚠️ Update method signatures
+   - ⚠️ Add permission validation
+
+2. Performance Optimization:
+   - ⚠️ Implement caching strategy
+   - ⚠️ Optimize database queries
+   - ⚠️ Add performance monitoring
+   - ⚠️ Document optimization patterns
+
+### Step 4: Integration Testing (High Priority)
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: Step 3
+
+1. Test Suite Development:
+   - ⚠️ Create permission-based test cases
+   - ⚠️ Test inheritance scenarios
+   - ⚠️ Verify backward compatibility
+   - ⚠️ Add performance tests
+
+2. Test Infrastructure:
+   - ⚠️ Set up test database
+   - ⚠️ Create test data fixtures
+   - ⚠️ Implement test helpers
+   - ⚠️ Add CI/CD integration
+
+### Step 5: Performance Optimization (Medium Priority)
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: Step 4
+
+1. Caching Implementation:
+   - ⚠️ Design caching strategy
+   - ⚠️ Implement cache invalidation
+   - ⚠️ Add cache monitoring
+   - ⚠️ Document caching patterns
+
+2. Query Optimization:
+   - ⚠️ Analyze query patterns
+   - ⚠️ Optimize permission checks
+   - ⚠️ Add database indexes
+   - ⚠️ Monitor query performance
+
+### Step 6: Documentation (Medium Priority)
+- **Status**: In Progress
+- **Testing**: Not Started
+- **Dependencies**: All previous steps
+
+1. Technical Documentation:
+   - ✅ Create migration guides
+   - ⚠️ Document API changes
+   - ⚠️ Update OpenAPI/Swagger
+   - ⚠️ Document best practices
+
+2. Developer Guidelines:
+   - ⚠️ Create usage examples
+   - ⚠️ Document common patterns
+   - ⚠️ Add troubleshooting guide
+   - ⚠️ Create performance guide
+
+### Step 7: Final Validation and Cleanup
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: All previous steps
+
+1. Security Audit:
+   - ⚠️ Review permission checks
+   - ⚠️ Validate inheritance rules
+   - ⚠️ Check for security gaps
+   - ⚠️ Document security patterns
+
+2. Performance Validation:
+   - ⚠️ Run load tests
+   - ⚠️ Verify caching
+   - ⚠️ Check memory usage
+   - ⚠️ Document benchmarks
+
+3. Code Cleanup:
+   - ⚠️ Remove deprecated code
+   - ⚠️ Clean up migrations
+   - ⚠️ Update dependencies
+   - ⚠️ Final documentation review
+
+## Phase 11: Database Schema Validation and Management
+
+### 11.1 Production Scripts vs Temporary Scripts
+- **Status**: In Progress
+- **Testing**: Not Started
+- **Dependencies**: Phase 5 Dynamic Access Control Implementation
+
+#### Scripts to Retain in Production
+1. Core validation and synchronization tools:
+   - `db_schema_validator.py` - The main schema validation engine
+   - `run_validator.py` - Helper script for running validations
+   - `validate_db.py` - Simplified interface for common validation tasks
+
+2. Configuration and definition files:
+   - `expected_schema.json` - Schema definition for validation
+   - `db_validator_config.json` - Configuration for validators
+
+3. Documentation:
+   - `db_schema_validator_README.md` - Usage documentation
+   - `schema_modification_guide.md` - Guide for schema updates
+   - `README.md` - Overview documentation
+
+#### Temporary Scripts to Remove Before Production
+1. Development and migration utilities:
+   - Angular migration scripts in `angular/migration/`
+   - Any scripts prefixed with `temp_` or `dev_`
+   - One-time setup scripts not needed for ongoing operation
+
+2. Test and experimental scripts:
+   - Scripts in `angular/scripts/` that are only for testing
+   - Any files with `_test` or `_experimental` in their names
+
+### 11.2 Schema Validation Next Steps
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 11.1 Production Scripts vs Temporary Scripts
+
+1. Complete schema extraction implementation:
+   - Implement automatic extraction from TypeORM entities
+   - Create diff generation between extracted and actual schemas
+   - Add schema versioning support
+
+2. Add PostgreSQL support:
+   - Implement PostgreSQL schema extraction
+   - Create PostgreSQL-specific migration scripts
+   - Test with production-like PostgreSQL environment
+
+3. Integration with CI/CD pipeline:
+   - Add validation step to deployment process
+   - Create warning/error thresholds for schema differences
+   - Implement automatic reporting
+
+4. Performance optimization:
+   - Improve validation speed for large schemas
+   - Optimize memory usage during validation
+   - Add incremental validation for specific tables
+
+### 11.3 Documentation Enhancement
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 11.2 Schema Validation Next Steps
+
+1. Create comprehensive validation guide:
+   - Common validation scenarios and solutions
+   - Troubleshooting schema issues
+   - Best practices for schema maintenance
+
+2. Maintenance procedures:
+   - Document process for updating expected schema
+   - Create runbooks for common schema issues
+   - Define schema governance process
+
+3. Integration documentation:
+   - How to integrate validation with existing systems
+   - API documentation for programmatic validation
+   - Configuring monitoring systems
+
+### 11.4 Testing and Quality Assurance
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 11.1, 11.2, 11.3
+
+1. Create comprehensive test suite:
+   - Unit tests for validation logic
+   - Integration tests with different database types
+   - Edge case testing for complex schemas
+
+2. Performance testing:
+   - Benchmark validation performance
+   - Test with large production-like schemas
+   - Optimize for specific validation scenarios
+
+3. Security review:
+   - Review script permissions and access
+   - Ensure validation doesn't expose sensitive information
+   - Implement proper error handling and logging
+
+### Deployment Considerations
+
+1. Database Migration:
+   - Main database tables will need to be migrated
+   - SQLite cache will be regenerated on each environment
+
+2. Startup Procedure:
+   - Initial scan and sync will occur on application startup
+   - Initial database population from code
+   - Schedule periodic scans via cron or similar
+
+3. Monitoring:
+   - Add monitoring for sync failures
+   - Alert on permission inconsistencies
+   - Track performance metrics 

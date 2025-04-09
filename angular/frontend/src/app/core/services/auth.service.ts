@@ -1,6 +1,6 @@
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, throwError, catchError, map, mergeMap, of } from 'rxjs';
+import { BehaviorSubject, Observable, tap, throwError, catchError, map, mergeMap, of, switchMap } from 'rxjs';
 import { isPlatformBrowser } from '@angular/common';
 import { 
   User, 
@@ -11,9 +11,18 @@ import {
   ForgotPasswordRequest,
   ResetPasswordRequest,
   VerificationResponse,
-  PasswordChangeRequest
+  PasswordChangeRequest,
+  Permission
 } from '../../models';
 import { environment } from '../../../environments/environment';
+import { Router } from '@angular/router';
+import { PermissionService } from './permission.service';
+
+// Interface for auth status response
+export interface AuthStatus {
+  isAuthenticated: boolean;
+  user: User | null;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -26,6 +35,11 @@ export class AuthService {
   private csrfTokenSubject = new BehaviorSubject<string | null>(null);
   private platformId = inject(PLATFORM_ID);
   
+  // Make these public for template access
+  public currentUser: User | null = null;
+  public userPermissions: Permission[] = [];
+  private permissionCache: Map<string, boolean> = new Map();
+  
   // For testing purposes - will store the most recent verification token
   private testVerificationTokenSubject = new BehaviorSubject<string | null>(null);
   testVerificationToken$ = this.testVerificationTokenSubject.asObservable();
@@ -35,18 +49,28 @@ export class AuthService {
   accessToken$ = this.accessTokenSubject.asObservable();
   csrfToken$ = this.csrfTokenSubject.asObservable();
 
-  constructor(private http: HttpClient) {
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private permissionService: PermissionService
+  ) {
     // Only load auth state if in browser environment
     if (isPlatformBrowser(this.platformId)) {
       this.loadAuthStateFromStorage();
     }
+
+    // Subscribe to currentUser$ to keep currentUser property in sync
+    this.currentUser$.subscribe(user => {
+      this.currentUser = user;
+      if (user) {
+        this.userPermissions = user.permissions || [];
+      } else {
+        this.userPermissions = [];
+      }
+    });
   }
 
-  // Getters for values
-  get currentUser(): User | null {
-    return this.currentUserSubject.value;
-  }
-
+  // Public getters
   get accessToken(): string | null {
     return this.accessTokenSubject.value;
   }
@@ -58,75 +82,50 @@ export class AuthService {
   get csrfToken(): string | null {
     return this.csrfTokenSubject.value;
   }
-  
-  get testVerificationToken(): string | null {
-    return this.testVerificationTokenSubject.value;
-  }
 
   get isAuthenticated(): boolean {
     return !!this.accessToken && !!this.currentUser;
   }
 
   /**
-   * Check if the current user has a specific role
-   * @param role The role to check for
-   * @returns True if the user has the specified role, false otherwise
+   * Check if the current user has a specific permission
+   * @param resourceName The resource to check access for
+   * @param actionName The action to check permission for
+   * @returns True if the user has the permission, false otherwise
    */
-  hasRole(role: string): boolean {
-    console.log('hasRole check for:', role);
-    
-    if (!this.currentUser) {
-      console.log('No current user, returning false');
-      return false;
+  hasPermission(resourceName: string, actionName: string): boolean {
+    const cacheKey = `${resourceName}:${actionName}`;
+    if (this.permissionCache.has(cacheKey)) {
+      return this.permissionCache.get(cacheKey)!;
     }
-    
-    // Special case for admin@example.com - always grant admin access
-    if (this.currentUser.email === 'admin@example.com') {
-      console.log('Admin user detected, granting access for role:', role);
-      return true;
-    }
-    
-    // Handle case where roles might be missing
-    if (!this.currentUser.roles || !Array.isArray(this.currentUser.roles) || this.currentUser.roles.length === 0) {
-      console.log('User has no roles array or empty roles array');
-      
-      // Hard-code superadmin role for admin@example.com
-      if (this.currentUser.email === 'admin@example.com') {
-        console.log('Setting superadmin role for admin@example.com');
-        this.currentUser.roles = ['superadmin'];
-      } else {
-        console.log('No roles found for user');
-        return false;
-      }
-    }
-    
-    console.log('Current user roles:', this.currentUser.roles);
-    
-    // Map frontend role names to backend role names
-    const roleMap: Record<string, string> = {
-      'USER': 'user',
-      'PROJECT_MANAGER': 'superuser',
-      'ADMIN': 'superadmin',
-      'SUPERADMIN': 'superadmin'
-    };
-    
-    const backendRole = roleMap[role] || role.toLowerCase();
-    console.log('Checking for backend role:', backendRole);
-    
-    // Check if the user has the role directly
-    const hasRole = this.currentUser.roles.some(r => 
-      r.toLowerCase() === backendRole.toLowerCase()
+
+    const hasPermission = this.userPermissions.some(
+      p => p.resourceName === resourceName && p.actionName === actionName
     );
-    
-    // Grant access to superadmin for all roles
-    const isSuperAdmin = this.currentUser.roles.some(r => 
-      r.toLowerCase() === 'superadmin'
+    this.permissionCache.set(cacheKey, hasPermission);
+    return hasPermission;
+  }
+
+  /**
+   * Check if the current user has any of the specified permissions
+   * @param permissions Array of permission objects with resourceName and actionName
+   * @returns True if the user has any of the permissions, false otherwise
+   */
+  hasAnyPermission(permissions: { resourceName: string; actionName: string }[]): boolean {
+    return permissions.some(({ resourceName, actionName }) => 
+      this.hasPermission(resourceName, actionName)
     );
-    
-    console.log('Has direct role:', hasRole);
-    console.log('Is superadmin:', isSuperAdmin);
-    
-    return hasRole || isSuperAdmin;
+  }
+
+  /**
+   * Check if the current user has all of the specified permissions
+   * @param permissions Array of permission objects with resourceName and actionName
+   * @returns True if the user has all of the permissions, false otherwise
+   */
+  hasAllPermissions(permissions: { resourceName: string; actionName: string }[]): boolean {
+    return permissions.every(({ resourceName, actionName }) => 
+      this.hasPermission(resourceName, actionName)
+    );
   }
 
   // Public method to refresh auth state from storage
@@ -142,7 +141,7 @@ export class AuthService {
   login(credentials: UserLogin): Observable<AuthResponse> {
     console.log('AuthService.login called');
     console.log('Request URL:', `${this.API_URL}/login`);
-
+    
     return this.http.post<any>(`${this.API_URL}/login`, credentials)
       .pipe(
         map(response => {
@@ -161,7 +160,7 @@ export class AuthService {
             csrfToken: response.csrf_token,
             expiresIn: response.expires_in || 3600
           };
-
+          
           // Set token immediately for subsequent requests
           this.accessTokenSubject.next(tokens.accessToken);
           this.refreshTokenSubject.next(tokens.refreshToken);
@@ -176,6 +175,9 @@ export class AuthService {
             }
           }).pipe(
             map(user => {
+              // Update user permissions
+              this.updateUserPermissions(user);
+              
               // Combine tokens with user data
               const authResponse: AuthResponse = {
                 user: user,
@@ -191,12 +193,25 @@ export class AuthService {
               
               // If profile fetch fails, still return partial response
               // This will allow the interceptor to use the token for future requests
+              const partialUser: User = {
+                id: 0,
+                email: '',
+                firstName: '',
+                lastName: '',
+                isActive: false,
+                isVerified: false,
+                lastLogin: new Date(),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                permissions: [] as Permission[],
+                emailVerified: false,
+                requiresPasswordChange: false,
+                lastPasswordChange: new Date(),
+                groups: []
+              };
+
               const partialResponse: AuthResponse = {
-                user: {
-                  id: 0,
-                  email: credentials.email,
-                  roles: []
-                },
+                user: partialUser,
                 ...tokens,
                 requiresVerification: false
               };
@@ -204,7 +219,7 @@ export class AuthService {
               return of(partialResponse);
             })
           );
-        }),
+      }),
         mergeMap(observable => observable),
         tap(response => {
           // Handle the auth response synchronously
@@ -217,14 +232,20 @@ export class AuthService {
           }
           
           console.log('Auth state updated successfully');
+          
+          // Load user permissions after successful login
+          this.permissionService.loadUserPermissions().subscribe(
+            () => console.log('User permissions loaded successfully'),
+            error => console.error('Error loading user permissions:', error)
+          );
         }),
         catchError(error => {
           console.error('Login error:', error);
           // Clear any partial state on error
           this.clearAuthState();
           return throwError(() => error);
-        })
-      );
+      })
+    );
   }
 
   // Register
@@ -259,7 +280,7 @@ export class AuthService {
     // If no refresh token available, just return success immediately
     if (!this.refreshToken) {
       console.warn('No refresh token available for logout, already cleared auth state locally');
-      return of({ success: true, message: 'Logged out successfully (local only)' });
+      return of({ success: true, message: 'Logged out locally' });
     }
 
     const request: RefreshTokenRequest = { refreshToken: this.refreshToken };
@@ -269,6 +290,22 @@ export class AuthService {
       .pipe(
         tap((response) => {
           console.log('Logout successful:', response);
+          
+          // Clear local storage
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('csrfToken');
+          localStorage.removeItem('user');
+          localStorage.removeItem('testVerificationToken');
+          
+          // Clear the current user
+          this.currentUserSubject.next(null);
+          
+          // Clear the permissions cache
+          this.permissionService.clearCache();
+          
+          // Navigate to login page
+          this.router.navigate(['/login']);
         }),
         catchError(error => {
           console.error('Error during logout API call:', error);
@@ -290,13 +327,21 @@ export class AuthService {
       this.clearAuthState();
       return throwError(() => new Error('Invalid refresh token format'));
     }
-
+    
     const request: RefreshTokenRequest = { refreshToken: this.refreshToken };
     console.log('Sending refresh token request with token type:', typeof this.refreshToken);
     
     return this.http.post<AuthResponse>(`${this.API_URL}/refresh`, request)
       .pipe(
-        tap(response => this.handleAuthResponse(response)),
+        tap(response => {
+          this.handleAuthResponse(response);
+          
+          // Refresh permissions after token refresh
+          this.permissionService.loadUserPermissions().subscribe(
+            () => console.log('User permissions refreshed successfully'),
+            error => console.error('Error refreshing user permissions:', error)
+          );
+        }),
         catchError(error => {
           console.error('Token refresh error:', error);
           // If we get an invalid token error, clear the auth state
@@ -390,14 +435,35 @@ export class AuthService {
             
             // Simulate a successful response
             const mockUser: User = {
-              id: Math.floor(Math.random() * 1000) + 1, // Random ID
+              id: Math.floor(Math.random() * 1000) + 1,
               email: email,
-              firstName: email.split('@')[0], // Use part of email as first name for mock
+              firstName: email.split('@')[0],
               lastName: 'User',
-              emailVerified: true, // Mark as verified
-              roles: ['user'],
+              isActive: true,
+              isVerified: true,
+              emailVerified: true,
+              lastLogin: new Date(),
               createdAt: new Date(),
-              updatedAt: new Date()
+              updatedAt: new Date(),
+              permissions: [
+                {
+                  id: 'default-read',
+                  name: 'Read Access',
+                  description: 'Default read access for new users',
+                  resourceName: 'profile',
+                  actionName: 'read'
+                },
+                {
+                  id: 'default-update',
+                  name: 'Update Profile',
+                  description: 'Ability to update own profile',
+                  resourceName: 'profile',
+                  actionName: 'update'
+                }
+              ],
+              requiresPasswordChange: false,
+              lastPasswordChange: new Date(),
+              groups: []
             };
             
             // Create tokens that are guaranteed to be strings
@@ -626,5 +692,61 @@ export class AuthService {
         return throwError(() => error);
       })
     );
+  }
+
+  /**
+   * Check the current authentication status
+   * Used during app initialization to determine if user is already authenticated
+   * @returns Observable of AuthStatus containing authentication state and user if authenticated
+   */
+  checkAuthStatus(): Observable<AuthStatus> {
+    // If we're in a server environment, user is not authenticated
+    if (!isPlatformBrowser(this.platformId)) {
+      return of({ isAuthenticated: false, user: null });
+    }
+    
+    // If we already have a user and token in memory, use that
+    if (this.isAuthenticated && this.currentUser) {
+      return of({
+        isAuthenticated: true,
+        user: this.currentUser
+      });
+    }
+    
+    // Try loading from storage
+    this.loadAuthStateFromStorage();
+    
+    // Check again after loading from storage
+    if (this.isAuthenticated && this.currentUser) {
+      return of({
+        isAuthenticated: true,
+        user: this.currentUser
+      });
+    }
+    
+    // If we have a token but no user, try to fetch the user profile
+    if (this.accessToken && !this.currentUser) {
+      return this.getUserProfile().pipe(
+        map(user => ({
+          isAuthenticated: true,
+          user
+        })),
+        catchError(() => {
+          // If profile fetch fails, user is not authenticated
+          this.clearAuthState();
+          return of({ isAuthenticated: false, user: null });
+        })
+      );
+    }
+    
+    // If no token or failed to load, user is not authenticated
+    return of({ isAuthenticated: false, user: null });
+  }
+
+  // Update user permissions when profile is loaded
+  private updateUserPermissions(user: User): void {
+    this.currentUser = user;
+    this.userPermissions = user.permissions || [];
+    this.permissionCache.clear(); // Clear cache when permissions change
   }
 }

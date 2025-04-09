@@ -1,0 +1,74 @@
+.permission-dialog-content {
+  height: 500px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.search-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.search-field {
+  flex-grow: 1;
+  margin-right: 16px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.permissions-container {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.resource-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.permission-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.permission-name {
+  font-weight: 500;
+}
+
+.permission-description {
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.6);
+  margin-top: 4px;
+}
+
+.permission-action {
+  margin-top: 4px;
+}
+
+.tag {
+  display: inline-block;
+  background-color: #e0e0e0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+::ng-deep .mat-expansion-panel-body {
+  padding-top: 0 !important;
+}
+
+::ng-deep .mat-expansion-panel {
+  margin-bottom: 8px;
+}
+
+::ng-deep .mat-selection-list {
+  padding-top: 0 !important;
+} 

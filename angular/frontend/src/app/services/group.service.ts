@@ -1,22 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, map, catchError } from 'rxjs';
+import { Observable, of, map, catchError, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { User } from './user.service';
-
-export interface Member {
-  id: number;
-  name: string;
-  role: string;
-}
-
-export interface Group {
-  id: number;
-  name: string;
-  description: string;
-  owner: string;
-  members: Member[];
-}
+import { User } from '../models/user.model';
+import { Group, Member, Permission, GROUP_PERMISSION_SETS } from '../models/group.model';
 
 @Injectable({
   providedIn: 'root'
@@ -27,65 +14,85 @@ export class GroupService {
   constructor(private http: HttpClient) {}
 
   getGroups(): Observable<Group[]> {
-    return this.http.get<Group[]>(this.apiUrl);
+    return this.http.get<Group[]>(this.apiUrl).pipe(
+      map(groups => groups.map(group => ({
+        ...group,
+        permissions: group.permissions || [],
+        members: group.members || []
+      }))),
+      catchError(error => {
+        console.error('Error getting groups:', error);
+        return throwError(() => error);
+      })
+    );
   }
 
   getGroup(id: number): Observable<Group> {
-    return this.http.get<Group>(`${this.apiUrl}/${id}`);
+    return this.http.get<Group>(`${this.apiUrl}/${id}`).pipe(
+      map(group => this.convertToNewFormat([group])[0]),
+      catchError(error => {
+        console.error(`Error getting group ${id}:`, error);
+        return throwError(() => error);
+      })
+    );
   }
 
   createGroup(group: Partial<Group>): Observable<Group> {
-    return this.http.post<Group>(this.apiUrl, group);
+    return this.http.post<Group>(this.apiUrl, group).pipe(
+      map(group => this.convertToNewFormat([group])[0]),
+      catchError(error => {
+        console.error('Error creating group:', error);
+        return throwError(() => error);
+      })
+    );
   }
 
   updateGroup(id: number, group: Partial<Group>): Observable<Group> {
-    return this.http.put<Group>(`${this.apiUrl}/${id}`, group);
+    return this.http.put<Group>(`${this.apiUrl}/${id}`, group).pipe(
+      map(group => this.convertToNewFormat([group])[0]),
+      catchError(error => {
+        console.error(`Error updating group ${id}:`, error);
+        return throwError(() => error);
+      })
+    );
   }
 
   deleteGroup(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+    return this.http.delete<void>(`${this.apiUrl}/${id}`).pipe(
+      catchError(error => {
+        console.error(`Error deleting group ${id}:`, error);
+        return throwError(() => error);
+      })
+    );
   }
 
-  addMember(groupId: number, userId: number, role: string = 'Member'): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/${groupId}/members`, { userId, role });
-  }
-
-  removeMember(groupId: number, userId: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${groupId}/members/${userId}`);
-  }
-
-  updateMemberRole(groupId: number, userId: number, role: string): Observable<void> {
-    return this.http.put<void>(`${this.apiUrl}/${groupId}/members/${userId}`, { role });
-  }
-  
-  // Try different endpoints to get group members
-  getGroupMembers(groupId: number): Observable<User[]> {
-    // First try the /users endpoint
+  getGroupMembers(groupId: number): Observable<Member[]> {
     return this.http.get<User[]>(`${this.apiUrl}/${groupId}/users`).pipe(
+      map(users => users.map(user => ({
+        id: user.id,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        permissions: user.permissions?.map(p => ({
+          id: p.id,
+          name: p.name,
+          resource: p.resourceName,
+          action: p.actionName,
+          granted: true
+        })) || [],
+        role: user.roles?.[0] // For legacy support
+      }))),
       catchError(() => {
-        // If that fails, try the /members endpoint
         return this.http.get<Member[]>(`${this.apiUrl}/${groupId}/members`).pipe(
-          map(members => {
-            // Convert Member objects to User objects
-            return members.map(member => ({
-              id: member.id,
-              name: member.name,
-              email: '', // We don't have this info from members endpoint
-              role: member.role,
-              groups: [] // We don't have this info from members endpoint
-            }));
-          }),
+          map(members => members.map(member => ({
+            ...member,
+            permissions: member.permissions || []
+          }))),
           catchError(() => {
-            // If both fail, try getting the group and accessing its members
             return this.getGroup(groupId).pipe(
               map(group => {
                 if (group.members && group.members.length > 0) {
                   return group.members.map(member => ({
-                    id: member.id,
-                    name: member.name,
-                    email: '', 
-                    role: member.role,
-                    groups: []
+                    ...member,
+                    permissions: member.permissions || []
                   }));
                 }
                 return [];
@@ -99,5 +106,67 @@ export class GroupService {
         );
       })
     );
+  }
+
+  /**
+   * @deprecated Use addMemberWithPermissions instead
+   */
+  addMember(groupId: number, userId: number, role: string = 'Member'): Observable<void> {
+    console.warn('addMember() is deprecated. Use addMemberWithPermissions() instead');
+    const permissions = GROUP_PERMISSION_SETS['MEMBER'];
+    return this.addMemberWithPermissions(groupId, userId, permissions);
+  }
+
+  addMemberWithPermissions(groupId: number, userId: number, permissions: Permission[]): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${groupId}/members`, { 
+      userId, 
+      permissions 
+    }).pipe(
+      catchError(error => {
+        console.error(`Error adding member to group ${groupId}:`, error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  removeMember(groupId: number, userId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${groupId}/members/${userId}`).pipe(
+      catchError(error => {
+        console.error(`Error removing member from group ${groupId}:`, error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  /**
+   * @deprecated Use updateMemberPermissions instead
+   */
+  updateMemberRole(groupId: number, userId: number, role: string): Observable<void> {
+    console.warn('updateMemberRole() is deprecated. Use updateMemberPermissions() instead');
+    const permissions = GROUP_PERMISSION_SETS['MEMBER'];
+    return this.updateMemberPermissions(groupId, userId, permissions);
+  }
+
+  updateMemberPermissions(groupId: number, userId: number, permissions: Permission[]): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${groupId}/members/${userId}`, { 
+      permissions 
+    }).pipe(
+      catchError(error => {
+        console.error(`Error updating member permissions in group ${groupId}:`, error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  private convertToNewFormat(groups: Group[]): Group[] {
+    return groups.map(group => ({
+      ...group,
+      members: group.members.map(member => ({
+        ...member,
+        permissions: member.role ? 
+          GROUP_PERMISSION_SETS['MEMBER'] :
+          member.permissions || []
+      }))
+    }));
   }
 } 

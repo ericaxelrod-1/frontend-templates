@@ -1,58 +1,48 @@
-<mat-toolbar color="primary">
-  <button mat-icon-button class="menu-button" (click)="toggleSidebar()">
-    <mat-icon>menu</mat-icon>
-  </button>
-  
-  <div class="logo-container" routerLink="/">
-    <img [src]="headerLogo" alt="App Logo" class="app-logo">
-    <span class="app-title">{{ appName }}</span>
+<mat-toolbar class="header-toolbar" [class.fixed]="isFixedHeader">
+  <!-- Left side -->
+  <div class="left-section">
+    <button mat-icon-button (click)="toggleSidebar()">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <img [src]="headerLogo" alt="Logo" class="header-logo" *ngIf="headerLogo">
+    <span class="app-name">{{ appName }}</span>
   </div>
-  
-  <span class="spacer"></span>
-  
-  <ng-container *ngIf="isAuthenticated || authService.isAuthenticated; else loginButton">
-    <button mat-button (click)="logout()">
-      <mat-icon>exit_to_app</mat-icon>
-      <span>Logout</span>
-    </button>
-    
-    <button mat-icon-button routerLink="/app/profile">
-      <mat-icon>account_circle</mat-icon>
-    </button>
-    
-    <button mat-icon-button [matMenuTriggerFor]="userMenu">
-      <mat-icon>more_vert</mat-icon>
-    </button>
-    
-    <mat-menu #userMenu="matMenu">
-      <div class="user-menu-header" *ngIf="user || authService.currentUser">
-        <p class="user-name">{{ (user || authService.currentUser)?.firstName || 'User' }} {{ (user || authService.currentUser)?.lastName || '' }}</p>
-        <p class="user-email">{{ (user || authService.currentUser)?.email }}</p>
-      </div>
-      <button mat-menu-item routerLink="/app/profile">
-        <mat-icon>person</mat-icon>
-        <span>Profile</span>
+
+  <!-- Right side -->
+  <div class="right-section">
+    <ng-container *ngIf="isAuthenticated; else loginButton">
+      <button mat-button [matMenuTriggerFor]="userMenu" class="user-menu-button">
+        <mat-icon>account_circle</mat-icon>
+        <span>{{ user?.firstName || 'User' }}</span>
       </button>
-      <button mat-menu-item>
-        <mat-icon>settings</mat-icon>
-        <span>Settings</span>
+      
+      <mat-menu #userMenu="matMenu">
+        <div class="user-menu-header">
+          <p class="user-name">{{ user?.firstName || 'User' }} {{ user?.lastName || '' }}</p>
+          <p class="user-email">{{ user?.email }}</p>
+        </div>
+        <mat-divider></mat-divider>
+        <button mat-menu-item routerLink="/profile">
+          <mat-icon>person</mat-icon>
+          <span>Profile</span>
+        </button>
+        <button mat-menu-item routerLink="/settings">
+          <mat-icon>settings</mat-icon>
+          <span>Settings</span>
+        </button>
+        <mat-divider></mat-divider>
+        <button mat-menu-item (click)="logout()">
+          <mat-icon>exit_to_app</mat-icon>
+          <span>Logout</span>
+        </button>
+      </mat-menu>
+    </ng-container>
+    
+    <ng-template #loginButton>
+      <button mat-button routerLink="/login">
+        <mat-icon>login</mat-icon>
+        <span>Login</span>
       </button>
-      <mat-divider></mat-divider>
-      <button mat-menu-item (click)="logout()">
-        <mat-icon>exit_to_app</mat-icon>
-        <span>Log out</span>
-      </button>
-    </mat-menu>
-  </ng-container>
-  
-  <ng-template #loginButton>
-    <button mat-button routerLink="/login">
-      <mat-icon>login</mat-icon>
-      <span>Login</span>
-    </button>
-    <button mat-button routerLink="/register">
-      <mat-icon>person_add</mat-icon>
-      <span>Register</span>
-    </button>
-  </ng-template>
+    </ng-template>
+  </div>
 </mat-toolbar>

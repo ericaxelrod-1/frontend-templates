@@ -6,10 +6,8 @@ import {
   Router, 
   UrlTree 
 } from '@angular/router';
-import { Observable, of, switchMap } from 'rxjs';
+import { Observable } from 'rxjs';
 import { AuthService } from '../services/auth.service';
-import { Store } from '@ngxs/store';
-import { AuthState } from '../../store/auth/auth.state';
 
 @Injectable({
   providedIn: 'root'
@@ -17,30 +15,21 @@ import { AuthState } from '../../store/auth/auth.state';
 export class AuthGuard implements CanActivate {
   constructor(
     private authService: AuthService,
-    private router: Router,
-    private store: Store
+    private router: Router
   ) {}
 
   canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    
-    // Get authentication state from store
-    return this.store.select(AuthState.isAuthenticated).pipe(
-      switchMap(isAuthenticated => {
-        if (isAuthenticated && this.authService.isAuthenticated) {
-          return of(true);
-        }
-        
-        // If not authenticated, redirect to login with returnUrl
-        // The returnUrl should include the 'app/' prefix for protected routes
-        const returnUrl = state.url;
-        console.log('AuthGuard redirecting to login with returnUrl:', returnUrl);
-        return of(this.router.createUrlTree(['/login'], { 
-          queryParams: { returnUrl } 
-        }));
-      })
-    );
+    // Check if the user is authenticated
+    if (this.authService.currentUser) {
+      return true;
+    }
+
+    // Not authenticated, redirect to login with the return url
+    return this.router.createUrlTree(['/login'], { 
+      queryParams: { returnUrl: state.url }
+    });
   }
 } 

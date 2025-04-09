@@ -1,25 +1,59 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { JwtAuthGuard } from './core/guards/jwt-auth.guard';
-import { RoleGuard } from './core/guards/role.guard';
+import { AuthGuard } from './core/guards/auth.guard';
+import { PermissionGuard } from './core/guards/permission.guard';
+import { LoginComponent } from './features/auth/login/login.component';
+import { DashboardComponent } from './features/dashboard/dashboard.component';
+import { UnauthorizedComponent } from './features/errors/unauthorized/unauthorized.component';
+import { NotFoundComponent } from './features/errors/not-found/not-found.component';
+import { AccessDeniedComponent } from './shared/components/access-denied/access-denied.component';
 
 const routes: Routes = [
-  {
-    path: 'verify-email',
-    component: () => import('./features/auth/verify-email/verify-email.component').then(m => m.VerifyEmailComponent),
-    title: 'Verify Email'
+  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+  { path: 'login', component: LoginComponent },
+  { 
+    path: 'dashboard', 
+    component: DashboardComponent, 
+    canActivate: [AuthGuard]
   },
-  
-  // Admin routes (protected by auth and role guards)
-  {
-    path: 'admin',
-    canActivate: [JwtAuthGuard, RoleGuard],
-    data: { roles: ['SUPERADMIN'] },
-    loadChildren: () => import('./modules/admin/admin.module').then(m => m.AdminModule)
+  { 
+    path: 'users', 
+    loadChildren: () => import('./features/users/users.module').then(m => m.UsersModule),
+    canActivate: [AuthGuard, PermissionGuard],
+    data: {
+      permissionRule: 'users:view'
+    }
   },
-  
-  // Fallback route
-  { path: '**', redirectTo: '' }
+  { 
+    path: 'admin/users', 
+    loadChildren: () => import('./features/admin/users-management/users-management.module')
+      .then(m => m.UsersManagementModule),
+    canActivate: [AuthGuard, PermissionGuard],
+    data: {
+      permissionRule: 'users:manage'
+    }
+  },
+  { 
+    path: 'admin/roles', 
+    loadChildren: () => import('./features/admin/roles-management/roles-management.module')
+      .then(m => m.RolesManagementModule),
+    canActivate: [AuthGuard, PermissionGuard],
+    data: {
+      permissionRule: 'roles:manage'
+    }
+  },
+  { 
+    path: 'admin/permissions', 
+    loadChildren: () => import('./features/admin/permissions-management/permissions-management.module')
+      .then(m => m.PermissionsManagementModule),
+    canActivate: [AuthGuard, PermissionGuard],
+    data: {
+      permissionRule: 'permissions:manage'
+    }
+  },
+  { path: 'unauthorized', component: UnauthorizedComponent },
+  { path: 'access-denied', component: AccessDeniedComponent },
+  { path: '**', component: NotFoundComponent }
 ];
 
 @NgModule({

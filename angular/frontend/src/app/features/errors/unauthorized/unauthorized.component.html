@@ -1,0 +1,43 @@
+<div class="container">
+  <div class="row justify-content-center mt-5">
+    <div class="col-md-8 text-center">
+      <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+          <h1 class="mb-0">
+            <i class="bi bi-shield-x me-2"></i>
+            Access Denied
+          </h1>
+        </div>
+        <div class="card-body">
+          <div class="my-5">
+            <i class="bi bi-lock-fill text-danger" style="font-size: 5rem;"></i>
+          </div>
+          
+          <h2 class="mb-3">You don't have permission to access this resource</h2>
+          
+          <p class="lead mb-4">
+            Sorry, you don't have the necessary permissions to access this page or perform this action. 
+            If you believe this is a mistake, please contact your administrator.
+          </p>
+          
+          <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
+            <button class="btn btn-outline-secondary btn-lg me-md-2" (click)="goBack()">
+              <i class="bi bi-arrow-left me-2"></i>
+              Go Back
+            </button>
+            
+            <button *ngIf="!isAuthenticated" class="btn btn-primary btn-lg" (click)="goToLogin()">
+              <i class="bi bi-box-arrow-in-right me-2"></i>
+              Log In
+            </button>
+            
+            <button *ngIf="isAuthenticated" class="btn btn-primary btn-lg" (click)="goToDashboard()">
+              <i class="bi bi-speedometer2 me-2"></i>
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div> 

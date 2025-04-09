@@ -1,0 +1,55 @@
+{
+  "scannedAt": "2025-04-08T03:58:26.957Z",
+  "permissions": [
+    {
+      "name": "permissions:create",
+      "resourceName": "permissions",
+      "actionName": "create"
+    },
+    {
+      "name": "permissions:delete",
+      "resourceName": "permissions",
+      "actionName": "delete"
+    },
+    {
+      "name": "permissions:list",
+      "resourceName": "permissions",
+      "actionName": "list"
+    },
+    {
+      "name": "permissions:read",
+      "resourceName": "permissions",
+      "actionName": "read"
+    },
+    {
+      "name": "permissions:update",
+      "resourceName": "permissions",
+      "actionName": "update"
+    },
+    {
+      "name": "users:create",
+      "resourceName": "users",
+      "actionName": "create"
+    },
+    {
+      "name": "users:delete",
+      "resourceName": "users",
+      "actionName": "delete"
+    },
+    {
+      "name": "users:edit",
+      "resourceName": "users",
+      "actionName": "edit"
+    },
+    {
+      "name": "users:list",
+      "resourceName": "users",
+      "actionName": "list"
+    },
+    {
+      "name": "users:update",
+      "resourceName": "users",
+      "actionName": "update"
+    }
+  ]
+}

@@ -93,8 +93,10 @@ export class AuthInterceptor implements HttpInterceptor {
   private handle401Error(request: HttpRequest<unknown>, next: HttpHandler, originalError: HttpErrorResponse): Observable<HttpEvent<unknown>> {
     // Avoid infinite loop of token refresh
     if (request.url.includes('/api/auth/refresh')) {
-      // Instead of clearAuthState, call logout which will clear the state
-      this.authService.logout().subscribe();
+      // Call logout and ignore the result as we're going to throw anyway
+      this.authService.logout().subscribe(() => {
+        console.log('Logged out after refresh token failure');
+      });
       return throwError(() => originalError);
     }
     
@@ -129,8 +131,10 @@ export class AuthInterceptor implements HttpInterceptor {
         // Token refresh failed - proceed to logout
         this.refreshTokenInProgress = false;
         this.refreshTokenSubject.next(null);
-        // Instead of clearAuthState, call logout which will clear the state
-        this.authService.logout().subscribe();
+        // Call logout and ignore the result as we're going to throw anyway
+        this.authService.logout().subscribe(() => {
+          console.log('Logged out after refresh token failure');
+        });
         
         return throwError(() => originalError);
       }),

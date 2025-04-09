@@ -2,6 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, Router, NavigationEnd, Event } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { HeaderComponent } from '../header/header.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { FooterComponent } from '../footer/footer.component';
@@ -19,6 +21,8 @@ import { LoggerService } from '../../services/logging/logger.service';
     CommonModule,
     RouterOutlet,
     MatSidenavModule,
+    MatButtonModule,
+    MatIconModule,
     HeaderComponent,
     SidebarComponent,
     FooterComponent
@@ -61,6 +65,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     // Check authentication state on component load
     this.checkAuthState();
+
+    // Subscribe to auth service's user observable to get user preferences
+    this.subscription.add(
+      this.authService.currentUser$.subscribe(user => {
+        if (user?.preferences?.sidebarCollapsed) {
+          this.sidebarOpened = !user.preferences.sidebarCollapsed;
+        }
+      })
+    );
   }
 
   ngOnDestroy() {
