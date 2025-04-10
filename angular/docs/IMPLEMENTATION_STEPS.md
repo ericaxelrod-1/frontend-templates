@@ -956,3 +956,177 @@ Security Features:
    - Add monitoring for sync failures
    - Alert on permission inconsistencies
    - Track performance metrics 
+
+## Phase 12: Backend Migration Error Remediation
+
+### 12.1 Type Adapter Implementation
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Priority**: Critical
+
+1. Create Compatibility Layer:
+   - Create `PermissionTypeAdapter` utility class to convert between number and string IDs
+   - Implement bidirectional conversion for role-based and permission-based models
+   - Add validation to ensure data integrity during conversion
+   - Document usage patterns for both models
+
+2. Entity Type Updates:
+   - Modify entity interfaces to support both permission models
+   - Update TypeORM decorators to handle both ID types
+   - Create normalized database access patterns
+   - Implement consistent error handling for type mismatches
+
+### 12.2 Module Naming Conflict Resolution
+- **Status**: Not Started
+- **Testing**: Not Started  
+- **Dependencies**: None
+- **Priority**: Critical
+
+1. Export Deduplication:
+   - Audit permission-related modules for naming conflicts
+   - Rename duplicate exports with clear naming conventions
+   - Update import references throughout codebase
+   - Add migration notes for each renamed export
+
+2. Module Structure Refactoring:
+   - Reorganize permission-related modules for clarity
+   - Create clear separation between old and new permission models
+   - Implement explicit imports to avoid ambiguity
+   - Document new module structure for development team
+
+### 12.3 Controller Migration Completion
+- **Status**: 25% Complete
+- **Testing**: Not Started
+- **Dependencies**: 12.1, 12.2
+- **Priority**: High
+
+1. Controller Update Pattern:
+   - Create standardized approach for remaining controllers
+   - Replace `@Roles()` decorators with `@RequirePermission()`
+   - Update route guards to use permission-based checks
+   - Implement consistent error handling for permission failures
+
+2. Controller Testing:
+   - Create test fixtures for permission-based controllers
+   - Validate all endpoints with new permission model
+   - Test backward compatibility with role-based clients
+   - Document breaking changes and required client updates
+
+### 12.4 Service Methods Migration
+- **Status**: 15% Complete
+- **Testing**: Not Started
+- **Dependencies**: 12.1, 12.2
+- **Priority**: High
+
+1. Service Update Pattern:
+   - Create standardized approach for remaining services (85%)
+   - Replace direct role references with permission service calls
+   - Update method signatures for permission-based access
+   - Implement type conversion where needed for compatibility
+
+2. Service Method Testing:
+   - Create test fixtures for permission-based services
+   - Validate core functionality with new permission model
+   - Test edge cases with mixed permission formats
+   - Document API changes and client impact
+
+### 12.5 Test Adaptation Strategy
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 12.1, 12.2, 12.3, 12.4
+- **Priority**: Medium
+
+1. Test Fixture Updates:
+   - Create mock data for permission-based tests
+   - Update existing test fixtures for new model
+   - Implement test helpers for permission testing
+   - Document test patterns for both models
+
+2. Test Utilities:
+   - Create `PermissionTestUtils` class
+   - Implement permission generation for test cases
+   - Add convenience methods for permission assertions
+   - Create migration guide for test authors
+
+### 12.6 Database Migration Script
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 12.1, 12.2
+- **Priority**: Medium
+
+1. Script Development:
+   - Enhance existing role-to-permission migration script
+   - Add validation for data integrity during migration
+   - Implement rollback capability for failed migrations
+   - Create detailed logging for migration process
+
+2. Migration Verification:
+   - Create verification queries for post-migration
+   - Implement data consistency checks
+   - Add reporting for migration success/failure
+   - Document migration process for operations team
+
+### 12.7 API Endpoint Regression Testing
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 12.3, 12.4, 12.5
+- **Priority**: High
+
+1. Comprehensive Testing:
+   - Test all endpoints with permission-based access
+   - Verify error responses for unauthorized access
+   - Validate permission inheritance behavior
+   - Document API behavior changes
+
+2. Performance Testing:
+   - Benchmark permission-based endpoints
+   - Compare with role-based endpoint performance
+   - Identify bottlenecks in permission resolution
+   - Implement optimizations for critical paths
+
+### 12.8 Documentation and Knowledge Transfer
+- **Status**: Not Started
+- **Testing**: N/A
+- **Dependencies**: All previous tasks
+- **Priority**: Medium
+
+1. Technical Documentation:
+   - Update API documentation with permission changes
+   - Create migration guide for client developers
+   - Document type adapter usage patterns
+   - Update entity relationship diagrams
+
+2. Developer Guidelines:
+   - Create best practices for permission-based development
+   - Document common patterns and anti-patterns
+   - Provide examples for both access control models
+   - Create troubleshooting guide for common issues
+
+## Implementation Timeline
+
+### Week 1: Critical Path (Type Adapters and Module Conflicts)
+- Day 1-2: Implement type adapter utilities
+- Day 3-4: Resolve module naming conflicts
+- Day 5: Testing and validation
+
+### Week 2: Controller and Service Migration
+- Day 1-3: Complete controller migration (remaining 75%)
+- Day 3-5: Begin service method migration (targeting 50% completion)
+
+### Week 3: Testing and Completion
+- Day 1-2: Complete service method migration (remaining 35%)
+- Day 3-4: Implement test adaptation strategy
+- Day 5: Regression testing and performance validation
+
+### Week 4: Finalization
+- Day 1-2: Database migration script enhancement
+- Day 3-4: Comprehensive API testing
+- Day 5: Documentation and knowledge transfer
+
+## Success Criteria
+1. Backend builds successfully without type errors
+2. All endpoints function with permission-based access control
+3. Tests pass with updated permission model
+4. Migration path documented for remaining components
+5. Performance metrics within acceptable thresholds 

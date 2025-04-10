@@ -530,8 +530,9 @@ npm run check:duplicate-css   # ✅ Passed
 13. ~~Implement hierarchical role and group structures~~ (Completed)
 14. ~~Create dynamic permission resolution service~~ (Completed)
 15. ~~Migrate frontend components to use permission-based access checks~~ (Completed)
-16. **Continue backend migration to dynamic access control:**
-    - Update backend scripts to remove role-based code
+16. **Continue backend migration to dynamic access control (CRITICAL PRIORITY):**
+    - Implement type adapters for permission model compatibility
+    - Fix module naming conflicts
     - Complete controller migration (75% remaining)
     - Update service methods (85% remaining)
     - Run database role-to-permission mappings
@@ -722,8 +723,9 @@ npm run check:duplicate-css   # ✅ Passed
 13. ~~Implement hierarchical role and group structures~~ (Completed)
 14. ~~Create dynamic permission resolution service~~ (Completed)
 15. ~~Migrate frontend components to use permission-based access checks~~ (Completed)
-16. **Continue backend migration to dynamic access control:**
-    - Update backend scripts to remove role-based code
+16. **Continue backend migration to dynamic access control (CRITICAL PRIORITY):**
+    - Implement type adapters for permission model compatibility
+    - Fix module naming conflicts
     - Complete controller migration (75% remaining)
     - Update service methods (85% remaining)
     - Run database role-to-permission mappings
@@ -773,3 +775,95 @@ npm run check:duplicate-css   # ✅ Passed
    - ❌ Frontend module integration issues (Blocking)
    - ❌ Component template binding issues (Blocking)
    - ❌ Form control integration issues (Blocking)
+
+## Backend Migration Issues
+
+### Current Error Analysis
+- **Status**: Has Issues (Critical)
+- **Impact**: Preventing backend build
+- **Root Cause**: Incomplete migration from role-based to permission-based access control
+
+1. **Type Mismatch Errors**:
+   - Permission IDs changed from `number` to `string` type causing incompatibilities
+   - Error pattern: `Type 'number' is not assignable to type 'string | FindOperator<string>'`
+   - Affecting multiple controllers and services
+
+2. **Entity Structure Changes**:
+   - Permission entity structure has been significantly modified
+   - Error pattern: `Object literal may only specify known properties, and 'resourceId' does not exist in type...`
+   - Database models are out of sync with service implementations
+
+3. **Relationship Model Changes**:
+   - User-to-Role relationship changed from one-to-one to many-to-many
+   - Error pattern: `Property 'role' does not exist on type 'User'. Did you mean 'roles'?`
+   - Code still references old model in many places
+
+4. **Module Naming Conflicts**:
+   - Duplicate exports in permission-related modules
+   - Error pattern: `Module './entities/permission.entity' has already exported a member named 'Permission'`
+   - Causing build tooling confusion
+
+### Remediation Plan
+- **Priority**: Critical - Backend Build Blocker
+- **Timeline**: 1-2 weeks
+- **Owner**: Backend Team
+- **Dependencies**: Current migration progress (25% controllers, 15% services complete)
+
+1. **Phase 1: Schema Consistency (Immediate)**
+   - Create type adapters/converters to bridge old and new permission models
+   - Update entity definitions to support both formats during transition
+   - Fix module naming conflicts
+
+2. **Phase 2: Code Migration (Short-term)**
+   - Complete controller migration (remaining 75%)
+   - Accelerate service methods migration (remaining 85%)
+   - Create regression test suite for API endpoints
+
+3. **Phase 3: Test Adaptation (Medium-term)**
+   - Update test fixtures to use new permission model
+   - Create test utilities to support both models during transition
+   - Fix failing tests with new permission structure
+
+## Next Steps Priority (Updated)
+
+1. ~~Complete the authentication system (blocked by database setup)~~ (Completed)
+2. ~~Implement user management core functionality~~ (Completed)
+3. ~~Implement group management functionality~~ (Completed)
+4. ~~Finish database migrations and seeding~~ (Completed)
+5. ~~Implement remaining security features (rate limiting, input validation)~~ (Completed)
+6. ~~Add consistent branding across components~~ (Completed)
+7. ~~Implement email verification system~~ (Completed)
+8. ~~Implement GDPR compliance features~~ (Completed)
+9. Add remaining backend tests
+10. Address build/compilation issues 
+11. ~~Conduct comprehensive audit of hardcoded access controls~~ (Completed)
+12. ~~Develop migration plan for database-driven permission system~~ (Completed)
+13. ~~Implement hierarchical role and group structures~~ (Completed)
+14. ~~Create dynamic permission resolution service~~ (Completed)
+15. ~~Migrate frontend components to use permission-based access checks~~ (Completed)
+16. **Continue backend migration to dynamic access control (CRITICAL PRIORITY):**
+    - Implement type adapters for permission model compatibility
+    - Fix module naming conflicts
+    - Complete controller migration (75% remaining)
+    - Update service methods (85% remaining)
+    - Run database role-to-permission mappings
+    - Update integration tests
+    - Monitor progress with regular audit script runs
+17. Optimize permission system performance
+18. Create admin interface for permission management
+
+## IP Allowlist Feature
+- ✅ Entity definitions (LoginAttempt, IPReputation, Captcha)
+- ✅ CaptchaService implementation
+- ✅ LoginAttemptService implementation
+- ✅ IPReputationService
+- ✅ IP Allowlist Service and Middleware
+- IP management interface 
+
+## Known Issues (Updated)
+
+14. Backend Migration Critical Issues:
+    - Type mismatches between number and string IDs
+    - Entity structure incompatibilities
+    - Relationship model changes not fully implemented
+    - Module naming conflicts causing build errors
