@@ -15,56 +15,14 @@ import { AppConfigService } from './core/services/app-config.service';
 import { LoggerService } from './services/logging/logger.service';
 import { environment } from '../environments/environment';
 import { AuthService } from './core/services/auth.service';
-import { Store } from '@ngxs/store';
-import { AuthActions } from './store/auth/auth.state';
 import { firstValueFrom } from 'rxjs';
 import { CaptchaService } from './core/services/captcha.service';
 import { AdvancedCaptchaService } from './core/services/advanced-captcha.service';
 import { RolesConstantsService } from './core/constants/roles';
 
 // Function to initialize the logger
-export function initializeLogging(logger: LoggerService) {
+export function initializeLogging() {
   return () => {
-    return Promise.resolve();
-  };
-}
-
-// Function to initialize roles
-export function initializeRoles(rolesService: RolesConstantsService) {
-  return () => {
-    console.log('Initializing roles from database');
-    return firstValueFrom(rolesService.initialize()).catch(error => {
-      console.error('Error loading roles from backend:', error);
-      return Promise.resolve(); // Continue app initialization even if roles fetch fails
-    });
-  };
-}
-
-// Function to initialize authentication state
-export function initializeAuth(authService: AuthService, store: Store) {
-  return async () => {
-    try {
-      console.log('App initializing - checking auth state');
-      
-      // Force a refresh of the auth state from localStorage
-      authService.refreshAuthStateFromStorage();
-      
-      if (authService.isAuthenticated && authService.currentUser) {
-        console.log('Auth tokens found, setting initial state and fetching profile');
-        
-        // First set the initial state from local storage - this is important to avoid UI flicker
-        await firstValueFrom(store.dispatch(
-          new AuthActions.SetInitialAuthState(authService.currentUser, true)
-        ));
-        
-        // Then fetch the latest profile
-        return await firstValueFrom(store.dispatch(new AuthActions.AppInitialize()));
-      } else {
-        console.log('No auth tokens found, skipping initialization');
-      }
-    } catch (error) {
-      console.error('Error during auth initialization:', error);
-    }
     return Promise.resolve();
   };
 }
@@ -94,19 +52,13 @@ export const appConfig: ApplicationConfig = {
     {
       provide: APP_INITIALIZER,
       useFactory: initializeLogging,
-      deps: [LoggerService],
+      deps: [],
       multi: true
     },
     {
       provide: APP_INITIALIZER,
-      useFactory: initializeRoles,
-      deps: [RolesConstantsService],
-      multi: true
-    },
-    {
-      provide: APP_INITIALIZER,
-      useFactory: initializeAuth,
-      deps: [AuthService, Store],
+      useFactory: (authService: AuthService) => () => authService.initializeAuthState(),
+      deps: [AuthService],
       multi: true
     },
     importProvidersFrom(

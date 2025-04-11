@@ -3,8 +3,12 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
-import { AuthService } from '../auth.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { AppConfigService } from '../../../core/services/app-config.service';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Store } from '@ngxs/store';
+import { AuthActions } from '../../../store/auth/auth.state';
+import { VerificationResponse } from '../../../models';
 
 @Component({
   selector: 'app-verify-email',
@@ -27,7 +31,8 @@ export class VerifyEmailComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private authService: AuthService,
-    private appConfig: AppConfigService
+    private appConfig: AppConfigService,
+    private store: Store
   ) { 
     this.appName = this.appConfig.appName;
     this.landingLogo = this.appConfig.landingLogo;
@@ -37,31 +42,37 @@ export class VerifyEmailComponent implements OnInit {
     // Get token from the URL
     this.route.queryParams.subscribe(params => {
       const token = params['token'];
-      if (token) {
-        this.verifyEmail(token);
+      const email = params['email'];
+      if (token && email) {
+        this.verifyEmail(token, email);
+      } else if (token) {
+        this.showError('Email address is missing. Verification requires both token and email.');
       } else {
         this.showError('Verification link is invalid. No token provided.');
       }
     });
   }
 
-  private verifyEmail(token: string) {
+  private verifyEmail(token: string, email: string): void {
+    console.log('verifyEmail called with token:', token, 'and email:', email);
     this.isVerifying = true;
     this.isSuccess = false;
     this.isError = false;
+    this.errorMessage = '';
     
-    this.authService.verifyEmail(token)
-      .pipe(
-        finalize(() => {
-          this.isVerifying = false;
-        })
-      )
+    this.authService.verifyEmail(token, email)
       .subscribe({
-        next: () => {
+        next: (response: VerificationResponse) => {
+          console.log('Email verification successful:', response);
+          this.isVerifying = false;
           this.isSuccess = true;
+          this.store.dispatch(new AuthActions.VerifyEmailSuccess(response.user));
         },
-        error: (error) => {
-          this.showError(error.error?.message || 'Email verification failed. Please try again or contact support.');
+        error: (error: HttpErrorResponse) => {
+          console.error('Email verification failed:', error);
+          this.isVerifying = false;
+          this.isError = true;
+          this.errorMessage = error?.error?.message || 'Email verification failed. Please try again or contact support.';
         }
       });
   }

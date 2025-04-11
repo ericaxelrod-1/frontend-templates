@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatSort } from '@angular/material/sort';
 import { MatPaginator } from '@angular/material/paginator';
@@ -171,7 +171,7 @@ interface Permission {
     }
   `]
 })
-export class PermissionsListComponent implements OnInit {
+export class PermissionsListComponent implements OnInit, AfterViewInit {
   displayedColumns: string[] = ['id', 'resourceName', 'actionName', 'fullPermission', 'description', 'actions'];
   dataSource = new MatTableDataSource<Permission>([]);
   filterControl = new FormControl('');

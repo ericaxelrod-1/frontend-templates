@@ -16,7 +16,7 @@ import { AppConfigService } from '../../../core/services';
 })
 export class ResetPasswordComponent implements OnInit, OnDestroy {
   resetPasswordForm!: FormGroup;
-  token: string = '';
+  token = '';
   private subscription: Subscription = new Subscription();
   private platformId = inject(PLATFORM_ID);
 

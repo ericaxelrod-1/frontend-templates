@@ -3,7 +3,9 @@
     <h2>Users</h2>
     <div class="user-item" *ngFor="let user of users" 
          [class.selected]="selectedUser?.id === user.id"
-         (click)="selectUser(user)">
+         (click)="selectUser(user)"
+         (keyup.enter)="selectUser(user)"
+         tabindex="0">
       <div class="user-info">
         <span class="user-name">{{user.firstName}} {{user.lastName}}</span>
         <span class="user-email">{{user.email}}</span>
@@ -29,20 +31,20 @@
   <div class="user-details" *ngIf="selectedUser && canViewUserDetails()">
     <h3>User Details</h3>
     <div class="detail-row">
-      <label>Name:</label>
-      <span>{{selectedUser.firstName}} {{selectedUser.lastName}}</span>
+      <label for="userNameDetail">Name:</label>
+      <span id="userNameDetail">{{selectedUser.firstName}} {{selectedUser.lastName}}</span>
     </div>
     <div class="detail-row">
-      <label>Email:</label>
-      <span>{{selectedUser.email}}</span>
+      <label for="userEmailDetail">Email:</label>
+      <span id="userEmailDetail">{{selectedUser.email}}</span>
     </div>
     <div class="detail-row" *ngIf="selectedUser.roles?.length">
-      <label>Roles:</label>
-      <span>{{getRoleNames(selectedUser)}}</span>
+      <label for="userRolesDetail">Roles:</label>
+      <span id="userRolesDetail">{{getRoleNames(selectedUser)}}</span>
     </div>
     <div class="detail-row" *ngIf="selectedUser.permissions?.length">
-      <label>Permissions:</label>
-      <span>{{selectedUser.permissions.length}} permissions assigned</span>
+      <label for="userPermissionsDetail">Permissions:</label>
+      <span id="userPermissionsDetail">{{selectedUser.permissions.length}} permissions assigned</span>
     </div>
   </div>
 </div> 

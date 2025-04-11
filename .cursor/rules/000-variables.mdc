@@ -4,6 +4,11 @@ globs:
 alwaysApply: true
 ---
 ---
+description: 
+globs: 
+alwaysApply: true
+---
+---
 description: "User-defined variable definitions for the project. These will be referenced throughout the project."
 globs: ["*"]
 priority: 1
@@ -20,18 +25,26 @@ priority: 1
  - /docs/
 -angular_backend
  - angular/backend
+-task_management_dir
+ - [working_docs_dir]/task-management/
 
 ## Key Files
+-project_structure
+ - [working_docs_dir]/PROJECT_STRUCTURE.md
 -implementation_steps
  - [working_docs_dir]/implementation_steps.md
 -current_state
  - [working_docs_dir]/current_state.md
 -package_management
  - [working_docs_dir]/package-management.md
+-backlog
+ - [task_management_dir]/backlog.md
+-changelog
+ - [task_management_dir]/changelog.md
+-changelog_archive
+ - [task_management_dir]/changelog_archive.md
 
 
 # Error handling
 
 Prompt the user if you are unclear about the referenced variable. Do not make assumptions.
-
-

@@ -22,7 +22,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   @ViewChild('captchaSelector') captchaSelector!: CaptchaSelectorComponent;
   
   loginForm!: FormGroup;
-  returnUrl: string = '/';
+  returnUrl = '/';
   private subscription = new Subscription();
   private platformId = inject(PLATFORM_ID);
 

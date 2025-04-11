@@ -48,7 +48,9 @@ interface CaptchaImage {
                 <div *ngFor="let image of imageChallenge.images; let i = index" 
                      class="image-item"
                      [class.selected]="image.selected"
-                     (click)="toggleImageSelection(i)">
+                     (click)="toggleImageSelection(i)"
+                     (keyup.enter)="toggleImageSelection(i)"
+                     tabindex="0">
                   <div class="placeholder-image" [style.background-color]="image.color">
                     <span class="image-text">{{ image.label }}</span>
                   </div>
@@ -261,8 +263,6 @@ export class CaptchaSelectorComponent implements OnInit {
     correctAnswer: '23'
   };
 
-  constructor() {}
-
   ngOnInit() {
     this.generateRandomChallenge();
   }
@@ -288,8 +288,8 @@ export class CaptchaSelectorComponent implements OnInit {
     const maxNumber = this.getDifficultyValue(10, 20, 50);
     const operationCount = this.getDifficultyValue(2, 3, 4);
     
-    let numbers: number[] = [];
-    let ops: string[] = [];
+    const numbers: number[] = [];
+    const ops: string[] = [];
     
     // Generate numbers and operations based on difficulty
     for (let i = 0; i < operationCount; i++) {

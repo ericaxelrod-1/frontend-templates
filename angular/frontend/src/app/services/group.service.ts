@@ -74,11 +74,11 @@ export class GroupService {
         permissions: user.permissions?.map(p => ({
           id: p.id,
           name: p.name,
-          resource: p.resourceName,
-          action: p.actionName,
+          resourceName: p.resourceName,
+          actionName: p.actionName,
           granted: true
         })) || [],
-        role: user.roles?.[0] // For legacy support
+        role: user.roles?.[0]?.name // For legacy support
       }))),
       catchError(() => {
         return this.http.get<Member[]>(`${this.apiUrl}/${groupId}/members`).pipe(
@@ -111,7 +111,7 @@ export class GroupService {
   /**
    * @deprecated Use addMemberWithPermissions instead
    */
-  addMember(groupId: number, userId: number, role: string = 'Member'): Observable<void> {
+  addMember(groupId: number, userId: number, role = 'Member'): Observable<void> {
     console.warn('addMember() is deprecated. Use addMemberWithPermissions() instead');
     const permissions = GROUP_PERMISSION_SETS['MEMBER'];
     return this.addMemberWithPermissions(groupId, userId, permissions);
@@ -164,7 +164,7 @@ export class GroupService {
       members: group.members.map(member => ({
         ...member,
         permissions: member.role ? 
-          GROUP_PERMISSION_SETS['MEMBER'] :
+          GROUP_PERMISSION_SETS[member.role] || GROUP_PERMISSION_SETS['MEMBER'] :
           member.permissions || []
       }))
     }));

@@ -5,12 +5,12 @@ import {
   RouterStateSnapshot,
   Router
 } from '@angular/router';
-import { Observable, of } from 'rxjs';
+import { Observable } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { Store } from '@ngxs/store';
 import { AuthState } from '../../store/auth/auth.state';
 import { PermissionService } from '../services/permission.service';
-import { map, catchError, take, filter } from 'rxjs/operators';
+import { map, take, filter } from 'rxjs/operators';
 import { User } from '../../models/user.model';
 
 // Define permission rule interfaces
@@ -72,21 +72,20 @@ export class PermissionGuard implements CanActivate {
       return this.store.select(AuthState.permissionsLoaded).pipe(
         filter(loaded => loaded),
         take(1),
-        map(() => this.checkPermissions(permissionRule, state.url))
+        map(() => this.checkPermissions(permissionRule))
       );
     }
     
     // If permissions are already loaded, check them synchronously
-    return this.checkPermissions(permissionRule, state.url);
+    return this.checkPermissions(permissionRule);
   }
   
   /**
    * Check if the user has the required permissions
    * @param permissionRule The permission rule to check
-   * @param returnUrl The URL to redirect to on success
    * @returns Boolean indicating if user has required permissions
    */
-  private checkPermissions(permissionRule: PermissionRule, returnUrl: string): boolean {
+  private checkPermissions(permissionRule: PermissionRule): boolean {
     const hasPermission = this.store.selectSnapshot(AuthState.hasPermission);
     const hasAnyPermission = this.store.selectSnapshot(AuthState.hasAnyPermission);
     const hasAllPermissions = this.store.selectSnapshot(AuthState.hasAllPermissions);

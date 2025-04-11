@@ -14,6 +14,8 @@ import { CaptchaSelectorComponent } from '../../../shared/components/captcha/adv
 import { CaptchaService } from '../../../core/services/captcha.service';
 import { AdvancedCaptchaService } from '../../../core/services/advanced-captcha.service';
 import { LoggerService } from '../../../services/logging/logger.service';
+import { HttpErrorResponse } from '@angular/common/http';
+import { AuthResponse } from '../../../models';
 
 // Custom validator for password strength
 export function passwordStrengthValidator(): ValidatorFn {
@@ -250,37 +252,38 @@ export class RegisterComponent implements OnInit, OnDestroy {
             const debugInfoString = localStorage.getItem('authDebugInfo');
             if (debugInfoString) {
               const debugInfo = JSON.parse(debugInfoString);
-              this.emailSender = debugInfo.emailSender || null;
-              
-              console.log('Debug info loaded from storage:', {
-                ...debugInfo,
-                verificationToken: debugInfo.verificationToken ? '********' : null
-              });
+              if (debugInfo && debugInfo.emailSender) {
+                this.emailSender = debugInfo.emailSender;
+              }
             }
           } catch (error) {
-            console.error('Error parsing debug info:', error);
+            console.error('Error getting debug info:', error);
           }
         })
       );
+      
+      // Check for persisted registration state
+      this.checkPersistedState();
     }
   }
 
-  // Helper method to check visibility
+  // Check if element is visible on screen
   private isElementVisible(element: HTMLElement): boolean {
-    if (!element) return false;
-    
-    // Check if we're in a browser environment before accessing window
-    if (isPlatformBrowser(this.platformId)) {
-      const style = window.getComputedStyle(element);
-      return style.display !== 'none' && 
-             style.visibility !== 'hidden' && 
-             style.opacity !== '0' &&
-             element.offsetWidth > 0 && 
-             element.offsetHeight > 0;
+    if (!element) {
+      return false;
     }
     
-    // Default to true in non-browser environments
-    return true;
+    const rect = element.getBoundingClientRect();
+    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+    
+    // Return true if any part of the element is visible
+    return (
+      rect.top < windowHeight &&
+      rect.left < windowWidth &&
+      rect.bottom > 0 &&
+      rect.right > 0
+    );
   }
 
   ngOnDestroy(): void {
@@ -288,10 +291,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.subscription.unsubscribe();
   }
 
-  // Add a direct button click handler for debugging
+  // Button click handler for debugging visual issues
   onButtonClick(event: MouseEvent): void {
-    console.log('Register button clicked directly');
-    // Don't prevent default behavior, let the form submission happen
+    console.log('Button clicked:', event);
+    console.log('Form validity state:', this.registerForm.valid);
   }
 
   // Convenience getter for easy access to form fields
@@ -315,52 +318,38 @@ export class RegisterComponent implements OnInit, OnDestroy {
       return;
     }
     
-    let strength = 0;
+    let score = 0;
     
     // Length check
-    if (password.length >= 8) strength += 25;
+    if (password.length >= 8) score += 1;
+    if (password.length >= 12) score += 1;
     
-    // Character variety checks
-    if (/[A-Z]+/.test(password)) strength += 25;
-    if (/[a-z]+/.test(password)) strength += 25;
-    if (/[0-9]+/.test(password)) strength += 12.5;
-    if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)) strength += 12.5;
+    // Character type checks
+    if (/[A-Z]/.test(password)) score += 1;
+    if (/[a-z]/.test(password)) score += 1;
+    if (/[0-9]/.test(password)) score += 1;
+    if (/[^A-Za-z0-9]/.test(password)) score += 1;
     
-    this.passwordStrength = strength;
+    // Set normalized strength (0-100)
+    this.passwordStrength = Math.min(100, Math.round((score / 6) * 100));
     
-    // Set appropriate message
-    if (strength < 50) {
-      this.passwordMessage = 'Weak';
-    } else if (strength < 75) {
-      this.passwordMessage = 'Medium';
-    } else if (strength < 100) {
-      this.passwordMessage = 'Strong';
+    // Set message based on strength
+    if (this.passwordStrength < 40) {
+      this.passwordMessage = 'Weak password';
+    } else if (this.passwordStrength < 70) {
+      this.passwordMessage = 'Moderate password';
     } else {
-      this.passwordMessage = 'Very Strong';
+      this.passwordMessage = 'Strong password';
     }
   }
 
   onSubmit(): void {
-    console.log('Register form submit started');
+    console.log('Form submitted');
     this.submitted = true;
-    
-    // Mark fields as touched for validation
-    this.registerForm.markAllAsTouched();
-    if (this.captchaSelector) {
-      this.captchaSelector.markAsTouched();
-    }
-    
-    // Log the form values (excluding password for security)
-    const formValuesForLogging = { ...this.registerForm.value };
-    delete formValuesForLogging.password;
-    delete formValuesForLogging.confirmPassword;
-    console.log('Form values (excluding password):', formValuesForLogging);
     
     // Stop here if form is invalid
     if (this.registerForm.invalid) {
-      console.warn('Form is invalid');
-      
-      // Log which controls are invalid and why
+      console.warn('Form is invalid. Validation errors:');
       Object.keys(this.registerForm.controls).forEach(key => {
         const control = this.registerForm.get(key);
         if (control?.invalid) {
@@ -457,7 +446,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     // Submit registration
     this.authService.register(registrationData)
       .subscribe({
-        next: (response) => {
+        next: (response: AuthResponse) => {
           this.loading = false;
           this.logger.info('Registration successful');
           
@@ -479,7 +468,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
             });
           }
         },
-        error: (error) => {
+        error: (error: HttpErrorResponse) => {
           this.loading = false;
           this.error = error?.error?.message || 'Registration failed. Please try again.';
           this.logger.error('Registration failed', { error });
@@ -592,4 +581,4 @@ export class RegisterComponent implements OnInit, OnDestroy {
       console.error('Clipboard API not available');
     }
   }
-} 
+}

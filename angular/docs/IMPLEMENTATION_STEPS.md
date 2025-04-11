@@ -290,6 +290,15 @@
 3. Implement component themes
 4. Validate theme configuration
 
+### 4.6 Frontend Auth Initialization (APP_INITIALIZER)
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: 4.2 State Management, 4.3 Authentication UI
+1. Implement an `initializeAuthState()` method in `AuthService` that loads tokens from storage and validates the session (e.g., by fetching user profile).
+2. Use Angular's `APP_INITIALIZER` token in `AppModule` to call `initializeAuthState()`.
+3. Ensure the `APP_INITIALIZER` factory returns a Promise or Observable that resolves only after authentication state is confirmed.
+4. This will delay application bootstrap until authentication is ready, preventing 401 errors on initial page load for requests needing authentication headers.
+
 ## Phase 5: Frontend Features (Week 5)
 
 ### 5.1 Admin Interface
@@ -1103,26 +1112,116 @@ Security Features:
    - Provide examples for both access control models
    - Create troubleshooting guide for common issues
 
-## Implementation Timeline
+## Phase 13: Type Standardization and Code Cleanup (Week 10-12)
 
-### Week 1: Critical Path (Type Adapters and Module Conflicts)
-- Day 1-2: Implement type adapter utilities
-- Day 3-4: Resolve module naming conflicts
-- Day 5: Testing and validation
+### 13.1 ID Type Standardization
+- **Status**: In Progress
+- **Testing**: Not Started
+- **Dependencies**: None
+1. Frontend Model Updates ✅
+   - ✅ Update Permission interface in user.model.ts to use consistent ID type
+   - ✅ Update Permission interface in group.model.ts to align with entity definitions
+   - ✅ Update AdminUserCreation interface to use consistent permission ID types
+   - ✅ Fix Member interface in group.model.ts to use standard permission format
+   - ✅ Update all frontend interfaces using permissions to match backend types
+2. Backend Entity Updates ✅
+   - ✅ Standardize GroupPermission entity to use number for groupId
+   - ✅ Update Group entity ID type to be consistent (number instead of string)
+   - ✅ Update service methods to use correct group ID type (number)
+   - ✅ Fix linter errors related to ID type mismatches
+   - ✅ Review UserPermission entity for ID type consistency
+3. API Consistency
+   - Update all DTO classes to use consistent ID types
+   - Ensure controllers return consistent permission object types
+   - Update serialization/deserialization logic for permissions
+   - Add type validation to prevent ID type mismatches
+   - Document standardized permission object format
 
-### Week 2: Controller and Service Migration
-- Day 1-3: Complete controller migration (remaining 75%)
-- Day 3-5: Begin service method migration (targeting 50% completion)
+### 13.2 Deprecated Code Removal
+- **Status**: In Progress
+- **Testing**: Not Started
+- **Dependencies**: None
+1. Model Cleanup ✅
+   - ✅ Remove deprecated role comments and properties in user.model.ts
+   - ✅ Remove deprecated role handling in group.model.ts
+   - ✅ Update GROUP_PERMISSION_SETS constant to remove role references
+   - ✅ Clean up deprecated imports and unused code
+2. Service Cleanup
+   - Update AuthService to remove role-based access methods
+   - Clean up PermissionsService to use standardized methods
+   - Remove legacy role-checking code in guards
+   - Update any services still using role-based checks
+3. Documentation Updates
+   - Update API documentation to remove role-based examples
+   - Add migration notes for any breaking changes
+   - Document permission-based approach consistently
+   - Update developer guidelines to enforce permission usage
 
-### Week 3: Testing and Completion
-- Day 1-2: Complete service method migration (remaining 35%)
-- Day 3-4: Implement test adaptation strategy
-- Day 5: Regression testing and performance validation
+### 13.3 Property Implementation
+- **Status**: Complete
+- **Testing**: Not Started
+- **Dependencies**: 13.1 ID Type Standardization
+1. Cache Service ✅
+   - ✅ Complete missing properties in PermissionsService
+   - ✅ Implement proper caching for permission checks
+   - ✅ Add cache invalidation on permission updates
+   - ✅ Implement cache refresh mechanism
+2. Cache Result Methods ✅
+   - ✅ Add missing hasPermissionCached method
+   - ✅ Implement cacheUserPermissions functionality (leveraging existing CacheService)
+   - ✅ Update getCachedPermissions method
+   - ✅ Add cachePermissionResult helper method
+3. Utility Methods ✅
+   - ✅ Implement missing utility methods for permission manipulation
+   - ✅ Add permission combination/filtering helpers
+   - ✅ Create permission conversion utilities
+   - ✅ Implement backwards compatibility layer
 
-### Week 4: Finalization
-- Day 1-2: Database migration script enhancement
-- Day 3-4: Comprehensive API testing
-- Day 5: Documentation and knowledge transfer
+### 13.4 Structural Cleanup
+- **Status**: In Progress
+- **Testing**: Not Started
+- **Dependencies**: 13.2 Deprecated Code Removal, 13.3 Property Implementation
+1. Service Location
+   - ✅ Fix duplicate service registration in permissions.module.ts
+   - Update permission.guard.ts to use PermissionsService class directly
+   - Organize permission-related services consistently
+   - Update imports to use correct service paths
+   - Fix circular dependency issues
+2. Entity Relationships
+   - Clean up entity relationship definitions
+   - Standardize relationship naming conventions
+   - Fix bidirectional relationship issues
+   - Add proper cascade options
+3. Module Imports
+   - ✅ Fix string token vs class registration conflict
+   - Update module exports for consistency
+   - Ensure proper service registration
+   - Clean up unused imports
+
+## Implementation Timeline:
+- Week 10: ID Type Standardization and Property Implementation (Tasks 13.1, 13.3)
+- Week 11: Deprecated Code Removal (Task 13.2)
+- Week 12: Structural Cleanup and Final Testing (Task 13.4)
+
+## Files Requiring Updates:
+- **Frontend Models**:
+  - angular/frontend/src/app/models/user.model.ts
+  - angular/frontend/src/app/models/group.model.ts
+  - angular/frontend/src/app/services/auth.service.ts
+  - angular/frontend/src/app/services/permission.service.ts
+  - angular/frontend/src/app/guards/permission.guard.ts
+- **Backend Code**:
+  - angular/backend/src/modules/permissions/entities/group-permission.entity.ts
+  - angular/backend/src/modules/permissions/entities/group.entity.ts
+  - angular/backend/src/modules/permissions/entities/permission.entity.ts
+  - angular/backend/src/modules/permissions/services/permission.service.ts
+  - angular/backend/src/modules/permissions/cache-sync.service.ts
+  - angular/backend/src/modules/permissions/permission.guard.ts
+  - angular/backend/src/modules/auth/auth.service.ts
+- **Test Files**:
+  - angular/frontend/src/app/services/permission.service.spec.ts
+  - angular/backend/src/modules/permissions/permissions.service.spec.ts
+  - Other affected test files
 
 ## Success Criteria
 1. Backend builds successfully without type errors

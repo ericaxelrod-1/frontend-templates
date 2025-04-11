@@ -25,7 +25,7 @@ export interface Environment {
   };
   captcha: {
     enabled: boolean;
-    difficulty: string;
+    difficulty: 'easy' | 'medium' | 'hard';
   };
   debugMode: boolean;
 } 

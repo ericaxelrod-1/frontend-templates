@@ -15,7 +15,7 @@ import { AppConfigService } from '../../core/services';
   styleUrl: './footer.component.scss'
 })
 export class FooterComponent {
-  @Input() isAuthPage: boolean = false;
+  @Input() isAuthPage = false;
   currentYear = new Date().getFullYear();
   
   // App configuration properties

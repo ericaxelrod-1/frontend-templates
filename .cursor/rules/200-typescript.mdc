@@ -1,0 +1,111 @@
+---
+description: 
+globs: *.ts,*.tsx
+alwaysApply: false
+---
+---
+description: "Strict requirements for typescript edits"
+globs: ["**/*.ts", "**/*.tsx"]
+tags: ["typescript", "linter", "ESlint"]
+priority: 5
+---
+
+# TypeScript Best Practices
+
+## Linter
+✅ **ALWAYS follow these instructions after editing typescript files:**
+- Always run ESlint after making typescript edits
+- Verify the linter output
+- Address any linter issues immediately
+- Continue this process until all linter issues are resolved
+
+## Type Safety 
+✅ **Enforce strict type safety:**
+- Prefer explicit types over inferred types for function parameters and return values
+- Never use `any` type unless absolutely necessary
+  - When `any` is unavoidable, use type assertions with specific types ASAP
+  - Use `unknown` instead of `any` when the type is indeterminate
+- Use `Error` subtypes for error handling (e.g., `HttpErrorResponse` for HTTP errors)
+- Avoid implicit type conversions; use explicit type guards instead
+- Use proper typing for promises and observables: `Promise<T>`, `Observable<T>`
+
+## TypeScript Patterns
+
+### Preferred Patterns
+✅ **Use these patterns:**
+- Use interfaces for object shapes, especially for public APIs and models
+- Use type aliases for unions, intersections, and mapped types
+- Use generics for reusable components and functions
+- Use readonly properties to indicate immutability
+- Use string literal unions for constants with semantic meaning
+- Create type guards with user-defined type predicates: `function isUser(obj: any): obj is User`
+
+### Patterns to Avoid
+❌ **Avoid these patterns:**
+- Avoid `!` non-null assertion operator
+- Avoid constant conditions (`if (true)`, `if (false)`) 
+- Avoid `as any` type assertions when a more specific type can be used
+- Avoid excessive nested conditional types
+- Avoid using `Object` or `{}` as types (use `Record<string, unknown>` instead)
+
+## Error Handling
+✅ **Follow these error handling practices:**
+- Type catch blocks appropriately (e.g., `catch(error: unknown)`)
+- Always type error parameters in callback functions, especially in RxJS operators
+- Prefer type assertion (`const typedError = error as HttpErrorResponse`) for specific error handling
+- Return specific error types from error handlers
+
+## Documentation
+✅ **Documentation requirements:**
+- Add JSDoc comments for:
+  - Public methods and functions
+  - Complex types
+  - Non-obvious code paths
+- Document parameters with `@param` and return values with `@returns`
+- For complex generics, include examples in documentation
+- Document error states and exceptions with `@throws`
+
+## Angular-Specific Types
+✅ **Follow Angular typing conventions:**
+- Use appropriate Angular types (e.g., `OnInit`, `AfterViewInit`)
+- Type component inputs/outputs properly with `@Input()` and `@Output()`
+- Use specific form types: `FormGroup`, `FormControl`, `FormArray`
+- Return appropriate Observable types from services
+- Type HTTP responses with interfaces matching the expected data structure
+
+## Testing
+✅ **For testing TypeScript code:**
+- Mock with type-safe mocks
+- Type test fixtures with proper interfaces
+- Use typed testing utilities
+- Ensure type safety in test assertions and expectations
+
+## Configuration
+✅ **TypeScript configuration:**
+- Maintain strict type checking in tsconfig.json
+- Ensure all strictness flags are enabled:
+  - `"strict": true`
+  - `"noImplicitAny": true`
+  - `"strictNullChecks": true`
+  - `"noImplicitReturns": true`
+
+## Code Style
+✅ **Style guidelines:**
+- Order imports logically: Angular core, third-party, application imports
+- Group and organize type definitions for readability
+- Use PascalCase for interfaces, types, and classes
+- Use camelCase for variables, properties, and function names
+- Place interfaces and types in dedicated files for shared models
+
+## RxJS Patterns
+✅ **For RxJS code:**
+- Type all observables with their expected output type
+- Type RxJS operators properly, especially catchError, switchMap, etc.
+- Use typed subjects: `BehaviorSubject<User>`, not just `BehaviorSubject<any>`
+- Ensure proper error typing in error handling operators
+
+## Project Structure Reference
+✅ **Always consult the project structure documentation:**
+- Before adding new TypeScript files, consult [Project Structure Documentation](@000-variables.mdc[project_structure])
+- Place files according to their functional purpose in the appropriate directory
+- Follow established patterns for similar files and components 

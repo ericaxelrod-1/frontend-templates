@@ -17,7 +17,7 @@ import { AppConfigService } from '../../core/services/app-config.service';
 })
 export class DashboardComponent implements OnInit {
   // App configuration properties
-  appName: string = 'Angular Template';
+  appName = 'Angular Template';
   headerLogo: string | null = null;
   
   constructor(private appConfig: AppConfigService) {}

@@ -6,6 +6,7 @@ export interface Permission {
   description: string;
   resourceName: string;
   actionName: string;
+  granted?: boolean;
 }
 
 export interface UserPreferences {
@@ -19,6 +20,12 @@ export interface UserPreferences {
   };
 }
 
+export interface Role {
+  id: number;
+  name: string;
+  description?: string;
+}
+
 export interface User {
   id: number;
   email: string;
@@ -30,10 +37,7 @@ export interface User {
   createdAt?: Date;
   updatedAt?: Date;
   permissions: Permission[];
-  /**
-   * @deprecated Use permissions instead
-   */
-  roles?: string[];
+  roles?: Role[];
   emailVerified?: boolean;
   requiresPasswordChange?: boolean;
   lastPasswordChange?: Date;
@@ -101,14 +105,10 @@ export interface AdminUserCreation {
   firstName?: string;
   lastName?: string;
   password?: string;
-  /**
-   * @deprecated Use permissions instead. Roles are being phased out in favor of permissions.
-   */
-  roles?: string[];
   permissions?: {
     id: string;
-    resource: string;
-    action: string;
+    resourceName: string;
+    actionName: string;
     granted: boolean;
   }[];
   groups?: number[];

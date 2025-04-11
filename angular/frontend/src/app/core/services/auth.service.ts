@@ -1,18 +1,18 @@
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, throwError, catchError, map, mergeMap, of, switchMap } from 'rxjs';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap, throwError, catchError, of, take } from 'rxjs';
 import { isPlatformBrowser } from '@angular/common';
 import { 
   User, 
-  UserLogin, 
-  UserRegistration, 
+  UserLogin,
   AuthResponse,
   RefreshTokenRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
   VerificationResponse,
   PasswordChangeRequest,
-  Permission
+  Permission,
+  UserRegistration
 } from '../../models';
 import { environment } from '../../../environments/environment';
 import { Router } from '@angular/router';
@@ -38,7 +38,7 @@ export class AuthService {
   // Make these public for template access
   public currentUser: User | null = null;
   public userPermissions: Permission[] = [];
-  private permissionCache: Map<string, boolean> = new Map();
+  private permissionCache = new Map<string, boolean>();
   
   // For testing purposes - will store the most recent verification token
   private testVerificationTokenSubject = new BehaviorSubject<string | null>(null);
@@ -49,25 +49,33 @@ export class AuthService {
   accessToken$ = this.accessTokenSubject.asObservable();
   csrfToken$ = this.csrfTokenSubject.asObservable();
 
+  // Add a subject to signal when initialization is complete
+  private isInitializedSubject = new BehaviorSubject<boolean>(false);
+  isInitialized$ = this.isInitializedSubject.asObservable();
+
+  // Public getter for synchronous check
+  public get isInitialized(): boolean {
+    return this.isInitializedSubject.value;
+  }
+
   constructor(
     private http: HttpClient,
     private router: Router,
     private permissionService: PermissionService
   ) {
-    // Only load auth state if in browser environment
-    if (isPlatformBrowser(this.platformId)) {
-      this.loadAuthStateFromStorage();
-    }
-
     // Subscribe to currentUser$ to keep currentUser property in sync
     this.currentUser$.subscribe(user => {
       this.currentUser = user;
       if (user) {
         this.userPermissions = user.permissions || [];
+        this.permissionCache.clear(); // Clear cache when user/permissions change
       } else {
         this.userPermissions = [];
+        this.permissionCache.clear();
       }
     });
+    // NOTE: Removed the direct call to loadAuthStateFromStorage from constructor
+    // Initialization is now handled solely by initializeAuthState called via APP_INITIALIZER
   }
 
   // Public getters
@@ -128,224 +136,101 @@ export class AuthService {
     );
   }
 
-  // Public method to refresh auth state from storage
-  refreshAuthStateFromStorage(): void {
-    console.log('Refreshing auth state from storage');
-    if (isPlatformBrowser(this.platformId)) {
-      this.loadAuthStateFromStorage();
-      console.log('Auth state after refresh - isAuthenticated:', this.isAuthenticated);
+  /**
+   * Initializes the authentication state by loading tokens from storage,
+   * attempting a refresh if tokens exist, and only setting state upon success.
+   * Designed to be used with APP_INITIALIZER.
+   * @returns Observable<boolean> emitting true if auth state restored/refreshed, false otherwise.
+   */
+  initializeAuthState(): Observable<boolean> {
+    console.log('AuthService: Initializing authentication state (Solution B)...');
+    this.isInitializedSubject.next(false); // Signal start
+
+    if (!isPlatformBrowser(this.platformId)) {
+      console.log('AuthService: Not in browser, skipping auth init.');
+      this.isInitializedSubject.next(true);
+      return of(false);
     }
-  }
 
-  // Login
-  login(credentials: UserLogin): Observable<AuthResponse> {
-    console.log('AuthService.login called');
-    console.log('Request URL:', `${this.API_URL}/login`);
-    
-    return this.http.post<any>(`${this.API_URL}/login`, credentials)
-      .pipe(
-        map(response => {
-          console.log('Raw login response received');
+    return new Observable<boolean>(observer => {
+      try {
+        const storedData = this.readAuthStateFromStorage();
 
-          // Validate token response
-          if (!response || !response.access_token || !response.refresh_token) {
-            console.error('Invalid login response - missing token data');
-            throw new Error('Invalid login response: missing token data');
-          }
-
-          // Store tokens immediately for subsequent requests
-          const tokens = {
-            accessToken: response.access_token,
-            refreshToken: response.refresh_token,
-            csrfToken: response.csrf_token,
-            expiresIn: response.expires_in || 3600
-          };
-          
-          // Set token immediately for subsequent requests
-          this.accessTokenSubject.next(tokens.accessToken);
-          this.refreshTokenSubject.next(tokens.refreshToken);
-          if (tokens.csrfToken) {
-            this.csrfTokenSubject.next(tokens.csrfToken);
-          }
-
-          // Return an observable that will fetch the user profile
-          return this.http.get<User>(`${this.API_URL}/profile`, {
-            headers: {
-              'Authorization': `Bearer ${tokens.accessToken}`
-            }
-          }).pipe(
-            map(user => {
-              // Update user permissions
-              this.updateUserPermissions(user);
-              
-              // Combine tokens with user data
-              const authResponse: AuthResponse = {
-                user: user,
-                ...tokens,
-                requiresVerification: false
-              };
-
-              console.log('Complete login process successful');
-              return authResponse;
-            }),
-            catchError(profileError => {
-              console.error('Error fetching user profile after login:', profileError);
-              
-              // If profile fetch fails, still return partial response
-              // This will allow the interceptor to use the token for future requests
-              const partialUser: User = {
-                id: 0,
-                email: '',
-                firstName: '',
-                lastName: '',
-                isActive: false,
-                isVerified: false,
-                lastLogin: new Date(),
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                permissions: [] as Permission[],
-                emailVerified: false,
-                requiresPasswordChange: false,
-                lastPasswordChange: new Date(),
-                groups: []
-              };
-
-              const partialResponse: AuthResponse = {
-                user: partialUser,
-                ...tokens,
-                requiresVerification: false
-              };
-              
-              return of(partialResponse);
-            })
-          );
-      }),
-        mergeMap(observable => observable),
-        tap(response => {
-          // Handle the auth response synchronously
-          this.handleAuthResponse(response);
-          
-          // Verify the state was updated correctly
-          if (!this.isAuthenticated) {
-            console.error('Authentication state not properly updated after login');
-            throw new Error('Authentication state not properly updated');
-          }
-          
-          console.log('Auth state updated successfully');
-          
-          // Load user permissions after successful login
-          this.permissionService.loadUserPermissions().subscribe(
-            () => console.log('User permissions loaded successfully'),
-            error => console.error('Error loading user permissions:', error)
-          );
-        }),
-        catchError(error => {
-          console.error('Login error:', error);
-          // Clear any partial state on error
+        if (storedData.accessToken && storedData.refreshToken) {
+          console.log('AuthService: Tokens found. Attempting proactive refresh...');
+          // Pass the actual refresh token string
+          this.refreshAccessToken(storedData.refreshToken)
+            .subscribe({
+              next: () => {
+                console.log('AuthService: Proactive token refresh successful.');
+                observer.next(true);
+                observer.complete();
+              },
+              error: (refreshError) => {
+                console.warn('AuthService: Proactive token refresh failed. Clearing state.', refreshError);
+                this.clearAuthState();
+                observer.next(false);
+                observer.complete();
+              }
+            });
+        } else {
+          console.log('AuthService: No valid token pair found in storage. Clearing state.');
           this.clearAuthState();
-          return throwError(() => error);
+          observer.next(false);
+          observer.complete();
+        }
+      } catch (error) {
+        console.error('AuthService: Error during initial auth state loading:', error);
+        this.clearAuthState();
+        observer.next(false);
+        observer.complete();
+      }
+    }).pipe(
+      take(1),
+      tap(result => {
+         console.log(`AuthService: Initialization observable completed. Final Auth State: ${result}`);
+         this.isInitializedSubject.next(true);
+      }),
+      catchError(err => {
+        console.error('AuthService: Uncaught error in initialization pipe:', err);
+        this.clearAuthState();
+        this.isInitializedSubject.next(true);
+        return of(false);
       })
     );
   }
 
-  // Register
-  register(userData: UserRegistration): Observable<AuthResponse> {
-    console.log('AuthService.register called with:', {
-      ...userData,
-      password: '******' // Don't log the actual password
-    });
-    console.log('Request URL:', `${this.API_URL}/register`);
-    
-    // Use real HTTP implementation
-    return this.http.post<AuthResponse>(`${this.API_URL}/register`, userData)
-      .pipe(
-        tap(response => {
-          console.log('Registration successful');
-          this.handleAuthResponse(response);
-        }),
-        catchError(error => {
-          console.error('Registration HTTP error:', error);
-          return throwError(() => error);
-        })
-      );
-  }
+  // Ensure refreshAccessToken signature matches call
+  refreshAccessToken(token?: string | null): Observable<AuthResponse> {
+    const refreshTokenToUse = token ?? this.refreshTokenSubject.value; // Use provided or current subject value
 
-  // Logout
-  logout(): Observable<any> {
-    console.log('AuthService.logout called, refresh token available:', !!this.refreshToken);
-    
-    // Always clear local auth state first to ensure UI updates immediately
-    this.clearAuthState();
-    
-    // If no refresh token available, just return success immediately
-    if (!this.refreshToken) {
-      console.warn('No refresh token available for logout, already cleared auth state locally');
-      return of({ success: true, message: 'Logged out locally' });
+    if (!refreshTokenToUse) {
+      return throwError(() => new Error('No refresh token available for refreshAccessToken call'));
     }
-
-    const request: RefreshTokenRequest = { refreshToken: this.refreshToken };
-    console.log('Sending logout request to backend');
-    
-    return this.http.post(`${this.API_URL}/logout`, request)
-      .pipe(
-        tap((response) => {
-          console.log('Logout successful:', response);
-          
-          // Clear local storage
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('csrfToken');
-          localStorage.removeItem('user');
-          localStorage.removeItem('testVerificationToken');
-          
-          // Clear the current user
-          this.currentUserSubject.next(null);
-          
-          // Clear the permissions cache
-          this.permissionService.clearCache();
-          
-          // Navigate to login page
-          this.router.navigate(['/login']);
-        }),
-        catchError(error => {
-          console.error('Error during logout API call:', error);
-          // Auth state already cleared, just log the error and return success
-          return of({ success: true, message: 'Logged out locally despite API error' });
-        })
-      );
-  }
-
-  // Refresh token
-  refreshAccessToken(): Observable<AuthResponse> {
-    if (!this.refreshToken) {
-      return throwError(() => new Error('No refresh token available'));
-    }
-
-    // Ensure refresh token is a string and properly formatted
-    if (typeof this.refreshToken !== 'string' || this.refreshToken.trim() === '') {
-      console.error('Invalid refresh token format:', this.refreshToken);
+    if (typeof refreshTokenToUse !== 'string' || refreshTokenToUse.trim() === '') {
+      console.error('Invalid refresh token format:', refreshTokenToUse);
       this.clearAuthState();
       return throwError(() => new Error('Invalid refresh token format'));
     }
     
-    const request: RefreshTokenRequest = { refreshToken: this.refreshToken };
-    console.log('Sending refresh token request with token type:', typeof this.refreshToken);
+    const request: RefreshTokenRequest = { refreshToken: refreshTokenToUse };
+    console.log('Sending refresh token request...');
     
     return this.http.post<AuthResponse>(`${this.API_URL}/refresh`, request)
       .pipe(
         tap(response => {
-          this.handleAuthResponse(response);
-          
-          // Refresh permissions after token refresh
+          console.log('Token refresh HTTP call successful. Handling response...');
+          this.handleAuthResponse(response); // Updates subjects and storage
+          // Load permissions AFTER successful refresh
           this.permissionService.loadUserPermissions().subscribe(
-            () => console.log('User permissions refreshed successfully'),
-            error => console.error('Error refreshing user permissions:', error)
+            () => console.log('User permissions refreshed successfully after token refresh.'),
+            error => console.error('Error refreshing user permissions after token refresh:', error)
           );
         }),
         catchError(error => {
-          console.error('Token refresh error:', error);
-          // If we get an invalid token error, clear the auth state
-          if (error.status === 400) {
+          console.error('Token refresh HTTP call failed:', error);
+          if (error.status === 400 || error.status === 401) { // 400/401 usually means invalid refresh token
+            console.log('Clearing auth state due to invalid refresh token.');
             this.clearAuthState();
           }
           return throwError(() => error);
@@ -353,60 +238,78 @@ export class AuthService {
       );
   }
 
+  // Reads from storage but DOES NOT update state subjects
+  private readAuthStateFromStorage(): { accessToken: string | null, refreshToken: string | null, csrfToken: string | null, user: User | null } {
+    if (!isPlatformBrowser(this.platformId)) {
+      return { accessToken: null, refreshToken: null, csrfToken: null, user: null };
+    }
+    try {
+      const accessToken: string | null = localStorage.getItem('accessToken');
+      const refreshToken: string | null = localStorage.getItem('refreshToken');
+      const csrfToken: string | null = localStorage.getItem('csrfToken');
+      const userJson: string | null = localStorage.getItem('user');
+      const user: User | null = userJson ? JSON.parse(userJson) as User : null;
+
+      return { accessToken, refreshToken, csrfToken, user };
+    } catch (error) {
+      console.error('Error reading auth state from localStorage:', error);
+      // Clear potentially corrupted storage
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('csrfToken');
+      localStorage.removeItem('user');
+      return { accessToken: null, refreshToken: null, csrfToken: null, user: null };
+    }
+  }
+
   // Get user profile
   getUserProfile(): Observable<User> {
     return this.http.get<User>(`${this.API_URL}/profile`);
   }
 
-  // Forgot password
-  forgotPassword(email: string): Observable<any> {
-    const request: ForgotPasswordRequest = { email };
-    console.log('AuthService.forgotPassword called with:', email);
-    console.log('Request URL:', `${this.API_URL}/forgot-password`);
-    console.log('Full API_URL value:', this.API_URL);
-    
-    // Mock implementation for testing when backend is not available
-    if (false) { // Changed to use the real API implementation
-      console.log('Using mock implementation for forgotPassword');
-      // Simulate a delay like a real API call would have
-      return new Observable(observer => {
-        setTimeout(() => {
-          // Simulate a successful response
-          const mockResponse = { 
-            success: true, 
-            message: 'If the email exists, a password reset link will be sent',
-            resetToken: 'mock-token-for-testing'
-          };
-          console.log('Mock forgot password response:', mockResponse);
-          observer.next(mockResponse);
-          observer.complete();
-        }, 1000); // 1 second delay to simulate network latency
-      });
-    }
-    
-    // Real implementation when backend is available
-    return this.http.post(`${this.API_URL}/forgot-password`, request).pipe(
-      tap(response => console.log('Forgot password response:', response)),
+  /**
+   * Request a password reset email.
+   */
+  forgotPassword(request: ForgotPasswordRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.API_URL}/forgot-password`, request).pipe(
+      tap(() => console.log('Forgot password request sent')),
       catchError(error => {
-        console.error('Forgot password HTTP error:', error);
+        console.error('Forgot password request failed:', error);
         return throwError(() => error);
       })
     );
   }
 
   // Verify reset token
-  verifyResetToken(token: string): Observable<any> {
-    return this.http.post(`${this.API_URL}/verify-reset-token`, { token });
+  verifyResetToken(token: string): Observable<{ valid: boolean }> {
+    return this.http.post<{ valid: boolean }>(`${this.API_URL}/verify-reset-token`, { token });
   }
 
-  // Reset password
-  resetPassword(resetData: ResetPasswordRequest): Observable<any> {
-    return this.http.post(`${this.API_URL}/reset-password`, resetData);
+  /**
+   * Reset the password using a token.
+   */
+  resetPassword(request: ResetPasswordRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.API_URL}/reset-password`, request).pipe(
+      tap(() => console.log('Password reset successful')),
+      catchError((error) => {
+        const typedError = error as HttpErrorResponse;
+        console.error('Password reset failed:', typedError);
+        return throwError(() => typedError);
+      })
+    );
   }
 
-  // Validate CSRF token
-  validateCsrfToken(): Observable<any> {
-    return this.http.post(`${this.API_URL}/validate-csrf`, {});
+  /**
+   * Validate a CSRF token.
+   */
+  validateCsrfToken(csrfToken: string): Observable<{ valid: boolean }> {
+    return this.http.post<{ valid: boolean }>(`${this.API_URL}/validate-csrf`, { csrfToken }).pipe(
+      tap(response => console.log('CSRF token validation result:', response)),
+      catchError(error => {
+        console.error('CSRF token validation failed:', error);
+        return of({ valid: false });
+      })
+    );
   }
 
   // Verify email
@@ -419,98 +322,6 @@ export class AuthService {
     
     if (!email) {
       return throwError(() => new Error('Email is required for verification'));
-    }
-    
-    // Mock implementation for testing when backend is not available
-    if (false) { // Changed to use the real API implementation
-      console.log('Using mock implementation for email verification');
-      
-      return new Observable(observer => {
-        setTimeout(() => {
-          try {
-            // Validate token (in a real app, this would be done on the server)
-            if (token.length < 5) {
-              throw new Error('Invalid verification token');
-            }
-            
-            // Simulate a successful response
-            const mockUser: User = {
-              id: Math.floor(Math.random() * 1000) + 1,
-              email: email,
-              firstName: email.split('@')[0],
-              lastName: 'User',
-              isActive: true,
-              isVerified: true,
-              emailVerified: true,
-              lastLogin: new Date(),
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              permissions: [
-                {
-                  id: 'default-read',
-                  name: 'Read Access',
-                  description: 'Default read access for new users',
-                  resourceName: 'profile',
-                  actionName: 'read'
-                },
-                {
-                  id: 'default-update',
-                  name: 'Update Profile',
-                  description: 'Ability to update own profile',
-                  resourceName: 'profile',
-                  actionName: 'update'
-                }
-              ],
-              requiresPasswordChange: false,
-              lastPasswordChange: new Date(),
-              groups: []
-            };
-            
-            // Create tokens that are guaranteed to be strings
-            const accessToken = `mock-access-token-${Date.now()}`;
-            const refreshToken = `mock-refresh-token-${Date.now()}`;
-            const csrfToken = `mock-csrf-token-${Date.now()}`;
-            
-            const mockResponse: VerificationResponse = {
-              user: mockUser,
-              success: true,
-              message: 'Email verified successfully.',
-              accessToken: accessToken,
-              refreshToken: refreshToken,
-              csrfToken: csrfToken
-            };
-            
-            // Update auth state with the verified user
-            this.handleAuthResponse({
-              user: mockUser,
-              accessToken: accessToken,
-              refreshToken: refreshToken,
-              csrfToken: csrfToken,
-              expiresIn: 3600,
-              requiresVerification: false
-            });
-            
-            console.log('Mock verification response:', {
-              ...mockResponse,
-              accessToken: '******',
-              refreshToken: '******',
-              csrfToken: '******'
-            });
-            
-            observer.next(mockResponse);
-            observer.complete();
-          } catch (error: any) {
-            console.error('Error in mock email verification:', error);
-            observer.error({
-              error: {
-                message: error.message || 'Email verification failed'
-              },
-              status: 400,
-              statusText: 'Bad Request'
-            });
-          }
-        }, 1500); // 1.5 second delay to simulate network latency
-      });
     }
     
     // Real implementation when backend is available
@@ -531,37 +342,43 @@ export class AuthService {
     );
   }
 
-  // Change password
-  changePassword(passwordChangeRequest: PasswordChangeRequest): Observable<any> {
-    console.log('AuthService.changePassword called');
-    
-    return this.http.post<any>(`${this.API_URL}/change-password`, passwordChangeRequest);
+  /**
+   * Change the current user's password.
+   */
+  changePassword(request: PasswordChangeRequest): Observable<void> {
+    return this.http.post<void>(`${this.API_URL}/profile/change-password`, request).pipe(
+      tap(() => console.log('Password changed successfully')),
+      catchError((error) => {
+        const typedError = error as HttpErrorResponse;
+        console.error('Password change failed:', typedError);
+        return throwError(() => typedError);
+      })
+    );
   }
 
   // Private helper methods
   private handleAuthResponse(response: AuthResponse): void {
-    console.log('Handling auth response');
-    
-    // Validate response data
+    console.log('Handling auth response (updating subjects and storage)');
     if (!response.user || !response.accessToken || !response.refreshToken) {
-      console.error('Invalid auth response:', response);
+      console.error('Invalid auth response in handleAuthResponse:', response);
+      this.clearAuthState(); // Clear state if response is invalid
       throw new Error('Invalid auth response: missing required data');
     }
     
-    // Update state in memory
+    // Update subjects first
     this.currentUserSubject.next(response.user);
     this.accessTokenSubject.next(response.accessToken);
     this.refreshTokenSubject.next(response.refreshToken);
     this.csrfTokenSubject.next(response.csrfToken);
     
-    // Save to storage if in browser environment
+    // Then save to storage
     if (isPlatformBrowser(this.platformId)) {
       try {
         this.saveAuthStateToStorage(response);
-        console.log('Auth state saved to storage');
+        console.log('Auth state saved to storage by handleAuthResponse');
       } catch (error) {
-        console.error('Error saving auth state to storage:', error);
-        throw error;
+        console.error('Error saving auth state to storage in handleAuthResponse:', error);
+        // Don't re-throw, but state might be inconsistent
       }
     }
   }
@@ -573,8 +390,9 @@ export class AuthService {
         localStorage.setItem('user', JSON.stringify(authResponse.user));
         localStorage.setItem('accessToken', authResponse.accessToken);
         localStorage.setItem('refreshToken', authResponse.refreshToken);
-        localStorage.setItem('csrfToken', authResponse.csrfToken);
-        
+        // Handle potentially null/undefined csrfToken
+        localStorage.setItem('csrfToken', authResponse.csrfToken || ''); // Save empty string if null/undefined
+
         // Save debug info if available (development only)
         if (authResponse.debugInfo) {
           localStorage.setItem('authDebugInfo', JSON.stringify(authResponse.debugInfo));
@@ -588,82 +406,10 @@ export class AuthService {
     }
   }
 
-  private loadAuthStateFromStorage(): void {
-    // Check for browser environment before accessing localStorage
-    if (isPlatformBrowser(this.platformId)) {
-      try {
-        const userJson = localStorage.getItem('user');
-        const accessToken = localStorage.getItem('accessToken');
-        let refreshToken = localStorage.getItem('refreshToken');
-        const csrfToken = localStorage.getItem('csrfToken');
-        const testToken = localStorage.getItem('testVerificationToken');
-
-        console.log('Loading auth state from storage - found tokens:', { 
-          hasUser: !!userJson, 
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken
-        });
-
-        // Only try to parse and set user data if both user and token exist
-        if (userJson && accessToken) {
-          try {
-            const user = JSON.parse(userJson);
-            
-            // Validate tokens format (simple check)
-            const isValidAccessToken = typeof accessToken === 'string' && accessToken.length > 20;
-            const isValidRefreshToken = typeof refreshToken === 'string' && refreshToken.length > 20;
-            
-            if (!isValidAccessToken) {
-              console.warn('Invalid access token format in localStorage, clearing auth state');
-              this.clearAuthState();
-              return;
-            }
-            
-            if (!isValidRefreshToken && refreshToken !== null) {
-              console.warn('Invalid refresh token format in localStorage, clearing refresh token');
-              localStorage.removeItem('refreshToken');
-              refreshToken = null;
-            }
-            
-            // Validate that user object has required fields
-            if (user && user.id && user.email && isValidAccessToken) {
-              console.log('Valid auth data found in localStorage, setting auth state');
-              this.currentUserSubject.next(user);
-              this.accessTokenSubject.next(accessToken);
-              
-              if (refreshToken) {
-                this.refreshTokenSubject.next(refreshToken);
-              }
-              
-              if (csrfToken) {
-                this.csrfTokenSubject.next(csrfToken);
-              }
-            } else {
-              console.warn('Invalid user data in localStorage, clearing auth state');
-              this.clearAuthState();
-            }
-          } catch (error) {
-            console.error('Error parsing user data from localStorage:', error);
-            this.clearAuthState(); // Clear invalid data
-          }
-        } else {
-          // Clear any partial state if either user or token is missing
-          console.log('Incomplete auth data in localStorage, clearing auth state');
-          this.clearAuthState();
-        }
-        
-        // Load test verification token if available
-        if (testToken) {
-          this.testVerificationTokenSubject.next(testToken);
-        }
-      } catch (error) {
-        console.error('Error accessing localStorage:', error);
-        this.clearAuthState(); // Clear potentially corrupted data
-      }
-    }
-  }
-
-  public clearAuthState(): void {
+  /**
+   * Clears all authentication tokens and user data from subjects and storage.
+   */
+  private clearAuthState(): void {
     this.currentUserSubject.next(null);
     this.accessTokenSubject.next(null);
     this.refreshTokenSubject.next(null);
@@ -679,17 +425,18 @@ export class AuthService {
   }
 
   // Delete account
-  deleteAccount(): Observable<any> {
+  deleteAccount(): Observable<void> {
     console.log('AuthService.deleteAccount called');
     
-    return this.http.delete<any>(`${this.API_URL}/delete-account`).pipe(
+    return this.http.delete<void>(`${this.API_URL}/delete-account`).pipe(
       tap(() => {
         // Clear auth state on successful account deletion
         this.clearAuthState();
       }),
-      catchError(error => {
-        console.error('Error deleting account:', error);
-        return throwError(() => error);
+      catchError((error) => {
+        const typedError = error as HttpErrorResponse;
+        console.error('Error deleting account:', typedError);
+        return throwError(() => typedError);
       })
     );
   }
@@ -700,46 +447,26 @@ export class AuthService {
    * @returns Observable of AuthStatus containing authentication state and user if authenticated
    */
   checkAuthStatus(): Observable<AuthStatus> {
-    // If we're in a server environment, user is not authenticated
     if (!isPlatformBrowser(this.platformId)) {
       return of({ isAuthenticated: false, user: null });
     }
-    
-    // If we already have a user and token in memory, use that
+
+    // Use current in-memory state first
     if (this.isAuthenticated && this.currentUser) {
-      return of({
-        isAuthenticated: true,
-        user: this.currentUser
-      });
+      return of({ isAuthenticated: true, user: this.currentUser });
+    }
+
+    // If not in memory, check storage but DON'T validate here
+    const stored = this.readAuthStateFromStorage();
+    if (stored.accessToken && stored.user) {
+        // If data is in storage, we assume it *might* be valid, but return current (null) state.
+        // The APP_INITIALIZER should have handled validation/refresh.
+        // If called *after* init, a component should trigger getUserProfile or similar
+        // based on the potentially null currentUser$. Return the current (likely null) state for now.
+         return of({ isAuthenticated: !!this.accessToken && !!this.currentUser, user: this.currentUser });
     }
     
-    // Try loading from storage
-    this.loadAuthStateFromStorage();
-    
-    // Check again after loading from storage
-    if (this.isAuthenticated && this.currentUser) {
-      return of({
-        isAuthenticated: true,
-        user: this.currentUser
-      });
-    }
-    
-    // If we have a token but no user, try to fetch the user profile
-    if (this.accessToken && !this.currentUser) {
-      return this.getUserProfile().pipe(
-        map(user => ({
-          isAuthenticated: true,
-          user
-        })),
-        catchError(() => {
-          // If profile fetch fails, user is not authenticated
-          this.clearAuthState();
-          return of({ isAuthenticated: false, user: null });
-        })
-      );
-    }
-    
-    // If no token or failed to load, user is not authenticated
+    // If nothing in memory or storage, definitely not authenticated
     return of({ isAuthenticated: false, user: null });
   }
 
@@ -748,5 +475,84 @@ export class AuthService {
     this.currentUser = user;
     this.userPermissions = user.permissions || [];
     this.permissionCache.clear(); // Clear cache when permissions change
+  }
+
+  /**
+   * Logs the user out by clearing auth state and navigating to login.
+   */
+  logout(): Observable<void> {
+    const refreshToken = this.refreshTokenSubject.value;
+    
+    // Clear local state immediately
+    this.clearAuthState();
+    
+    // Navigate to login page
+    this.router.navigate(['/login']);
+
+    // Call the backend logout endpoint if a refresh token existed
+    if (refreshToken) {
+      return this.http.post<void>(`${this.API_URL}/logout`, { refreshToken }).pipe(
+        catchError(err => {
+          console.error('Logout API call failed, but local state is cleared:', err);
+          // Don't block logout if API call fails, just log error
+          return of(undefined); 
+        })
+      );
+    } else {
+      // If no refresh token, nothing to invalidate on backend
+      return of(undefined); 
+    }
+  }
+
+  /**
+   * Log in a user.
+   */
+  login(credentials: UserLogin): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials).pipe(
+      tap(response => {
+        this.handleAuthResponse(response);
+        // Load permissions AFTER successful login
+        this.permissionService.loadUserPermissions().subscribe();
+      }),
+      catchError((error) => {
+        const typedError = error as HttpErrorResponse;
+        console.error('Login failed:', typedError);
+        this.clearAuthState(); // Clear state on login failure
+        return throwError(() => typedError);
+      })
+    );
+  }
+  
+  /**
+   * Register a new user.
+   */
+  register(userData: UserRegistration): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.API_URL}/register`, userData).pipe(
+      tap(response => {
+        this.handleAuthResponse(response);
+        // Load permissions after successful registration if user is auto-logged in
+        if (response.user) {
+          this.permissionService.loadUserPermissions().subscribe();
+        }
+      }),
+      catchError((error: HttpErrorResponse) => {
+        console.error('Registration failed:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+  
+  /**
+   * Refreshes the authentication state from storage.
+   * Reads stored tokens and user data and updates the state subjects.
+   */
+  refreshAuthStateFromStorage(): void {
+    const storedState = this.readAuthStateFromStorage();
+    if (storedState.accessToken && storedState.user) {
+      this.accessTokenSubject.next(storedState.accessToken);
+      this.refreshTokenSubject.next(storedState.refreshToken);
+      this.csrfTokenSubject.next(storedState.csrfToken);
+      this.currentUserSubject.next(storedState.user);
+    }
   }
 }

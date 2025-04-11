@@ -1,19 +1,16 @@
 export interface Permission {
   id: string;
   name: string;
-  resource: string;
-  action: string;
+  resourceName: string;
+  actionName: string;
   granted: boolean;
 }
 
 export interface Member {
   id: number;
   name: string;
-  /**
-   * @deprecated Use permissions instead. Member roles are being phased out in favor of group-specific permissions.
-   */
-  role?: string;
   permissions: Permission[];
+  role?: string;
 }
 
 export interface Group {
@@ -25,18 +22,18 @@ export interface Group {
   permissions: Permission[];
 }
 
-export const GROUP_PERMISSION_SETS: { [key: string]: Permission[] } = {
+export const GROUP_PERMISSION_SETS: Record<string, Permission[]> = {
   'OWNER': [
-    { id: 'group:manage', name: 'Manage Group', resource: 'group', action: 'manage', granted: true },
-    { id: 'group:delete', name: 'Delete Group', resource: 'group', action: 'delete', granted: true },
-    { id: 'member:manage', name: 'Manage Members', resource: 'member', action: 'manage', granted: true }
+    { id: 'group:manage', name: 'Manage Group', resourceName: 'group', actionName: 'manage', granted: true },
+    { id: 'group:delete', name: 'Delete Group', resourceName: 'group', actionName: 'delete', granted: true },
+    { id: 'member:manage', name: 'Manage Members', resourceName: 'member', actionName: 'manage', granted: true }
   ],
   'ADMIN': [
-    { id: 'group:manage', name: 'Manage Group', resource: 'group', action: 'manage', granted: true },
-    { id: 'member:manage', name: 'Manage Members', resource: 'member', action: 'manage', granted: true }
+    { id: 'group:manage', name: 'Manage Group', resourceName: 'group', actionName: 'manage', granted: true },
+    { id: 'member:manage', name: 'Manage Members', resourceName: 'member', actionName: 'manage', granted: true }
   ],
   'MEMBER': [
-    { id: 'group:read', name: 'View Group', resource: 'group', action: 'read', granted: true },
-    { id: 'member:read', name: 'View Members', resource: 'member', action: 'read', granted: true }
+    { id: 'group:read', name: 'View Group', resourceName: 'group', actionName: 'read', granted: true },
+    { id: 'member:read', name: 'View Members', resourceName: 'member', actionName: 'read', granted: true }
   ]
 }; 

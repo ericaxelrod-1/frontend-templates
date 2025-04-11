@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
@@ -14,7 +14,7 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
   templateUrl: './role-permissions.component.html',
   styleUrls: ['./role-permissions.component.scss']
 })
-export class RolePermissionsComponent implements OnInit {
+export class RolePermissionsComponent implements OnInit, AfterViewInit {
   roles: Role[] = [];
   selectedRole: Role | null = null;
   allPermissions: Permission[] = [];

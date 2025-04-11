@@ -3,7 +3,7 @@ description:
 globs: 
 alwaysApply: true
 ---
- ---
+---
 description: "Strict rules for order of operations before code changes"
 globs: ["**/*"]
 tags: ["scripts", "code", "configuration","implementation","package"]
@@ -12,30 +12,116 @@ priority: 2
 
 # STRICT MANDATORY SEQUENCE - DO NOT SKIP ANY STEPS
 
-⚠️ **WARNING: It is ABSOLUTELY PROHIBITED to explore project files, run commands, or begin any implementation before completing steps 1-4 below. No exceptions!**
+⚠️ **WARNING: It is ABSOLUTELY PROHIBITED to explore project files, run commands, or begin any implementation before completing steps 1-6 below. No exceptions!**
 
 ⚠️ **You MUST NOT browse directories, check code files, or run any commands until you have thoroughly reviewed the implementation status files.**
 
-Before making any code changes **follow this exact sequence**
-- New scripts
-- Editing scripts
-- Installing packages
-- Uninstalling packages
-- Creating configuration files
-- Editing configuration files
+## Task Atomic Transaction
 
- **Never deviate from the priority order in Review @000-variables.mdc[current_state] unless explicitly authorized in the conversation.**
+⚠️ **Code and documentation are a single atomic transaction - they must be completed together or not at all.**
 
+Task sequence:
+1. Read documentation (@000-variables.mdc[current_state], @000-variables.mdc[backlog], @000-variables.mdc[changelog], @000-variables.mdc[implementation_steps])
+2. Make code changes
+3. Test code changes
+4. Update ALL documentation:
+   - @000-variables.mdc[changelog]
+   - @000-variables.mdc[backlog]
+   - @000-variables.mdc[implementation_steps]
+   - @000-variables.mdc[current_state]
+5. ONLY THEN report completion to user
 
-1. **Review @000-variables.mdc[implementation_steps]** first to understand the project plan
-2. **Review @000-variables.mdc[current_state]** first to understand the current project state
-3. **Check task dependencies** before starting work on a new task
-4. **Select the next task based on Review @000-variables.mdc[implementation_steps] and @000-variables.mdc[current_state]** 
-- 1st priority: Tasks which with a status of "Has Issues" or which have failed tests
-- 2nd priority: Tasks with a status of Not Started
-5. Examine the code base
-6. Begin editing and testing code for the **chosen task**
-7. **Update task status** after completing work
+## Task Evaluation Flow
+
+```
+┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
+│                   │     │                   │     │                   │
+│  @000-variables.mdc     │  @000-variables.mdc     │  @000-variables.mdc
+│     [current_state]     │     [backlog]      │     │     [changelog]   │
+│   Project Status  │────▶│  Pending Issues   │────▶│  Active Changes   │
+│                   │     │                   │     │                   │
+└───────────────────┘     └───────────────────┘     └───────────────────┘
+          │                        │                         │
+          ▼                        ▼                         ▼
+┌───────────────────┐             │                         │
+│  @000-variables.mdc              │                         │
+│  [implementation_steps]         │                         │
+│    Master Plan    │◀────────────┴─────────────────────────┘
+│                   │
+└───────────────────┘
+          │
+          ▼
+┌───────────────────┐
+│                   │
+│   TASK SELECTION  │
+│                   │
+└───────────────────┘
+```
+
+## Priority Order
+1. Critical bugs (BUG-XXX) from @000-variables.mdc[backlog]
+2. In-progress items from @000-variables.mdc[changelog]
+3. Tasks with "Has Issues" status in @000-variables.mdc[implementation_steps] or @000-variables.mdc[current_state]
+4. High priority features from @000-variables.mdc[backlog]
+5. Tasks with a status of "Not Started" in @000-variables.mdc[implementation_steps]
+
+Before making any code changes **follow this exact sequence**:
+
+1. **Perform maintenance tasks:**
+   - Check current system datetime
+   - Move items older than 24 hours from "Completed Today" to "Recent Completions" in @000-variables.mdc[changelog]
+   - Move items older than 7 days to @000-variables.mdc[changelog_archive]
+   - Update timestamps in all document headers
+
+2. **Review @000-variables.mdc[current_state]** to understand the project status
+   - Focus on "Current Focus Areas"
+   - Note any "Known Issues" 
+   - Check "Recent Accomplishments"
+
+3. **Review @000-variables.mdc[backlog]** for highest priority items
+   - Critical bugs MUST be addressed before any new features
+   - Recently added items should be reviewed for priority
+   - Items matching current focus areas take precedence
+
+4. **Check @000-variables.mdc[changelog]** for in-progress work
+   - Continue any "In Progress" items before starting new work
+   - Review recent completions to avoid duplicating work
+
+5. **Review @000-variables.mdc[implementation_steps]** to understand the project plan
+   - Identify the current implementation phase
+   - Check dependencies for potential tasks
+   - Verify task priorities and sequences
+
+6. **Select the next task based on the priority order above**
+   - Report your understanding of the current state to the user
+   - Explain which task you're planning to work on and why
+   - List any dependencies for that task and confirm they're completed
+   - Move the selected item from backlog to "In Progress" in changelog if it's a new task
+
+7. Examine the code base
+8. Begin editing and testing code for the **chosen task**
+9. **Update task documentation** as you work:
+   - Add current system datetime
+   - Add implementation notes to the backlog entry
+   - Document issues encountered and solutions
+   - List all files modified with explanations
+   - Record test results
+
+10. **Upon completion**:
+    - Move the item to "Completed Today" in @000-variables.mdc[changelog]
+    - Update status in @000-variables.mdc[backlog] and @000-variables.mdc[implementation_steps]
+    - Add any new issues discovered to @000-variables.mdc[backlog]
+    - Update relevant sections in @000-variables.mdc[current_state]
+
+# Changelog Maintenance Guidelines
+
+Every time you start a new session:
+
+1. Check for items older than 7 days in the "Recent Completions" section of @000-variables.mdc[changelog]
+2. Move these items to @000-variables.mdc[changelog_archive] under the appropriate month section
+3. Include the full item detail including ID, title, completion date, and implementation notes
+4. Maintain chronological order within each month section
+5. Create a new month section if needed
 
 # Status-first protocol
 
@@ -47,4 +133,3 @@ When receiving any new instructions, **first check how they align with the curre
 - You **MUST** report your understanding of the current state
 - You **MUST** explain which task you're planning to work on and why
 - You **MUST** list any dependencies for that task and confirm they're completed
-

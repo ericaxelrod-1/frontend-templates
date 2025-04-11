@@ -153,4 +153,12 @@ export class ProfileComponent implements OnInit {
     this.showDeleteConfirmation = false;
     this.deleteConfirmationText = '';
   }
+  
+  // Helper method to safely get role names for the template
+  getRoleNames(): string {
+    if (!this.user || !this.user.roles || !this.user.roles.length) {
+      return '';
+    }
+    return this.user.roles.map(role => role.name).join(', ');
+  }
 } 

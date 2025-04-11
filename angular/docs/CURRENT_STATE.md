@@ -1,5 +1,5 @@
 # Current Implementation State
-Last Updated: March 23, 2023
+Last Updated: May 10, 2023
 
 ## Current Focus Areas
 1. ~~Authentication System implementation~~ (Completed)
@@ -171,24 +171,36 @@ Last Updated: March 23, 2023
    - Lazy loading of permissions
 
 ## Recent Accomplishments
-1. Completed Login Monitoring System backend implementation
-2. Verified log file creation and rotation in debug mode
-3. Implemented email verification UI components and token system
-4. Completed GDPR account deletion functionality
-5. Implemented PII anonymization for user data
-6. Added cookie consent and data protection features
-7. Implemented entity definitions for all required database models
-8. Set up HTTP logger middleware for request tracking
-9. Implemented Swagger API documentation
-10. Completed Authentication System with JWT, guards, and password validation
-11. Completed User Management API with role-based authorization
-12. Completed Group Management API with membership control and permissions
-13. Implemented code quality tools for frontend validation
-14. Completed frontend migration to permission-based access control
-15. Implemented backward-compatible Roles decorator in backend
-16. Created migration guides for backend controllers
-17. Implemented RoleMigrationSeed script for mapping roles to permissions
-18. Migrated example RolesController to use permission-based approach
+1. Implemented AuthService logout method and improved auth error handling
+   - Added proper logout functionality to AuthService
+   - Updated AuthInterceptor to handle token refresh failures
+   - Improved user session management during authentication errors
+2. Fixed ESLint errors in authentication-related files
+   - Resolved unused variable warnings
+   - Fixed import-related issues
+   - Addressed several type safety concerns
+3. Cleaned up project structure for Dynamic Access Control system
+   - Removed duplicate documentation directories
+   - Relocated permission example files to proper locations
+   - Improved code organization for better maintainability
+4. Completed Login Monitoring System backend implementation
+5. Verified log file creation and rotation in debug mode
+6. Implemented email verification UI components and token system
+7. Completed GDPR account deletion functionality
+8. Implemented PII anonymization for user data
+9. Added cookie consent and data protection features
+10. Implemented entity definitions for all required database models
+11. Set up HTTP logger middleware for request tracking
+12. Implemented Swagger API documentation
+13. Completed Authentication System with JWT, guards, and password validation
+14. Completed User Management API with role-based authorization
+15. Completed Group Management API with membership control and permissions
+16. Implemented code quality tools for frontend validation
+17. Completed frontend migration to permission-based access control
+18. Implemented backward-compatible Roles decorator in backend
+19. Created migration guides for backend controllers
+20. Implemented RoleMigrationSeed script for mapping roles to permissions
+21. Migrated example RolesController to use permission-based approach
 
 ## Implemented Features
 
@@ -630,7 +642,8 @@ npm run check:duplicate-css   # ✅ Passed
    - DebugLogsComponent imported but not used in AppComponent template
    - Debug mode configuration incomplete
 10. Build/Compilation Issues:
-    - Dynamic import warnings during HMR (Hot Module Replacement)
+    - Nodemailer module not an ESM bailout warnings
+    - ~~Dynamic import warnings during HMR reload~~ (Resolved)
     - Development server performance degradation with HMR enabled
     - ~~Material theme compilation warnings~~ (Resolved)
 11. Hardcoded Access Control Issues:
@@ -648,6 +661,15 @@ npm run check:duplicate-css   # ✅ Passed
     - TypeORM entity relationships between Permission and RolePermission
     - Permission cache update on role or group changes
     - Performance concerns with permission resolution in high-traffic endpoints
+14. **401 Unauthorized Error on Page Load (Critical)**:
+    - **Symptom**: Requests to protected backend endpoints (e.g., `/api/roles`) fail with 401 immediately after the application loads, even if the user was previously logged in.
+    - **Root Cause**: Frontend attempts to make authenticated API calls *before* the `AuthService` has finished loading the JWT token from storage and initializing the authentication state.
+    - **Planned Solution**: Implement **Task 4.6 Frontend Auth Initialization (APP_INITIALIZER)** to delay application startup until authentication is ready.
+15. ESLint Error Remediation (In Progress)
+    - Initial fixes for authentication service completed
+    - ~198 ESLint errors remaining across the codebase
+    - Many "Unexpected any" type errors to be addressed
+    - Plan in place to resolve remaining issues (see IMP-003 in backlog)
 
 ## Blockers
 
@@ -742,124 +764,6 @@ npm run check:duplicate-css   # ✅ Passed
 - ✅ IP Allowlist Service and Middleware
 - IP management interface 
 
-## Known Issues
-
-### CAPTCHA Implementation Issues
-1. Module Import Issues:
-   - CommonModule not properly imported in components using *ngIf directives
-   - ReactiveFormsModule not properly imported causing formGroup binding errors
-   - NgClass directive not recognized in components
-
-2. Component Integration Issues:
-   - app-captcha component not recognized in LoginComponent
-   - CaptchaComponent template has null safety issues with captchaData object
-   - Form control bindings not properly set up in CaptchaComponent
-
-3. Template Binding Issues:
-   - formGroup binding not working in both LoginComponent and CaptchaComponent
-   - ngClass bindings failing on input elements and app-captcha component
-   - Null safety warnings for captchaData access in template
-
-4. Build/Compilation Errors:
-   - Multiple NG8103 warnings about missing CommonModule imports
-   - NG8002 errors for formGroup and ngClass bindings
-   - NG8001 error for unrecognized app-captcha element
-   - NG1 errors for potential null object access
-
-### Current Status
-
-1. CAPTCHA System Development:
-   - ✅ Backend CAPTCHA service implementation complete
-   - ✅ Frontend CAPTCHA service implementation complete
-   - ✅ CAPTCHA component UI design complete
-   - ❌ Frontend module integration issues (Blocking)
-   - ❌ Component template binding issues (Blocking)
-   - ❌ Form control integration issues (Blocking)
-
-## Backend Migration Issues
-
-### Current Error Analysis
-- **Status**: Has Issues (Critical)
-- **Impact**: Preventing backend build
-- **Root Cause**: Incomplete migration from role-based to permission-based access control
-
-1. **Type Mismatch Errors**:
-   - Permission IDs changed from `number` to `string` type causing incompatibilities
-   - Error pattern: `Type 'number' is not assignable to type 'string | FindOperator<string>'`
-   - Affecting multiple controllers and services
-
-2. **Entity Structure Changes**:
-   - Permission entity structure has been significantly modified
-   - Error pattern: `Object literal may only specify known properties, and 'resourceId' does not exist in type...`
-   - Database models are out of sync with service implementations
-
-3. **Relationship Model Changes**:
-   - User-to-Role relationship changed from one-to-one to many-to-many
-   - Error pattern: `Property 'role' does not exist on type 'User'. Did you mean 'roles'?`
-   - Code still references old model in many places
-
-4. **Module Naming Conflicts**:
-   - Duplicate exports in permission-related modules
-   - Error pattern: `Module './entities/permission.entity' has already exported a member named 'Permission'`
-   - Causing build tooling confusion
-
-### Remediation Plan
-- **Priority**: Critical - Backend Build Blocker
-- **Timeline**: 1-2 weeks
-- **Owner**: Backend Team
-- **Dependencies**: Current migration progress (25% controllers, 15% services complete)
-
-1. **Phase 1: Schema Consistency (Immediate)**
-   - Create type adapters/converters to bridge old and new permission models
-   - Update entity definitions to support both formats during transition
-   - Fix module naming conflicts
-
-2. **Phase 2: Code Migration (Short-term)**
-   - Complete controller migration (remaining 75%)
-   - Accelerate service methods migration (remaining 85%)
-   - Create regression test suite for API endpoints
-
-3. **Phase 3: Test Adaptation (Medium-term)**
-   - Update test fixtures to use new permission model
-   - Create test utilities to support both models during transition
-   - Fix failing tests with new permission structure
-
-## Next Steps Priority (Updated)
-
-1. ~~Complete the authentication system (blocked by database setup)~~ (Completed)
-2. ~~Implement user management core functionality~~ (Completed)
-3. ~~Implement group management functionality~~ (Completed)
-4. ~~Finish database migrations and seeding~~ (Completed)
-5. ~~Implement remaining security features (rate limiting, input validation)~~ (Completed)
-6. ~~Add consistent branding across components~~ (Completed)
-7. ~~Implement email verification system~~ (Completed)
-8. ~~Implement GDPR compliance features~~ (Completed)
-9. Add remaining backend tests
-10. Address build/compilation issues 
-11. ~~Conduct comprehensive audit of hardcoded access controls~~ (Completed)
-12. ~~Develop migration plan for database-driven permission system~~ (Completed)
-13. ~~Implement hierarchical role and group structures~~ (Completed)
-14. ~~Create dynamic permission resolution service~~ (Completed)
-15. ~~Migrate frontend components to use permission-based access checks~~ (Completed)
-16. **Continue backend migration to dynamic access control (CRITICAL PRIORITY):**
-    - Implement type adapters for permission model compatibility
-    - Fix module naming conflicts
-    - Complete controller migration (75% remaining)
-    - Update service methods (85% remaining)
-    - Run database role-to-permission mappings
-    - Update integration tests
-    - Monitor progress with regular audit script runs
-17. Optimize permission system performance
-18. Create admin interface for permission management
-
-## IP Allowlist Feature
-- ✅ Entity definitions (LoginAttempt, IPReputation, Captcha)
-- ✅ CaptchaService implementation
-- ✅ LoginAttemptService implementation
-- ✅ IPReputationService
-- ✅ IP Allowlist Service and Middleware
-- IP management interface 
-
 ## Known Issues (Updated)
 
 14. Backend Migration Critical Issues:
@@ -867,3 +771,167 @@ npm run check:duplicate-css   # ✅ Passed
     - Entity structure incompatibilities
     - Relationship model changes not fully implemented
     - Module naming conflicts causing build errors
+
+## Permission System Type Standardization Issues
+
+After implementing the dynamic access control system, we've identified several type inconsistency issues that need to be addressed for better type safety and code maintainability.
+
+### ID Type Inconsistencies (In Progress - 75% Complete)
+
+The following models have inconsistent ID types:
+
+1. **Permission Entities**
+   - Permission: Uses `string` (UUID) for ID
+   - RolePermission: Uses `number` for roleId but `string` for permissionId
+   - ✅ UserPermission: Uses `number` for userId and `string` for permissionId (consistent)
+   - ✅ GroupPermission: Updated to use `number` for groupId for consistency
+   - ✅ Group: Updated to use `number` for ID instead of string (UUID)
+   - ✅ Service Methods: Updated to use consistent ID types (number for groupId)
+
+2. **Group ID Type Conflict**
+   - ✅ Frontend Model: Uses `number` for Group ID (consistent)
+   - ✅ Backend Entity: Updated to use `number` for Group ID (was `string` UUID)
+   - ✅ Service Methods: Updated to use `number` for Group ID consistently
+   - API Responses: Need to update controllers to ensure consistent responses
+
+3. **Permission Reference Format**
+   - ✅ Frontend user.model.ts: Updated Permission interface with consistent properties
+   - ✅ Frontend group.model.ts: Updated Permission interface with standardized property names
+   - ✅ AdminUserCreation interface: Updated to use consistent property names (resourceName, actionName)
+   - Backend: `id: string` (UUID) in Permission entity
+
+### Deprecated Code Issues (In Progress - 30% Complete)
+
+Several places still contain deprecated code that should be removed:
+
+1. **User Model Annotations**
+   - ✅ Removed `@deprecated` annotations and role property from user.model.ts
+   - ✅ Removed legacy role-based fields in interfaces
+
+2. **Group Model Annotations**
+   - ✅ Removed `@deprecated` annotations and role property from group.model.ts
+   - ✅ Updated GROUP_PERMISSION_SETS to use standardized property names
+
+3. **Service Methods**
+   - Several services have deprecated methods marked for removal
+   - Some controllers still depend on role-based methods
+
+### Property Reference Issues (In Progress - 100% Complete)
+
+The PermissionsService has missing properties that are referenced in code:
+
+1. **Cache Service Property**
+   - ✅ `cacheService` property properly injected and utilized
+   - ✅ Cache-related methods implemented
+   - ✅ Added `getAll` and `getAllKeys` methods to CacheService
+
+2. **Method Implementation**
+   - ✅ `hasPermissionCached` method implemented
+   - ✅ `cacheUserPermissions` method implemented (leveraging existing CacheService)
+   - ✅ `getCachedPermissions` method implemented
+   - ✅ Added `cachePermissionResult` helper method
+   - ✅ Added cache invalidation methods 
+   - ✅ Added cache refresh mechanism
+
+3. **Utility Methods**
+   - ✅ Added utility methods for permission manipulation
+   - ✅ Added permission combination/filtering helpers
+   - ✅ Added permission parsing/formatting utilities
+   - ✅ Added permission comparison methods
+
+### Structural Issues (In Progress - 30% Complete)
+
+The codebase has structural issues related to duplicate service implementations:
+
+1. **Duplicate Service Implementations**
+   - ✅ Fixed duplicate PermissionsService registration in permissions.module.ts
+   - ✅ Removed conflicting string token vs class provider pattern
+   - Inconsistent import references across the codebase
+
+2. **Module Import Circularity**
+   - ✅ Fixed service registration to prevent token duplication
+   - Circular dependencies between modules
+   - Inconsistent service registration
+
+3. **Entity Relationship Definitions**
+   - Inconsistent relationship definitions between entities
+   - Some bidirectional relationships are missing or incorrectly defined
+
+## Remediation Plan
+
+### 1. ID Type Standardization (Critical priority)
+- Standardize all frontend models to use consistent ID types
+- Update backend entities to follow consistent ID type patterns
+- Ensure API interfaces match between frontend and backend
+
+### 2. Deprecated Code Removal (Medium priority)
+- Remove all deprecated role-based code and annotations
+- Update any components still using role-based methods
+- Update documentation to reflect permission-only approach
+
+### 3. Property Implementation (High priority)
+- Complete missing property implementations in PermissionsService
+- Implement all referenced cache methods
+- Add missing utility methods with consistent signatures
+
+### 4. Structural Cleanup (Medium priority)
+- Consolidate duplicate service implementations
+- Fix module import circularity issues
+- Standardize entity relationship definitions
+
+## Summary of Permission System Type Standardization Progress
+
+We've made significant progress in standardizing and improving the permission system:
+
+### Completed Tasks
+
+1. **Frontend Model Updates** ✅
+   - Updated Permission interfaces in user.model.ts and group.model.ts
+   - Removed deprecated role properties and annotations
+   - Standardized property names (resourceName, actionName)
+   - Updated permission set constants to use consistent naming
+
+2. **Backend Entity Updates** ✅
+   - Standardized GroupPermission entity to use number for groupId
+   - Updated Group entity ID type to use number instead of string (UUID)
+   - Updated service methods to use consistent ID types
+   - Fixed linter errors related to ID type mismatches
+
+3. **Cache and Property Implementation** ✅
+   - Implemented missing hasPermissionCached method
+   - Added cache invalidation and refresh mechanisms
+   - Implemented utility methods for permission manipulation
+   - Added helper methods for permission filtering and combination
+
+4. **Structural Improvements** 🔄
+   - Fixed duplicate service registration in permissions.module.ts
+   - Updated permission.guard.ts to use PermissionsService class directly
+   - Removed string token injection in favor of direct class usage
+
+### Remaining Tasks
+
+1. **API Consistency**
+   - Update DTO classes to use consistent ID types
+   - Ensure controllers return consistent permission objects
+   - Add type validation to prevent ID type mismatches
+
+2. **Service Cleanup**
+   - Remove remaining role-based access methods
+   - Clean up any services still using role-based checks
+
+3. **Entity Relationships**
+   - Clean up entity relationship definitions
+   - Fix bidirectional relationship issues
+
+4. **Documentation**
+   - Update API documentation to reflect permission-based approach
+   - Add migration notes for breaking changes
+
+### Impact
+
+These improvements have:
+- Enhanced type safety throughout the permission system
+- Reduced potential for errors from inconsistent ID types
+- Improved performance through proper caching implementation
+- Simplified the module structure by removing duplicate providers
+- Added utility methods that make permission management more robust

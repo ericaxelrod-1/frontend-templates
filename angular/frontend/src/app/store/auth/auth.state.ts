@@ -6,6 +6,7 @@ import { PermissionService } from '../../core/services/permission.service';
 import { User, UserRegistration } from '../../models';
 import { catchError, tap } from 'rxjs/operators';
 import { throwError, of } from 'rxjs';
+import { RolesConstantsService } from '../../core/constants/roles';
 
 // Auth actions
 export namespace AuthActions {
@@ -127,6 +128,20 @@ export namespace AuthActions {
     static readonly type = '[Auth] Load User Permissions Failure';
     constructor(public error: string) {}
   }
+
+  // Add a new action for loading roles
+  export class LoadRoles {
+    static readonly type = '[Auth] Load Roles';
+  }
+  
+  export class LoadRolesSuccess {
+    static readonly type = '[Auth] Load Roles Success';
+  }
+  
+  export class LoadRolesFailure {
+    static readonly type = '[Auth] Load Roles Failure';
+    constructor(public error: string) {}
+  }
 }
 
 // Auth state model
@@ -141,6 +156,7 @@ export interface AuthStateModel {
   verificationSuccess: boolean;
   permissions: string[]; // Added permissions array
   permissionsLoaded: boolean; // Track if permissions are loaded
+  rolesLoaded: boolean; // Track if roles are loaded
 }
 
 // Default state
@@ -154,7 +170,8 @@ const defaults: AuthStateModel = {
   registrationSuccess: false,
   verificationSuccess: false,
   permissions: [], // Initialize with empty array
-  permissionsLoaded: false
+  permissionsLoaded: false,
+  rolesLoaded: false
 };
 
 @State<AuthStateModel>({
@@ -165,7 +182,8 @@ const defaults: AuthStateModel = {
 export class AuthState {
   constructor(
     private authService: AuthService,
-    private permissionService: PermissionService
+    private permissionService: PermissionService,
+    private rolesService: RolesConstantsService
   ) {}
 
   @Selector()
@@ -248,6 +266,11 @@ export class AuthState {
     };
   }
 
+  @Selector()
+  static rolesLoaded(state: AuthStateModel): boolean {
+    return state.rolesLoaded;
+  }
+
   @Action(AuthActions.Login)
   login(ctx: StateContext<AuthStateModel>, action: AuthActions.Login) {
     ctx.patchState({ loading: true, error: null });
@@ -288,18 +311,16 @@ export class AuthState {
 
   @Action(AuthActions.LoginSuccess)
   loginSuccess(ctx: StateContext<AuthStateModel>, action: AuthActions.LoginSuccess) {
-    console.log('LoginSuccess - User object:', action.user);
-    console.log('LoginSuccess - User permissions:', action.user?.permissions);
-    
     ctx.patchState({
-      user: action.user,
-      isAuthenticated: true,
       loading: false,
-      error: null
+      error: null,
+      user: action.user,
+      isAuthenticated: true
     });
     
-    // Dispatch action to load permissions
+    // Dispatch actions to load permissions and roles
     ctx.dispatch(new AuthActions.LoadUserPermissions());
+    ctx.dispatch(new AuthActions.LoadRoles());
     
     return ctx.dispatch(new Navigate(['/app/dashboard']));
   }
@@ -373,7 +394,7 @@ export class AuthState {
     });
     
     console.log('Making HTTP request to:', `${this.authService['API_URL']}/forgot-password`);
-    return this.authService.forgotPassword(action.email).pipe(
+    return this.authService.forgotPassword({ email: action.email }).pipe(
       tap(response => {
         console.log('ForgotPassword success response:', response);
         ctx.dispatch(new AuthActions.ForgotPasswordSuccess());
@@ -463,6 +484,9 @@ export class AuthState {
     console.log('AuthState: Logout action dispatched');
     ctx.patchState({ loading: true });
     
+    // Reset roles when logging out
+    this.rolesService.reset();
+    
     return this.authService.logout().pipe(
       tap(() => {
         ctx.setState({
@@ -529,6 +553,10 @@ export class AuthState {
       verificationSuccess: true
     });
     
+    // Load permissions and roles after successful verification
+    ctx.dispatch(new AuthActions.LoadUserPermissions());
+    ctx.dispatch(new AuthActions.LoadRoles());
+    
     // Redirect to home page after successful verification
     return ctx.dispatch(new Navigate(['/app/dashboard']));
   }
@@ -548,8 +576,9 @@ export class AuthState {
       tap((status: AuthStatus) => {
         if (status.isAuthenticated && status.user) {
           ctx.dispatch(new AuthActions.SetInitialAuthState(status.user, true));
-          // Also load permissions
+          // Also load permissions and roles if authenticated
           ctx.dispatch(new AuthActions.LoadUserPermissions());
+          ctx.dispatch(new AuthActions.LoadRoles());
         } else {
           ctx.patchState({
             isAuthenticated: false,
@@ -608,6 +637,40 @@ export class AuthState {
     ctx.patchState({
       error: action.error,
       permissionsLoaded: false
+    });
+  }
+
+  @Action(AuthActions.LoadRoles)
+  loadRoles(ctx: StateContext<AuthStateModel>) {
+    // Only attempt to load roles if authenticated
+    if (!ctx.getState().isAuthenticated) {
+      return of(null);
+    }
+    
+    return this.rolesService.initialize().pipe(
+      tap(() => {
+        ctx.dispatch(new AuthActions.LoadRolesSuccess());
+      }),
+      catchError(error => {
+        console.error('Error loading roles:', error);
+        ctx.dispatch(new AuthActions.LoadRolesFailure('Failed to load roles'));
+        return of(null);
+      })
+    );
+  }
+
+  @Action(AuthActions.LoadRolesSuccess)
+  loadRolesSuccess(ctx: StateContext<AuthStateModel>) {
+    ctx.patchState({
+      rolesLoaded: true
+    });
+  }
+
+  @Action(AuthActions.LoadRolesFailure)
+  loadRolesFailure(ctx: StateContext<AuthStateModel>, action: AuthActions.LoadRolesFailure) {
+    ctx.patchState({
+      error: action.error,
+      rolesLoaded: false
     });
   }
 } 

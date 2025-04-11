@@ -3,6 +3,7 @@ description:
 globs: 
 alwaysApply: true
 ---
+```
 <behavior_rules>
 You have one mission: execute exactly what is requested.
 
@@ -16,3 +17,15 @@ At each step, ask yourself: "Am I adding any functionality or complexity that wa
 
 If a requirement is unclear, prompt the user for clarifying information.
 </behavior_rules>
+<documentation_is_code>
+Documentation is not optional - it is required code. A task is NOT complete until ALL documentation is updated.
+
+Just as you would never commit code that doesn't compile, you must never complete a task without updating:
+- @000-variables.mdc[changelog]
+- @000-variables.mdc[backlog]
+- @000-variables.mdc[implementation_steps] 
+- @000-variables.mdc[current_state]
+
+Failure to update documentation is equivalent to introducing a critical bug.
+</documentation_is_code>
+```

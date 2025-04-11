@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatSort } from '@angular/material/sort';
 import { MatPaginator } from '@angular/material/paginator';
@@ -205,7 +205,7 @@ interface RoutePermission {
     }
   `]
 })
-export class RoutePermissionsComponent implements OnInit {
+export class RoutePermissionsComponent implements OnInit, AfterViewInit {
   displayedColumns: string[] = ['path', 'description', 'requiredPermissions', 'overridePermissions', 'lastSynced', 'actions'];
   dataSource = new MatTableDataSource<RoutePermission>([]);
   filterControl = new FormControl('');

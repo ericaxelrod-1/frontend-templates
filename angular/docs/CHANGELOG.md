@@ -2,6 +2,55 @@
 
 This document tracks all significant changes to the Angular Template Application.
 
+## 2024-06-30 17:30:00
+
+### Fixed 401 Errors on Public Pages
+
+- **Feature**: Fixed unauthorized errors occurring on public pages
+- **Description**: Improved dynamic access control implementation to prevent 401 errors on login and registration pages
+
+- **Details**:
+  - Updated public endpoint classification in the auth interceptor:
+    - Added forgot-password, reset-password, and verify-email to the public endpoint list
+  - Optimized application bootstrap process:
+    - Removed role initialization from APP_INITIALIZER
+    - Deferred role loading until after successful authentication
+  - Enhanced roles service:
+    - Added better error handling to prevent failed requests from blocking the application
+    - Implemented reset functionality for logout scenarios
+  - Integrated role loading with authentication flow:
+    - Roles are now loaded only after login, verification, or session restoration
+  
+- **Benefits**:
+  - Public pages (login, register) no longer show 401 errors
+  - Improved application startup performance
+  - More reliable user experience for unauthenticated visitors
+  - Better separation between public and authenticated contexts
+
+## 2024-06-30 15:45:00
+
+### Angular Build Errors Fixed
+
+- **Feature**: Fixed multiple build errors preventing successful compilation
+- **Description**: Resolved various issues in the authentication components and services that were causing build failures
+
+- **Details**:
+  - Added missing method implementations in AuthService:
+    - Implemented register() method
+    - Implemented refreshAuthStateFromStorage() method
+    - Fixed incorrect method reference (loadAuthStateFromStorage -> readAuthStateFromStorage)
+  - Fixed type issues in components:
+    - Corrected parameter and return types
+    - Added proper type annotations to callback functions
+    - Fixed the verifyEmail method to accept email parameter
+  - Resolved syntax errors:
+    - Fixed unterminated template literals in register component
+  
+- **Benefits**:
+  - Application now builds successfully without errors
+  - Improved type safety throughout authentication components
+  - Better code consistency and maintainability
+
 ## 2023-03-23 06:15:30
 
 ### Application Branding Integration

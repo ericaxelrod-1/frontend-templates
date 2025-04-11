@@ -1,0 +1,76 @@
+---
+description: 
+globs: *
+alwaysApply: false
+---
+---
+description: "Rules for maintaining project structure and organization"
+globs: ["**/*"]
+tags: ["project", "structure", "organization", "files"]
+priority: 3
+---
+
+# Project Structure Rules
+
+## Reference Documentation
+
+⚠️ **BEFORE modifying, creating, or relocating files:**
+- Always run a shell command to verify the current working directory before running any other commands
+- Always refer to [Project Structure Documentation](@000-variables.mdc[project_structure]) to understand the organization of the codebase
+- Consult this document before deciding where to place new files or components
+
+## File Placement Guidelines
+
+### General Rules
+
+- Place files according to their purpose in the correct directory as defined in the project structure documentation
+- Maintain separation of concerns between frontend and backend code
+- Do not create files in the root directory without explicit approval
+- Follow the established naming conventions for each directory and file type
+
+### Frontend Files
+
+- Angular components should be placed in their appropriate feature module or in `components/` if shared
+- Models and interfaces should be placed in the `models/` directory
+- State management files belong in the `store/` directory
+- Core services, guards, and interceptors must be placed in the `core/` directory
+
+### Backend Files
+
+- API endpoints should be organized by module in the appropriate subdirectory of `modules/`
+- Entity definitions must be placed with their respective module
+- Database migrations should be placed in the `migrations/` directory
+- Configuration files belong in the `config/` directory
+
+## Directory Structure
+
+- Maintain the established directory hierarchy as outlined in the project structure documentation
+- Do not create new top-level directories without explicit approval
+- When adding new features, follow the established pattern for similar features
+
+## Documentation Placement
+
+- Project-wide documentation belongs in `angular/docs/`
+- Frontend-specific documentation belongs in `angular/frontend/docs/`
+- Backend-specific documentation belongs in `angular/backend/docs/`
+- Module-specific documentation should be placed within the relevant module directory
+
+## Rule Placement
+
+- Project-wide rules should be placed in `angular/docs/rules/`
+- Frontend-specific rules should be placed in `angular/frontend/docs/rules/`
+- Backend-specific rules should be placed in `angular/backend/docs/rules/`
+
+## Configuration Files
+
+- Configuration files should be placed at the appropriate level as defined in the project structure
+- Do not modify configuration files without understanding their impact on the build process
+
+## When in Doubt
+
+If unsure where to place a file or how to organize a new feature:
+1. Consult [Project Structure Documentation](@000-variables.mdc[project_structure])
+2. Follow existing patterns for similar files or features
+3. Ask for clarification if the structure is not clear
+
+Always prioritize maintainability and logical organization over convenience. 

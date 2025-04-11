@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
@@ -13,7 +13,7 @@ import { EditGroupPermissionsDialogComponent } from './edit-group-permissions-di
   templateUrl: './group-permissions.component.html',
   styleUrls: ['./group-permissions.component.scss']
 })
-export class GroupPermissionsComponent implements OnInit {
+export class GroupPermissionsComponent implements OnInit, AfterViewInit {
   groups: Group[] = [];
   selectedGroup: Group | null = null;
   allPermissions: Permission[] = [];

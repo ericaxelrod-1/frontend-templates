@@ -3,7 +3,7 @@ description:
 globs: 
 alwaysApply: true
 ---
- ---
+---
 description: "Guidelines for tracking implementation status of project tasks"
 globs: ["**/*"]
 tags: ["project", "tracking", "implementation"]
@@ -14,54 +14,118 @@ priority: 3
 
 ⚠️ **STOP: You MUST complete this checklist before ANY code exploration or implementation**
 
-- [ ] Read @000-variables.mdc[implementation_steps] in its entirety
-- [ ] Read @000-variables.mdc[current-state] in its entirety
-- [ ] Identify current focus areas and their priority
+- [ ] Read @000-variables.mdc[current_state] in its entirety
+- [ ] Read @000-variables.mdc[backlog] for critical bugs and high priority items
+- [ ] Check @000-variables.mdc[changelog] for in-progress work
+- [ ] Read @000-variables.mdc[implementation_steps] to understand the project plan
+- [ ] Perform maintenance on @000-variables.mdc[changelog] and @000-variables.mdc[changelog_archive]
 - [ ] Report your understanding of the current state to the user
-- [ ] Identify the next task to work on based on dependencies and priority
-- [ ] Confirm with the user before proceeding to code exploration
+- [ ] Identify the next task to work on based on the priority system
+- [e user before proceeding to
 
 ⚠️ **Failure to complete this checklist before exploring code is a critical violation**
 
+# Definition of Done
+
+⚠️ **A task is ONLY considered complete when ALL of these are true:**
+1. Code changes work as expected
+2. Tests pass
+3. ALL documentation is updated:
+   - ✓ @000-variables.mdc[changelog] updated with current system date (not manually entered)
+   - ✓ @000-variables.mdc[implementation_steps] status updated
+   - ✓ @000-variables.mdc[current_state] reflects changes
+   - ✓ @000-variables.mdc[backlog] updated
+
 # Implementation Tracking Guidelines
 
-Before any code exploration or implementation, first read [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] and [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] in full. Report your understanding of the current state and next task dependencies before exploring any project directories.
+## Task Implementation Process
 
-This rule provides guidance on how to track the implementation status of project tasks using the [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] file.
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐ │     │  IMPLEMENT      │     │  DOCUMENT       │
+│     │  --------       │     │  --------       │
+│ 1. Bugs first   │────▶│ 1. Edit files   │────▶│ 1. Update status│
+│ 2. In-progress  │     │ 2. Run tests    │     │ 2. Track issues │
+│ 3. High priority│     │ 3. Fix issues   │     │ 3. List changes │
+└─────────────────┘     └───────────────────────┘
+```
 
+1. **Select task according to the priority order:**
+   - Critical bugs (BUG-XXX) from @000-variables.mdc[backlog]
+   - In-progress items from @000-variables.mdc[changelog]
+   - Tasks with "Has Issues" status in @000-variables.mdc[implementation_steps]
+   - High priority features from @000-variables.mdc[backlog]
+   - Regular tasks from @000-variables.mdc[implementation_steps]
 
+2. **Update @000-variables.mdc[changelog]:**
+   - Move task from backlog to "In Progress"
+   - Add start date and initial implementation notes
+   - List files **with full paths** you plan to modify
 
+3. **During implementation:**
+   - Document issues encountered and solutions in backlck all modified files with explanations of what was changed and why
+   - Document test results as you go
 
-## Purpose
+4. **Upon completion:**
+   - Move task to "Completed Today" in @000-variables.mdc[changelog]
+   - Update status in @000-variables.mdc[backlog]
+   - Update corresponding task in @000-variables.mdc[implementation_steps]
+   - Update relevant sections in @000-variables.mdc[current_state]
+   - Create new backlog items for any discovered issues
 
-The [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] file serves as:
-- A development log tracking implementation progress
-- A backlog of pending tasks
-- A reference for project status
+## ID Tracking System
 
-## How to Track Implementation Status
+Use consistent IDs across all documents:
+- **BUG-XXX**: For bugs (e.g., BUG-001)
+- **FEAT-XXX**: For features (e.g., FEAT-001)
+- **IMP-XXX**: For improvements (e.g., IMP-001)
+- **TECH-XXX**: For technical debt (e.g., TECH-001)
 
-When starting a new development session **follow this exact sequence**
-
-1. **Review [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps]** first to understand the project plan
-2. **Review @000-variables.mdc[current_state]** first to understand the current project state
-3. **Check task dependencies** before starting work on a new task
-4. **Select the next task based on Review @000-variables.mdc[implementation_steps] and @000-variables.mdc[current_state]** 
-- 1st priority: Tasks which with a status of "Has Issues" or which have failed tests
-- 2nd priority: Tasks with a status of Not Started
-5. Examine the code base
-6. Begin editing and testing code for the **chosen task**
-7. **Update task status** after completing work
+Guidelines for ID usage:
+- IDs are permanent and travel with the item through all documents
+- Never reuse IDs, even if items are deleted
+- Always use the full ID format when referencing items
+- For subtasks, use hierarchical format: FEAT-001.1, FEAT-001.2, etc.
 
 ## Status Tracking Format
 
-Each implementation task in [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] should include:
+###.mdc[backlog]
 
 ```markdown
-### [Task Number] [Task Name]
+### [ID]: [Title]
+- **Status**: [Complete/In Progressarted]
+- **Testing**: [Passed/Failed/Not Started]
+- **Dependencies**: [List of IDs, e.g., FEAT-003, BUG-002]
+- **Added**: YYYY-MM-DD
+- **Description**: [Detailed description]
+
+#### Implementation Notes
+- ****: 
+  - [Issue]: [Solution]
+
+- **Files Modified**:
+  - `path/to/file`: [What changed and why]
+
+- **Testing Results**:
+  - [Test]: [Result]
+```
+
+### In @000-variables.mdc[changelog]
+
+```markdown
+### [ID]: [Title]
+- **Started**: YYYY-MM-DD
+- **Completed**: YYYY-MM-DD (for completed items)
+- **Implementation Notes**: [Details]
+- **Files Modified**: [List with explanations]
+- **Testing Results**: [Summary]
+```
+
+### In @000-variables.mdc[implementation_steps]
+
+```markdown
+### [Task Number] [Task Name] (ID: [ID])
 - **Status**: [Complete/In Progress/Has Issues/Not Started]
 - **Testing**: [Passed/Failed/Not Started]
-  - [Test Name]: [Passed/Failed]
   - [Test Name]: [Passed/Failed]
 - **Dependencies**: [Task references or "None"]
 - **Last Updated**: [Date]
@@ -80,36 +144,20 @@ Each implementation task in [000-variables.mdc](mdc:.cursor/rules/000-variables.
 - **Failed**: One or more tests failing
 - **Not Started**: Testing has not begun
 
-## Dependency Management
+## Documentation Synchronization
 
-Dependencies should be clearly listed for each task to indicate what must be completed first. When encountering a task with unmet dependencies:
-
-1. Identify the blocking tasks
-2. Prioritize those blocking tasks
-3. Update the [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] to reflect the dependency chain
-
-## Current Focus Tracking
-
-The [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] file should be maintained to highlight:
-
-1. Current focus areas
-2. Recent accomplishments
-3. Known issues
-4. Immediate priorities
-5. Blockers
-
-## Using Task References
-
-When referring to [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] in conversations and code:
-
-1. Use the task numbering scheme (e.g., "Task 1.2.3")
-2. Quote relevant sections when discussing specific requirements
-3. Reference dependencies explicitly
+When updating task status, ensure all documents are synchronized:
+1. Update the item in @000-variables.mdc[backlog]
+2. Update the item in @000-variables.mdc[changelog]
+3. Update corresponding task in @000-variables.mdc[implementation_steps]
+4. Update relevant sections in @000-variables.mdc[current_state]
 
 ## Rule Application
 
 This rule should be applied whenever:
 1. Starting a new development session
-2. Completing a task
-3. Encountering implementation issues
-4. Planning next development steps
+2. Selecting a task to work on
+3. During implementation
+4. Completing a task
+5. Encountering implementation issues
+6. Planning next development steps

@@ -8,7 +8,7 @@ import {
   HttpResponse
 } from '@angular/common/http';
 import { Observable, throwError, BehaviorSubject, from, of } from 'rxjs';
-import { catchError, filter, take, switchMap, finalize, tap } from 'rxjs/operators';
+import { catchError, filter, take, switchMap, finalize } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
 import { environment } from '../../../environments/environment';
 
@@ -20,37 +20,39 @@ export class AuthInterceptor implements HttpInterceptor {
   constructor(private authService: AuthService) {}
 
   intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
-    // Skip token for certain requests
+    // Skip token for non-API requests or specific auth endpoints
     if (this.shouldSkipToken(request)) {
       return next.handle(request);
     }
 
-    // Add auth token if available
-    const accessToken = this.authService.accessToken;
-    const csrfToken = this.authService.csrfToken;
-    
-    if (accessToken) {
-      request = this.addAuthenticationToken(request, accessToken, csrfToken);
+    // Get current token synchronously
+    const currentToken = this.authService.accessToken;
+
+    // If token exists, add it and proceed
+    if (currentToken) {
+      request = this.addAuthenticationToken(request, currentToken, this.authService.csrfToken);
+    } else {
+      // Log if proceeding without a token (useful for debugging)
+      console.log(`AuthInterceptor: No token found. Proceeding without auth header for request: ${request.url}`);
     }
 
-    // Handle the request and check for 401 errors
+    // Handle the request (passing the potentially modified request)
+    return this.handleRequest(request, next);
+  }
+  
+  // Extracted request handling logic for reuse
+  private handleRequest(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     return next.handle(request).pipe(
-      tap(event => {
-        // Optionally handle successful responses if needed
-        if (event instanceof HttpResponse) {
-          // You can do something with successful responses here
-        }
-      }),
       catchError((error: HttpErrorResponse) => {
         // Special handling for logout - don't retry on 400 errors during logout
         if (request.url.includes('/api/auth/logout') && error.status === 400) {
-          console.log('Error response: 400 from logout endpoint - ignoring and proceeding with logout');
-          // Return a successful completion for logout 400 errors
+          console.log('AuthInterceptor: Ignoring 400 from logout endpoint.');
           return of(new HttpResponse({ status: 200, body: { success: true, message: 'Logged out successfully' } }));
         }
         
-        // Handle 401 - unauthorized errors
-        if (error.status === 401) {
+        // Handle 401 - unauthorized errors (potential token refresh)
+        if (error.status === 401 && !request.url.includes('/api/auth/refresh')) {
+           console.log(`AuthInterceptor: Received 401 for ${request.url}. Attempting token refresh.`);
           return this.handle401Error(request, next, error);
         }
 
@@ -80,11 +82,14 @@ export class AuthInterceptor implements HttpInterceptor {
   }
 
   private shouldSkipToken(request: HttpRequest<unknown>): boolean {
-    // Skip auth token for login, register, and token refresh endpoints
+    // Skip auth token for all public auth endpoints
     const skipUrls = [
       `${environment.apiUrl}/auth/login`,
       `${environment.apiUrl}/auth/register`,
-      `${environment.apiUrl}/auth/refresh`
+      `${environment.apiUrl}/auth/refresh`,
+      `${environment.apiUrl}/auth/forgot-password`,
+      `${environment.apiUrl}/auth/reset-password`,
+      `${environment.apiUrl}/auth/verify-email`
     ];
     
     return skipUrls.some(url => request.url.includes(url));
@@ -95,7 +100,7 @@ export class AuthInterceptor implements HttpInterceptor {
     if (request.url.includes('/api/auth/refresh')) {
       // Call logout and ignore the result as we're going to throw anyway
       this.authService.logout().subscribe(() => {
-        console.log('Logged out after refresh token failure');
+        console.log('Logged out after refresh token failure during refresh attempt');
       });
       return throwError(() => originalError);
     }
@@ -127,7 +132,7 @@ export class AuthInterceptor implements HttpInterceptor {
           response.csrfToken
         ));
       }),
-      catchError(error => {
+      catchError(() => {
         // Token refresh failed - proceed to logout
         this.refreshTokenInProgress = false;
         this.refreshTokenSubject.next(null);

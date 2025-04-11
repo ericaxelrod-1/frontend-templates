@@ -16,9 +16,7 @@ export interface Permission {
 /**
  * @deprecated Use Permission interface instead
  */
-export interface PermissionObject {
-  [key: string]: boolean;
-}
+export type PermissionObject = Record<string, boolean>;
 
 /**
  * @deprecated Roles are being phased out in favor of direct permission assignments

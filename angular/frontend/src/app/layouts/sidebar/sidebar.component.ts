@@ -21,7 +21,7 @@ import { PermissionService } from '../../core/services/permission.service';
   styleUrl: './sidebar.component.scss'
 })
 export class SidebarComponent implements OnInit {
-  @Input() opened: boolean = false;
+  @Input() opened = false;
   
   // Common navigation items for all users
   commonNavItems = [

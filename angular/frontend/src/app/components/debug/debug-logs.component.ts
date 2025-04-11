@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LoggerService } from '../../services/logging/logger.service';
+import { LoggerService, LogEntry, LogLevel } from '../../services/logging/logger.service';
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -35,9 +35,9 @@ import { FormsModule } from '@angular/forms';
         </label>
       </div>
       <div class="logs-container">
-        <div *ngFor="let log of filteredLogs" class="log-entry" [ngClass]="log.level">
+        <div *ngFor="let log of filteredLogs" class="log-entry" [ngClass]="getLogLevelString(log.level)">
           <div class="log-timestamp">{{ log.timestamp | date:'medium' }}</div>
-          <div class="log-level">{{ log.level.toUpperCase() }}</div>
+          <div class="log-level">{{ getLogLevelString(log.level).toUpperCase() }}</div>
           <div class="log-message">{{ log.message }}</div>
           <div class="log-data" *ngIf="log.data">
             <pre>{{ log.data | json }}</pre>
@@ -205,10 +205,10 @@ export class DebugLogsComponent implements OnInit {
   @Output() closed = new EventEmitter<void>();
   @Output() logsCountChanged = new EventEmitter<number>();
   
-  logs: any[] = [];
-  filteredLogs: any[] = [];
-  filterLevel: string = 'all';
-  searchText: string = '';
+  logs: LogEntry[] = [];
+  filteredLogs: LogEntry[] = [];
+  filterLevel = 'all';
+  searchText = '';
   
   ngOnInit(): void {
     this.refreshLogs();
@@ -228,6 +228,7 @@ export class DebugLogsComponent implements OnInit {
       console.error('Failed to parse logs', e);
       this.logs = [];
       this.filteredLogs = [];
+      this.logsCountChanged.emit(0);
     }
   }
   
@@ -260,7 +261,7 @@ export class DebugLogsComponent implements OnInit {
   applyFilters(): void {
     this.filteredLogs = this.logs.filter(log => {
       // Filter by level
-      if (this.filterLevel !== 'all' && log.level !== this.filterLevel) {
+      if (this.filterLevel !== 'all' && LogLevel[log.level].toLowerCase() !== this.filterLevel) {
         return false;
       }
       
@@ -273,12 +274,16 @@ export class DebugLogsComponent implements OnInit {
     });
   }
   
-  logContainsText(log: any, text: string): boolean {
+  logContainsText(log: LogEntry, text: string): boolean {
     const searchText = text.toLowerCase();
     return (
       log.message.toLowerCase().includes(searchText) ||
-      log.level.toLowerCase().includes(searchText) ||
+      LogLevel[log.level].toLowerCase().includes(searchText) ||
       JSON.stringify(log.data || {}).toLowerCase().includes(searchText)
     );
+  }
+  
+  getLogLevelString(level: LogLevel): string {
+    return LogLevel[level].toLowerCase();
   }
 } 

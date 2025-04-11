@@ -32,7 +32,7 @@ export class EditRolePermissionsDialogComponent implements OnInit {
   filteredPermissions: Permission[] = [];
   
   // Group permissions by resource
-  permissionsByResource: { [key: string]: Permission[] } = {};
+  permissionsByResource: Record<string, Permission[]> = {};
   resourceNames: string[] = [];
   
   constructor(

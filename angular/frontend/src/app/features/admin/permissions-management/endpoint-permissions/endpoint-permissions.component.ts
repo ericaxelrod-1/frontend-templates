@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatSort } from '@angular/material/sort';
 import { MatPaginator } from '@angular/material/paginator';
@@ -23,7 +23,7 @@ interface EndpointPermission {
   templateUrl: './endpoint-permissions.component.html',
   styleUrls: ['./endpoint-permissions.component.scss']
 })
-export class EndpointPermissionsComponent implements OnInit {
+export class EndpointPermissionsComponent implements OnInit, AfterViewInit {
   displayedColumns: string[] = ['method', 'path', 'description', 'requiredPermissions', 'overridePermissions', 'actions'];
   dataSource = new MatTableDataSource<EndpointPermission>([]);
   filterControl = new FormControl('');

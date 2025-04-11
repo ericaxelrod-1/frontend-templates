@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 ---
 description: "Guidelines for tracking implementation status of project tasks"
@@ -12,11 +12,11 @@ priority: 3
 
 # Implementation Tracking Guidelines
 
-This rule provides guidance on how to track the implementation status of project tasks using the [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] file.
+This rule provides guidance on how to track the implementation status of project tasks using the @000-variables.mdc[implementation_steps] file.
 
 ## Purpose
 
-The [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] file serves as:
+The @000-variables.mdc[implementation_steps] file serves as:
 - A development log tracking implementation progress
 - A backlog of pending tasks
 - A reference for project status
@@ -25,13 +25,13 @@ The [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_step
 
 When starting a new development session:
 
-1. **Review [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps]** first to understand the current project state
+1. **Review @000-variables.mdc[implementation_steps]** first to understand the current project state
 2. **Check task dependencies** before starting work on a new task
 3. **Update task status** after completing work
 
 ## Status Tracking Format
 
-Each implementation task in [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] should include:
+Each implementation task in @000-variables.mdc[implementation_steps] should include:
 
 ```markdown
 ### [Task Number] [Task Name]
@@ -61,11 +61,11 @@ Dependencies should be clearly listed for each task to indicate what must be com
 
 1. Identify the blocking tasks
 2. Prioritize those blocking tasks
-3. Update the [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] to reflect the dependency chain
+3. Update the @000-variables.mdc[current_state] to reflect the dependency chain
 
 ## Current Focus Tracking
 
-The [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] file should be maintained to highlight:
+The @000-variables.mdc[current_state] file should be maintained to highlight:
 
 1. Current focus areas
 2. Recent accomplishments
@@ -75,7 +75,7 @@ The [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[current-state] file
 
 ## Using Task References
 
-When referring to [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[implementation_steps] in conversations and code:
+When referring to @000-variables.mdc[implementation_steps] in conversations and code:
 
 1. Use the task numbering scheme (e.g., "Task 1.2.3")
 2. Quote relevant sections when discussing specific requirements

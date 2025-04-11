@@ -20,10 +20,10 @@ import { Location } from '@angular/common';
   styleUrl: './error.component.scss'
 })
 export class ErrorComponent {
-  @Input() errorTitle: string = 'An error occurred';
-  @Input() errorMessage: string = 'Something went wrong. Please try again later.';
-  @Input() showHomeButton: boolean = true;
-  @Input() showBackButton: boolean = true;
+  @Input() errorTitle = 'An error occurred';
+  @Input() errorMessage = 'Something went wrong. Please try again later.';
+  @Input() showHomeButton = true;
+  @Input() showBackButton = true;
   
   constructor(private location: Location) {}
   

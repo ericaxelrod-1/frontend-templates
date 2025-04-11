@@ -56,7 +56,7 @@
       <div class="user-info">
         <p><strong>User ID:</strong> {{user.id}}</p>
         <p><strong>Created:</strong> {{user.createdAt | date:'medium'}}</p>
-        <p *ngIf="user.roles && user.roles.length"><strong>Roles:</strong> {{user.roles.join(', ')}}</p>
+        <p *ngIf="user.roles && user.roles.length"><strong>Roles:</strong> {{getRoleNames()}}</p>
       </div>
       
       <div class="form-group">
