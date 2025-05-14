@@ -5,9 +5,8 @@ import { MatTableDataSource } from '@angular/material/table';
 import { FormControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { PermissionManagementService, Role, Permission } from '../../../../core/services/permission-management.service';
+import { PermissionService, Role, Permission } from '../../../../core/services/permission.service';
 import { EditRolePermissionsDialogComponent } from './edit-role-permissions-dialog/edit-role-permissions-dialog.component';
-import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-role-permissions',
@@ -30,7 +29,7 @@ export class RolePermissionsComponent implements OnInit, AfterViewInit {
   loading = false;
   
   constructor(
-    private permissionService: PermissionManagementService,
+    private permissionService: PermissionService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar
   ) { }
@@ -119,31 +118,42 @@ export class RolePermissionsComponent implements OnInit, AfterViewInit {
   updateRolePermissions(roleId: string, grantedPermissions: string[], revokedPermissions: string[]): void {
     this.loading = true;
     
-    // Process granted permissions
-    const grantPromises = grantedPermissions.map(permId => 
-      this.permissionService.updateRolePermission(roleId, permId, true).toPromise()
-    );
-    
-    // Process revoked permissions
-    const revokePromises = revokedPermissions.map(permId => 
-      this.permissionService.updateRolePermission(roleId, permId, false).toPromise()
-    );
-    
-    // Wait for all updates to complete
-    Promise.all([...grantPromises, ...revokePromises])
-      .then(() => {
-        this.snackBar.open('Role permissions updated successfully', 'Close', { duration: 3000 });
-        this.loadRoles();
-        if (this.selectedRole) {
-          this.loadRolePermissions(this.selectedRole.id);
-        }
-        this.loading = false;
-      })
-      .catch(error => {
-        console.error('Error updating role permissions:', error);
+    // Get current permissions for the role
+    this.permissionService.getRolePermissions(roleId).subscribe(
+      currentPermissions => {
+        // Create new permissions array by:
+        // 1. Starting with current permissions
+        // 2. Adding newly granted permissions
+        // 3. Removing revoked permissions
+        const updatedPermissions = currentPermissions
+          .map(p => p.id) // Get current permission IDs
+          .filter(id => !revokedPermissions.includes(id)) // Remove revoked permissions
+          .concat(grantedPermissions); // Add new permissions
+        
+        // Update all permissions in a single call
+        this.permissionService.updateRolePermissions(roleId, updatedPermissions)
+          .subscribe(
+            () => {
+              this.snackBar.open('Role permissions updated successfully', 'Close', { duration: 3000 });
+              this.loadRoles();
+              if (this.selectedRole) {
+                this.loadRolePermissions(this.selectedRole.id);
+              }
+              this.loading = false;
+            },
+            error => {
+              console.error('Error updating role permissions:', error);
+              this.snackBar.open('Failed to update role permissions', 'Close', { duration: 3000 });
+              this.loading = false;
+            }
+          );
+      },
+      error => {
+        console.error('Error loading current role permissions:', error);
         this.snackBar.open('Failed to update role permissions', 'Close', { duration: 3000 });
         this.loading = false;
-      });
+      }
+    );
   }
   
   refreshData(): void {

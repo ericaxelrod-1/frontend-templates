@@ -1,0 +1,1022 @@
+{
+  "timestamp": "2025-05-09T09:47:33.790101",
+  "database": {
+    "path": "./src/database/database.sqlite",
+    "tables_count": 15,
+    "tables": [
+      "actions",
+      "api_endpoints",
+      "cache_permission_map",
+      "cache_sync_status",
+      "frontend_routes",
+      "groups",
+      "permission",
+      "resources",
+      "role_permissions",
+      "roles",
+      "ui_components",
+      "user_groups",
+      "user_permission",
+      "user_roles",
+      "users"
+    ]
+  },
+  "entities": {
+    "count": 21,
+    "entities": [
+      {
+        "name": "Captcha",
+        "table_name": "captcha",
+        "file_path": "angular/backend/src/modules\\auth\\entities\\captcha.entity.ts"
+      },
+      {
+        "name": "IPReputation",
+        "table_name": "i_p_reputation",
+        "file_path": "angular/backend/src/modules\\auth\\entities\\ip-reputation.entity.ts"
+      },
+      {
+        "name": "LoginAttempt",
+        "table_name": "login_attempt",
+        "file_path": "angular/backend/src/modules\\auth\\entities\\login-attempt.entity.ts"
+      },
+      {
+        "name": "Category",
+        "table_name": "category",
+        "file_path": "angular/backend/src/modules\\categories\\entities\\category.entity.ts"
+      },
+      {
+        "name": "Action",
+        "table_name": "actions",
+        "file_path": "angular/backend/src/modules\\permissions\\entities\\action.entity.ts"
+      },
+      {
+        "name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "file_path": "src/modules\\permissions\\entities\\api-endpoint.entity.ts"
+      },
+      {
+        "name": "Component",
+        "table_name": "components",
+        "file_path": "angular/backend/src/modules\\permissions\\entities\\component.entity.ts"
+      },
+      {
+        "name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "file_path": "src/modules\\permissions\\entities\\frontend-route.entity.ts"
+      },
+      {
+        "name": "GroupPermission",
+        "table_name": "group_permissions",
+        "file_path": "angular/backend/src/modules\\permissions\\entities\\group-permission.entity.ts"
+      },
+      {
+        "name": "Group",
+        "table_name": "groups",
+        "file_path": "angular/backend/src/modules\\permissions\\entities\\group.entity.ts"
+      },
+      {
+        "name": "Permission",
+        "table_name": "permissions",
+        "file_path": "src/modules\\permissions\\entities\\permission.entity.ts"
+      },
+      {
+        "name": "Resource",
+        "table_name": "resource",
+        "file_path": "angular/backend/src/modules\\permissions\\entities\\resource.entity.ts"
+      },
+      {
+        "name": "Route",
+        "table_name": "routes",
+        "file_path": "angular/backend/src/modules\\permissions\\entities\\route.entity.ts"
+      },
+      {
+        "name": "UiComponent",
+        "table_name": "ui_components",
+        "file_path": "src/modules\\permissions\\entities\\ui-component.entity.ts"
+      },
+      {
+        "name": "UserPermission",
+        "table_name": "user_permission",
+        "file_path": "angular/backend/src/modules\\permissions\\entities\\user-permission.entity.ts"
+      },
+      {
+        "name": "RolePermission",
+        "table_name": "role_permissions",
+        "file_path": "angular/backend/src/modules\\roles\\entities\\role-permission.entity.ts"
+      },
+      {
+        "name": "Role",
+        "table_name": "roles",
+        "file_path": "angular/backend/src/modules\\roles\\entities\\role.entity.ts"
+      },
+      {
+        "name": "Tag",
+        "table_name": "tag",
+        "file_path": "angular/backend/src/modules\\tags\\entities\\tag.entity.ts"
+      },
+      {
+        "name": "Task",
+        "table_name": "task",
+        "file_path": "angular/backend/src/modules\\tasks\\entities\\task.entity.ts"
+      },
+      {
+        "name": "UserGroup",
+        "table_name": "user_groups",
+        "file_path": "angular/backend/src/modules\\users\\entities\\user-group.entity.ts"
+      },
+      {
+        "name": "User",
+        "table_name": "users",
+        "file_path": "angular/backend/src/modules\\users\\entities\\user.entity.ts"
+      }
+    ]
+  },
+  "migrations": {
+    "count": 23,
+    "migrations": [
+      {
+        "name": "CreatePermissionEntities1658012345678",
+        "file_path": "angular/backend/src/migrations\\1658012345678-CreatePermissionEntities.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "SeedInitialPermissions1658012445678",
+        "file_path": "angular/backend/src/migrations\\1658012445678-SeedInitialPermissions.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "AddActionPermissions1684156801000",
+        "file_path": "angular/backend/src/migrations\\1684156801000-add-action-permissions.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "FixRolePermissions1684156802000",
+        "file_path": "angular/backend/src/migrations\\1684156802000-fix-role-permissions.ts",
+        "created_tables": [],
+        "modified_tables": [
+          "role_permissions",
+          "roles",
+          "roles",
+          "roles"
+        ]
+      },
+      {
+        "name": "AddPermissionsToCacheMap1684156803000",
+        "file_path": "angular/backend/src/migrations\\1684156803000-add-permissions-to-cache-map.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "FixRoleSchema1684156805000",
+        "file_path": "angular/backend/src/migrations\\1684156805000-fix-role-schema.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "CreateDynamicAccessControlTables1690000000000",
+        "file_path": "angular/backend/src/migrations\\1690000000000-CreateDynamicAccessControlTables.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "SeedPermissionsData1690000000001",
+        "file_path": "angular/backend/src/migrations\\1690000000001-SeedPermissionsData.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "FixLoginAttemptUserForeignKey1720000000000",
+        "file_path": "angular/backend/src/migrations\\1720000000000-FixLoginAttemptUserForeignKey.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "ConvertUserIdToNumeric1720000000001",
+        "file_path": "angular/backend/src/migrations\\1720000000001-ConvertUserIdToNumeric.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "ConvertPermissionIdToNumeric1720000000002",
+        "file_path": "angular/backend/src/migrations\\1720000000002-ConvertPermissionIdToNumeric.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "ConvertRemainingUUIDsToNumeric1720000000003",
+        "file_path": "angular/backend/src/migrations\\1720000000003-ConvertRemainingUUIDsToNumeric.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "CreateActionsTable1720000000003",
+        "file_path": "angular/backend/src/migrations\\1720000000003-CreateActionsTable.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "ConvertRemainingUUIDsToNumeric1720000000004",
+        "file_path": "angular/backend/src/migrations\\1720000000004-ConvertRemainingUUIDsToNumeric.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "CreateRolesTable1720000000004",
+        "file_path": "angular/backend/src/migrations\\1720000000004-CreateRolesTable.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "ConvertRoleIdToNumeric1720000000005",
+        "file_path": "angular/backend/src/migrations\\1720000000005-ConvertRoleIdToNumeric.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "ConvertPermissionIdToNumeric1720000000006",
+        "file_path": "angular/backend/src/migrations\\1720000000006-ConvertPermissionIdToNumeric.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "UpdatePermissionEntity1720000000100",
+        "file_path": "angular/backend/src/migrations\\1720000000100-UpdatePermissionEntity.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "AddActionReferenceToPermission1720000000101",
+        "file_path": "angular/backend/src/migrations\\1720000000101-AddActionReferenceToPermission.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "AddPermissionRelationshipTables1720000000102",
+        "file_path": "angular/backend/src/migrations\\1720000000102-AddPermissionRelationshipTables.ts",
+        "created_tables": [],
+        "modified_tables": []
+      },
+      {
+        "name": "CreateActionsTable1742536989655",
+        "file_path": "angular/backend/src/migrations\\1742536989655-CreateActionsTable.ts",
+        "created_tables": [],
+        "modified_tables": [
+          "permissions"
+        ]
+      },
+      {
+        "name": "UpdatePermissionActionField1742536989656",
+        "file_path": "angular/backend/src/migrations\\1742536989656-UpdatePermissionActionField.ts",
+        "created_tables": [],
+        "modified_tables": [
+          "permissions",
+          "permissions"
+        ]
+      },
+      {
+        "name": "FixSQLiteCompositePrimaryKeys1742536989657",
+        "file_path": "angular/backend/src/migrations\\1742536989657-FixSQLiteCompositePrimaryKeys.ts",
+        "created_tables": [],
+        "modified_tables": []
+      }
+    ]
+  },
+  "mismatches": {
+    "count": 101,
+    "by_type": {
+      "missing_entity": 5,
+      "missing_table": 11,
+      "nullability_mismatch": 15,
+      "missing_column": 25,
+      "extra_column": 39,
+      "extra_foreign_key": 6
+    },
+    "details": [
+      {
+        "type": "missing_entity",
+        "table_name": "cache_permission_map",
+        "detail": "Table 'cache_permission_map' exists in the database but has no corresponding entity"
+      },
+      {
+        "type": "missing_entity",
+        "table_name": "user_roles",
+        "detail": "Table 'user_roles' exists in the database but has no corresponding entity"
+      },
+      {
+        "type": "missing_entity",
+        "table_name": "permission",
+        "detail": "Table 'permission' exists in the database but has no corresponding entity"
+      },
+      {
+        "type": "missing_entity",
+        "table_name": "resources",
+        "detail": "Table 'resources' exists in the database but has no corresponding entity"
+      },
+      {
+        "type": "missing_entity",
+        "table_name": "cache_sync_status",
+        "detail": "Table 'cache_sync_status' exists in the database but has no corresponding entity"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "GroupPermission",
+        "table_name": "group_permissions",
+        "detail": "Entity 'GroupPermission' expects table 'group_permissions' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "Task",
+        "table_name": "task",
+        "detail": "Entity 'Task' expects table 'task' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "IPReputation",
+        "table_name": "i_p_reputation",
+        "detail": "Entity 'IPReputation' expects table 'i_p_reputation' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "Captcha",
+        "table_name": "captcha",
+        "detail": "Entity 'Captcha' expects table 'captcha' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "Resource",
+        "table_name": "resource",
+        "detail": "Entity 'Resource' expects table 'resource' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "Component",
+        "table_name": "components",
+        "detail": "Entity 'Component' expects table 'components' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "Category",
+        "table_name": "category",
+        "detail": "Entity 'Category' expects table 'category' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "LoginAttempt",
+        "table_name": "login_attempt",
+        "detail": "Entity 'LoginAttempt' expects table 'login_attempt' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "Permission",
+        "table_name": "permissions",
+        "detail": "Entity 'Permission' expects table 'permissions' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "Tag",
+        "table_name": "tag",
+        "detail": "Entity 'Tag' expects table 'tag' which doesn't exist in the database"
+      },
+      {
+        "type": "missing_table",
+        "entity_name": "Route",
+        "table_name": "routes",
+        "detail": "Entity 'Route' expects table 'routes' which doesn't exist in the database"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "Action",
+        "table_name": "actions",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'actions' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "Action",
+        "table_name": "actions",
+        "column_name": "action_name",
+        "detail": "Column 'action_name' is defined in entity 'Action' but missing from table 'actions'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "Action",
+        "table_name": "actions",
+        "column_name": "icon",
+        "detail": "Column 'icon' is defined in entity 'Action' but missing from table 'actions'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "Action",
+        "table_name": "actions",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'actions' but is not defined in entity 'Action'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "Action",
+        "table_name": "actions",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'actions' but is not defined in entity 'Action'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'api_endpoints' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "controllerName",
+        "detail": "Column 'controllerName' is defined in entity 'ApiEndpoint' but missing from table 'api_endpoints'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "description",
+        "detail": "Column 'description' is defined in entity 'ApiEndpoint' but missing from table 'api_endpoints'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "overridePermissions",
+        "detail": "Column 'overridePermissions' is defined in entity 'ApiEndpoint' but missing from table 'api_endpoints'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "path",
+        "detail": "Column 'path' exists in table 'api_endpoints' but is not defined in entity 'ApiEndpoint'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "method",
+        "detail": "Column 'method' exists in table 'api_endpoints' but is not defined in entity 'ApiEndpoint'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "controller_name",
+        "detail": "Column 'controller_name' exists in table 'api_endpoints' but is not defined in entity 'ApiEndpoint'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "action_name",
+        "detail": "Column 'action_name' exists in table 'api_endpoints' but is not defined in entity 'ApiEndpoint'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "required_permissions",
+        "detail": "Column 'required_permissions' exists in table 'api_endpoints' but is not defined in entity 'ApiEndpoint'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'api_endpoints' but is not defined in entity 'ApiEndpoint'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "ApiEndpoint",
+        "table_name": "api_endpoints",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'api_endpoints' but is not defined in entity 'ApiEndpoint'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'frontend_routes' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "name",
+        "detail": "Column 'name' is defined in entity 'FrontendRoute' but missing from table 'frontend_routes'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "description",
+        "detail": "Column 'description' is defined in entity 'FrontendRoute' but missing from table 'frontend_routes'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "overridePermissions",
+        "detail": "Column 'overridePermissions' is defined in entity 'FrontendRoute' but missing from table 'frontend_routes'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "component_name",
+        "detail": "Column 'component_name' exists in table 'frontend_routes' but is not defined in entity 'FrontendRoute'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "required_permissions",
+        "detail": "Column 'required_permissions' exists in table 'frontend_routes' but is not defined in entity 'FrontendRoute'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "redirect_to",
+        "detail": "Column 'redirect_to' exists in table 'frontend_routes' but is not defined in entity 'FrontendRoute'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'frontend_routes' but is not defined in entity 'FrontendRoute'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "FrontendRoute",
+        "table_name": "frontend_routes",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'frontend_routes' but is not defined in entity 'FrontendRoute'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "Group",
+        "table_name": "groups",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'groups' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "Group",
+        "table_name": "groups",
+        "column_name": "is_system_group",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'is_system_group' in table 'groups' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "Group",
+        "table_name": "groups",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'groups' but is not defined in entity 'Group'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "Group",
+        "table_name": "groups",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'groups' but is not defined in entity 'Group'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "UiComponent",
+        "table_name": "ui_components",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'ui_components' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "UiComponent",
+        "table_name": "ui_components",
+        "column_name": "filePath",
+        "detail": "Column 'filePath' is defined in entity 'UiComponent' but missing from table 'ui_components'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "UiComponent",
+        "table_name": "ui_components",
+        "column_name": "overridePermissions",
+        "detail": "Column 'overridePermissions' is defined in entity 'UiComponent' but missing from table 'ui_components'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "UiComponent",
+        "table_name": "ui_components",
+        "column_name": "lastSynced",
+        "detail": "Column 'lastSynced' is defined in entity 'UiComponent' but missing from table 'ui_components'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UiComponent",
+        "table_name": "ui_components",
+        "column_name": "required_permissions",
+        "detail": "Column 'required_permissions' exists in table 'ui_components' but is not defined in entity 'UiComponent'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UiComponent",
+        "table_name": "ui_components",
+        "column_name": "override_permissions",
+        "detail": "Column 'override_permissions' exists in table 'ui_components' but is not defined in entity 'UiComponent'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UiComponent",
+        "table_name": "ui_components",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'ui_components' but is not defined in entity 'UiComponent'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UiComponent",
+        "table_name": "ui_components",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'ui_components' but is not defined in entity 'UiComponent'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "UserPermission",
+        "table_name": "user_permission",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'user_permission' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "UserPermission",
+        "table_name": "user_permission",
+        "column_name": "granted",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'granted' in table 'user_permission' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UserPermission",
+        "table_name": "user_permission",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'user_permission' but is not defined in entity 'UserPermission'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UserPermission",
+        "table_name": "user_permission",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'user_permission' but is not defined in entity 'UserPermission'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "RolePermission",
+        "table_name": "role_permissions",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'role_permissions' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "RolePermission",
+        "table_name": "role_permissions",
+        "column_name": "granted",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'granted' in table 'role_permissions' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "RolePermission",
+        "table_name": "role_permissions",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'role_permissions' but is not defined in entity 'RolePermission'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "RolePermission",
+        "table_name": "role_permissions",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'role_permissions' but is not defined in entity 'RolePermission'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "Role",
+        "table_name": "roles",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'roles' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "Role",
+        "table_name": "roles",
+        "column_name": "is_system_role",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'is_system_role' in table 'roles' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "Role",
+        "table_name": "roles",
+        "column_name": "is_default",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'is_default' in table 'roles' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "Role",
+        "table_name": "roles",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'roles' but is not defined in entity 'Role'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "Role",
+        "table_name": "roles",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'roles' but is not defined in entity 'Role'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'user_groups' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "isAdmin",
+        "detail": "Column 'isAdmin' is defined in entity 'UserGroup' but missing from table 'user_groups'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "permissions",
+        "detail": "Column 'permissions' is defined in entity 'UserGroup' but missing from table 'user_groups'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "last_active",
+        "detail": "Column 'last_active' is defined in entity 'UserGroup' but missing from table 'user_groups'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "user_id",
+        "detail": "Column 'user_id' exists in table 'user_groups' but is not defined in entity 'UserGroup'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "group_id",
+        "detail": "Column 'group_id' exists in table 'user_groups' but is not defined in entity 'UserGroup'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "is_admin",
+        "detail": "Column 'is_admin' exists in table 'user_groups' but is not defined in entity 'UserGroup'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'user_groups' but is not defined in entity 'UserGroup'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'user_groups' but is not defined in entity 'UserGroup'"
+      },
+      {
+        "type": "nullability_mismatch",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "id",
+        "entity_nullable": false,
+        "db_nullable": true,
+        "detail": "Column 'id' in table 'users' has nullability 'True' in DB but 'False' in entity"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "username",
+        "detail": "Column 'username' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "isActive",
+        "detail": "Column 'isActive' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "isEmailVerified",
+        "detail": "Column 'isEmailVerified' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "lastLogin",
+        "detail": "Column 'lastLogin' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "firstName",
+        "detail": "Column 'firstName' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "lastName",
+        "detail": "Column 'lastName' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "emailVerified",
+        "detail": "Column 'emailVerified' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "registrationVerificationSent",
+        "detail": "Column 'registrationVerificationSent' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "userVerified",
+        "detail": "Column 'userVerified' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "userDeleted",
+        "detail": "Column 'userDeleted' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "missing_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "deleteDate",
+        "detail": "Column 'deleteDate' is defined in entity 'User' but missing from table 'users'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "password",
+        "detail": "Column 'password' exists in table 'users' but is not defined in entity 'User'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "first_name",
+        "detail": "Column 'first_name' exists in table 'users' but is not defined in entity 'User'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "last_name",
+        "detail": "Column 'last_name' exists in table 'users' but is not defined in entity 'User'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "is_active",
+        "detail": "Column 'is_active' exists in table 'users' but is not defined in entity 'User'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "is_verified",
+        "detail": "Column 'is_verified' exists in table 'users' but is not defined in entity 'User'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "metadata",
+        "detail": "Column 'metadata' exists in table 'users' but is not defined in entity 'User'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "created_at",
+        "detail": "Column 'created_at' exists in table 'users' but is not defined in entity 'User'"
+      },
+      {
+        "type": "extra_column",
+        "entity_name": "User",
+        "table_name": "users",
+        "column_name": "updated_at",
+        "detail": "Column 'updated_at' exists in table 'users' but is not defined in entity 'User'"
+      },
+      {
+        "type": "extra_foreign_key",
+        "entity_name": "UserPermission",
+        "table_name": "user_permission",
+        "column_name": "user_id",
+        "reference": "users.id",
+        "detail": "Foreign key from 'user_permission.user_id' to 'users.id' exists in database but not in entity"
+      },
+      {
+        "type": "extra_foreign_key",
+        "entity_name": "UserPermission",
+        "table_name": "user_permission",
+        "column_name": "permission_id",
+        "reference": "permission.id",
+        "detail": "Foreign key from 'user_permission.permission_id' to 'permission.id' exists in database but not in entity"
+      },
+      {
+        "type": "extra_foreign_key",
+        "entity_name": "RolePermission",
+        "table_name": "role_permissions",
+        "column_name": "role_id",
+        "reference": "roles.id",
+        "detail": "Foreign key from 'role_permissions.role_id' to 'roles.id' exists in database but not in entity"
+      },
+      {
+        "type": "extra_foreign_key",
+        "entity_name": "RolePermission",
+        "table_name": "role_permissions",
+        "column_name": "permission_id",
+        "reference": "permission.id",
+        "detail": "Foreign key from 'role_permissions.permission_id' to 'permission.id' exists in database but not in entity"
+      },
+      {
+        "type": "extra_foreign_key",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "group_id",
+        "reference": "groups.id",
+        "detail": "Foreign key from 'user_groups.group_id' to 'groups.id' exists in database but not in entity"
+      },
+      {
+        "type": "extra_foreign_key",
+        "entity_name": "UserGroup",
+        "table_name": "user_groups",
+        "column_name": "user_id",
+        "reference": "users.id",
+        "detail": "Foreign key from 'user_groups.user_id' to 'users.id' exists in database but not in entity"
+      }
+    ]
+  }
+}

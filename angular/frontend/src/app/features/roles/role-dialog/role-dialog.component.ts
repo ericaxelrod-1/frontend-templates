@@ -10,7 +10,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Role, Permission, PermissionObject, RoleService } from '../../../services/role.service';
+import { Role, Permission, RoleService } from '../../../services/role.service';
 
 // Interface to group permissions by resource
 interface PermissionGroup {
@@ -169,7 +169,7 @@ export class RoleDialogComponent implements OnInit {
   role: Partial<Role>;
   availablePermissions: Permission[] = [];
   permissionGroups: PermissionGroup[] = [];
-  permissionsObject: PermissionObject = {};
+  selectedPermissions: Set<string | number> = new Set();
 
   constructor(
     public dialogRef: MatDialogRef<RoleDialogComponent>,
@@ -179,18 +179,12 @@ export class RoleDialogComponent implements OnInit {
     this.role = data.role ? { ...data.role } : {
       name: '',
       description: '',
-      permissions: {} as PermissionObject
+      permissions: []
     };
     
-    // Convert array permissions to object if needed
-    if (data.role && Array.isArray(data.role.permissions)) {
-      this.permissionsObject = {};
-      (data.role.permissions as Permission[]).forEach(permission => {
-        this.permissionsObject[permission.id] = true;
-      });
-      this.role.permissions = this.permissionsObject;
-    } else if (data.role && data.role.permissions) {
-      this.permissionsObject = { ...(data.role.permissions as PermissionObject) };
+    // Initialize selected permissions from role
+    if (data.role?.permissions) {
+      this.selectedPermissions = new Set(data.role.permissions.map(p => p.id));
     }
   }
 
@@ -200,11 +194,11 @@ export class RoleDialogComponent implements OnInit {
 
   loadPermissions(): void {
     this.roleService.getPermissions().subscribe({
-      next: (permissions) => {
+      next: (permissions: Permission[]) => {
         this.availablePermissions = permissions;
         this.groupPermissionsByResource();
       },
-      error: (error) => {
+      error: (error: Error) => {
         console.error('Error loading permissions:', error);
       }
     });
@@ -240,7 +234,7 @@ export class RoleDialogComponent implements OnInit {
   getResourceFromPermission(permission: Permission): string {
     // Handle both id format (resource:action) and name format
     const id = permission.id || permission.name;
-    if (id && id.includes(':')) {
+    if (typeof id === 'string' && id.includes(':')) {
       return id.split(':')[0];
     }
     return 'other';
@@ -251,10 +245,10 @@ export class RoleDialogComponent implements OnInit {
    */
   formatPermissionName(permission: Permission): string {
     // If permission.id is in resource:action format, use that
-    if (permission.id && permission.id.includes(':')) {
+    if (typeof permission.id === 'string' && permission.id.includes(':')) {
       return permission.id;
     }
-    // Otherwise fall back to name
+    // Otherwise use name
     return permission.name;
   }
 
@@ -262,15 +256,18 @@ export class RoleDialogComponent implements OnInit {
    * Check if a specific permission is selected
    */
   isPermissionSelected(permission: Permission): boolean {
-    return Boolean(this.permissionsObject[permission.id]);
+    return this.selectedPermissions.has(permission.id);
   }
 
   /**
    * Toggle a permission selection
    */
   togglePermission(permission: Permission, isChecked: boolean): void {
-    this.permissionsObject[permission.id] = isChecked;
-    this.role.permissions = this.permissionsObject;
+    if (isChecked) {
+      this.selectedPermissions.add(permission.id);
+    } else {
+      this.selectedPermissions.delete(permission.id);
+    }
   }
 
   /**
@@ -278,13 +275,16 @@ export class RoleDialogComponent implements OnInit {
    */
   toggleResourcePermissions(resource: string, isChecked: boolean): void {
     const resourcePermissions = this.permissionGroups
-      .find(group => group.resource === resource)?.permissions || [];
-      
+      .find(group => group.resource === resource)
+      ?.permissions || [];
+
     resourcePermissions.forEach(permission => {
-      this.permissionsObject[permission.id] = isChecked;
+      if (isChecked) {
+        this.selectedPermissions.add(permission.id);
+      } else {
+        this.selectedPermissions.delete(permission.id);
+      }
     });
-    
-    this.role.permissions = this.permissionsObject;
   }
 
   /**
@@ -292,9 +292,12 @@ export class RoleDialogComponent implements OnInit {
    */
   toggleAllPermissions(isChecked: boolean): void {
     this.availablePermissions.forEach(permission => {
-      this.permissionsObject[permission.id] = isChecked;
+      if (isChecked) {
+        this.selectedPermissions.add(permission.id);
+      } else {
+        this.selectedPermissions.delete(permission.id);
+      }
     });
-    this.role.permissions = this.permissionsObject;
   }
 
   /**
@@ -302,15 +305,15 @@ export class RoleDialogComponent implements OnInit {
    */
   areAllPermissionsSelected(): boolean {
     return this.availablePermissions.length > 0 && 
-      this.availablePermissions.every(p => this.permissionsObject[p.id]);
+           this.availablePermissions.every(p => this.selectedPermissions.has(p.id));
   }
 
   /**
    * Check if some but not all permissions are selected
    */
   areSomePermissionsSelected(): boolean {
-    const selectedCount = this.availablePermissions.filter(p => this.permissionsObject[p.id]).length;
-    return selectedCount > 0 && selectedCount < this.availablePermissions.length;
+    return this.availablePermissions.some(p => this.selectedPermissions.has(p.id)) && 
+           !this.areAllPermissionsSelected();
   }
 
   /**
@@ -318,10 +321,11 @@ export class RoleDialogComponent implements OnInit {
    */
   areAllResourcePermissionsSelected(resource: string): boolean {
     const resourcePermissions = this.permissionGroups
-      .find(group => group.resource === resource)?.permissions || [];
-      
+      .find(group => group.resource === resource)
+      ?.permissions || [];
+    
     return resourcePermissions.length > 0 && 
-      resourcePermissions.every(p => this.permissionsObject[p.id]);
+           resourcePermissions.every(p => this.selectedPermissions.has(p.id));
   }
 
   /**
@@ -329,10 +333,11 @@ export class RoleDialogComponent implements OnInit {
    */
   areSomeResourcePermissionsSelected(resource: string): boolean {
     const resourcePermissions = this.permissionGroups
-      .find(group => group.resource === resource)?.permissions || [];
-      
-    const selectedCount = resourcePermissions.filter(p => this.permissionsObject[p.id]).length;
-    return selectedCount > 0 && selectedCount < resourcePermissions.length;
+      .find(group => group.resource === resource)
+      ?.permissions || [];
+    
+    return resourcePermissions.some(p => this.selectedPermissions.has(p.id)) && 
+           !this.areAllResourcePermissionsSelected(resource);
   }
 
   /**
@@ -340,9 +345,10 @@ export class RoleDialogComponent implements OnInit {
    */
   getSelectedPermissionCountForResource(resource: string): number {
     const resourcePermissions = this.permissionGroups
-      .find(group => group.resource === resource)?.permissions || [];
-      
-    return resourcePermissions.filter(p => this.permissionsObject[p.id]).length;
+      .find(group => group.resource === resource)
+      ?.permissions || [];
+    
+    return resourcePermissions.filter(p => this.selectedPermissions.has(p.id)).length;
   }
 
   onCancel(): void {
@@ -350,8 +356,10 @@ export class RoleDialogComponent implements OnInit {
   }
 
   onSave(): void {
-    // Ensure permissions is properly set
-    this.role.permissions = this.permissionsObject;
+    // Convert selected permission IDs back to Permission array
+    this.role.permissions = this.availablePermissions
+      .filter(p => this.selectedPermissions.has(p.id));
+    
     this.dialogRef.close(this.role);
   }
 } 

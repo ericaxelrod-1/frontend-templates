@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS user_groups (
 );
 
 -- Step 9: Create direct user permissions (for exceptions)
-CREATE TABLE IF NOT EXISTS user_permissions (
+CREATE TABLE IF NOT EXISTS user_permission (
     user_id INT NOT NULL,
     permission_id INT NOT NULL,
     granted BOOLEAN DEFAULT TRUE, -- TRUE = grant, FALSE = deny (override)
@@ -100,7 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_group_permissions_group_id ON group_permissions(g
 CREATE INDEX IF NOT EXISTS idx_group_permissions_permission_id ON group_permissions(permission_id);
 CREATE INDEX IF NOT EXISTS idx_group_hierarchy_parent ON group_hierarchy(parent_group_id);
 CREATE INDEX IF NOT EXISTS idx_group_hierarchy_child ON group_hierarchy(child_group_id);
-CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON user_permissions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_permission_user_id ON user_permission(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_groups_user_id ON user_groups(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_groups_group_id ON user_groups(group_id);
 CREATE INDEX IF NOT EXISTS idx_permissions_resource_action ON permissions(resource, action);
@@ -161,7 +161,7 @@ CREATE OR REPLACE VIEW user_effective_permissions AS
 SELECT u.id AS user_id, p.id AS permission_id, p.resource, p.action, 
        up.granted AS is_granted, 1 AS precedence
 FROM users u
-JOIN user_permissions up ON u.id = up.user_id
+JOIN user_permission up ON u.id = up.user_id
 JOIN permissions p ON up.permission_id = p.id
 
 UNION ALL

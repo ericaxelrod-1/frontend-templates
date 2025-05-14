@@ -201,24 +201,22 @@ export class UsersComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Check permissions once on init
-    this.permissionService.hasAnyPermission(['user:update', 'user:create', 'user:delete']).subscribe(
+    // Get current user
+    this.authService.currentUser$.subscribe(user => {
+      this.currentUser = user;
+    });
+
+    // Check permissions
+    this.permissionService.hasPermission('users:manage').subscribe(
       hasPermission => this.hasManageUsersPermission = hasPermission
     );
     
-    this.permissionService.hasAnyPermission(['group:update', 'group:create', 'group:delete']).subscribe(
+    this.permissionService.hasPermission('groups:manage').subscribe(
       hasPermission => this.hasManageGroupsPermission = hasPermission
     );
-    
-    this.authService.currentUser$.subscribe(user => {
-      if (user) {
-        this.currentUser = this.convertAuthUserToUserModel(user);
-        this.loadData();
-      } else {
-        this.loading = false;
-        this.router.navigate(['/login']);
-      }
-    });
+
+    // Load data
+    this.loadData();
   }
 
   // Method to convert auth user to our User model
@@ -461,6 +459,6 @@ export class UsersComponent implements OnInit {
   }
 
   canEditUsers(): boolean {
-    return this.hasManageUsersPermission;
+    return this.permissionService.hasPermissionSync('users:edit');
   }
 }

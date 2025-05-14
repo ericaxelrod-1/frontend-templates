@@ -1,0 +1,13 @@
+---
+description: Use this when debugging
+globs: 
+alwaysApply: false
+---
+**Do not make any code changes**
+
+Investigate these issues thoroughly. Search through the codebase and database for explanations
+
+** Do not make any assumptions. **
+** If you cannot positivly identify the cause of an issue, continue exploring until you definitively find the issue. Leave no stone unturned **
+
+Take your time to think **deeply**. **Think for at least 30 minutes** before providing an answer.

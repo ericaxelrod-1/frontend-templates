@@ -9,6 +9,7 @@
 6. [Tasks](#tasks)
 7. [Error Handling](#error-handling)
 8. [Pagination](#pagination)
+9. [Data Transfer Objects (DTOs)](#data-transfer-objects-dtos)
 
 ## Overview
 
@@ -36,6 +37,36 @@ All API requests should include the following headers:
 Content-Type: application/json
 Accept: application/json
 ```
+
+### API Response Format
+
+Backend responses use snake_case for property names, while the frontend uses camelCase. The transformation between these formats is handled automatically by the frontend's `CaseTransformInterceptor`, so developers can always use camelCase in frontend code.
+
+Example backend response:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "first_name": "John",
+    "last_name": "Doe"
+  }
+}
+```
+
+After interceptor transformation (available in frontend code):
+```typescript
+{
+  accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  user: {
+    firstName: "John",
+    lastName: "Doe"
+  }
+}
+```
+
+When documenting API requests and responses in this document, we use the actual backend format (snake_case) for clarity and consistency with the actual API contract.
 
 ## Authentication
 
@@ -860,4 +891,22 @@ Most list endpoints support pagination using the following query parameters:
     "last": "/api/users?page=10&limit=10"
   }
 }
-``` 
+```
+
+## Data Transfer Objects (DTOs)
+
+### ApiEndpointDto
+
+Represents an API endpoint in the system.
+
+```typescript
+{
+  path: string;       // The URL path of the endpoint
+  method: string;     // The HTTP method (GET, POST, PUT, DELETE, etc.)
+  description: string; // A description of what the endpoint does
+}
+```
+
+Used in:
+- GET /api/permissions/endpoints - Returns a list of available API endpoints
+- POST /api/permissions/endpoints/sync - Syncs endpoint permissions 

@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { PermissionManagementService } from '../../../../core/services/permission-management.service';
+import { PermissionService } from '../../../../core/services/permission.service';
 
 @Component({
   selector: 'app-permissions-dashboard',
@@ -11,7 +11,7 @@ export class PermissionsDashboardComponent implements OnInit {
   loading = false;
   
   constructor(
-    private permissionService: PermissionManagementService,
+    private permissionService: PermissionService,
     private snackBar: MatSnackBar
   ) { }
 

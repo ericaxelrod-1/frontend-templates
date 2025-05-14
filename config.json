@@ -1,0 +1,15 @@
+{
+  "debug_mode": true,
+  "log_directory": "logs",
+  "connection_timeout": 5000,
+  "database": {
+    "path": "./src/database/database.sqlite",
+    "backup_directory": "./backup",
+    "enable_foreign_keys": true,
+    "create_missing_tables": true
+  },
+  "validation": {
+    "enable_auto_fix": false,
+    "check_on_startup": true
+  }
+} 

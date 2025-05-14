@@ -92,10 +92,22 @@ export class AuthInterceptor implements HttpInterceptor {
       `${environment.apiUrl}/auth/verify-email`
     ];
     
-    return skipUrls.some(url => request.url.includes(url));
+    const isPublicEndpoint = skipUrls.some(url => request.url.includes(url));
+    
+    if (isPublicEndpoint) {
+      console.log(`AuthInterceptor: Skipping token for public endpoint: ${request.url}`);
+    }
+    
+    return isPublicEndpoint;
   }
 
   private handle401Error(request: HttpRequest<unknown>, next: HttpHandler, originalError: HttpErrorResponse): Observable<HttpEvent<unknown>> {
+    // If this is a public endpoint, don't try to refresh the token
+    if (this.shouldSkipToken(request)) {
+      console.log(`AuthInterceptor: Received 401 for public endpoint ${request.url}, not attempting token refresh`);
+      return throwError(() => originalError);
+    }
+    
     // Avoid infinite loop of token refresh
     if (request.url.includes('/api/auth/refresh')) {
       // Call logout and ignore the result as we're going to throw anyway
@@ -120,9 +132,11 @@ export class AuthInterceptor implements HttpInterceptor {
     this.refreshTokenSubject.next(null);
     
     // Try to refresh the token
+    console.log(`AuthInterceptor: Attempting to refresh token for endpoint: ${request.url}`);
     return from(this.authService.refreshAccessToken().pipe(
       switchMap(response => {
         // Token refresh successful - notify waiters and retry the request
+        console.log('AuthInterceptor: Token refresh successful, retrying original request');
         this.refreshTokenInProgress = false;
         this.refreshTokenSubject.next(response.accessToken);
         
@@ -132,8 +146,9 @@ export class AuthInterceptor implements HttpInterceptor {
           response.csrfToken
         ));
       }),
-      catchError(() => {
+      catchError((refreshError) => {
         // Token refresh failed - proceed to logout
+        console.error('AuthInterceptor: Token refresh failed:', refreshError.status, refreshError.message);
         this.refreshTokenInProgress = false;
         this.refreshTokenSubject.next(null);
         // Call logout and ignore the result as we're going to throw anyway

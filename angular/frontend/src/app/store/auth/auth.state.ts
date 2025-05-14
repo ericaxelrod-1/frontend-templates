@@ -4,7 +4,7 @@ import { Navigate } from '@ngxs/router-plugin';
 import { AuthService, AuthStatus } from '../../core/services/auth.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { User, UserRegistration } from '../../models';
-import { catchError, tap } from 'rxjs/operators';
+import { catchError, tap, switchMap } from 'rxjs/operators';
 import { throwError, of } from 'rxjs';
 import { RolesConstantsService } from '../../core/constants/roles';
 
@@ -318,11 +318,29 @@ export class AuthState {
       isAuthenticated: true
     });
     
-    // Dispatch actions to load permissions and roles
-    ctx.dispatch(new AuthActions.LoadUserPermissions());
-    ctx.dispatch(new AuthActions.LoadRoles());
+    console.log('AuthState: Login successful, beginning sequential role and permission loading');
     
-    return ctx.dispatch(new Navigate(['/app/dashboard']));
+    // Use sequential flow with switchMap to ensure proper order:
+    // 1. Load roles first
+    // 2. Then load permissions
+    // 3. Then navigate to dashboard
+    return this.rolesService.initialize().pipe(
+      tap(() => {
+        console.log('AuthState: Roles loaded successfully');
+        ctx.patchState({ rolesLoaded: true });
+      }),
+      switchMap(() => ctx.dispatch(new AuthActions.LoadUserPermissions())),
+      switchMap(() => {
+        console.log('AuthState: Authentication sequence completed successfully');
+        return ctx.dispatch(new Navigate(['/app/dashboard']));
+      }),
+      catchError(error => {
+        console.error('AuthState: Error in authentication sequence:', error);
+        // Still consider auth successful even if roles/permissions loading fails
+        // This prevents being stuck in a failed state
+        return ctx.dispatch(new Navigate(['/app/dashboard']));
+      })
+    );
   }
 
   @Action(AuthActions.LoginFailure)
@@ -553,12 +571,25 @@ export class AuthState {
       verificationSuccess: true
     });
     
-    // Load permissions and roles after successful verification
-    ctx.dispatch(new AuthActions.LoadUserPermissions());
-    ctx.dispatch(new AuthActions.LoadRoles());
+    console.log('AuthState: Email verification successful, beginning sequential role and permission loading');
     
-    // Redirect to home page after successful verification
-    return ctx.dispatch(new Navigate(['/app/dashboard']));
+    // Use the same sequential flow as login success
+    return this.rolesService.initialize().pipe(
+      tap(() => {
+        console.log('AuthState: Roles loaded successfully after email verification');
+        ctx.patchState({ rolesLoaded: true });
+      }),
+      switchMap(() => ctx.dispatch(new AuthActions.LoadUserPermissions())),
+      switchMap(() => {
+        console.log('AuthState: Verification authentication sequence completed successfully');
+        return ctx.dispatch(new Navigate(['/app/dashboard']));
+      }),
+      catchError(error => {
+        console.error('AuthState: Error in verification authentication sequence:', error);
+        // Still consider auth successful even if roles/permissions loading fails
+        return ctx.dispatch(new Navigate(['/app/dashboard']));
+      })
+    );
   }
 
   @Action(AuthActions.VerifyEmailFailure)
@@ -576,9 +607,19 @@ export class AuthState {
       tap((status: AuthStatus) => {
         if (status.isAuthenticated && status.user) {
           ctx.dispatch(new AuthActions.SetInitialAuthState(status.user, true));
-          // Also load permissions and roles if authenticated
-          ctx.dispatch(new AuthActions.LoadUserPermissions());
-          ctx.dispatch(new AuthActions.LoadRoles());
+          
+          // Use sequential loading for app initialization too
+          this.rolesService.initialize().pipe(
+            tap(() => {
+              console.log('AuthState: Roles loaded successfully during app initialization');
+              ctx.patchState({ rolesLoaded: true });
+            }),
+            switchMap(() => ctx.dispatch(new AuthActions.LoadUserPermissions())),
+            catchError(error => {
+              console.error('AuthState: Error loading roles/permissions during app init:', error);
+              return of(null); // Allow app to continue even if role loading fails
+            })
+          ).subscribe();
         } else {
           ctx.patchState({
             isAuthenticated: false,

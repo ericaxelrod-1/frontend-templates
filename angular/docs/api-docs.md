@@ -230,6 +230,113 @@ DELETE /api/permissions/actions/:id
 
 **Response**: Status code 204 (No Content) if successful
 
+### API Endpoints
+
+API Endpoints represent the actual REST endpoints in the system that are protected by permissions.
+
+#### Get All Endpoints
+
+```
+GET /api/permissions/endpoints
+```
+
+**Required Permission**: `endpoints:list`
+
+**Response**:
+
+```json
+[
+  {
+    "id": 1,
+    "path": "/api/users",
+    "method": "GET",
+    "description": "List all users",
+    "requiredPermissions": ["users:list"]
+  },
+  {
+    "id": 2,
+    "path": "/api/roles",
+    "method": "POST",
+    "description": "Create a new role",
+    "requiredPermissions": ["roles:create"]
+  }
+]
+```
+
+#### Get Endpoint by ID
+
+```
+GET /api/permissions/endpoints/:id
+```
+
+**Required Permission**: `endpoints:read`
+
+**Response**:
+
+```json
+{
+  "id": 1,
+  "path": "/api/users",
+  "method": "GET",
+  "description": "List all users",
+  "requiredPermissions": ["users:list"]
+}
+```
+
+#### Update Endpoint Permissions
+
+```
+PUT /api/permissions/endpoints/:id/permissions
+```
+
+**Required Permission**: `endpoints:update`
+
+**Request Body**:
+
+```json
+{
+  "requiredPermissions": ["users:list", "users:read"]
+}
+```
+
+**Response**: Returns the updated endpoint
+
+#### Scan and Register Endpoints
+
+```
+POST /api/permissions/endpoints/scan
+```
+
+**Required Permission**: `endpoints:manage`
+
+**Description**: Scans the application for all API endpoints and registers them in the system. This is typically done during application startup or after adding new endpoints.
+
+**Response**:
+
+```json
+{
+  "scanned": 25,
+  "registered": 5,
+  "updated": 2,
+  "removed": 1
+}
+```
+
+### ApiEndpointDto Structure
+
+The `ApiEndpointDto` is used to represent API endpoints in the system. It contains the following properties:
+
+- `path` (string): The URL path of the endpoint (e.g., "/api/users")
+- `method` (string): The HTTP method (GET, POST, PUT, DELETE, etc.)
+- `description` (string): A human-readable description of what the endpoint does
+
+When an endpoint is registered in the system, additional properties are added:
+
+- `id` (number): Unique identifier for the endpoint
+- `requiredPermissions` (string[]): Array of permission strings required to access this endpoint
+- `createdAt` (Date): When the endpoint was first registered
+- `updatedAt` (Date): When the endpoint was last updated
+
 ### Permissions
 
 Permissions are combinations of resources and actions.
@@ -901,99 +1008,6 @@ POST /api/permissions/routes/:id/reset
 **Required Permission**: `routes:manage`
 
 **Response**: Returns the updated route with default permissions
-
-### API Endpoints
-
-#### Get All API Endpoints
-
-```
-GET /api/permissions/endpoints
-```
-
-**Required Permission**: `endpoints:list`
-
-**Query Parameters**:
-- `search` (optional): Search term for filtering endpoints
-- `page` (optional): Page number for pagination
-- `limit` (optional): Items per page
-
-**Response**:
-
-```json
-{
-  "items": [
-    {
-      "id": "list_users_endpoint",
-      "path": "GET /api/users",
-      "description": "List all users",
-      "requiredPermissions": ["users:list"],
-      "overridePermissions": false,
-      "lastSynced": "2023-04-07T14:32:21Z"
-    }
-  ],
-  "total": 1,
-  "page": 1,
-  "limit": 10
-}
-```
-
-#### Get API Endpoint by ID
-
-```
-GET /api/permissions/endpoints/:id
-```
-
-**Required Permission**: `endpoints:read`
-
-**Response**:
-
-```json
-{
-  "id": "list_users_endpoint",
-  "path": "GET /api/users",
-  "description": "List all users",
-  "requiredPermissions": ["users:list"],
-  "overridePermissions": false,
-  "lastSynced": "2023-04-07T14:32:21Z",
-  "permissions": [
-    {
-      "id": 15,
-      "resource": "users",
-      "action": "list",
-      "description": "List users"
-    }
-  ]
-}
-```
-
-#### Update API Endpoint Permissions
-
-```
-PUT /api/permissions/endpoints/:id/permissions
-```
-
-**Required Permission**: `endpoints:update`
-
-**Request Body**:
-
-```json
-{
-  "requiredPermissions": ["users:list", "users:view"],
-  "overridePermissions": true
-}
-```
-
-**Response**: Returns the updated endpoint with permissions
-
-#### Reset API Endpoint to Default
-
-```
-POST /api/permissions/endpoints/:id/reset
-```
-
-**Required Permission**: `endpoints:manage`
-
-**Response**: Returns the updated endpoint with default permissions
 
 ### Synchronization
 

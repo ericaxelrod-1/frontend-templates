@@ -213,7 +213,8 @@ export class AuthService {
       return throwError(() => new Error('Invalid refresh token format'));
     }
     
-    const request: RefreshTokenRequest = { refreshToken: refreshTokenToUse };
+    // Using token property to match backend expectations
+    const request = { token: refreshTokenToUse };
     console.log('Sending refresh token request...');
     
     return this.http.post<AuthResponse>(`${this.API_URL}/refresh`, request)

@@ -12,6 +12,29 @@ Before deploying, ensure you have:
 - A production-ready email service (not MailDev) - see [Email Configuration Guide](./email-configuration-guide.md)
 - Proper database credentials for your production database
 
+## Default Credentials
+
+After initial setup, the following default user accounts are created:
+
+### Super Admin Account
+- **Email**: admin@example.com
+- **Password**: Admin123!
+- **Role**: SUPERADMIN
+- **Important**: For security reasons, you will be required to change this password on first login
+
+### Additional Default Accounts
+- Manager Account:
+  - Email: manager@example.com
+  - Password: Manager123!
+  - Role: SUPERUSER
+
+- Regular User Account:
+  - Email: user@example.com
+  - Password: User123!
+  - Role: USER
+
+⚠️ **Security Warning**: Change all default passwords immediately after deployment. These credentials are for initial setup only and should not be used in a production environment.
+
 ## Development Setup
 
 ### 1. Installing Dependencies
@@ -426,249 +449,4 @@ The application uses different environment files for various stages of developme
 - **Key Settings**:
   - `DATABASE_FILE`: Path to database file
   - `DATABASE_SYNCHRONIZE`: Should be `false` for production
-  - `JWT_SECRET`: Secure secret key for JWT tokens
-  - `PORT`: API server port (default: 3000)
-
-### 2. `.env.development` (Development Environment)
-- **Location**: `angular/backend/.env.development`
-- **Purpose**: Configuration specific to development environments
-- **Usage**:
-  - Used when running: `npm run start:dev`
-  - Used when running: `npm run start:debug`
-- **Key Settings**:
-  - `DATABASE_WRITE_ENABLED`: Set to `true` to enable database writes during development
-  - `DATABASE_SYNCHRONIZE`: Set to `true` for automatic schema updates
-  - `DEBUG`: Set to `true` for enhanced logging
-  - `THROTTLE_LIMIT`: Higher value for easier development
-
-### 3. `.env.test` (Testing Environment)
-- **Location**: `angular/backend/.env.test`
-- **Purpose**: Configuration specific to automated tests
-- **Usage**:
-  - Used when running: `npm run test`
-  - Used when running: `npm run test:e2e`
-- **Key Settings**:
-  - `DATABASE_NAME`: Set to `:memory:` for in-memory testing database
-  - `PORT`: Different from development (3001) to avoid conflicts
-  - `DATABASE_SYNCHRONIZE`: Set to `true` for clean test environment
-
-### Environment Variables Reference
-
-Below is a complete reference of all environment variables used in the application:
-
-| Variable | Description | Default | Used In |
-|----------|-------------|---------|---------|
-| `NODE_ENV` | Environment mode | `development` | All modes |
-| `PORT` | API server port | `3000` | All modes |
-| `DATABASE_FILE` | SQLite database file path | `db.sqlite` | Development/Production |
-| `DATABASE_SYNCHRONIZE` | Auto-update database schema | `false` | All modes |
-| `DATABASE_WRITE_ENABLED` | Enable database writes | `true` in dev, `true` in prod | Development |
-| `MIGRATIONS_RUN` | Run migrations on startup | `true` | Development/Production |
-| `JWT_SECRET` | Secret for JWT signing | varies by environment | All modes |
-| `JWT_EXPIRES_IN` | JWT expiration time | `1d` | All modes |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh token expiration | `7d` | Development/Production |
-| `FRONTEND_URL` | URL of the frontend application | `http://localhost:4200` | All modes |
-| `THROTTLE_TTL` | Rate limiting time window (seconds) | `60` | All modes |
-| `THROTTLE_LIMIT` | Maximum requests per time window | `10` in prod, `100` in dev | All modes |
-| `DEBUG` | Enable debug mode | `true` in dev, `false` in prod | Development |
-| `DEBUG_LOG_LEVEL` | Logging verbosity | `debug` | Development |
-| `ENABLE_COOKIE_CONSENT` | Enable cookie consent system | `true` | All modes |
-| `COOKIE_NECESSARY_ENABLED` | Enable necessary cookies | `true` | All modes |
-| `COOKIE_PREFERENCES_DEFAULT` | Default for preference cookies | `false` | All modes |
-| `COOKIE_ANALYTICS_DEFAULT` | Default for analytics cookies | `false` | All modes |
-| `COOKIE_MARKETING_DEFAULT` | Default for marketing cookies | `false` | All modes |
-| `ANALYTICS_TRACKING_ID` | Google Analytics ID | - | Production |
-| `MARKETING_PIXEL_ID` | Facebook Pixel ID | - | Production |
-| `STORE_COOKIE_CONSENT_WITH_USER` | Store consent with user accounts | `true` | All modes |
-
-### Overriding Environment Variables
-
-You can override any environment variable by:
-
-1. Setting it directly when running a command:
-   ```bash
-   DATABASE_WRITE_ENABLED=true npm run start:dev
-   ```
-
-2. Creating a custom `.env.local` file (not tracked by Git) with your personal overrides
-
-### Database Writes in Development Mode
-
-By default, the application now includes the `DATABASE_WRITE_ENABLED=true` setting in the development environment file. This enables database writes during development, allowing you to:
-
-- Create and register user accounts
-- Test the full email verification flow
-- Add and modify data in development
-- Test role assignments and group memberships
-
-If you need to work without persisting data, you can override this setting:
-```bash
-DATABASE_WRITE_ENABLED=false npm run start:dev
-```
-
-## Deployment to Server
-
-### Traditional Server Deployment
-
-1. Transfer the built application to your server:
-   ```bash
-   scp -r dist/frontend user@your-server:/path/to/deployment
-   ```
-
-2. Install production dependencies:
-   ```bash
-   cd /path/to/deployment
-   npm ci --only=production
-   ```
-
-3. Start the server:
-   ```bash
-   # Using a process manager like PM2 is recommended
-   pm2 start server.js --name "angular-template"
-   ```
-
-### Docker Deployment
-
-1. Build the Docker image:
-   ```bash
-   docker build -t angular-template:latest .
-   ```
-
-2. Run the container:
-   ```bash
-   docker run -d -p 80:4000 \
-     -e NODE_ENV=production \
-     -e API_URL=https://your-api-url.com \
-     -e ENABLE_COOKIE_CONSENT=true \
-     # Add other environment variables here \
-     --name angular-app \
-     angular-template:latest
-   ```
-
-## Post-Deployment Verification
-
-After deployment, perform these checks:
-
-1. Verify the application loads correctly in the browser
-2. Test all critical user flows (login, signup, etc.)
-3. Ensure all API endpoints respond correctly
-4. Confirm emails are sent properly
-5. Check for any console errors
-6. Verify analytics tracking is working (if applicable)
-7. Test on multiple browsers and devices
-8. Verify email verification process works end-to-end
-9. Test the account deletion process (GDPR compliance)
-10. Verify the cookie consent banner appears and functions correctly
-
-## Monitoring and Maintenance
-
-Set up monitoring for your deployed application:
-
-- Configure application logging to a centralized service
-- Set up uptime monitoring
-- Configure error tracking (e.g., Sentry)
-- Set up performance monitoring
-- Configure alerts for critical issues
-
-## Troubleshooting Common Issues
-
-### Application Not Loading
-
-- Check server logs for errors
-- Verify that the server is running
-- Ensure ports are correctly configured
-- Check for network connectivity issues
-
-### Email Service Issues
-
-- Verify email configuration variables
-- Check firewall settings for outgoing SMTP connections
-- Ensure your email provider allows sending from your server's IP
-- Enable debug logging for the email service:
-  ```
-  DEBUG=true DEBUG_LOG_FILE=true
-  ```
-
-### Cookie Consent Issues
-
-- Check browser console for JavaScript errors
-- Verify that cookie consent preferences are saved in localStorage
-- Test cookie storage with different settings combinations
-- Ensure tracking scripts respect consent settings
-
-### Database Connection Issues
-
-- Verify database connection string
-- Check database server status
-- Ensure firewall rules allow connections
-- Verify credentials are correct
-
-## Regular Maintenance Tasks
-
-- Update dependencies regularly to patch security vulnerabilities
-- Rotate credentials periodically
-- Monitor disk space and server resources
-- Backup database and configuration regularly
-- Review and update security measures
-- Update privacy policies when cookie behavior changes
-
-## Rollback Plan
-
-In case of critical issues after deployment:
-
-1. Revert to the previous stable version:
-   ```bash
-   # If using Git tags for releases
-   git checkout v1.0.0
-   npm install
-   npm run build:prod
-   # Then redeploy
-   ```
-
-2. Or restore from backup if available
-
-3. Notify users of temporary disruption if necessary
-
-## Additional Resources
-
-- [Angular Deployment Guide](https://angular.io/guide/deployment)
-- [Email Configuration Guide](./email-configuration-guide.md)
-- [Cookie Management Guide](./cookies.md)
-- [GDPR Compliance Documentation](./gdpr-compliance.md)
-- [Security Best Practices](https://angular.io/guide/security)
-- [Performance Optimization Guide](https://web.dev/angular)
-
-### Environment Files vs. CLI Flags
-
-It's important to understand the difference between environment files and CLI flags:
-
-#### Environment Files (`.env`, `.env.development`, `.env.test`)
-- Control application behavior and runtime configuration
-- Define variables like database connections, API URLs, feature flags
-- Loaded by the server process during startup
-- Accessed through `process.env` in the backend code
-
-#### Angular CLI Flags (--verbose, --hmr, --configuration)
-- Control how the Angular CLI builds and serves the application
-- Do not directly interact with environment files
-- Applied during the build/serve process
-- Examples:
-  - `--verbose`: Increases build process logging, showing detailed webpack output
-  - `--hmr`: Enables Hot Module Replacement for faster frontend development
-  - `--configuration`: Selects which Angular environment file to use (not related to backend `.env` files)
-
-#### Using Both Together
-
-When developing, you often use both systems in tandem:
-
-```bash
-# Start backend with environment file
-cd angular/backend
-npm run start:dev  # Uses .env.development
-
-# In another terminal, start frontend with CLI flags
-cd angular/frontend
-ng serve --verbose --hmr  # Uses Angular CLI flags
-```
-
-This combination gives you detailed build logs and fast frontend updates while also enabling the proper backend configuration for development. 
+  - `
