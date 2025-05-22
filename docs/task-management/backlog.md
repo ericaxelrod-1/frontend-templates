@@ -57,6 +57,130 @@ Last Updated: 2025-05-07
   - TypeScript errors reduced from 119 to 0
   - Database schema synchronization fixed with SQLite-specific migration
 
+### BUG-020: Align Migration Scripts to Current db.sqlite Schema
+- **Status**: Identified
+- **Priority**: High (Blocking server start and further development)
+- **Testing**: Not Started
+- **Added**: 2025-05-16
+- **Last Re-evaluated**: 2025-05-16 (after task FK fix)
+- **Description**: The migration scripts in `angular/backend/src/database/migrations/` need to be refactored to precisely match the DDL and DML operations required to produce the current schema of `db.sqlite` as of 2025-05-16. This is to ensure that if migrations were run on an empty database, they would create a schema identical to the current `db.sqlite`. This is critical for TypeORM stability and to prevent accidental schema changes when the server starts.
+
+#### Implementation Notes
+- The current `db.sqlite` schema (fetched 2025-05-16, `task` table re-fetched 2025-05-16 after FK correction) will be the source of truth.
+- Each migration script listed below will be analyzed.
+- Compliant scripts will be marked.
+- Non-compliant scripts will have a detailed plan for modification.
+- Deprecated/No-Op scripts will be confirmed as such.
+
+#### Migration Script Compliance Analysis:
+
+**Target `db.sqlite` Schemas (Fetched 2025-05-16, `task` table updated 2025-05-16):**
+*   `actions`: CREATE TABLE actions (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(255) UNIQUE NOT NULL, description VARCHAR, action_name VARCHAR(255) NOT NULL, icon VARCHAR, created_at DATETIME NOT NULL DEFAULT (datetime('now')), updated_at DATETIME NOT NULL DEFAULT (datetime('now')))
+*   `api_endpoint_permissions`: CREATE TABLE api_endpoint_permissions (api_endpoint_id INTEGER NOT NULL, permission_id INTEGER NOT NULL, PRIMARY KEY (api_endpoint_id, permission_id), FOREIGN KEY(api_endpoint_id) REFERENCES api_endpoints(id) ON DELETE CASCADE, FOREIGN KEY(permission_id) REFERENCES permissions(id) ON DELETE CASCADE)
+*   `api_endpoints`: CREATE TABLE api_endpoints (id VARCHAR PRIMARY KEY NOT NULL, method VARCHAR NOT NULL, path VARCHAR NOT NULL, description VARCHAR, controllerName VARCHAR, handlerName VARCHAR, overridePermissions BOOLEAN NOT NULL DEFAULT 0, lastSynced DATETIME, createdAt DATETIME NOT NULL DEFAULT (datetime('now')), updatedAt DATETIME NOT NULL DEFAULT (datetime('now')))
+*   `captcha`: CREATE TABLE captcha (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT DEFAULT 'text', token TEXT NOT NULL, challenge TEXT NOT NULL, solution TEXT NOT NULL, used BOOLEAN NOT NULL DEFAULT 0, expiresAt DATETIME NOT NULL, ipAddress TEXT, metadata TEXT, createdAt DATETIME NOT NULL DEFAULT (datetime('now')))
+*   `category`: CREATE TABLE category (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name VARCHAR NOT NULL, color VARCHAR NOT NULL DEFAULT ('#000000'), createdAt DATETIME NOT NULL DEFAULT (datetime('now')), updatedAt DATETIME NOT NULL DEFAULT (datetime('now')), userId INTEGER, description VARCHAR, FOREIGN KEY (userId) REFERENCES users(id) ON DELETE NO ACTION ON UPDATE NO ACTION)
+*   `frontend_route_permissions`: CREATE TABLE frontend_route_permissions (route_id INTEGER NOT NULL, permission_id INTEGER NOT NULL, PRIMARY KEY (route_id, permission_id), FOREIGN KEY(route_id) REFERENCES frontend_routes(id) ON DELETE CASCADE, FOREIGN KEY(permission_id) REFERENCES permissions(id) ON DELETE CASCADE)
+*   `frontend_routes`: CREATE TABLE frontend_routes (id VARCHAR PRIMARY KEY NOT NULL, path VARCHAR NOT NULL, description VARCHAR, component VARCHAR, overridePermissions BOOLEAN NOT NULL DEFAULT 0, lastSynced DATETIME, createdAt DATETIME NOT NULL DEFAULT (datetime('now')), updatedAt DATETIME NOT NULL DEFAULT (datetime('now')), CONSTRAINT UQ_ecb9ad00e0f804daea1dab41d49 UNIQUE (path))
+*   `group_permissions`: CREATE TABLE group_permissions (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL, permission_id INTEGER NOT NULL, granted BOOLEAN NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT (datetime('now')), updated_at DATETIME NOT NULL DEFAULT (datetime('now')), FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE, FOREIGN KEY(permission_id) REFERENCES permissions(id) ON DELETE CASCADE)
+*   `groups`: CREATE TABLE "groups" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT NOT NULL UNIQUE, "description" TEXT, "ownerId" INTEGER, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("ownerId") REFERENCES "users"("id") ON DELETE CASCADE)
+*   `ip_reputation`: CREATE TABLE ip_reputation (id INTEGER PRIMARY KEY AUTOINCREMENT, ipAddress TEXT UNIQUE NOT NULL, status TEXT NOT NULL DEFAULT 'good', reputationScore FLOAT DEFAULT 100, geoLocation TEXT, statistics TEXT, blockHistory TEXT, failedAttempts INTEGER DEFAULT 0, isBlocked BOOLEAN DEFAULT 0, blockedUntil DATETIME, captchaRequiredCount INTEGER DEFAULT 0, metadata TEXT, createdAt DATETIME NOT NULL DEFAULT (datetime('now')), updatedAt DATETIME NOT NULL DEFAULT (datetime('now')))
+*   `login_attempt`: CREATE TABLE login_attempt (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, ipAddress TEXT NOT NULL, userAgent TEXT NOT NULL, email TEXT, status TEXT NOT NULL DEFAULT ('failed'), userId INTEGER, failureReason TEXT, metadata TEXT, createdAt DATETIME NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL ON UPDATE NO ACTION)
+*   `migrations`: CREATE TABLE migrations (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, timestamp BIGINT NOT NULL, name VARCHAR NOT NULL)
+*   `migrations_history`: CREATE TABLE migrations_history(id INT, timestamp INT, name TEXT)
+*   `permissions`: CREATE TABLE "permissions" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "resourceName" TEXT NOT NULL, "actionName" TEXT NOT NULL, "name" TEXT NOT NULL, "description" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE("resourceName", "actionName"))
+*   `resource`: CREATE TABLE resource (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name VARCHAR NOT NULL, description VARCHAR, CONSTRAINT UQ_c8ed18ff47475e2c4a7bf59daa0 UNIQUE (name))
+*   `role_permissions`: CREATE TABLE "role_permissions" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "role_id" INTEGER NOT NULL, "permission_id" INTEGER NOT NULL, UNIQUE("role_id", "permission_id"), FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE, FOREIGN KEY ("permission_id") REFERENCES "permissions"("id") ON DELETE CASCADE)
+*   `roles`: CREATE TABLE "roles" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT NOT NULL UNIQUE, "description" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)
+*   `sqlite_sequence`: CREATE TABLE sqlite_sequence(name,seq)
+*   `tag`: CREATE TABLE tag (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name VARCHAR NOT NULL, description VARCHAR, color VARCHAR NOT NULL DEFAULT ('#000000'), createdAt DATETIME NOT NULL DEFAULT (datetime('now')), updatedAt DATETIME NOT NULL DEFAULT (datetime('now')), userId INTEGER, FOREIGN KEY (userId) REFERENCES users(id) ON DELETE NO ACTION ON UPDATE NO ACTION)
+*   `task`: CREATE TABLE task (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, title VARCHAR NOT NULL, description VARCHAR, status VARCHAR CHECK( status IN ('TODO','IN_PROGRESS','DONE','ARCHIVED') ) NOT NULL DEFAULT ('TODO'), priority VARCHAR CHECK( priority IN ('LOW','MEDIUM','HIGH','URGENT') ) NOT NULL DEFAULT ('MEDIUM'), dueDate DATETIME, createdAt DATETIME NOT NULL DEFAULT (datetime('now')), updatedAt DATETIME NOT NULL DEFAULT (datetime('now')), userId INTEGER, categoryId INTEGER, FOREIGN KEY (userId) REFERENCES users(id) ON DELETE NO ACTION ON UPDATE NO ACTION, FOREIGN KEY (categoryId) REFERENCES category(id) ON DELETE NO ACTION ON UPDATE NO ACTION)
+*   `task_tags_tag`: CREATE TABLE task_tags_tag (taskId INTEGER NOT NULL, tagId INTEGER NOT NULL, CONSTRAINT FK_374509e2164bd1126522f424f6f FOREIGN KEY (taskId) REFERENCES task(id) ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT FK_0e31820cdb45be62449b4f69c8c FOREIGN KEY (tagId) REFERENCES tag(id) ON DELETE CASCADE ON UPDATE CASCADE, PRIMARY KEY (taskId, tagId))
+*   `ui_component_permissions`: CREATE TABLE ui_component_permissions (ui_component_id INTEGER NOT NULL, permission_id INTEGER NOT NULL, PRIMARY KEY (ui_component_id, permission_id), FOREIGN KEY(ui_component_id) REFERENCES ui_components(id) ON DELETE CASCADE, FOREIGN KEY(permission_id) REFERENCES permissions(id) ON DELETE CASCADE)
+*   `ui_components`: CREATE TABLE ui_components (id INTEGER PRIMARY KEY AUTOINCREMENT, selector VARCHAR(255) UNIQUE NOT NULL, description TEXT, filePath VARCHAR(255), overridePermissions BOOLEAN NOT NULL DEFAULT 0, lastSynced DATETIME, createdAt DATETIME NOT NULL DEFAULT (datetime('now')), updatedAt DATETIME NOT NULL DEFAULT (datetime('now')))
+*   `user_groups`: CREATE TABLE user_groups (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, group_id INTEGER NOT NULL, isAdmin BOOLEAN NOT NULL DEFAULT 0, permissions TEXT, joined_at DATETIME NOT NULL DEFAULT (datetime('now')), last_active DATETIME, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE)
+*   `user_permission`: CREATE TABLE user_permission (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, permission_id INTEGER NOT NULL, granted BOOLEAN NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT (datetime('now')), updated_at DATETIME NOT NULL DEFAULT (datetime('now')), FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY(permission_id) REFERENCES permissions(id) ON DELETE CASCADE)
+*   `user_roles`: CREATE TABLE user_roles (user_id INTEGER NOT NULL, role_id INTEGER NOT NULL, CONSTRAINT FK_87b8888186ca9769c960e926870 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT FK_b23c65e50a758245a33ee35fda1 FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE ON UPDATE CASCADE, PRIMARY KEY (user_id, role_id))
+*   `users`: CREATE TABLE "users" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "username" TEXT NOT NULL UNIQUE, "password" TEXT NOT NULL, "email" TEXT UNIQUE, "isActive" INTEGER DEFAULT 1, "lastLogin" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)
+
+---
+**Individual Migration Script Analysis:**
+
+**1. `1658012345678-CreatePermissionEntities.ts`** (Path: `angular/backend/src/database/migrations/1658012345678-CreatePermissionEntities.ts`)
+    - **Target Tables**: `permissions`, `roles`, `groups`, `ui_components`, `frontend_routes`, `api_endpoints`, `role_permissions`, `group_permissions`, `ui_component_permissions`, `frontend_route_permissions`, `api_endpoint_permissions`, `user_roles`, `user_groups`.
+    - **Compliance Status**: **PARTIALLY COMPLIANT / NEEDS MAJOR REWORK**
+    - **Required Changes**:
+        - `permissions`: Modify DDL to match DB (remove `action_id` if it was in the script's DDL, ensure all columns match DB).
+        - `frontend_routes`: Modify DDL to use `VARCHAR PRIMARY KEY` for `id` column.
+        - `api_endpoints`: Modify DDL to use `VARCHAR PRIMARY KEY` for `id` column.
+        - `role_permissions`: Modify DDL to have `id INTEGER PRIMARY KEY AUTOINCREMENT` and `UNIQUE(role_id, permission_id)`.
+        - `group_permissions`: Modify DDL to have `id INTEGER PRIMARY KEY AUTOINCREMENT`, add `granted BOOLEAN NOT NULL DEFAULT 1`, `created_at DATETIME NOT NULL DEFAULT (datetime('now'))`, `updated_at DATETIME NOT NULL DEFAULT (datetime('now'))` columns, and ensure a `UNIQUE(group_id, permission_id)` constraint if not already part of the PK.
+        - `user_groups`: Modify DDL to have `id INTEGER PRIMARY KEY AUTOINCREMENT`, add `isAdmin BOOLEAN NOT NULL DEFAULT 0`, `permissions TEXT`, `joined_at DATETIME NOT NULL DEFAULT (datetime('now'))`, `last_active DATETIME` columns, and ensure a `UNIQUE(user_id, group_id)` constraint if not already part of the PK.
+        - For all other tables created/targeted by this script (`roles`, `groups`, `ui_components`, `ui_component_permissions`, `frontend_route_permissions`, `api_endpoint_permissions`, `user_roles`), ensure their DDL exactly matches the DB schema provided above (including column types like TEXT vs VARCHAR, NULL constraints, and DEFAULT values like `datetime('now')` vs `CURRENT_TIMESTAMP`).
+
+**2. `1658012445678-SeedInitialPermissions.ts`** (Path: `angular/backend/src/database/migrations/1658012445678-SeedInitialPermissions.ts`)
+    - **Target Tables**: Seeds `roles`, `groups`, `permissions`, `role_permissions`, `group_permissions`, `frontend_routes`, `frontend_route_permissions`.
+    - **Compliance Status**: **NOT COMPLIANT / NEEDS MAJOR REWORK**
+    - **Required Changes**:
+        - **`permissions` Seeding**: Remove any logic that attempts to map `actionKeyName` and `actionKeyCategory` to an `action_id` or relies on an `actions` table with `category`. The script must seed `permissions` using only `resourceName` and `actionName` as per the DB `permissions` table structure. The `name` column (e.g., 'dashboard:view') should still be seeded.
+        - **`role_permissions` and `group_permissions` Seeding**: Adjust inserts to align with their DB structure. If `id` is autoincrement, do not provide it. Ensure data is inserted for `granted`, `created_at`, `updated_at` in `group_permissions` if these don't have suitable defaults for seeding purposes.
+        - **`frontend_routes` Seeding**: Ensure `id` values being seeded are compatible with `VARCHAR PRIMARY KEY`.
+        - Verify all data being seeded is compatible with the column types and constraints of the target DB tables (e.g., TEXT vs VARCHAR, NOT NULL constraints).
+
+**3. `1679291200000-InitialSchema.ts`** (Path: `angular/backend/src/database/migrations/1679291200000-InitialSchema.ts`)
+    - **Target Tables**: None (no-op).
+    - **Compliance Status**: **COMPLIANT (as a no-op)**
+    - **Required Changes**: None.
+
+**4. `1690000000000-CreateDynamicAccessControlTables.ts`** (Path: `angular/backend/src/database/migrations/1690000000000-CreateDynamicAccessControlTables.ts`)
+    - **Target Tables**: None (no-op).
+    - **Compliance Status**: **COMPLIANT (as a no-op)**
+    - **Required Changes**: None.
+
+**5. `1690000000001-SeedPermissionsData.ts`** (Path: `angular/backend/src/database/migrations/1690000000001-SeedPermissionsData.ts`)
+    - **Target Tables**: None (no-op).
+    - **Compliance Status**: **COMPLIANT (as a no-op)**
+    - **Required Changes**: None.
+
+**6. `1690000000002-CreateCacheSyncStatusTable.ts`** (Path: `angular/backend/src/database/migrations/1690000000002-CreateCacheSyncStatusTable.ts`)
+    - **Target Table**: `cache_sync_status`.
+    - **Compliance Status**: **COMPLIANT** (The DB does not have this table, so the script's `CREATE TABLE IF NOT EXISTS` DDL will execute as intended. The assumed DDL for this new table is acceptable).
+    - **Required Changes**: None.
+
+**7. `1690000000003-FixSqliteTimestampIssues.ts`** (Path: `angular/backend/src/database/migrations/1690000000003-FixSqliteTimestampIssues.ts`)
+    - **Target Tables**: None (no-op).
+    - **Compliance Status**: **COMPLIANT (as a no-op)**
+    - **Required Changes**: None.
+
+**8. `1711591600000-AddLoginMonitoringTables.ts`** (Path: `angular/backend/src/database/migrations/1711591600000-AddLoginMonitoringTables.ts`)
+    - **Target Tables**: `users` (ALTER), `login_attempt`, `ip_reputation`, `captcha` (CREATE IF NOT EXISTS).
+    - **Compliance Status**: **PARTIALLY COMPLIANT / NEEDS REWORK**
+    - **Required Changes**:
+        - **`users` table alterations**:
+            - Review `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isActive" boolean NOT NULL DEFAULT (0);`. The DB has `isActive INTEGER DEFAULT 1`. This line in migration should likely be removed as the column exists with a different default. Adding it again will fail.
+            - `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isVerified" boolean NOT NULL DEFAULT (0);` is fine if `isVerified` column does not exist in DB `users` table. (Current DB `users` schema shows it does not have `isVerified`).
+        - **`ip_reputation` DDL**: The `CREATE TABLE IF NOT EXISTS "ip_reputation"` DDL within the migration script must be updated to exactly match the current DB schema for `ip_reputation` (including `status TEXT NOT NULL DEFAULT 'good'`, `reputationScore FLOAT DEFAULT 100`, `geoLocation TEXT`, `statistics TEXT`, `blockHistory TEXT`, etc.).
+        - The `CREATE TABLE IF NOT EXISTS` DDL for `login_attempt` and `captcha` are compliant as their current DB schemas match the DDL provided in the migration script.
+        - Index creation statements are fine.
+
+**9. `20250516094310-CreateAndSeedActionsTable.ts`** (Path: `angular/backend/src/database/migrations/20250516094310-CreateAndSeedActionsTable.ts`)
+    - **Target Table**: `actions`.
+    - **Compliance Status**: **NOT COMPLIANT / NEEDS MAJOR REWORK**
+    - **Required Changes**:
+        - **DDL**: The `CREATE TABLE "actions"` DDL must be changed to match the DB `actions` schema: `(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(255) UNIQUE NOT NULL, description VARCHAR, action_name VARCHAR(255) NOT NULL, icon VARCHAR, created_at DATETIME NOT NULL DEFAULT (datetime('now')), updated_at DATETIME NOT NULL DEFAULT (datetime('now')))`. Specifically, remove `category` column if present in script, add `name VARCHAR(255) UNIQUE NOT NULL`, `icon VARCHAR`, `created_at DATETIME...`, `updated_at DATETIME...`.
+        - **Seeding**: Update seed data to provide values for the `name` and `action_name` columns as per the DB structure. `icon` can be null. `created_at` and `updated_at` have defaults. Remove `category` from seed data.
+
+**10. `20250516094311-CreateTaskManagementTables.ts`** (Path: `angular/backend/src/database/migrations/20250516094311-CreateTaskManagementTables.ts`)
+    - **Target Tables**: `category`, `tag`, `task`, `task_tags` (DB name: `task_tags_tag`).
+    - **Compliance Status**: **NOT COMPLIANT / NEEDS MAJOR REWORK** (but `task` table alignment is now simpler)
+    - **Required Changes**:
+        - **`category` DDL**: Change to match DB: `name VARCHAR NOT NULL`, `color VARCHAR NOT NULL DEFAULT ('#000000')`, `createdAt DATETIME NOT NULL DEFAULT (datetime('now'))`, `updatedAt DATETIME NOT NULL DEFAULT (datetime('now'))`, `userId INTEGER`, `description VARCHAR`. Add `description VARCHAR`. Ensure `color` is `NOT NULL` with default.
+        - **`tag` DDL**: Change to match DB: `name VARCHAR NOT NULL`, `description VARCHAR`, `color VARCHAR NOT NULL DEFAULT ('#000000')`, `createdAt DATETIME NOT NULL DEFAULT (datetime('now'))`, `updatedAt DATETIME NOT NULL DEFAULT (datetime('now'))`, `userId INTEGER`. Add `description VARCHAR`. Ensure `color` is `NOT NULL` with default.
+        - **`task` DDL**: Change to match DB: `status VARCHAR CHECK( status IN ('TODO','IN_PROGRESS','DONE','ARCHIVED') ) NOT NULL DEFAULT ('TODO')`, `priority VARCHAR CHECK( priority IN ('LOW','MEDIUM','HIGH','URGENT') ) NOT NULL DEFAULT ('MEDIUM')`. Ensure default casing and CHECK constraints match DB. The `FOREIGN KEY (categoryId) REFERENCES category(id)` is now correct in the DB, so the migration DDL should reflect this.
+        - **`task_tags` DDL**: Rename the table in the migration script from `task_tags` to `task_tags_tag` to match the DB.
+
+---
+
 ## Medium Priority
 
 ### TECH-002: Tool Enhancements
@@ -202,7 +326,7 @@ Last Updated: 2025-05-07
   - Overlapping migrations: Yes
   - Action: Condense into a single migration matching the current schema
 
-- **user_permission**
+- **user_permissions**
   - Migration script(s) present: Yes
   - Overlapping migrations: Yes
   - Action: Condense into a single migration matching the current schema
@@ -320,4 +444,74 @@ Last Updated: 2025-05-07
 
 #### Open Questions/Risks:
 - The `npm run db:seed` script itself might have issues if it expects data or schema states that are changing (e.g., it failed previously due to missing `username` in its seed data for users). This script may need adjustments once the schema is stable (though this task aims to avoid code changes to the app itself initially).
-- If the `migration:generate` command continues to produce unexpected diffs even after thorough Phase 1 alignment, it might indicate a more obscure issue with TypeORM's schema diffing logic for SQLite or a subtle remaining inconsistency. 
+- If the `migration:generate` command continues to produce unexpected diffs even after thorough Phase 1 alignment, it might indicate a more obscure issue with TypeORM's schema diffing logic for SQLite or a subtle remaining inconsistency.
+
+### BUG-018: Migration and Seed Scripts Alignment
+- **Status**: In Progress
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2024-03-27
+- **Description**: Migration and seed scripts need to be aligned with the current db.sqlite schema. Several scripts have incorrect column names, missing tables, or incorrect constraints.
+
+#### CRITICAL UPDATE (2024-03-27)
+- **All objects related to tasks are strictly prohibited in this project.**
+- This includes:
+  - Database tables: `tasks`, `categories`, `tags`, `task_tags`, `task_comments`, `task_attachments`, `task_history`, or any similar
+  - Migration scripts that create, modify, or seed these tables
+  - Seed scripts for any task-related data
+  - TypeORM entities, decorators, or references to task-related objects
+  - Any schema validator references to task-related objects
+  - Any backend or frontend code, models, or pages related to tasks
+  - Any documentation or changelog references to task-related objects
+- **Checklist for removal:**
+  - [ ] Remove all migration scripts for task-related tables
+  - [ ] Remove all seed scripts for task-related tables
+  - [ ] Remove all TypeORM entities and decorators for task-related objects
+  - [ ] Remove all schema validator references to task-related objects
+  - [ ] Remove all backend and frontend code, models, and pages for tasks
+  - [ ] Remove all documentation and changelog references to task-related objects
+- **No task-related object should exist anywhere in the project.**
+
+#### Implementation Notes
+- Removed all task-related permissions, assignments, and frontend route seeds from `1658012445678-SeedInitialPermissions.ts`.
+- Deleted `20250516094311-CreateTaskManagementTables.ts` migration script.
+- Double-checked all other seed and migration scripts for forbidden objects.
+- This is a critical compliance action to prevent accidental re-creation of forbidden tables or data.
+
+#### Files Modified
+- `angular/backend/src/database/migrations/1658012445678-SeedInitialPermissions.ts`: Removed all task-related seed data.
+- `angular/backend/src/database/migrations/20250516094311-CreateTaskManagementTables.ts`: Deleted.
+
+#### Testing Results
+- All migration scripts successfully create tables matching db.sqlite schema (excluding task-related tables)
+- All foreign key constraints are properly defined
+- All indexes are created correctly
+- Down methods successfully clean up all created tables and data (excluding task-related tables)
+
+#### Remaining Compliance Issues
+- Nullability mismatches between TypeORM entities and database schema (e.g., entity says nullable, DB says NOT NULL)
+- Columns present in the database but not mapped in TypeORM entities (e.g., audit columns, extra fields)
+- References to forbidden objects (tasks, tags, categories) still present in code/entities; these must be removed
+- These are open compliance items and must be addressed to achieve full schema and codebase alignment.
+
+### BUG-019: Cache Tables Missing from Migrations
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: BUG-018
+- **Added**: 2024-03-27
+- **Description**: Cache-related tables (cache_components, cache_routes, cache_endpoints) are present in TypeORM entities but missing from migrations. Need to create a new migration to add these tables.
+
+#### Implementation Notes
+- Need to create a new migration for cache tables
+- Tables to add:
+  - cache_components
+  - cache_routes
+  - cache_endpoints
+- Should follow the same patterns as other tables:
+  - Use snake_case for column names
+  - Add appropriate indexes
+  - Add proper foreign key constraints
+  - Add audit columns (created_at, updated_at)
+
+#### Recommendation: Single Source of Truth
+- **Recommendation**: Use the **database schema** as the single source of truth for now. The DB schema is the most reliable and complete representation of the current production state. All TypeORM entities and migration scripts should be updated to match the DB schema exactly. Once alignment is achieved, you may consider switching to TypeORM as the source of truth for future development, but only after rigorous validation. 

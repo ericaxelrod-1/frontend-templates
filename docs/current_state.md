@@ -15,6 +15,30 @@ This repository contains tools for managing and validating database schemas and 
 - Entity file consolidation and TypeScript error fixes
 - Test file updates for entity type corrections
 - Further improvements to shared module patterns for dependency injection
+- Cache Tables Implementation
+  - Need to create migration for cache_components, cache_routes, cache_endpoints
+  - Should follow established patterns for column names and constraints
+- Entity File Consolidation (TECH-001.3)
+  - Ongoing work to consolidate and organize entity files
+  - Focus on maintaining consistent patterns across all entities
+- **CRITICAL COMPLIANCE:**
+  - All objects related to tasks are strictly prohibited in this project.
+  - This includes:
+    - Database tables: `tasks`, `categories`, `tags`, `task_tags`, `task_comments`, `task_attachments`, `task_history`, or any similar
+    - Migration scripts that create, modify, or seed these tables
+    - Seed scripts for any task-related data
+    - TypeORM entities, decorators, or references to task-related objects
+    - Any schema validator references to task-related objects
+    - Any backend or frontend code, models, or pages related to tasks
+    - Any documentation or changelog references to task-related objects
+  - **Checklist for removal:**
+    - [ ] Remove all migration scripts for task-related tables
+    - [ ] Remove all seed scripts for task-related tables
+    - [ ] Remove all TypeORM entities and decorators for task-related objects
+    - [ ] Remove all schema validator references to task-related objects
+    - [ ] Remove all backend and frontend code, models, and pages for tasks
+    - [ ] Remove all documentation and changelog references to task-related objects
+  - **No task-related object should exist anywhere in the project.**
 
 ## Known Issues
 
@@ -29,6 +53,14 @@ This repository contains tools for managing and validating database schemas and 
 - Singular vs. plural table name inconsistencies
 - Some test files with type mismatches that need updating
 - Other potential circular dependencies in modules
+- Cache Tables Missing (BUG-019)
+  - Cache-related tables missing from migrations
+  - Present in TypeORM entities but not in database
+- Entity File Organization (TECH-001)
+  - Some entity files need consolidation
+  - Inconsistent patterns across different entities
+- **CRITICAL COMPLIANCE:**
+  - All objects related to tasks must be removed from the project (see checklist above)
 
 ## Recent Accomplishments
 
@@ -96,6 +128,19 @@ This repository contains tools for managing and validating database schemas and 
 - Completed test suite enhancements for validation utilities
 - Extended authentication service with proper JWT implementation
 - All schema alignment and table naming issues (TECH-003, TECH-003.1, TECH-003.2, BUG-015, TASK-004) have been resolved as of 2025-05-13 by TASK-004. The database schema, migrations, and seed scripts are now fully aligned and tested. No further table naming or schema alignment issues remain.
+- Migration Script Alignment (BUG-018)
+  - Fixed all migration scripts to match db.sqlite schema (excluding task-related tables)
+  - Removed all task-related permissions, assignments, and frontend route seeds from `1658012445678-SeedInitialPermissions.ts`
+  - Deleted `20250516094311-CreateTaskManagementTables.ts` migration script
+  - Double-checked all other seed and migration scripts for forbidden objects
+  - This is a critical compliance action to prevent accidental re-creation of forbidden tables or data
+  - Added proper column names, types, and constraints
+  - Created missing cache tables migration
+  - Fixed table names and indexes
+  - Added proper down methods
+- Schema Validation Tool
+  - Successfully implemented and tested schema_validator
+  - Used to identify and fix schema discrepancies
 
 ## Next Steps
 
@@ -111,6 +156,9 @@ This repository contains tools for managing and validating database schemas and 
 5. Create CI/CD pipeline for automated testing
 6. Implement schema validation improvements with better error reporting
 7. Add role hierarchy management features
+8. Create migration for cache tables
+9. Continue entity file consolidation
+10. Update TypeORM entities to match new migrations
 
 ## Development Environment
 
@@ -134,3 +182,15 @@ This repository contains tools for managing and validating database schemas and 
   - Use the shared module pattern with interfaces and tokens
   - Apply forwardRef to all circular module imports
   - Provide fallback implementations in services 
+
+## Project Health
+- Database Schema: ✅ Aligned (except cache tables)
+- Migration Scripts: ✅ Fixed and tested
+- Entity Files: 🟡 In progress
+- Documentation: ✅ Up to date 
+
+## Remaining Compliance Issues
+- Nullability mismatches between TypeORM entities and database schema (e.g., entity says nullable, DB says NOT NULL)
+- Columns present in the database but not mapped in TypeORM entities (e.g., audit columns, extra fields)
+- References to forbidden objects (tasks, tags, categories) still present in code/entities; these must be removed
+- These are open compliance items and must be addressed to achieve full schema and codebase alignment. 

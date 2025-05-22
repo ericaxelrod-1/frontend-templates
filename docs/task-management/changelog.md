@@ -51,6 +51,20 @@ Last Updated: 2025-05-07
   - angular/backend/src/modules/users/groups.service.ts (updated)
   - angular/backend/src/app.module.ts (updated)
 
+### BUG-018: Migration and Seed Scripts Alignment
+- **Started**: 2024-03-27
+- **Status**: In Progress
+- **Implementation Notes**:
+  - **CRITICAL UPDATE (2024-03-27):**
+    - All objects related to tasks are strictly prohibited in this project.
+    - Removed all task-related permissions, assignments, and frontend route seeds from `1658012445678-SeedInitialPermissions.ts`.
+    - Deleted `20250516094311-CreateTaskManagementTables.ts` migration script.
+    - Double-checked all other seed and migration scripts for forbidden objects.
+    - This is a critical compliance action to prevent accidental re-creation of forbidden tables or data.
+- **Files Modified**:
+  - `angular/backend/src/database/migrations/1658012445678-SeedInitialPermissions.ts`: Removed all task-related seed data.
+  - `angular/backend/src/database/migrations/20250516094311-CreateTaskManagementTables.ts`: Deleted.
+
 ## Completed Today
 
 ### TASK-004: Align Database Schema, Documentation, and Migrations
@@ -174,8 +188,6 @@ Last Updated: 2025-05-07
     - Application now progresses past the scanner service initialization
     - Note: Other dependency issues exist in the application, but they're not related to BUG-013 and should be tracked separately
 
-## Recent Completions
-
 ### BUG-012: Missing ManifestService Dependency in PermissionsModule
 - **Completed**: 2025-05-02
 - **Implementation Notes**: 
@@ -271,4 +283,10 @@ Last Updated: 2025-05-07
 - **Implementation Notes**: Created REST API for schema validation.
 - **Files Modified**:
   - angular/backend/src/controllers/schema.controller.ts
-  - angular/backend/src/services/schema.service.ts 
+  - angular/backend/src/services/schema.service.ts
+
+- **Remaining Compliance Issues:**
+  - Nullability mismatches between TypeORM entities and database schema
+  - Columns present in the database but not mapped in TypeORM entities
+  - References to forbidden objects (tasks, tags, categories) still present in code/entities; these must be removed
+  - These are open compliance items and must be addressed to achieve full schema and codebase alignment. 

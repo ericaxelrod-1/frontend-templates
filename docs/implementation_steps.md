@@ -304,4 +304,50 @@ Add permission auditing capabilities to track changes to permissions.
 - Create audit log schema
 - Implement audit log viewers
 - Add export functionality
-- Implement alerting for critical permission changes 
+- Implement alerting for critical permission changes
+
+## Phase 1: Database Schema and Migration Alignment
+
+### Task 1: Schema Validation and Documentation (ID: TASK-001)
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Last Updated**: 2024-03-27
+- **Notes**: 
+  - Created schema_validator tool
+  - Documented current schema in detail
+  - Identified all discrepancies between TypeORM and DB
+
+### Task 2: Migration Script Cleanup (ID: TASK-002)
+- **Status**: In Progress
+- **Testing**: Not Started
+- **Dependencies**: TASK-001
+- **Last Updated**: 2024-03-27
+- **Notes**:
+  - **CRITICAL UPDATE (2024-03-27):**
+    - Removed all task-related permissions, assignments, and frontend route seeds from `1658012445678-SeedInitialPermissions.ts`.
+    - Deleted `20250516094311-CreateTaskManagementTables.ts` migration script.
+    - Double-checked all other seed and migration scripts for forbidden objects.
+    - This is a critical compliance action to prevent accidental re-creation of forbidden tables or data.
+  - Fixed all migration scripts to match db.sqlite schema (excluding task-related tables)
+  - Added proper column names, types, and constraints
+  - Fixed table names and indexes
+  - Added proper down methods
+  - **Remaining Compliance Issues:**
+    - [ ] Resolve nullability mismatches between TypeORM entities and database schema
+    - [ ] Map all columns present in the database to TypeORM entities (including audit columns)
+    - [ ] Remove all references to forbidden objects (tasks, tags, categories) from code/entities
+    - These are open compliance items and must be addressed to achieve full schema and codebase alignment.
+
+### Task 3: Cache Tables Implementation (ID: TASK-003)
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: TASK-002
+- **Last Updated**: 2024-03-27
+- **Notes**:
+  - Need to create migration for cache tables
+  - Tables to add:
+    - cache_components
+    - cache_routes
+    - cache_endpoints
+  - Should follow established patterns for column names and constraints 

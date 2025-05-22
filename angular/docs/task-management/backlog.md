@@ -146,6 +146,77 @@ Last Updated: 2025-05-09
 - **Testing Results**:
   - [No tests run yet]
 
+### BUG-019: Migration Scripts Misaligned with Actual SQLite Database Schema
+- **Status**: Identified
+- **Priority**: Critical
+- **Testing**: Not Started
+- **Added**: 2025-05-16
+- **Description**: Early migration scripts (e.g., `1658012345678-CreatePermissionEntities.ts`) use PostgreSQL-specific DDL syntax (UUIDs as primary keys, `uuid_generate_v4()`, `now()` for timestamps). This has resulted in an actual SQLite database schema that significantly differs from the migrations' intent. Key discrepancies include INTEGER or VARCHAR primary keys instead of UUIDs, different default value mechanisms, and missing constraints. These misalignments cause subsequent migration failures (e.g., `SeedInitialPermissions1658012445678` failing on `frontend_routes` insert) and prevent reliable database schema management.
+
+#### Technical Details & Investigation Findings:
+- **Primary Key Mismatches**:
+    - Migrations define `id` columns as `uuid PRIMARY KEY DEFAULT uuid_generate_v4()`.
+    - Actual DB (SQLite) has `id` columns as `INTEGER PRIMARY KEY AUTOINCREMENT` (e.g., `permissions`, `roles`, `groups`, `ui_components`) or `VARCHAR PRIMARY KEY NOT NULL` (e.g., `frontend_routes`, `api_endpoints`). The `VARCHAR` PKs do not auto-generate, leading to insert failures.
+- **Foreign Key Mismatches**:
+    - FK columns in migrations are typed as `uuid` to match intended PKs.
+    - Actual DB has these FKs as `INTEGER` to match the actual `INTEGER` PKs of referenced tables.
+- **Default Value Generation**:
+    - Migrations use `DEFAULT now()` (PostgreSQL).
+    - Actual DB uses `DEFAULT CURRENT_TIMESTAMP` or `DEFAULT (datetime('now'))` (SQLite).
+- **Problematic Table Examples from `1658012345678-CreatePermissionEntities.ts` analysis**:
+    - `frontend_routes`: Migration `id uuid`, DB `id VARCHAR`. Caused `NOT NULL constraint failed: frontend_routes.id` in `SeedInitialPermissions1658012445678`.
+    - `api_endpoints`: Migration `id uuid`, DB `id VARCHAR`. Missing `UNIQUE("method", "path")` constraint in DB.
+- **Join Table Differences**:
+    - Some join tables (e.g., `role_permissions`, `group_permissions`, `user_groups`) in the DB have a surrogate `id INTEGER PRIMARY KEY AUTOINCREMENT`, while the migration defines the PK as a composite of FKs.
+- **Extraneous Columns**:
+    - Tables like `group_permissions` and `user_groups` have additional columns in the DB (`granted`, `created_at`, `id` etc.) not defined in their initial creation migration (`1658012345678`), suggesting alterations by other processes or later unanalyzed migrations.
+- **Root Cause**: Using DDL specific to one database system (PostgreSQL) in migrations that are run against a different database system (SQLite) without TypeORM correctly abstracting or the migrations conditionally handling these differences.
+
+#### Impact:
+- **Critical Migration Failures**: Prevents database from reaching a consistent, intended state. Blocks seeding of essential data.
+- **Schema Unreliability**: The actual schema does not match the documented intent of early migrations.
+- **Development Blocker**: Hinders resolution of other database-dependent bugs (e.g., aspects of BUG-018).
+- **Data Integrity Risks**: Potential for unexpected behavior or data issues due to schema deviations.
+
+#### Next Steps (High-Level Plan):
+1.  **Systematic Migration Review (Complete as of 2025-05-16)**: Detailed analysis of all migration files against the current DB schema has been performed. Findings highlight systemic issues with PostgreSQL-specific DDL in early migrations and inconsistencies in table naming.
+2.  **Formulate Correction Strategy (Decision: Standardize on INTEGER PKs for SQLite and Refactor Migrations)**:
+    *   **Chosen Path**: Standardize on `INTEGER PRIMARY KEY AUTOINCREMENT` for all primary keys in SQLite. Align all migrations and entities to this standard. Plural table names will be used consistently.
+    *   **Detailed Refactoring Plan**:
+        1.  **Create New Migration for `actions` Table (Prerequisite)**:
+            *   ID: (e.g., `1720000000000-CreateAndSeedActionsTable.ts` - use current unique timestamp)
+            *   Purpose: Define and seed the `actions` table (`id INTEGER PK AUTOINCREMENT`, `action_name TEXT NOT NULL`, `description TEXT`, `category TEXT`, `UNIQUE(action_name, category)`). This is essential for the `permissions` table.
+        2.  **Revise `1658012345678-CreatePermissionEntities.ts` (Core DDL)**:
+            *   Change all PKs to `id INTEGER PRIMARY KEY AUTOINCREMENT`.
+            *   Change FK columns to `INTEGER`.
+            *   Use plural table names consistently (e.g., `permissions`, `roles`, `users`).
+            *   Add `action_id INTEGER` FK (to `actions(id)`) to the `permissions` table.
+            *   Convert `DEFAULT now()` to `DEFAULT (datetime('now'))`. Remove `CREATE EXTENSION`.
+            *   Change `frontend_routes` and `api_endpoints` PKs to `INTEGER PRIMARY KEY AUTOINCREMENT`.
+            *   Ensure SQLite-compatible `UNIQUE` constraints.
+        3.  **Revise `1658012445678-SeedInitialPermissions.ts` (Core Seeding)**:
+            *   Target plural table names. Omit `id` from `INSERT` for `AUTOINCREMENT` PKs.
+            *   Seed `permissions` (including `action_id` based on seeded `actions`), `roles`, `groups`, `users`, `role_permissions`, `group_permissions`.
+            *   Use SQLite-compatible timestamp defaults if needed.
+        4.  **Handle `1679291200000-InitialSchema.ts` (Deprecate/Delete)**:
+            *   This migration's DDL for singular `user`, `role`, `group` is superseded. Make it a no-op or delete.
+            *   If the `task` table it creates IS actively used, move its (corrected) DDL to `1658012345678`. (DB currently has `task` with `id INTEGER PK`).
+        5.  **Handle `1690000000000-CreateDynamicAccessControlTables.ts` (Deprecate/Refactor)**:
+            *   Much of its DDL is superseded or incorrect (singular names, UUIDs). Make it a no-op or extract any unique, essential DDL (corrected for SQLite) into a new, clean migration or merge into `1658012345678`.
+        6.  **Handle `1690000000001-SeedPermissionsData.ts` (Deprecate/Delete)**:
+            *   Its seeding logic (for `permissions`, `roles`) should be merged into the revised `1658012445678`. Make this migration a no-op or delete.
+        7.  **Review `1690000000002-CreateCacheSyncStatusTable.ts` (Keep As Is)**:
+            *   SQLite-friendly DDL. Should run correctly after fixes.
+        8.  **Review `1690000000003-FixSqliteTimestampIssues.ts` (Likely No-Op/Minor Tweak)**:
+            *   Timestamp fixes are likely ineffective. Redundant `cache_sync_status` creation is fine. If its temp table DDL for `ui_components` (`id varchar PK`) ever triggers, it needs to be `INTEGER PK`. Can be kept or made a no-op.
+        9.  **Revise `1711591600000-AddLoginMonitoringTables.ts` (Minor Edits)**:
+            *   Change `ALTER TABLE "user"` to `ALTER TABLE "users"`.
+            *   Ensure `login_attempt` FK is `REFERENCES "users" ("id")`. (DB already reflects this). DDL for new tables is otherwise good.
+        10. **Database Reset & Full Migration Run**: After all revisions, delete `db.sqlite` and run all migrations fresh. Verify schema and data.
+        11. **Update TypeORM Entities**: Align all `*.entity.ts` files with the corrected schema (number PKs, plural table names).
+        12. **Update BUG-019 Documentation**: Record all decisions, deletions, and new migration details here in the backlog.
+3.  **Implement Corrections**: (Next phase) Apply the above changes to the relevant migration files.
+
 ## High Priority Features
 ### FEAT-001: Example High Priority Feature
 - **Status**: Not Started

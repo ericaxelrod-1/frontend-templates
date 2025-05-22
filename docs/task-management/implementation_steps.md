@@ -31,4 +31,32 @@
 - **Testing**: Passed
 - **Dependencies**: TECH-002.5
 - **Last Updated**: 2025-05-13
-- **Notes**: All schema alignment and table naming issues resolved by TASK-004. See changelog for details. 
+- **Notes**: All schema alignment and table naming issues resolved by TASK-004. See changelog for details.
+
+### BUG-018: Migration and Seed Scripts Alignment
+1. **Migration Script Consolidation** (Not Started)
+   - Create new migration `1690000000004-ConsolidateActionTables.ts`
+   - Replace/supersede conflicting migrations
+   - Include proper up/down migrations
+
+2. **Schema Alignment** (Not Started)
+   - Update Initial Schema Migration
+   - Fix Permission Entities Migration
+   - Update Dynamic Access Control Tables
+
+3. **Seed Script Organization** (Not Started)
+   - Consolidate permission seeds
+   - Update initial seed
+   - Update user/group seeds
+   - Create validation seeds
+
+4. **Testing** (Not Started)
+   - Test up/down migrations
+   - Verify schema matches
+   - Test seed data
+   - Validate constraints
+
+5. **Rollout** (Not Started)
+   - Apply to development
+   - Test in staging
+   - Plan production deployment 

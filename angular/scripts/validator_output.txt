@@ -1,0 +1,18 @@
+2025-05-19 09:15:44,146 - schema_validator_runner - DEBUG - Log file created at: C:\Users\axelr\OneDrive\Documents\GitHub\frontend-templates\angular\scripts\schema_validator_run_20250519_091544.log
+2025-05-19 09:15:44,147 - schema_validator_runner - DEBUG - Workspace root: C:\Users\axelr\OneDrive\Documents\GitHub\frontend-templates
+2025-05-19 09:15:44,148 - schema_validator_runner - INFO - Starting schema validator runner
+2025-05-19 09:15:44,148 - schema_validator_runner - DEBUG - Arguments: Namespace(config=None, validate=True, extract=False, sync=False, output=None, dry_run=False, debug=True, non_interactive=False)
+Checking Python environment...
+Using Python 3.13.2 (tags/v3.13.2:4f8bb39, Feb  4 2025, 15:23:48) [MSC v.1942 64 bit (AMD64)]
+All dependencies are from the standard library. No additional packages needed.
+2025-05-19 09:15:44,150 - schema_validator_runner - INFO - Checking database at: C:\Users\axelr\OneDrive\Documents\GitHub\frontend-templates\angular\backend\db.sqlite
+2025-05-19 09:15:44,151 - schema_validator_runner - INFO - Database file found and accessible.
+2025-05-19 09:15:44,152 - schema_validator_runner - DEBUG - Running command: C:\Python313\python.exe C:\Users\axelr\OneDrive\Documents\GitHub\frontend-templates\angular\scripts\db_schema_validator.py --config C:\Users\axelr\OneDrive\Documents\GitHub\frontend-templates\angular\scripts\db_validator_config.json --validate --debug
+2025-05-19 09:15:44,153 - schema_validator_runner - DEBUG - Working directory: C:\Users\axelr\OneDrive\Documents\GitHub\frontend-templates
+2025-05-19 09:15:44,311 - schema_validator_runner - ERROR - Validator stderr:
+2025-05-19 09:15:44,312 - schema_validator_runner - ERROR -   File "C:\Users\axelr\OneDrive\Documents\GitHub\frontend-templates\angular\scripts\db_schema_validator.py", line 184
+2025-05-19 09:15:44,312 - schema_validator_runner - ERROR -     table_name_match = re.search(r"@Entity\(\s*(?:['"]([^'"]+)['"]\s*)?(?:,\s*\{[^}]*\})?\s*\)", content)
+2025-05-19 09:15:44,312 - schema_validator_runner - ERROR -                                                      ^
+2025-05-19 09:15:44,312 - schema_validator_runner - ERROR - SyntaxError: closing parenthesis ']' does not match opening parenthesis '('
+2025-05-19 09:15:44,312 - schema_validator_runner - ERROR - Validator failed with return code 1
+2025-05-19 09:15:44,313 - schema_validator_runner - INFO - Schema validator completed with return code 1
