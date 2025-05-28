@@ -492,7 +492,7 @@ export class AuthService {
 
     // Call the backend logout endpoint if a refresh token existed
     if (refreshToken) {
-      return this.http.post<void>(`${this.API_URL}/logout`, { refreshToken }).pipe(
+      return this.http.post<void>(`${this.API_URL}/logout`, { token: refreshToken }).pipe(
         catchError(err => {
           console.error('Logout API call failed, but local state is cleared:', err);
           // Don't block logout if API call fails, just log error

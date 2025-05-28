@@ -62,6 +62,46 @@ Last Updated: 2025-05-09
 - `angular/backend/src/modules/permissions/entities/permission.entity.ts`: Adjusted nullable properties.
 - `angular/backend/src/modules/roles/entities/role.entity.ts`: Adjusted `name` column properties.
 
+### BUG-019: Comprehensive Schema Analysis Complete
+- **Started**: 2025-05-27
+- **Completed**: 2025-05-27
+- **Implementation Notes**: Conducted exhaustive audit of all database tables, TypeORM entities, decorators, and migration files to identify schema misalignments. Analysis revealed critical mismatches between entity definitions and actual database schema.
+
+#### Analysis Findings
+- **Database Tables Audited**: 25 tables including users, roles, permissions, actions, frontend_routes, api_endpoints, ui_components, and all join tables
+- **Entity Files Examined**: 20+ TypeORM entity files across auth, permissions, users, and roles modules
+- **Migration Files Analyzed**: 18 migration files from 2023-2025 timeframe
+- **Critical Issues Identified**:
+  1. **Join Table Column Mismatches**: @JoinTable decorators reference incorrect foreign key column names
+     - ui_component_permissions: Entity uses 'component_id', database uses 'ui_component_id'
+     - frontend_route_permissions: Entity uses 'route_id', database uses 'frontend_route_id'
+     - api_endpoint_permissions: Entity uses 'endpoint_id', database uses 'api_endpoint_id'
+  2. **Service Query Errors**: PatternDetectionService queries 'attempt.email' but database column is 'email_attempted'
+  3. **Column Name Mapping**: Action entity missing @Column name mapping for 'action_code' database column
+  4. **Migration Schema Conflicts**: Early migrations use PostgreSQL syntax but execute against SQLite
+  5. **Primary Key Type Mismatches**: Some migrations create INTEGER PKs when entities expect VARCHAR PKs
+
+#### Files Requiring Updates (Documented in BUG-019)
+- **Entities**: 4 entity files need @JoinTable and @Column decorator fixes
+- **Services**: 1 service file needs query column reference updates
+- **Migrations**: 3 migration files need complete rewrites for SQLite compatibility
+- **Root Cause**: PostgreSQL DDL syntax in SQLite environment causing schema drift
+
+#### Impact Assessment
+- **Production Blocking**: Pattern detection service fails every 10 minutes
+- **Development Risk**: Entity relationships may fail to load
+- **Data Integrity**: Schema mismatches risk data corruption
+- **Testing Impediment**: Inconsistent schema prevents reliable testing
+
+#### Next Steps Prioritized
+1. **Critical (24h)**: Fix PatternDetectionService and @JoinTable decorators
+2. **High (1 week)**: Rewrite core migrations for SQLite compatibility
+3. **Medium (2 weeks)**: Implement automated schema validation
+4. **Low (1 month)**: Update documentation and guidelines
+
+#### Files Modified
+- `angular/docs/task-management/backlog.md`: Updated BUG-019 with comprehensive analysis findings, file-by-file breakdown, and prioritized fix plan
+
 ## In Progress
 
 ### TECH-001: Database Migration Scripts Investigation

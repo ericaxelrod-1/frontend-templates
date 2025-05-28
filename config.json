@@ -3,7 +3,7 @@
   "log_directory": "logs",
   "connection_timeout": 5000,
   "database": {
-    "path": "./src/database/database.sqlite",
+    "path": "./angular/backend/db.sqlite",
     "backup_directory": "./backup",
     "enable_foreign_keys": true,
     "create_missing_tables": true
