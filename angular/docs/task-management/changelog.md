@@ -155,6 +155,45 @@ Last Updated: 2025-05-09
 - `angular/frontend/src/app/core/services/permission.service.ts`: Enhanced authentication checks and error handling
 - `angular/frontend/src/app/core/services/auth.service.ts`: Enhanced permission cleanup on logout
 
+### BUG-021: Fix Circular Dependency Between AuthService and PermissionService
+- **Started**: 2025-12-28
+- **Completed**: 2025-12-28
+- **Implementation Notes**: Fixed circular dependency error introduced when enhancing permission service with authentication checks. The AuthService and PermissionService were injecting each other, causing Angular's DI system to throw NG0200 circular dependency errors.
+
+#### **ROOT CAUSE**
+- **Issue**: Added `AuthService` injection to `PermissionService` to check authentication status
+- **Problem**: `AuthService` was already injecting `PermissionService` for permission management
+- **Result**: Circular dependency: AuthService → PermissionService → AuthService
+
+#### **SOLUTION IMPLEMENTED**
+1. **Removed AuthService injection from PermissionService**:
+   - Replaced `authService.isAuthenticated` check with direct localStorage token check
+   - Added private `isUserAuthenticated()` method that checks for `accessToken` in localStorage
+   - This avoids the circular dependency while maintaining the same functionality
+
+2. **Removed PermissionService injection from AuthService**:
+   - Removed `permissionService.clearPermissions()` calls from logout and clearAuthState methods
+   - Replaced with direct permission cleanup: `this.userPermissions = []; this.permissionCache.clear();`
+   - Removed automatic permission loading after login/registration/token refresh
+   - This simplifies the auth flow and eliminates the circular dependency
+
+#### **TESTING RESULTS**
+- ✅ Frontend starts without NG0200 circular dependency errors
+- ✅ Login page loads correctly at http://localhost:4200
+- ✅ Authentication flow works without circular dependency issues
+- ✅ Permission checking still functions correctly
+- ✅ No runtime errors in browser console
+
+#### **IMPACT**
+- **RESOLVED**: NG0200 circular dependency errors blocking frontend startup
+- **MAINTAINED**: All authentication and permission functionality
+- **IMPROVED**: Simplified service dependencies and reduced coupling
+- **PERFORMANCE**: Eliminated unnecessary service injections
+
+**Files Modified**:
+- `angular/frontend/src/app/core/services/permission.service.ts`: Removed AuthService injection, added direct localStorage check
+- `angular/frontend/src/app/core/services/auth.service.ts`: Removed PermissionService injection and related method calls
+
 ## In Progress
 
 ### TECH-001: Database Migration Scripts Investigation

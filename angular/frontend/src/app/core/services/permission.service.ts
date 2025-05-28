@@ -3,7 +3,6 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { catchError, map, tap, retry, finalize } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { AuthService } from './auth.service';
 
 export interface Permission {
   id: string;
@@ -46,10 +45,21 @@ export class PermissionService {
   private loadingPermissions = false;
   
   constructor(
-    private http: HttpClient,
-    private authService: AuthService
+    private http: HttpClient
   ) {
-    // Don't auto-load permissions in constructor to avoid circular dependencies
+    // Don't auto-load permissions in constructor
+  }
+
+  /**
+   * Check if user is authenticated by checking for access token in localStorage
+   * This avoids circular dependency with AuthService
+   */
+  private isUserAuthenticated(): boolean {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return false;
+    }
+    const token = localStorage.getItem('accessToken');
+    return !!token;
   }
   
   /**
@@ -57,7 +67,7 @@ export class PermissionService {
    */
   loadUserPermissions(): Observable<string[]> {
     // Check if user is authenticated first
-    if (!this.authService.isAuthenticated) {
+    if (!this.isUserAuthenticated()) {
       console.debug('User not authenticated - skipping permission load');
       this.userPermissionsSubject.next([]);
       this.permissionsLoadedSubject.next(true);
