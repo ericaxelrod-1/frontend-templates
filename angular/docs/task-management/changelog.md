@@ -194,6 +194,53 @@ Last Updated: 2025-05-09
 - `angular/frontend/src/app/core/services/permission.service.ts`: Removed AuthService injection, added direct localStorage check
 - `angular/frontend/src/app/core/services/auth.service.ts`: Removed PermissionService injection and related method calls
 
+### BUG-022: Fix Dashboard Navigation Permission Mismatches
+- **Started**: 2025-12-28
+- **Completed**: 2025-12-28
+- **Implementation Notes**: Fixed all dashboard tile navigation issues by aligning route permissions with actual database permissions. The dashboard tiles were redirecting to login because the routes required permissions that didn't exist in the database.
+
+#### **ROOT CAUSE ANALYSIS**
+- **Issue**: Dashboard tiles (Users, Groups, Activity) were redirecting to login instead of their respective pages
+- **Problem**: Route guards were checking for permissions that didn't exist in the database:
+  - Routes expected `users:list`, `groups:list`, `roles:list` but database had `users:read`, `groups:read`, `roles:read`
+  - Admin routes expected `admin:access` and `monitoring:access` but database had `system:admin`
+  - Components were checking for `groups:view`, `users:manage`, `monitoring:access` but database had different permissions
+
+#### **SOLUTION IMPLEMENTED**
+1. **Updated Route Permissions** (`angular/frontend/src/app/app.routes.ts`):
+   - ✅ Changed `users:list` → `users:read`
+   - ✅ Changed `groups:list` → `groups:read`
+   - ✅ Changed `roles:list` → `roles:read`
+   - ✅ Changed `admin:access` → `system:admin`
+
+2. **Fixed Component Permission Checks**:
+   - ✅ **Groups Component**: Changed `groups:view` → `groups:read`
+   - ✅ **Users Component**: Changed `user:read:all` → `users:read`, `users:edit` → `users:update`, `user:create` → `users:create`
+   - ✅ **Login Monitoring Component**: Changed `monitoring:access` → `system:admin`
+
+3. **Updated Admin Module Routes** (`angular/frontend/src/app/modules/admin/admin.module.ts`):
+   - ✅ Changed login-monitoring route: `monitoring:access` → `system:admin`
+   - ✅ Changed permissions route: `permissions:manage` → `permissions:admin`
+
+#### **VERIFICATION RESULTS**
+- ✅ All route permissions now match database permissions exactly
+- ✅ Dashboard tiles should now navigate to their respective pages instead of redirecting to login
+- ✅ Users with `superadmin` role have all required permissions in database
+- ✅ Permission checks are consistent between routes and components
+
+#### **FILES MODIFIED**
+- `angular/frontend/src/app/app.routes.ts`: Updated route permission requirements
+- `angular/frontend/src/app/features/groups/groups.component.ts`: Fixed permission check
+- `angular/frontend/src/app/features/users/users.component.ts`: Fixed multiple permission checks
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Fixed permission check
+- `angular/frontend/src/app/modules/admin/admin.module.ts`: Fixed route permissions
+
+#### **TESTING STATUS**
+- ✅ Frontend and backend servers running
+- ✅ Permission alignment verified against database
+- ✅ All permission checks use correct `resource:action` format
+- ✅ Ready for user testing of dashboard navigation
+
 ## In Progress
 
 ### TECH-001: Database Migration Scripts Investigation

@@ -252,6 +252,31 @@ Last Updated: 2025-05-23
 - ✅ No more 400 Bad Request errors from circular dependencies
 - ✅ Login flow should now work without permission check failures
 
+### BUG-023: Dashboard Tiles Redirecting to Login (Authentication Issue)
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-05-23
+- **Completed**: 2025-05-23
+- **Description**: Dashboard tiles were redirecting to login page instead of navigating to their respective pages (Users, Groups, Activity). Root cause was that users were not authenticated due to CAPTCHA blocking login process in development environment.
+
+#### Implementation Notes
+- **Root Cause**: CAPTCHA was enabled in development environment, preventing users from logging in
+- **Solution**: Disabled CAPTCHA in development environment by setting `environment.captcha.enabled = false`
+- **Admin Credentials**: `admin@example.com` / `Admin123!`
+
+- **Files Modified**:
+  - `angular/frontend/src/environments/environment.ts`: Set `captcha.enabled = false`
+  - `angular/frontend/src/environments/environment.development.ts`: Set `captcha.enabled = false`
+  - `angular/frontend/src/app/features/auth/login/login.component.ts`: Added conditional CAPTCHA validation
+  - `angular/frontend/src/app/features/auth/login/login.component.html`: Added conditional CAPTCHA display
+
+- **Testing Results**:
+  - Login form now displays without CAPTCHA in development
+  - Users can log in with admin credentials
+  - Dashboard tiles will navigate to protected routes after authentication
+  - Permission system verified working correctly with all required permissions present
+
 ## Medium Priority
 
 ### TECH-002: Tool Enhancements

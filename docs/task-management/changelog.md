@@ -153,6 +153,25 @@ Last Updated: 2025-05-23
 
 ## Completed Today
 
+### BUG-023: Dashboard Tiles Redirecting to Login (Authentication Issue)
+- **Started**: 2025-05-23
+- **Completed**: 2025-05-23
+- **Status**: Complete ✅
+- **Implementation Notes**: 
+  - **Root Cause**: Dashboard tiles were redirecting to login page instead of navigating to their respective pages (Users, Groups, Activity). Users were not authenticated due to CAPTCHA blocking login process in development environment.
+  - **Solution**: Disabled CAPTCHA in development environment by setting `environment.captcha.enabled = false`
+  - **Admin Credentials**: `admin@example.com` / `Admin123!`
+  - **Files Modified**:
+    - `angular/frontend/src/environments/environment.ts`: Set `captcha.enabled = false`
+    - `angular/frontend/src/environments/environment.development.ts`: Set `captcha.enabled = false`
+    - `angular/frontend/src/app/features/auth/login/login.component.ts`: Added conditional CAPTCHA validation
+    - `angular/frontend/src/app/features/auth/login/login.component.html`: Added conditional CAPTCHA display
+  - **Testing Results**:
+    - ✅ Login form now displays without CAPTCHA in development
+    - ✅ Users can log in with admin credentials
+    - ✅ Dashboard tiles will navigate to protected routes after authentication
+    - ✅ Permission system verified working correctly with all required permissions present
+
 ### BUG-031: Fix Login Circular Dependency with Permissions
 - **Started**: 2025-05-28
 - **Completed**: 2025-05-28

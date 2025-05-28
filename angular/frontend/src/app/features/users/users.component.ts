@@ -248,7 +248,7 @@ export class UsersComponent implements OnInit {
     this.loading = true;
 
     // Use the permissionService directly
-    this.permissionService.hasPermission('user:read:all').subscribe(canListAllUsers => {
+    this.permissionService.hasPermission('users:read').subscribe(canListAllUsers => {
       if (canListAllUsers) {
         // For users with management permissions, load all users and groups
         forkJoin({
@@ -387,7 +387,7 @@ export class UsersComponent implements OnInit {
 
   createUser(): void {
     // Check permission before navigating
-    if (this.permissionService.hasPermissionSync('user:create')) {
+    if (this.permissionService.hasPermissionSync('users:create')) {
       this.router.navigate(['/users/create']);
     }
   }
@@ -459,6 +459,6 @@ export class UsersComponent implements OnInit {
   }
 
   canEditUsers(): boolean {
-    return this.permissionService.hasPermissionSync('users:edit');
+    return this.permissionService.hasPermissionSync('users:update');
   }
 }
