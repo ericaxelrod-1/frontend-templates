@@ -3,6 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { catchError, map, tap, retry, finalize } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
+import { AuthService } from './auth.service';
 
 export interface Permission {
   id: string;
@@ -44,7 +45,10 @@ export class PermissionService {
   private permissionCache = new Map<string, boolean>();
   private loadingPermissions = false;
   
-  constructor(private http: HttpClient) {
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService
+  ) {
     // Don't auto-load permissions in constructor to avoid circular dependencies
   }
   
@@ -52,6 +56,15 @@ export class PermissionService {
    * Load the current user's permissions from the server
    */
   loadUserPermissions(): Observable<string[]> {
+    // Check if user is authenticated first
+    if (!this.authService.isAuthenticated) {
+      console.debug('User not authenticated - skipping permission load');
+      this.userPermissionsSubject.next([]);
+      this.permissionsLoadedSubject.next(true);
+      this.loadingPermissions = false;
+      return of([]);
+    }
+    
     // Avoid making duplicate requests while loading
     if (this.loadingPermissions) {
       return this.userPermissions$;
@@ -189,6 +202,16 @@ export class PermissionService {
     this.permissionsLoadedSubject.next(false);
     this.userPermissionsSubject.next([]);
   }
+
+  /**
+   * Clear all permissions and reset state (called on logout)
+   */
+  clearPermissions(): void {
+    this.permissionCache.clear();
+    this.permissionsLoadedSubject.next(false);
+    this.userPermissionsSubject.next([]);
+    this.loadingPermissions = false;
+  }
   
   /**
    * Handle HTTP errors with type safety
@@ -196,6 +219,12 @@ export class PermissionService {
    */
   private handleError<T>(defaultValue: T) {
     return (error: HttpErrorResponse): Observable<T> => {
+      // Don't log authentication errors as they are expected when user is not logged in
+      if (error.status === 401) {
+        console.debug('User not authenticated - permissions not loaded');
+        return of(defaultValue);
+      }
+      
       console.error('An error occurred:', error);
       
       let errorMessage = 'An error occurred while loading permissions. ';

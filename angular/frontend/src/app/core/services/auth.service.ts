@@ -416,6 +416,9 @@ export class AuthService {
     this.refreshTokenSubject.next(null);
     this.csrfTokenSubject.next(null);
     
+    // Clear permissions
+    this.permissionService.clearPermissions();
+    
     // Check for browser environment before accessing localStorage
     if (isPlatformBrowser(this.platformId)) {
       localStorage.removeItem('user');
@@ -486,6 +489,9 @@ export class AuthService {
     
     // Clear local state immediately
     this.clearAuthState();
+    
+    // Clear permissions
+    this.permissionService.clearPermissions();
     
     // Navigate to login page
     this.router.navigate(['/login']);

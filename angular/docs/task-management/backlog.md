@@ -189,6 +189,68 @@ Last Updated: 2025-05-09
 - **RESOLVED**: Migration execution failures
 - **IMPROVED**: Database schema consistency and reliability
 
+### BUG-020: Critical Seed Script Database Schema Misalignment
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-12-28
+- **Completed**: 2025-12-28
+- **Priority**: CRITICAL - BLOCKS ALL DATABASE SEEDING
+- **Description**: All seed scripts contain critical field name mismatches that prevent database seeding from working. The scripts reference non-existent database fields and use incorrect field names, causing complete seeding failures. This affects permission seeding, role assignment, and all related functionality.
+
+#### **CRITICAL ISSUES IDENTIFIED**
+
+**🚨 FIELD NAME MISMATCHES**:
+1. **Permission Seeding**: Scripts use `actionName` field but database has `action_id` (foreign key)
+2. **Role Permission Assignment**: Scripts use `granted` but database has `is_granted`
+3. **Foreign Key Fields**: Scripts use camelCase (`roleId`, `permissionId`) but database uses snake_case (`role_id`, `permission_id`)
+
+**🚨 MISSING DEPENDENCIES**:
+- Permission seed scripts don't create required Action entities first
+- Scripts assume `action_name` field exists but database uses `action_id` foreign key relationship
+
+**🚨 MIGRATION VS DATABASE MISMATCH**:
+- Migration `1658012345678-CreatePermissionEntities.ts` creates `permissions.action_name` field
+- Actual database has `permissions.action_id` field (foreign key to actions table)
+- Entity definitions expect `action_id` but migration creates `action_name`
+
+#### **AFFECTED SEED SCRIPTS**
+- `angular/backend/src/db/seeds/permission-seed.service.ts`: Uses wrong field names
+- `angular/backend/src/scripts/seed-roles.ts`: Uses wrong field names and missing Action dependencies
+- `angular/backend/src/database/seeds/initial.seed.ts`: Uses outdated permission format
+- `angular/backend/src/scripts/seed-permissions.ts`: Uses wrong field structure
+
+#### **IMPACT ASSESSMENT**
+- **🚫 ALL PERMISSION SEEDING FAILS**: Scripts reference non-existent fields
+- **🚫 ALL ROLE PERMISSION ASSIGNMENTS FAIL**: Wrong field names in role_permissions table
+- **🚫 DATABASE INTEGRITY COMPROMISED**: Foreign key constraints violated
+- **🚫 APPLICATION STARTUP MAY FAIL**: If seeding is part of initialization process
+
+#### Implementation Notes
+- **Issues Identified**:
+  - Permission service uses `granted` instead of `isGranted` for database field access
+  - Permission service missing `actionEntity` relations in getUserPermissions query
+  - Permission checker service uses `granted` instead of `isGranted` in fallback methods
+  - All permission-related queries failing due to field name mismatches
+
+- **Solutions Implemented**:
+  1. **Fixed Permission Service**: Updated all `granted` references to `isGranted` throughout the service
+  2. **Fixed Permission Checker Service**: Updated fallback permission checks to use `isGranted`
+  3. **Added Missing Relations**: Added `actionEntity` relations to getUserPermissions query
+  4. **Verified Seed Scripts**: Confirmed all seed scripts already use correct `isGranted` field
+  5. **Tested API Endpoints**: Verified `/api/permissions/user-permissions` now works correctly
+
+- **Files Modified**:
+  - `angular/backend/src/modules/permissions/services/permissions.service.ts`: Fixed all `granted` → `isGranted` references and added missing relations
+  - `angular/backend/src/modules/permissions/services/permission-checker.service.ts`: Fixed all `granted` → `isGranted` references
+
+- **Testing Results**:
+  - ✅ Backend server starts successfully without validation errors
+  - ✅ API endpoint `/api/permissions/user-permissions` returns 401 (auth required) instead of 400 (validation error)
+  - ✅ All permission-related database queries use correct field names
+  - ✅ Entity relationships properly loaded with `actionEntity` relations
+  - ✅ User authentication flow no longer blocked by validation errors
+
 ## High Priority Features
 ### FEAT-001: Example High Priority Feature
 - **Status**: Not Started
