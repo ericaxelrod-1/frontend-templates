@@ -351,3 +351,54 @@ Add permission auditing capabilities to track changes to permissions.
     - cache_routes
     - cache_endpoints
   - Should follow established patterns for column names and constraints 
+
+### 21. Create API Status/Health Endpoint (ID: FEAT-007)
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Last Updated**: 2025-05-28
+
+Create a comprehensive API status/health endpoint for system monitoring and debugging.
+
+**Sub-tasks:**
+- Create health endpoint controller with GET `/api/health` route
+- Implement database connectivity checks
+- Add service availability checks
+- Include system metrics and version information
+- Ensure security (no sensitive data exposure)
+- Add different detail levels (basic vs detailed)
+- Test endpoint functionality
+
+### 22. Fix Critical TypeScript Compilation Errors (ID: BUG-033)
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Last Updated**: 2025-05-28
+
+Fix critical TypeScript compilation errors in cache-sync.service.ts related to 'isGranted' vs 'granted' field naming.
+
+**Sub-tasks:**
+- Investigate CachePermissionMap entity field naming
+- Determine if cache_permission_maps table exists in database
+- Align field naming between entity and service code
+- Fix all compilation errors in cache-sync.service.ts
+- Test cache synchronization functionality
+- Verify no other services have similar issues
+
+### 23. Database Schema Alignment Investigation (ID: TECH-004)
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Last Updated**: 2025-05-28
+
+Investigate and resolve discrepancies between schema documentation, entities, and actual database.
+
+**Sub-tasks:**
+- Analyze purpose and usage of expected_schema.json
+- Compare DATABASE_SCHEMA.md with actual database schema
+- Verify all TypeORM entities match database tables
+- Investigate 'granted' vs 'isGranted' field naming consistency
+- Determine if audit reports show real issues or false positives
+- Establish single source of truth for schema documentation
+- Create action plan for schema alignment
+- Update or remove stale schema files 

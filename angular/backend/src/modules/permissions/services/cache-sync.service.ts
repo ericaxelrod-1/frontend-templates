@@ -299,7 +299,7 @@ export class CacheSyncService {
       resourceType: permission.resourceName,
       resourceId: permission.id.toString(),
       action: permission.actionName,
-      granted: true,
+      isGranted: true,
       priority: 0,
       lastSynced: new Date(),
     };
@@ -319,7 +319,7 @@ export class CacheSyncService {
       name: component.selector,
       resourceType: 'ui-component',
       resourceId: component.id,
-      granted: true,
+      isGranted: true,
       priority: 1,
       lastSynced: new Date(),
       action: 'access', // Default action for components
@@ -337,7 +337,7 @@ export class CacheSyncService {
       name: route.path,
       resourceType: 'frontend-route',
       resourceId: route.id,
-      granted: true,
+      isGranted: true,
       priority: 1,
       lastSynced: new Date(),
     };
@@ -360,7 +360,7 @@ export class CacheSyncService {
       name: `${endpoint.method} ${endpoint.path}`,
       resourceType: 'api-endpoint',
       resourceId: endpoint.id,
-      granted: true,
+      isGranted: true,
       priority: 1,
       lastSynced: new Date(),
       action: endpoint.method.toLowerCase(), // Use HTTP method as action
@@ -386,7 +386,7 @@ export class CacheSyncService {
       const entries = await this.cachePermissionMapRepository.find({
         where: {
           userId,
-          granted: true,
+          isGranted: true,
         },
       });
 

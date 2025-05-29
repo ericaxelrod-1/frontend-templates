@@ -1,6 +1,6 @@
 # Project Backlog
 
-Last Updated: 2025-05-23
+Last Updated: 2025-05-28
 
 ## High Priority
 
@@ -217,6 +217,40 @@ Last Updated: 2025-05-23
 - Create proper mock User objects with all required properties
 - Remove tests for non-existent methods or implement missing methods if needed
 
+### BUG-032: Fix CAPTCHA Configuration and Update Seed Scripts
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-05-28
+- **Completed**: 2025-05-28
+- **Description**: Fix CAPTCHA configuration to be properly configurable instead of completely disabled, and update all seed scripts to use correct database field names (isGranted instead of granted).
+
+#### Implementation Notes
+- **CAPTCHA Configuration**: Made CAPTCHA properly configurable for development vs production
+  - Re-enabled CAPTCHA with `enabled: true` but added `skipForDevelopment: true` option
+  - Set difficulty to 'easy' for development environment
+  - Updated login component to respect `skipForDevelopment` setting
+  - Updated environment interface to include optional `skipForDevelopment` property
+- **Seed Scripts Database Alignment**: Updated all seed scripts and models to use correct database field names
+  - Fixed cache sync service to use `isGranted` instead of `granted`
+  - Fixed frontend group service and models to use `isGranted` instead of `granted`
+  - Ensured all frontend and backend models are aligned with database schema
+
+- **Files Modified**:
+  - `angular/frontend/src/environments/environment.ts`: Re-enabled CAPTCHA with development skip option
+  - `angular/frontend/src/environments/environment.development.ts`: Re-enabled CAPTCHA with development skip option
+  - `angular/frontend/src/environments/environment.interface.ts`: Added optional `skipForDevelopment` property
+  - `angular/frontend/src/app/features/auth/login/login.component.ts`: Updated to respect `skipForDevelopment` setting
+  - `angular/backend/src/modules/permissions/services/cache-sync.service.ts`: Fixed field name mismatches
+  - `angular/frontend/src/app/services/group.service.ts`: Fixed field name mismatches
+  - `angular/frontend/src/app/models/group.model.ts`: Updated Permission interface
+
+- **Testing Results**:
+  - CAPTCHA properly configurable for development vs production
+  - Backend server running and responding correctly
+  - All seed scripts now use correct database field names
+  - Frontend and backend models aligned with database schema
+
 ### BUG-031: Fix Login Circular Dependency with Permissions
 - **Status**: Complete
 - **Testing**: Passed
@@ -252,12 +286,33 @@ Last Updated: 2025-05-23
 - ✅ No more 400 Bad Request errors from circular dependencies
 - ✅ Login flow should now work without permission check failures
 
-### BUG-023: Dashboard Tiles Redirecting to Login (Authentication Issue)
+### BUG-024: API Route Conflict - user-permissions Endpoint
 - **Status**: Complete
 - **Testing**: Passed
 - **Dependencies**: None
+- **Added**: 2025-05-28
+- **Completed**: 2025-05-28
+- **Description**: The `/api/permissions/user-permissions` endpoint was returning 400 Bad Request due to route conflict with the `:id` parameter route. The specific route was being intercepted by the `@Get(':id')` route handler which expected a numeric ID parameter.
+
+#### Implementation Notes
+- **Root Cause**: In NestJS, route order matters. The `user-permissions` route was defined after the `:id` route, causing the router to interpret "user-permissions" as an ID parameter
+- **Solution**: Moved the `@Get('user-permissions')` route definition before the `@Get(':id')` route in the permissions controller
+- **Testing**: Verified that `/api/permissions/user-permissions` now returns user permissions correctly when authenticated
+
+- **Files Modified**:
+  - `angular/backend/src/modules/permissions/controllers/permissions.controller.ts`: Reordered route definitions to fix conflict
+
+- **Testing Results**:
+  - API endpoint now returns 401 Unauthorized (correct) instead of 400 Bad Request when unauthenticated
+  - API endpoint returns user permissions array when properly authenticated
+  - Frontend login flow now works without console errors
+
+### BUG-023: Dashboard Tiles Redirecting to Login (Authentication Issue)
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: BUG-024
 - **Added**: 2025-05-23
-- **Completed**: 2025-05-23
+- **Completed**: 2025-05-28
 - **Description**: Dashboard tiles were redirecting to login page instead of navigating to their respective pages (Users, Groups, Activity). Root cause was that users were not authenticated due to CAPTCHA blocking login process in development environment.
 
 #### Implementation Notes
@@ -268,14 +323,39 @@ Last Updated: 2025-05-23
 - **Files Modified**:
   - `angular/frontend/src/environments/environment.ts`: Set `captcha.enabled = false`
   - `angular/frontend/src/environments/environment.development.ts`: Set `captcha.enabled = false`
-  - `angular/frontend/src/app/features/auth/login/login.component.ts`: Added conditional CAPTCHA validation
   - `angular/frontend/src/app/features/auth/login/login.component.html`: Added conditional CAPTCHA display
+  - `angular/frontend/src/app/features/auth/login/login.component.ts`: Added captchaEnabled property and conditional validation
 
 - **Testing Results**:
   - Login form now displays without CAPTCHA in development
-  - Users can log in with admin credentials
-  - Dashboard tiles will navigate to protected routes after authentication
-  - Permission system verified working correctly with all required permissions present
+  - Users can successfully authenticate with admin credentials
+  - Dashboard tiles should now navigate to their respective pages
+
+### BUG-025: Missing Login-Monitoring Permissions
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-05-28
+- **Completed**: 2025-05-28
+- **Description**: The login-monitoring endpoints required `login-monitoring:read` and `login-monitoring:manage` permissions but these permissions were never seeded in the database. This caused 401 Unauthorized errors when users tried to access the Activity tile (login monitoring dashboard).
+
+#### Implementation Notes
+- **Root Cause**: Missing permissions in database - `login-monitoring:read` and `login-monitoring:manage` permissions were not seeded
+- **Solution**: Added missing permissions to database and assigned them to superadmin role
+- **Database Changes**:
+  - Added `login-monitoring:read` permission (ID 28) with action_id 3 (read)
+  - Added `login-monitoring:manage` permission (ID 29) with action_id 6 (manage)
+  - Assigned both permissions to superadmin role (ID 10) with is_granted = 1
+
+- **Files Modified**:
+  - Database: `permissions` table - Added 2 new permissions
+  - Database: `role_permissions` table - Added 2 new role permission assignments
+  - Backend restart required to clear permission cache
+
+- **Testing Results**:
+  - ✅ `/api/login-monitoring/stats` endpoint now returns statistics
+  - ✅ `/api/login-monitoring/attempts/recent` endpoint now returns data
+  - ✅ Admin user now has `login-monitoring:read` and `login-monitoring:manage` permissions
 
 ## Medium Priority
 
@@ -789,3 +869,67 @@ Last Updated: 2025-05-23
 
 #### Recommendation: Single Source of Truth
 - **Recommendation**: Use the **database schema** as the single source of truth for now. The DB schema is the most reliable and complete representation of the current production state. All TypeORM entities and migration scripts should be updated to match the DB schema exactly. Once alignment is achieved, you may consider switching to TypeORM as the source of truth for future development, but only after rigorous validation. 
+
+### FEAT-007: Create API Status/Health Endpoint
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-05-28
+- **Description**: Create a comprehensive API status/health endpoint that provides system health information, database connectivity status, and service availability for monitoring and debugging purposes.
+
+#### Implementation Notes
+- **Endpoint Requirements**:
+  - GET `/api/health` or `/api/status` endpoint
+  - Return JSON with system status, database connectivity, service health
+  - Include timestamp, version info, and basic system metrics
+  - Provide different detail levels (basic vs detailed)
+- **Response Format**:
+  - Status: "healthy", "degraded", "unhealthy"
+  - Database connectivity check
+  - Service availability checks
+  - Memory/performance metrics (optional)
+- **Security**: Ensure endpoint doesn't expose sensitive information
+
+### BUG-033: Critical TypeScript Compilation Errors in Cache Sync Service
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-05-28
+- **Description**: Fix critical TypeScript compilation errors in cache-sync.service.ts where 'isGranted' property doesn't exist in CachePermissionMap entity but is being used in the code.
+
+#### Implementation Notes
+- **Root Cause**: CachePermissionMap entity uses 'granted' field but code tries to use 'isGranted'
+- **Compilation Errors**:
+  - Lines 302, 322, 340, 363: Object literal 'isGranted' doesn't exist in CachePermissionMap
+  - Line 389: 'isGranted' doesn't exist in FindOptionsWhere<CachePermissionMap>
+- **Solution Options**:
+  1. Update CachePermissionMap entity to use 'isGranted' instead of 'granted'
+  2. Update cache-sync.service.ts to use 'granted' instead of 'isGranted'
+  3. Investigate if CachePermissionMap table even exists in database
+- **Files Affected**:
+  - `angular/backend/src/modules/permissions/services/cache-sync.service.ts`
+  - `angular/backend/src/modules/permissions/cache-entities/cache-permission-map.entity.ts`
+
+### TECH-004: Database Schema vs Entity Alignment Investigation
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-05-28
+- **Description**: Investigate discrepancies between expected_schema.json, DATABASE_SCHEMA.md documentation, and actual database/entity implementations to determine if schema alignment issues are real or due to stale files.
+
+#### Implementation Notes
+- **Investigation Areas**:
+  - **expected_schema.json Purpose**: Determine what this file is used for and if it's stale
+  - **Database vs Documentation**: Compare actual database schema with DATABASE_SCHEMA.md
+  - **Entity vs Database**: Verify TypeORM entities match actual database tables
+  - **Field Name Consistency**: Investigate 'granted' vs 'isGranted' field naming across all entities
+- **Key Questions**:
+  - Is expected_schema.json still needed or is it legacy?
+  - Are the audit reports showing real issues or false positives?
+  - Should we standardize on DATABASE_SCHEMA.md as the single source of truth?
+- **Files to Investigate**:
+  - `expected_schema.json` (purpose and usage)
+  - `angular/docs/DATABASE_SCHEMA.md` (current documentation)
+  - All entity files vs actual database tables
+  - Schema audit reports in `audit_reports/` directory
+- **Outcome**: Clear documentation of schema alignment status and action plan

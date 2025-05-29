@@ -76,7 +76,7 @@ export class GroupService {
           name: p.name,
           resourceName: p.resourceName,
           actionName: p.actionName,
-          granted: true
+          isGranted: true
         })) || [],
         role: user.roles?.[0]?.name // For legacy support
       }))),

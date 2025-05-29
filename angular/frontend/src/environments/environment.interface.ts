@@ -26,6 +26,7 @@ export interface Environment {
   captcha: {
     enabled: boolean;
     difficulty: 'easy' | 'medium' | 'hard';
+    skipForDevelopment?: boolean;
   };
   debugMode: boolean;
 } 

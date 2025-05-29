@@ -146,6 +146,27 @@ export class PermissionsController {
     return this.permissionsService.findAll();
   }
 
+  /**
+   * Get permissions for the current user
+   * This endpoint must be placed before @Get(':id') to avoid route conflicts
+   */
+  @Get('user-permissions')
+  @ApiOperation({ summary: 'Get permissions for the current user' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of user permissions',
+    type: [String],
+  })
+  @ApiResponse({ status: 401, description: 'User not authenticated' })
+  async getUserPermissions(@Req() req?: Request): Promise<string[]> {
+    // Get userId from authenticated user
+    const userId = req?.user?.['id'];
+    if (!userId) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.permissionsService.getUserPermissions(userId);
+  }
+
   // Get permission by ID
   @Get(':id')
   @RequirePermissions('permissions:read')
@@ -237,27 +258,6 @@ export class PermissionsController {
   @ApiOperation({ summary: 'Get all actions' })
   async getAllActions() {
     return this.permissionsService.findAllActions();
-  }
-
-  /**
-   * Get permissions for the current user
-   * This endpoint must be placed before @Get(':id') to avoid route conflicts
-   */
-  @Get('user-permissions')
-  @ApiOperation({ summary: 'Get permissions for the current user' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of user permissions',
-    type: [String],
-  })
-  @ApiResponse({ status: 401, description: 'User not authenticated' })
-  async getUserPermissions(@Req() req?: Request): Promise<string[]> {
-    // Get userId from authenticated user
-    const userId = req?.user?.['id'];
-    if (!userId) {
-      throw new UnauthorizedException('User not authenticated');
-    }
-    return this.permissionsService.getUserPermissions(userId);
   }
 
   // Update user permission

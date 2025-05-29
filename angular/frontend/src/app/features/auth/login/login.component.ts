@@ -30,7 +30,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   loading = false;
   submitted = false;
   error = '';
-  captchaEnabled = environment.captcha.enabled;
+  captchaEnabled = environment.captcha.enabled && !environment.captcha.skipForDevelopment;
   
   // App configuration properties
   appName = 'Angular Template';

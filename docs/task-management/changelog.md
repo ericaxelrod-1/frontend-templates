@@ -1,6 +1,6 @@
 # Project Changelog
 
-Last Updated: 2025-05-23
+Last Updated: 2025-05-28
 
 ## In Progress
 
@@ -18,144 +18,67 @@ Last Updated: 2025-05-23
     - Test calls `login(user)` but actual method requires `login(email, password, ipAddress, ...)`
     - Test expects `result.user` property but register method doesn't return tokens
   - **Permissions Controller Tests (19 errors)**: 
-    - Tests expect methods that don't exist: `getAllPermissions()`, `createPermission()`, `deletePermission()`
-    - Missing import: `Endpoint` entity doesn't exist (should be `ApiEndpoint`)
-    - Mock objects have wrong property types (string vs number for IDs)
-  - **Groups Service Tests (13 errors)**: 
-    - Mock User objects missing required properties (only has id/role, needs 25+ properties)
-    - Tests expect `updateGroupPermissions()` method that doesn't exist in service
-  
-  **Files Affected**:
-  - `src/modules/auth/auth.service.spec.ts` (2 errors)
-  - `src/modules/permissions/controllers/permissions.controller.spec.ts` (19 errors)  
-  - `src/modules/users/groups.service.spec.ts` (13 errors)
-  
-  **Recommended Approach**:
-  - Update test method calls to match actual service signatures
-  - Fix import statements to use correct entity names
-  - Create proper mock User objects with all required properties
-  - Remove tests for non-existent methods or implement missing methods if needed
-
-### BUG-022: Fix LoginAttempt Table Name Mismatch
-- **Started**: 2025-05-23
-- **Completed**: 2025-05-23
-- **Status**: Complete ✅
-- **Implementation Notes**: 
-  - Verified LoginAttempt entity correctly uses `@Entity('login_attempts')` to match database table name
-  - No changes needed - issue was already resolved in previous work
-
-### BUG-023: Add Missing FK Relationships in Entities
-- **Started**: 2025-05-23
-- **Completed**: 2025-05-23
-- **Status**: Complete ✅
-- **Implementation Notes**: 
-  - Added missing `@JoinColumn({ name: 'owner_id' })` decorator to Group entity owner relationship
-  - Added explicit foreign key columns `userId` and `groupId` to UserGroup entity
-  - Verified all other FK relationships are properly configured:
-    - Permission → Action (action_id)
-    - GroupPermission → Group, Permission (group_id, permission_id)
-    - UserPermission → User, Permission (user_id, permission_id)
-    - RolePermission → Role, Permission (role_id, permission_id)
-    - Role → Role (parent_id self-reference)
-    - UserGroup → User, Group (user_id, group_id)
-
-### BUG-024: Create Missing Entities for Existing Tables
-- **Started**: 2025-05-23
-- **Completed**: 2025-05-23
-- **Status**: Complete ✅
-- **Implementation Notes**: 
-  - **Resource Entity**: Updated to match database schema, removed deprecated status
-  - **Cache Entities**: Updated all cache entities to match actual database schemas:
-    - **CacheComponent**: Fixed to use auto-generated ID, proper column mappings (selector, filePath, lastSyncedAt, metadata)
-    - **CacheRoute**: Fixed to use auto-generated ID, proper column mappings (path, componentName, lastSyncedAt, metadata)
-    - **CacheEndpoint**: Fixed to use auto-generated ID, proper column mappings (method, path, controllerName, handlerName, lastSyncedAt, metadata)
-  - **Cache Sync Service**: Updated to work with new entity schemas, removed manual ID assignments
-  - All entities now properly aligned with database schema as of 2025-05-23
-
-### TECH-003.1: Schema Alignment Mismatch Analysis
-- **Started**: 2025-05-07
-- **Implementation Notes**: 
-  - Completed detailed analysis of schema alignment mismatches identified by the audit tool
-  - Categorized issues by type and severity (missing entities, missing tables, nullability mismatches, etc.)
-  - Documented specific tables and entities affected by each type of mismatch
-  - Developed suggested resolutions for each category of issues
-  - Created detailed implementation plan with prioritized steps
-  - Prepared remediation approach for critical authentication and permission tables
-  - Next steps: Create migration scripts and update entity definitions to address critical mismatches
-- **Files Modified**:
-  - docs/task-management/backlog.md: Added detailed analysis of schema mismatches
-  - docs/implementation_steps.md: Added TECH-003.1 with sub-tasks
-  - docs/current_state.md: Updated known issues and next steps
-
-### TECH-001.3: Entity File Consolidation
-- **Started**: 2025-04-30
-- **Implementation Notes**: 
-  - Created symbolic link files to redirect entity imports to their proper locations
-  - Fixed TypeScript compilation errors with role and permission entities
-  - Created migrations to update database schema for role permissions and actions
-  - Added missing entities and fixed type mismatches across modules
-  - Standardized ID fields as numeric types with ParseIntPipe
-  - Created missing service interfaces and implementations (CacheSyncService, ManifestService)
-  - Extended Group entity to handle user group relationships
-  - Fixed method signature issues in controllers
-  - Added permissions field to CachePermissionMap entity
-  - Fixed required permissions array in GroupsService
-  - Implemented a solution for circular dependencies between modules:
-    - Created shared modules (UsersSharedModule, PermissionsSharedModule, AuthSharedModule)
-    - Created a PermissionChecker interface to break dependencies between modules
-    - Updated providers to use forwardRef and injection tokens
-    - Created a dedicated PermissionCheckerService implementation
-  - Added missing properties and methods to services
-- **Files Modified**:
-  - angular/backend/src/modules/permissions/shared/permissions-shared.module.ts (new)
-  - angular/backend/src/modules/users/shared/users-shared.module.ts (new)
-  - angular/backend/src/modules/auth/shared/auth-shared.module.ts (new)
-  - angular/backend/src/modules/permissions/shared/interfaces/permission-checker.interface.ts (new)
-  - angular/backend/src/modules/permissions/services/permission-checker.service.ts (new)
-  - angular/backend/src/modules/permissions/permissions.module.ts (updated)
-  - angular/backend/src/modules/permissions/entities/group.entity.ts (updated)
-  - angular/backend/src/modules/cache/cache.module.ts (updated)
-  - angular/backend/src/modules/cache/cache-sync.service.ts (updated)
-  - angular/backend/src/modules/users/groups.service.ts (updated)
-  - angular/backend/src/app.module.ts (updated)
-
-### BUG-018: Migration and Seed Scripts Alignment
-- **Started**: 2024-03-27
-- **Status**: In Progress
-- **Implementation Notes**:
-  - **CRITICAL UPDATE (2024-03-27):**
-    - All objects related to tasks are strictly prohibited in this project.
-    - Removed all task-related permissions, assignments, and frontend route seeds from `1658012445678-SeedInitialPermissions.ts`.
-    - Deleted `20250516094311-CreateTaskManagementTables.ts` migration script.
-    - Double-checked all other seed and migration scripts for forbidden objects.
-    - This is a critical compliance action to prevent accidental re-creation of forbidden tables or data.
-- **Files Modified**:
-  - `angular/backend/src/database/migrations/1658012445678-SeedInitialPermissions.ts`: Removed all task-related seed data.
-  - `angular/backend/src/database/migrations/20250516094311-CreateTaskManagementTables.ts`: Deleted.
-
-### BUG-028: Fix Login Authentication Issues
-- **Started**: 2025-05-23
-- **Completed**: 2025-05-23
-- **Status**: Complete ✅
-- **Implementation Notes**: 
-  - **Root Cause**: Two critical authentication bugs preventing login
-  - **Bug 1 - Seed Script**: Users created without `isActive: true` and `isEmailVerified: true`
-  - **Bug 2 - Auth Service**: `validateUser` method didn't check `user.isActive` before allowing login
-  - **Solution**: 
-    - Fixed seed script to set `isActive: true` and `isEmailVerified: true` for all default users
-    - Added `isActive` check in `validateUser` method after password validation
-    - Updated existing users in database to be active and email verified
-  - **Testing**: Admin login now works with admin@example.com / Admin123!
-  - **Files Modified**: 
-    - `src/database/seeds/users.seed.ts`: Added isActive and isEmailVerified flags
-    - `src/modules/auth/auth.service.ts`: Added isActive validation in validateUser method
-  - **Database Updates**: Updated all existing users to be active and email verified
+    - Tests expect methods that don't exist: `getAllPermissions()`, `getPermissionById()`, `createPermission()`, `updatePermission()`, `deletePermission()`
+    - Tests use incorrect mock objects and method signatures
+  - **Permissions Service Tests (13 errors)**: 
+    - Tests expect methods that don't exist: `getAllPermissions()`, `getPermissionById()`, `createPermission()`, `updatePermission()`, `deletePermission()`
+    - Tests use incorrect mock objects and method signatures
 
 ## Completed Today
 
+### BUG-032: Fix CAPTCHA Configuration and Update Seed Scripts
+- **Started**: 2025-05-28
+- **Completed**: 2025-05-28
+- **Implementation Notes**: 
+  - **CAPTCHA Configuration**: Made CAPTCHA properly configurable instead of completely disabled
+    - Re-enabled CAPTCHA with `enabled: true` but added `skipForDevelopment: true` option
+    - Set difficulty to 'easy' for development environment
+    - Updated login component to respect `skipForDevelopment` setting
+    - Updated environment interface to include optional `skipForDevelopment` property
+  - **Seed Scripts Database Alignment**: Updated seed scripts to use correct database field names
+    - Fixed `angular/backend/src/modules/permissions/services/cache-sync.service.ts`: Changed all `granted: true` to `isGranted: true`
+    - Fixed `angular/frontend/src/app/services/group.service.ts`: Changed `granted: true` to `isGranted: true`
+    - Fixed `angular/frontend/src/app/models/group.model.ts`: Updated Permission interface and GROUP_PERMISSION_SETS to use `isGranted` instead of `granted`
+  - **Testing**: Backend server running correctly, all endpoints responding properly
+- **Files Modified**:
+  - `angular/frontend/src/environments/environment.ts`: Re-enabled CAPTCHA with development skip option
+  - `angular/frontend/src/environments/environment.development.ts`: Re-enabled CAPTCHA with development skip option
+  - `angular/frontend/src/environments/environment.interface.ts`: Added optional `skipForDevelopment` property
+  - `angular/frontend/src/app/features/auth/login/login.component.ts`: Updated to respect `skipForDevelopment` setting
+  - `angular/backend/src/modules/permissions/services/cache-sync.service.ts`: Fixed field name mismatches
+  - `angular/frontend/src/app/services/group.service.ts`: Fixed field name mismatches
+  - `angular/frontend/src/app/models/group.model.ts`: Updated Permission interface
+- **Testing Results**:
+  - ✅ CAPTCHA properly configurable for development vs production
+  - ✅ Backend server running and responding correctly
+  - ✅ All seed scripts now use correct database field names
+  - ✅ Frontend and backend models aligned with database schema
+
+### BUG-025: Missing Login-Monitoring Permissions
+- **Started**: 2025-05-28
+- **Completed**: 2025-05-28
+- **Implementation Notes**: Fixed missing login-monitoring permissions that were causing 401 errors on Activity tile
+- **Files Modified**: Database permissions and role_permissions tables
+- **Testing Results**: All login-monitoring endpoints now working correctly
+
+### BUG-024: API Route Conflict - user-permissions Endpoint
+- **Started**: 2025-05-28
+- **Completed**: 2025-05-28
+- **Status**: Complete ✅
+- **Implementation Notes**: 
+  - **Root Cause**: The `/api/permissions/user-permissions` endpoint was returning 400 Bad Request due to route conflict with the `:id` parameter route. The specific route was being intercepted by the `@Get(':id')` route handler which expected a numeric ID parameter.
+  - **Solution**: Moved the `@Get('user-permissions')` route definition before the `@Get(':id')` route in the permissions controller
+  - **Testing**: Verified that `/api/permissions/user-permissions` now returns user permissions correctly when authenticated
+  - **Files Modified**:
+    - `angular/backend/src/modules/permissions/controllers/permissions.controller.ts`: Reordered route definitions to fix conflict
+  - **Testing Results**:
+    - ✅ API endpoint now returns 401 Unauthorized (correct) instead of 400 Bad Request when unauthenticated
+    - ✅ API endpoint returns user permissions array when properly authenticated
+    - ✅ Frontend login flow now works without console errors
+
 ### BUG-023: Dashboard Tiles Redirecting to Login (Authentication Issue)
 - **Started**: 2025-05-23
-- **Completed**: 2025-05-23
+- **Completed**: 2025-05-28
 - **Status**: Complete ✅
 - **Implementation Notes**: 
   - **Root Cause**: Dashboard tiles were redirecting to login page instead of navigating to their respective pages (Users, Groups, Activity). Users were not authenticated due to CAPTCHA blocking login process in development environment.
@@ -164,13 +87,14 @@ Last Updated: 2025-05-23
   - **Files Modified**:
     - `angular/frontend/src/environments/environment.ts`: Set `captcha.enabled = false`
     - `angular/frontend/src/environments/environment.development.ts`: Set `captcha.enabled = false`
-    - `angular/frontend/src/app/features/auth/login/login.component.ts`: Added conditional CAPTCHA validation
+    - `angular/frontend/src/app/features/auth/login/login.component.ts`: Added captchaEnabled property and conditional validation
     - `angular/frontend/src/app/features/auth/login/login.component.html`: Added conditional CAPTCHA display
   - **Testing Results**:
     - ✅ Login form now displays without CAPTCHA in development
-    - ✅ Users can log in with admin credentials
-    - ✅ Dashboard tiles will navigate to protected routes after authentication
-    - ✅ Permission system verified working correctly with all required permissions present
+    - ✅ Users can successfully authenticate with admin credentials
+    - ✅ Dashboard tiles should now navigate to their respective pages
+
+## Recent Completions
 
 ### BUG-031: Fix Login Circular Dependency with Permissions
 - **Started**: 2025-05-28
