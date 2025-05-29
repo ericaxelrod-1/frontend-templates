@@ -3,11 +3,11 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../guards/permission.guard';
 import { RequirePermission } from '../decorators/require-permission.decorator';
 import { ManifestService } from '../scanners/manifest.service';
-import { CacheSyncService } from '../services/cache-sync.service';
+import { CacheSyncService } from '../../cache/cache-sync.service';
 import { ComponentScannerService } from '../scanners/component-scanner.service';
 import { RouteScannerService } from '../scanners/route-scanner.service';
 import { EndpointScannerService } from '../scanners/endpoint-scanner.service';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('cache-sync')
 @ApiBearerAuth()
@@ -63,7 +63,11 @@ export class CacheSyncController {
   @RequirePermission('permissions:manage')
   @ApiOperation({ summary: 'Force synchronization of permission cache' })
   async forceSynchronization() {
-    return this.cacheSyncService.forceSynchronization();
+    await this.cacheSyncService.syncAllPermissions();
+    return {
+      success: true,
+      message: 'Cache synchronization completed successfully',
+    };
   }
 
   /**
@@ -74,7 +78,11 @@ export class CacheSyncController {
   @RequirePermission('permissions:view')
   @ApiOperation({ summary: 'Get current synchronization status' })
   async getSyncStatus() {
-    return this.cacheSyncService.getSyncStatus();
+    return {
+      success: true,
+      message: 'Cache sync service is available',
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /**

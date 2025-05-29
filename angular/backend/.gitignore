@@ -34,7 +34,7 @@ Thumbs.db
 .env.*
 !.env.example
 
-# Database
-*.sqlite
-*.sqlite3
-*.db
+# Database - Commented out to allow tracking SQLite files for development
+# *.sqlite
+# *.sqlite3
+# *.db

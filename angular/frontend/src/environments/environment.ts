@@ -27,8 +27,8 @@ export const environment: Environment = {
   },
   captcha: {
     enabled: true, // Re-enabled for proper security
-    difficulty: 'easy', // Set to easy for development
-    skipForDevelopment: true // Allow skipping in development mode
+    difficulty: 'medium', // Set to medium for production
+    skipForDevelopment: false // Don't skip CAPTCHA in production
   },
   debugMode: true
 }; 

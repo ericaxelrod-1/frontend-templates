@@ -11,7 +11,6 @@ import { RolePermission } from '../modules/roles/entities/role-permission.entity
 import { User } from '../modules/users/entities/user.entity';
 import { Group } from '../modules/users/entities/group.entity';
 import { UserGroup } from '../modules/users/entities/user-group.entity';
-import { CacheSyncStatus } from '../modules/permissions/cache-entities/cache-sync-status.entity';
 import { Action } from '../modules/permissions/entities/action.entity';
 import { Resource } from '../modules/permissions/entities/resource.entity';
 import { LoginAttempt } from '../modules/auth/entities/login-attempt.entity';
@@ -37,7 +36,6 @@ export const dataSourceOptions: DataSourceOptions = {
     RolePermission,
     User,
     UserGroup,
-    CacheSyncStatus,
     Action,
     Resource,
     LoginAttempt,

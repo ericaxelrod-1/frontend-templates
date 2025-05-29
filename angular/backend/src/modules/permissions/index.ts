@@ -9,7 +9,6 @@ export { RolePermission } from './entities/role-permission.entity';
 
 // Export services
 export { PermissionsService } from './services/permissions.service';
-export { CacheSyncService } from './cache-sync.service';
 
 // Export guards
 export { PermissionGuard } from './guards/permission.guard';

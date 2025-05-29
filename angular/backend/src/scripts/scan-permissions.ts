@@ -6,7 +6,7 @@ import { ManifestService } from '../modules/permissions/scanners/manifest.servic
 import { ComponentScannerService } from '../modules/permissions/scanners/component-scanner.service';
 import { RouteScannerService } from '../modules/permissions/scanners/route-scanner.service';
 import { EndpointScannerService } from '../modules/permissions/scanners/endpoint-scanner.service';
-import { CacheSyncService } from '../modules/permissions/services/cache-sync.service';
+import { CacheSyncService } from '../modules/cache/cache-sync.service';
 
 /**
  * Script to scan the entire application for components, routes, and API endpoints
@@ -55,8 +55,8 @@ async function bootstrap() {
     await permissionsService.syncPermissionsFromManifest();
 
     // Sync permissions to cache
-    console.log('Synchronizing permissions cache...');
-    await cacheSyncService.forceSynchronization();
+    console.log('Syncing permissions to cache...');
+    await cacheSyncService.syncAllPermissions();
 
     console.log('Scan and synchronization completed successfully');
 

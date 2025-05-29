@@ -10,7 +10,6 @@ import { Permission } from '../entities/permission.entity';
 import { UiComponent } from '../entities/ui-component.entity';
 import { FrontendRoute } from '../entities/frontend-route.entity';
 import { ApiEndpoint } from '../entities/api-endpoint.entity';
-import { CacheSyncService } from '../services/cache-sync.service';
 import { CacheModule } from '../../cache/cache.module';
 
 /**

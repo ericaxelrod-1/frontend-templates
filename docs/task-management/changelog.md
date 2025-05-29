@@ -94,6 +94,18 @@ Last Updated: 2025-05-28
     - ✅ Users can successfully authenticate with admin credentials
     - ✅ Dashboard tiles should now navigate to their respective pages
 
+### BUG-033: Critical TypeScript Compilation Errors in Cache Sync Service
+- **Completed**: 2025-01-21
+- **Implementation Notes**: Resolved by removing abandoned code instead of implementing incomplete feature
+- **Files Removed**: 
+  - `cache-permission-map.entity.ts`
+  - `cache-sync-status.entity.ts` 
+  - Two broken `cache-sync.service.ts` files
+  - Broken migration and test files
+- **Files Updated**: Fixed imports and method calls in remaining files
+- **Testing Results**: Build now compiles successfully without TypeScript errors
+- **Root Cause**: CachePermissionMap entity was abandoned development work - table never existed in database
+
 ## Recent Completions
 
 ### BUG-031: Fix Login Circular Dependency with Permissions

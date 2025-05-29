@@ -1,37 +1,29 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
 import { AppModule } from '../app.module';
-import { CacheSyncService } from '../modules/permissions/cache-sync.service';
+import { CacheSyncService } from '../modules/cache/cache-sync.service';
 
 /**
- * Script to manually trigger a full synchronization of the permissions cache.
- * This can be useful during development or after significant permission changes.
- *
- * Usage: npm run sync:permissions-cache
+ * Script to synchronize permissions cache
  */
 async function bootstrap() {
-  const logger = new Logger('SyncPermissionsCache');
-  logger.log('Starting manual permissions cache synchronization...');
+  const app = await NestFactory.createApplicationContext(AppModule);
 
   try {
-    // Create a standalone application
-    const app = await NestFactory.createApplicationContext(AppModule);
+    console.log('Starting permission cache synchronization...');
 
-    // Get the cache sync service
     const cacheSyncService = app.get(CacheSyncService);
 
-    // Run the synchronization
-    logger.log('Triggering cache synchronization...');
-    await cacheSyncService.syncAll();
-    logger.log('Cache synchronization completed successfully.');
+    console.log('Syncing all permissions to cache...');
+    await cacheSyncService.syncAllPermissions();
 
-    // Clean up
-    await app.close();
-    process.exit(0);
+    console.log('Permission cache synchronization completed successfully!');
   } catch (error) {
-    logger.error(`Cache synchronization failed: ${error.message}`, error.stack);
+    console.error('Error during cache synchronization:', error);
     process.exit(1);
+  } finally {
+    await app.close();
   }
 }
 
+// Run the script
 bootstrap();
