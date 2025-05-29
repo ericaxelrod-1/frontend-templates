@@ -1,42 +1,139 @@
 /* Import Angular Material and our custom theme */
-@use '@angular/material' as material;
-@use 'styles/themes/material-theme' as theme;
-@use 'styles/abstracts/mixins' as mixins;
+@use '@angular/material' as mat;
 
-/* Apply Angular Material core styles */
-@include material.core();
+/* Define accessible Material Design palettes */
+/* Using Indigo instead of Purple for better contrast ratios (WCAG AA compliance) */
+$primary-palette: mat.define-palette(mat.$indigo-palette, 600);
+$accent-palette: mat.define-palette(mat.$green-palette, A400);
+$warn-palette: mat.define-palette(mat.$red-palette, 500);
 
-/* Apply CSS Variables for Light Theme (default) */
+/* Create light theme with WCAG AA compliance */
+$light-theme: mat.define-light-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  ),
+  typography: mat.define-typography-config(),
+  density: 0,
+));
+
+/* Apply theme to all Material components */
+@include mat.all-component-themes($light-theme);
+
+/* CSS Custom Properties for non-Material components */
+/* These provide a single source of truth for colors */
 :root {
-  @include mixins.sync-theme-vars(false);
+  /* Primary colors with proper contrast */
+  --mdc-theme-primary: #{mat.get-color-from-palette($primary-palette)};
+  --mdc-theme-on-primary: #{mat.get-color-from-palette($primary-palette, default-contrast)};
+  --mdc-theme-primary-light: #{mat.get-color-from-palette($primary-palette, lighter)};
+  --mdc-theme-primary-dark: #{mat.get-color-from-palette($primary-palette, darker)};
+  
+  /* Accent colors */
+  --mdc-theme-accent: #{mat.get-color-from-palette($accent-palette)};
+  --mdc-theme-on-accent: #{mat.get-color-from-palette($accent-palette, default-contrast)};
+  
+  /* Surface and background colors */
+  --mdc-theme-surface: #{mat.get-color-from-palette(mat.$grey-palette, 50)};
+  --mdc-theme-background: #fafafa;
+  --mdc-theme-on-surface: #{mat.get-color-from-palette(mat.$grey-palette, 900)};
+  --mdc-theme-on-background: #{mat.get-color-from-palette(mat.$grey-palette, 900)};
+  
+  /* Semantic colors */
+  --mdc-theme-error: #{mat.get-color-from-palette($warn-palette)};
+  --mdc-theme-on-error: #{mat.get-color-from-palette($warn-palette, default-contrast)};
+  --mdc-theme-success: #4caf50;
+  --mdc-theme-warning: #ff9800;
+  --mdc-theme-info: #2196f3;
+  
+  /* Text colors with proper contrast ratios */
+  --mdc-theme-text-primary: rgba(0, 0, 0, 0.87);
+  --mdc-theme-text-secondary: rgba(0, 0, 0, 0.6);
+  --mdc-theme-text-disabled: rgba(0, 0, 0, 0.38);
+  
+  /* Border and divider colors */
+  --mdc-theme-divider: rgba(0, 0, 0, 0.12);
+  --mdc-theme-outline: rgba(0, 0, 0, 0.12);
 }
 
-/* Base styles */
+/* Dark theme support */
+.dark-theme {
+  --mdc-theme-surface: #{mat.get-color-from-palette(mat.$grey-palette, 800)};
+  --mdc-theme-background: #121212;
+  --mdc-theme-on-surface: #{mat.get-color-from-palette(mat.$grey-palette, 100)};
+  --mdc-theme-on-background: #{mat.get-color-from-palette(mat.$grey-palette, 100)};
+  
+  /* Dark theme text colors */
+  --mdc-theme-text-primary: rgba(255, 255, 255, 0.87);
+  --mdc-theme-text-secondary: rgba(255, 255, 255, 0.6);
+  --mdc-theme-text-disabled: rgba(255, 255, 255, 0.38);
+  
+  /* Dark theme borders and dividers */
+  --mdc-theme-divider: rgba(255, 255, 255, 0.12);
+  --mdc-theme-outline: rgba(255, 255, 255, 0.12);
+}
+
+/* Base styles with proper viewport coverage */
 html, body { 
   height: 100%; 
+  width: 100%;
   margin: 0;
+  padding: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
+  background-color: var(--mdc-theme-background);
+  color: var(--mdc-theme-on-background);
+  overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
-body {
-  margin: 0;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
-  background-color: var(--background-dark);
-  color: var(--text-primary);
-}
-
+/* Global container styles */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-/* Dark theme class */
-.dark-theme {
-  @include mixins.sync-theme-vars(true);
+/* Screen reader only class for accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* Light theme class (default) */
-.light-theme {
-  @include mixins.sync-theme-vars(false);
+/* Focus indicators for accessibility (WCAG compliance) */
+*:focus-visible {
+  outline: 2px solid var(--mdc-theme-accent);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --mdc-theme-outline: rgba(0, 0, 0, 0.3);
+    --mdc-theme-divider: rgba(0, 0, 0, 0.3);
+  }
+  
+  .dark-theme {
+    --mdc-theme-outline: rgba(255, 255, 255, 0.3);
+    --mdc-theme-divider: rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 } 

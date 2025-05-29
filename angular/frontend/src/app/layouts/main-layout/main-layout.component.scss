@@ -1,28 +1,40 @@
 .app-container {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
   height: 100vh;
+  background-color: var(--background-dark);
 }
 
 .sidenav-container {
   flex: 1;
+  display: flex;
+  min-height: 0;
+  background-color: var(--background-dark);
 }
 
 .sidebar {
   width: 250px;
+  background-color: var(--background-card);
+  border-right: 1px solid var(--text-secondary);
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
 }
 
 .main-content {
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 64px);
-  margin-top: 64px; /* For the fixed header */
+  margin-top: 64px;
+  background-color: var(--background-dark);
+  flex: 1;
 }
 
 .content-wrapper {
   padding: 24px;
   flex: 1;
-  position: relative; /* Ensure proper positioning */
+  min-height: 0;
+  background-color: var(--background-dark);
+  color: var(--text-primary);
 }
 
 /* Auth pages styles */
@@ -44,10 +56,13 @@
 .auth-header .logo {
   font-size: 20px;
   font-weight: 500;
+  color: var(--text-on-primary);
 }
 
 .auth-sidenav-container {
-  margin-top: 64px; /* Match auth header height */
+  margin-top: 64px;
+  background-color: var(--background-dark);
+  min-height: calc(100vh - 64px);
 }
 
 .auth-content {
@@ -55,8 +70,8 @@
   flex-direction: column;
   min-height: calc(100vh - 64px);
   background-color: var(--background-dark);
-  position: relative; /* Ensure proper positioning */
-  z-index: 1; /* Ensure stacking context */
+  color: var(--text-primary);
+  flex: 1;
 }
 
 /* Force auth pages to be visible */
@@ -66,9 +81,19 @@
   visibility: visible !important;
 }
 
+@media (max-width: 768px) {
+  .sidebar {
+    width: 200px;
+  }
+  
+  .content-wrapper {
+    padding: 16px;
+  }
+}
+
 @media (max-width: 599px) {
   .main-content {
-    margin-top: 56px; /* Smaller top margin for mobile */
+    margin-top: 56px;
     min-height: calc(100vh - 56px);
   }
   
@@ -77,10 +102,63 @@
   }
   
   .auth-sidenav-container {
-    margin-top: 56px; /* Match auth header height for mobile */
+    margin-top: 56px;
+    min-height: calc(100vh - 56px);
   }
   
   .auth-content {
     min-height: calc(100vh - 56px);
+  }
+  
+  .sidebar {
+    width: 280px;
+  }
+  
+  .content-wrapper {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .content-wrapper {
+    padding: 8px;
+  }
+  
+  .sidebar {
+    width: 100vw;
+    max-width: 320px;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .sidebar {
+    border-right: 2px solid var(--text-primary);
+  }
+  
+  .auth-header {
+    border-bottom: 2px solid var(--text-on-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .main-content,
+  .auth-content {
+    transition: none;
+  }
+}
+
+.dark-theme {
+  .app-container,
+  .sidenav-container,
+  .main-content,
+  .auth-content,
+  .content-wrapper {
+    background-color: var(--background-dark);
+  }
+  
+  .sidebar {
+    background-color: var(--background-card);
+    border-right-color: var(--text-secondary);
   }
 }

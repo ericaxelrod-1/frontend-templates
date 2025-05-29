@@ -1,70 +1,91 @@
-<mat-nav-list>
-  <div class="sidebar-header">
-    <h2>Menu</h2>
-  </div>
-  
-  <!-- Common navigation items -->
-  <ng-container *ngFor="let item of commonNavItems">
-    <!-- Show item if it has no permission requirement or if user has the required permission -->
-    <a mat-list-item 
-       *ngIf="!item.permission || hasPermission(item.permission)" 
-       [routerLink]="item.route" 
-       routerLinkActive="active-link">
-      <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-      <span matListItemTitle>{{ item.label }}</span>
-    </a>
-  </ng-container>
-  
-  <!-- Admin navigation items for users with management permissions -->
-  <ng-container *ngIf="isAdminOrManager">
-    <ng-container *ngFor="let item of adminNavItems">
-      <a mat-list-item 
-         *ngIf="hasPermission(item.permission)" 
-         [routerLink]="item.route" 
-         routerLinkActive="active-link">
-        <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-        <span matListItemTitle>{{ item.label }}</span>
-      </a>
-    </ng-container>
-  </ng-container>
-  
-  <!-- Admin Section (only visible to users with admin access) -->
-  <ng-container *ngIf="hasAdminAccess()">
-    <mat-divider class="section-divider"></mat-divider>
-    
-    <div class="sidebar-section">
-      <h3>Admin</h3>
+<nav role="navigation" aria-label="Main navigation">
+  <mat-nav-list>
+    <div class="sidebar-header">
+      <h2 id="sidebar-menu-heading">Menu</h2>
     </div>
     
-    <ng-container *ngFor="let item of adminItems">
+    <!-- Common navigation items -->
+    <ng-container *ngFor="let item of commonNavItems">
+      <!-- Show item if it has no permission requirement or if user has the required permission -->
       <a mat-list-item 
-         *ngIf="hasPermission(item.permission)" 
+         *ngIf="!item.permission || hasPermission(item.permission)" 
          [routerLink]="item.route" 
-         routerLinkActive="active-link">
-        <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+         routerLinkActive="active-link"
+         [attr.aria-label]="'Navigate to ' + item.label"
+         role="menuitem">
+        <mat-icon matListItemIcon [attr.aria-hidden]="true">{{ item.icon }}</mat-icon>
         <span matListItemTitle>{{ item.label }}</span>
       </a>
     </ng-container>
-  </ng-container>
-  
-  <mat-divider class="section-divider"></mat-divider>
-  
-  <div class="sidebar-section">
-    <h3>Account</h3>
-  </div>
-  
-  <a mat-list-item 
-     [routerLink]="'/profile'" 
-     routerLinkActive="active-link">
-    <mat-icon matListItemIcon>person</mat-icon>
-    <span matListItemTitle>My Profile</span>
-  </a>
-  
-  <a mat-list-item 
-     [routerLink]="'/profile'" 
-     [fragment]="'delete-account'"
-     class="delete-account-link">
-    <mat-icon matListItemIcon>delete_forever</mat-icon>
-    <span matListItemTitle>Delete Account</span>
-  </a>
-</mat-nav-list>
+    
+    <!-- Admin navigation items for users with management permissions -->
+    <ng-container *ngIf="isAdminOrManager">
+      <ng-container *ngFor="let item of adminNavItems">
+        <a mat-list-item 
+           *ngIf="hasPermission(item.permission)" 
+           [routerLink]="item.route" 
+           routerLinkActive="active-link"
+           [attr.aria-label]="'Navigate to ' + item.label"
+           role="menuitem">
+          <mat-icon matListItemIcon [attr.aria-hidden]="true">{{ item.icon }}</mat-icon>
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      </ng-container>
+    </ng-container>
+    
+    <!-- Admin Section (only visible to users with admin access) -->
+    <ng-container *ngIf="hasAdminAccess()">
+      <mat-divider class="section-divider" role="separator"></mat-divider>
+      
+      <div class="sidebar-section">
+        <h3 id="admin-section-heading">Admin</h3>
+      </div>
+      
+      <ng-container *ngFor="let item of adminItems">
+        <a mat-list-item 
+           *ngIf="hasPermission(item.permission)" 
+           [routerLink]="item.route" 
+           routerLinkActive="active-link"
+           [attr.aria-label]="'Navigate to ' + item.label + ' (Admin section)'"
+           role="menuitem">
+          <mat-icon matListItemIcon [attr.aria-hidden]="true">{{ item.icon }}</mat-icon>
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      </ng-container>
+    </ng-container>
+    
+    <mat-divider class="section-divider" role="separator"></mat-divider>
+    
+    <div class="sidebar-section">
+      <h3 id="account-section-heading">Account</h3>
+    </div>
+    
+    <a mat-list-item 
+       [routerLink]="'/profile'" 
+       routerLinkActive="active-link"
+       aria-label="Navigate to Profile page"
+       role="menuitem">
+      <mat-icon matListItemIcon aria-hidden="true">person</mat-icon>
+      <span matListItemTitle>Profile</span>
+    </a>
+    
+    <a mat-list-item 
+       [routerLink]="'/profile/password-change'" 
+       routerLinkActive="active-link"
+       aria-label="Navigate to Change Password page"
+       role="menuitem">
+      <mat-icon matListItemIcon aria-hidden="true">lock</mat-icon>
+      <span matListItemTitle>Change Password</span>
+    </a>
+    
+    <a mat-list-item 
+       class="delete-account-link" 
+       [routerLink]="'/profile/delete-account'" 
+       routerLinkActive="active-link"
+       aria-label="Navigate to Delete Account page (Warning: This action is destructive)"
+       role="menuitem">
+      <mat-icon matListItemIcon aria-hidden="true">delete_forever</mat-icon>
+      <span matListItemTitle>Delete Account</span>
+    </a>
+  </mat-nav-list>
+</nav>

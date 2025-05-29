@@ -2,9 +2,33 @@
   flex: 1 1 auto;
 }
 
+.header-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background-color: var(--primary-color);
+  color: var(--text-on-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+  min-height: 64px;
+  box-shadow: 0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px 0 rgba(0,0,0,.14), 0 1px 18px 0 rgba(0,0,0,.12);
+}
+
+.left-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
 .logo-container {
   display: flex;
   align-items: center;
+  gap: 12px;
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 4px;
@@ -18,46 +42,152 @@
 .app-logo {
   height: 36px;
   width: auto;
+  object-fit: contain;
 }
 
-.app-title {
-  margin-left: 10px;
-  font-size: 1.2rem;
+.app-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--text-on-primary);
+  white-space: nowrap;
+}
+
+.right-section {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.user-menu-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  max-width: 200px;
+  color: var(--text-on-primary);
+  
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  &:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+  }
+}
+
+.user-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
   font-weight: 500;
 }
 
+.dropdown-icon {
+  font-size: 18px;
+  opacity: 0.7;
+}
+
 .menu-button {
-  margin-right: 10px;
+  margin-right: 8px;
+  color: var(--text-on-primary);
+  
+  &:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+  }
 }
 
 .user-menu-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid #5c5c5c;
+  padding: 16px;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--text-secondary);
   margin-bottom: 8px;
 }
 
 .user-name {
-  margin: 0;
+  margin: 0 0 4px 0;
   font-weight: 500;
   font-size: 14px;
+  color: var(--text-primary);
 }
 
 .user-email {
-  margin: 5px 0 0;
+  margin: 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
+  word-break: break-word;
 }
 
-::ng-deep .mat-menu-content {
+::ng-deep .mat-mdc-menu-content {
   padding: 0 !important;
 }
 
-mat-toolbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background-color: #212121;
-  color: white;
+@media (max-width: 768px) {
+  .header-toolbar {
+    min-height: 56px;
+    padding: 0 12px;
+  }
+  
+  .left-section {
+    gap: 8px;
+  }
+  
+  .app-name {
+    font-size: 1.1rem;
+  }
+  
+  .user-menu-button {
+    padding: 6px 8px;
+    max-width: 150px;
+  }
+  
+  .user-name-text {
+    max-width: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-toolbar {
+    padding: 0 8px;
+  }
+  
+  .app-name {
+    font-size: 1rem;
+  }
+  
+  .user-menu-button {
+    padding: 4px 6px;
+    max-width: 120px;
+  }
+  
+  .user-name-text {
+    max-width: 60px;
+    font-size: 0.875rem;
+  }
+  
+  .dropdown-icon {
+    display: none;
+  }
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+@media (prefers-contrast: high) {
+  .header-toolbar {
+    border-bottom: 2px solid var(--text-on-primary);
+  }
+  
+  .user-menu-button:hover,
+  .logo-container:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
 }

@@ -1,6 +1,8 @@
 <div class="app-container">
   <!-- Only show header with sidebar toggle functionality on protected pages -->
-  <app-header *ngIf="!isAuthPage" (sidebarToggle)="toggleSidebar()"></app-header>
+  <app-header *ngIf="!isAuthPage" 
+              [sidebarOpened]="sidebarOpened"
+              (sidebarToggle)="toggleSidebar()"></app-header>
   
   <!-- Use the simple header for auth pages -->
   <div *ngIf="isAuthPage" class="auth-header">
@@ -10,14 +12,18 @@
   <mat-sidenav-container class="sidenav-container" [ngClass]="{'auth-sidenav-container': isAuthPage}">
     <!-- Only show sidebar on protected pages -->
     <mat-sidenav *ngIf="!isAuthPage" 
+                 id="main-sidebar"
                  [opened]="sidebarOpened" 
                  mode="side" 
-                 class="sidebar">
+                 class="sidebar"
+                 role="navigation"
+                 aria-label="Main navigation">
       <app-sidebar></app-sidebar>
     </mat-sidenav>
     
     <!-- Adjust content classes based on page type -->
-    <mat-sidenav-content [ngClass]="{'main-content': !isAuthPage, 'auth-content': isAuthPage}">
+    <mat-sidenav-content [ngClass]="{'main-content': !isAuthPage, 'auth-content': isAuthPage}"
+                         role="main">
       <div class="content-wrapper">
         <router-outlet></router-outlet>
       </div>

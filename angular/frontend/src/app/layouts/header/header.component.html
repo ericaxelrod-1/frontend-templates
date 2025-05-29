@@ -1,46 +1,71 @@
-<mat-toolbar class="header-toolbar" [class.fixed]="isFixedHeader">
+<mat-toolbar class="header-toolbar" [class.fixed]="isFixedHeader" role="banner">
   <!-- Left side -->
   <div class="left-section">
-    <button mat-icon-button (click)="toggleSidebar()">
+    <button mat-icon-button 
+            (click)="toggleSidebar()" 
+            aria-label="Toggle navigation menu"
+            [attr.aria-expanded]="sidebarOpened"
+            aria-controls="main-sidebar">
       <mat-icon>menu</mat-icon>
     </button>
-    <img [src]="headerLogo" alt="Logo" class="header-logo" *ngIf="headerLogo">
-    <span class="app-name">{{ appName }}</span>
+    <div class="logo-container">
+      <img [src]="headerLogo" 
+           [alt]="appName + ' Logo'" 
+           class="header-logo" 
+           *ngIf="headerLogo">
+      <h1 class="app-name" [attr.aria-label]="appName + ' Application'">{{ appName }}</h1>
+    </div>
   </div>
 
   <!-- Right side -->
   <div class="right-section">
     <ng-container *ngIf="isAuthenticated; else loginButton">
-      <button mat-button [matMenuTriggerFor]="userMenu" class="user-menu-button">
-        <mat-icon>account_circle</mat-icon>
-        <span>{{ user?.firstName || 'User' }}</span>
+      <button mat-button 
+              [matMenuTriggerFor]="userMenu" 
+              class="user-menu-button"
+              [attr.aria-label]="'User menu for ' + (user?.firstName || 'User') + ' ' + (user?.lastName || '')"
+              [attr.aria-expanded]="false">
+        <mat-icon aria-hidden="true">account_circle</mat-icon>
+        <span class="user-name-text">{{ user?.firstName || 'User' }}</span>
+        <mat-icon class="dropdown-icon" aria-hidden="true">arrow_drop_down</mat-icon>
       </button>
       
-      <mat-menu #userMenu="matMenu">
-        <div class="user-menu-header">
-          <p class="user-name">{{ user?.firstName || 'User' }} {{ user?.lastName || '' }}</p>
-          <p class="user-email">{{ user?.email }}</p>
+      <mat-menu #userMenu="matMenu" role="menu">
+        <div class="user-menu-header" role="presentation">
+          <p class="user-name" aria-label="Full name">{{ user?.firstName || 'User' }} {{ user?.lastName || '' }}</p>
+          <p class="user-email" aria-label="Email address">{{ user?.email }}</p>
         </div>
-        <mat-divider></mat-divider>
-        <button mat-menu-item routerLink="/profile">
-          <mat-icon>person</mat-icon>
+        <mat-divider role="separator"></mat-divider>
+        <button mat-menu-item 
+                routerLink="/profile"
+                role="menuitem"
+                aria-label="Go to profile page">
+          <mat-icon aria-hidden="true">person</mat-icon>
           <span>Profile</span>
         </button>
-        <button mat-menu-item routerLink="/settings">
-          <mat-icon>settings</mat-icon>
+        <button mat-menu-item 
+                routerLink="/settings"
+                role="menuitem"
+                aria-label="Go to settings page">
+          <mat-icon aria-hidden="true">settings</mat-icon>
           <span>Settings</span>
         </button>
-        <mat-divider></mat-divider>
-        <button mat-menu-item (click)="logout()">
-          <mat-icon>exit_to_app</mat-icon>
+        <mat-divider role="separator"></mat-divider>
+        <button mat-menu-item 
+                (click)="logout()"
+                role="menuitem"
+                aria-label="Logout from application">
+          <mat-icon aria-hidden="true">exit_to_app</mat-icon>
           <span>Logout</span>
         </button>
       </mat-menu>
     </ng-container>
     
     <ng-template #loginButton>
-      <button mat-button routerLink="/login">
-        <mat-icon>login</mat-icon>
+      <button mat-button 
+              routerLink="/login"
+              aria-label="Go to login page">
+        <mat-icon aria-hidden="true">login</mat-icon>
         <span>Login</span>
       </button>
     </ng-template>

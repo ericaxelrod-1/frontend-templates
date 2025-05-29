@@ -1,5 +1,0 @@
-// Test file for verifying Angular Material imports
-@use '@angular/material' as material;
-
-// Check if core styles import correctly
-@include material.core(); 

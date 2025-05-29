@@ -1,8 +1,5 @@
 /* Main styles file - imports all other styles */
 
-/* Import CSS variables */
-@use 'variables';
-
 /* Import abstracts */
 @use 'abstracts';
 
@@ -13,7 +10,4 @@
 @use 'components';
 
 /* Import layout styles */
-@use 'layout';
-
-/* Import Angular Material theme */
-@import '@angular/material/prebuilt-themes/purple-green.css'; 
+@use 'layout'; 
