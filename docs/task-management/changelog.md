@@ -26,6 +26,46 @@ Last Updated: 2025-05-28
 
 ## Completed Today
 
+### BUG-035: Git Repository Cleanup - Remove Subdirectory .gitignore Files
+- **Completed**: 2025-01-21
+- **Implementation Notes**: Cleaned up Git repository structure to ensure only one Git repository exists at the root level
+- **Root Cause**: Multiple .gitignore files existed in subdirectories (angular/backend and angular/frontend) which could cause confusion and conflicts with the main repository
+- **Files Removed**: 
+  - `angular/backend/.gitignore`: Removed to consolidate Git configuration at root level
+  - `angular/frontend/.gitignore`: Removed to consolidate Git configuration at root level
+- **Verification**: 
+  - Only one .git directory exists at project root
+  - Only one .gitignore file exists at project root
+  - Git status working correctly and tracking files properly
+- **Impact**: Simplified Git repository structure with single source of truth for version control configuration
+
+### BUG-034: CAPTCHA Missing from Login Screen and Database Files Not Tracked by Git
+- **Completed**: 2025-01-21
+- **Implementation Notes**: Fixed two separate issues affecting the application
+- **Root Causes**: 
+  1. CAPTCHA was hidden due to `skipForDevelopment: true` in environment configuration
+  2. Database files were being ignored by Git due to `.gitignore` rules in `angular/backend/.gitignore`
+- **Files Modified**: 
+  - `angular/backend/.gitignore`: Commented out database file exclusions to allow SQLite tracking
+  - `angular/frontend/src/environments/environment.development.ts`: Set `skipForDevelopment: false`
+  - `angular/frontend/src/environments/environment.ts`: Updated production CAPTCHA settings
+- **Testing Results**: 
+  - Frontend builds successfully with CAPTCHA now visible in forms
+  - Database files now appear as untracked files in Git status instead of being ignored
+- **Impact**: Users can now see and interact with CAPTCHA during authentication, and database changes will be properly tracked by version control
+
+### BUG-033: Critical TypeScript Compilation Errors in Cache Sync Service
+- **Completed**: 2025-01-21
+- **Implementation Notes**: Resolved by removing abandoned code instead of implementing incomplete feature
+- **Files Removed**: 
+  - `cache-permission-map.entity.ts`
+  - `cache-sync-status.entity.ts` 
+  - Two broken `cache-sync.service.ts` files
+  - Broken migration and test files
+- **Files Updated**: Fixed imports and method calls in remaining files
+- **Testing Results**: Build now compiles successfully without TypeScript errors
+- **Root Cause**: CachePermissionMap entity was abandoned development work - table never existed in database
+
 ### BUG-032: Fix CAPTCHA Configuration and Update Seed Scripts
 - **Started**: 2025-05-28
 - **Completed**: 2025-05-28
@@ -94,17 +134,30 @@ Last Updated: 2025-05-28
     - ✅ Users can successfully authenticate with admin credentials
     - ✅ Dashboard tiles should now navigate to their respective pages
 
-### BUG-033: Critical TypeScript Compilation Errors in Cache Sync Service
-- **Completed**: 2025-01-21
-- **Implementation Notes**: Resolved by removing abandoned code instead of implementing incomplete feature
-- **Files Removed**: 
-  - `cache-permission-map.entity.ts`
-  - `cache-sync-status.entity.ts` 
-  - Two broken `cache-sync.service.ts` files
-  - Broken migration and test files
-- **Files Updated**: Fixed imports and method calls in remaining files
-- **Testing Results**: Build now compiles successfully without TypeScript errors
-- **Root Cause**: CachePermissionMap entity was abandoned development work - table never existed in database
+### BUG-026: Migration and Seed Scripts Alignment
+- **Started**: 2025-05-23
+- **Completed**: 2025-05-23
+- **Status**: Complete ✅
+- **Implementation Notes**: 
+  - **Root Cause**: Database tables existed but migrations table was empty, causing conflicts
+  - **Solution**: Marked all existing migrations as executed by inserting records into migrations table
+  - **Fixed Migration Conflicts**:
+    - Removed duplicate actions table creation from CreatePermissionEntities migration
+    - Aligned migration timestamps with execution order
+    - All 13 migrations now properly tracked in migrations table
+  - **Testing**: Migration run now completes successfully with "No migrations are pending"
+  - **Files Modified**: 
+    - `src/database/migrations/1658012345678-CreatePermissionEntities.ts`: Removed duplicate actions table creation
+
+### BUG-027: Cache Tables Missing from Migrations
+- **Started**: 2025-05-23
+- **Completed**: 2025-05-23
+- **Status**: Complete ✅ (Not Needed)
+- **Implementation Notes**: 
+  - **Analysis**: Cache tables (cache_components, cache_routes, cache_endpoints) already exist in database
+  - **Migration**: CreateCacheTables20250517000000 migration already handles cache table creation
+  - **Resolution**: No action needed - cache tables are properly created and tracked in migrations
+  - **Verification**: All cache tables confirmed present in database with correct schema
 
 ## Recent Completions
 

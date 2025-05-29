@@ -130,6 +130,15 @@ This repository contains tools for managing and validating database schemas and 
 ## Recent Accomplishments
 
 ### January 2025
+- **BUG-035 RESOLVED**: Git Repository Cleanup - Removed subdirectory .gitignore files
+  - Cleaned up Git repository structure to ensure only one Git repository exists at the root level
+  - Removed conflicting .gitignore files from angular/backend and angular/frontend subdirectories
+  - Simplified version control configuration with single source of truth at project root
+  - Verified Git status working correctly with proper file tracking
+- **BUG-034 RESOLVED**: Fixed CAPTCHA missing from login screen and database files not being tracked by Git
+  - CAPTCHA now displays properly in authentication forms by setting `skipForDevelopment: false`
+  - Database files are now tracked by Git after commenting out exclusions in `angular/backend/.gitignore`
+  - Both development and production environments properly configured for CAPTCHA
 - **BUG-033 RESOLVED**: Fixed critical TypeScript compilation errors by removing abandoned CachePermissionMap code
   - Identified that CachePermissionMap entity was incomplete/abandoned development work
   - Removed all related entities, services, and broken migration files
