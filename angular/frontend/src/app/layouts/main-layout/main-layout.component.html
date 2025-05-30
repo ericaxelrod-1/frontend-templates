@@ -1,33 +1,55 @@
 <div class="app-container">
+  <!-- Skip Links for Accessibility -->
+  <nav class="skip-links" aria-label="Skip navigation">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <a href="#main-navigation" class="skip-link" *ngIf="!isAuthPage">Skip to navigation</a>
+    <a href="#footer" class="skip-link">Skip to footer</a>
+  </nav>
+
+  <!-- ARIA Live Region for Announcements -->
+  <div aria-live="polite" aria-atomic="true" class="live-region sr-only" id="announcements"></div>
+  <div aria-live="assertive" aria-atomic="true" class="live-region sr-only" id="alerts"></div>
+
   <!-- Only show header with sidebar toggle functionality on protected pages -->
   <app-header *ngIf="!isAuthPage" 
               [sidebarOpened]="sidebarOpened"
-              (sidebarToggle)="toggleSidebar()"></app-header>
+              (sidebarToggle)="toggleSidebar()"
+              role="banner"
+              aria-label="Site header"></app-header>
   
   <!-- Use the simple header for auth pages -->
-  <div *ngIf="isAuthPage" class="auth-header">
-    <div class="logo">Angular Template</div>
-  </div>
+  <header *ngIf="isAuthPage" class="auth-header" role="banner" aria-label="Authentication header">
+    <div class="logo">
+      <h1 class="mat-headline-medium">Angular Template</h1>
+    </div>
+  </header>
   
   <mat-sidenav-container class="sidenav-container" [ngClass]="{'auth-sidenav-container': isAuthPage}">
     <!-- Only show sidebar on protected pages -->
     <mat-sidenav *ngIf="!isAuthPage" 
-                 id="main-sidebar"
+                 id="main-navigation"
                  [opened]="sidebarOpened" 
                  mode="side" 
                  class="sidebar"
                  role="navigation"
-                 aria-label="Main navigation">
+                 aria-label="Main navigation"
+                 [attr.aria-expanded]="sidebarOpened"
+                 [attr.aria-hidden]="!sidebarOpened">
       <app-sidebar></app-sidebar>
     </mat-sidenav>
     
     <!-- Adjust content classes based on page type -->
     <mat-sidenav-content [ngClass]="{'main-content': !isAuthPage, 'auth-content': isAuthPage}"
-                         role="main">
+                         role="main"
+                         id="main-content"
+                         [attr.aria-label]="isAuthPage ? 'Authentication content' : 'Main application content'">
       <div class="content-wrapper">
         <router-outlet></router-outlet>
       </div>
-      <app-footer [isAuthPage]="isAuthPage"></app-footer>
+      <app-footer [isAuthPage]="isAuthPage" 
+                  role="contentinfo" 
+                  aria-label="Site footer"
+                  id="footer"></app-footer>
     </mat-sidenav-content>
   </mat-sidenav-container>
 </div>

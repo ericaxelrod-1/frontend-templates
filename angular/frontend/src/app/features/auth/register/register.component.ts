@@ -269,7 +269,12 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   // Check if element is visible on screen
   private isElementVisible(element: HTMLElement): boolean {
-    if (!element) {
+    if (!element || !isPlatformBrowser(this.platformId)) {
+      return false;
+    }
+    
+    // Check if getBoundingClientRect is available (browser environment)
+    if (typeof element.getBoundingClientRect !== 'function') {
       return false;
     }
     

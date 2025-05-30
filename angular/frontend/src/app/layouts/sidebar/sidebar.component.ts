@@ -1,11 +1,14 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatDividerModule } from '@angular/material/divider';
 import { RouterModule } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { PermissionService } from '../../core/services/permission.service';
+import { User } from '../../models/user.model';
 
 @Component({
   selector: 'app-sidebar',
@@ -15,13 +18,17 @@ import { PermissionService } from '../../core/services/permission.service';
     MatListModule,
     MatIconModule,
     MatSidenavModule,
+    MatDividerModule,
     RouterModule
   ],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss'
 })
-export class SidebarComponent implements OnInit {
+export class SidebarComponent implements OnInit, OnDestroy {
   @Input() opened = false;
+  
+  currentUser: User | null = null;
+  private destroy$ = new Subject<void>();
   
   // Common navigation items for all users
   commonNavItems = [
@@ -30,7 +37,7 @@ export class SidebarComponent implements OnInit {
       label: 'Users', 
       icon: 'people', 
       route: '/app/users', 
-      permission: 'users:list'
+      permission: 'users:read'
     },
   ];
 
@@ -40,23 +47,23 @@ export class SidebarComponent implements OnInit {
       label: 'Groups', 
       icon: 'group_work', 
       route: '/app/groups', 
-      permission: 'groups:list'
+      permission: 'groups:read'
     },
     { 
       label: 'Roles', 
       icon: 'admin_panel_settings', 
       route: '/app/roles', 
-      permission: 'roles:list'
+      permission: 'roles:read'
     }
   ];
 
   // Admin section items (only for users with admin access)
   adminItems = [
     { 
-      label: 'Login Monitoring', 
+      label: 'Activity Monitor', 
       icon: 'security', 
       route: '/admin/login-monitoring', 
-      permission: 'login-monitoring:view'
+      permission: 'system:admin'
     },
     { 
       label: 'Permissions', 
@@ -72,7 +79,17 @@ export class SidebarComponent implements OnInit {
   ) {}
   
   ngOnInit() {
-    // No initialization needed
+    // Subscribe to current user changes
+    this.authService.currentUser$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(user => {
+        this.currentUser = user;
+      });
+  }
+  
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
   
   /**
@@ -86,9 +103,9 @@ export class SidebarComponent implements OnInit {
    * Determines if the user has access to manage users, roles, or groups
    */
   get isAdminOrManager(): boolean {
-    return this.permissionService.hasPermissionSync('users:manage') ||
-           this.permissionService.hasPermissionSync('roles:manage') ||
-           this.permissionService.hasPermissionSync('groups:manage') ||
+    return this.permissionService.hasPermissionSync('users:read') ||
+           this.permissionService.hasPermissionSync('roles:read') ||
+           this.permissionService.hasPermissionSync('groups:read') ||
            this.permissionService.hasPermissionSync('system:admin');
   }
 
@@ -96,16 +113,16 @@ export class SidebarComponent implements OnInit {
    * Check if user has access to the admin section
    */
   hasAdminAccess(): boolean {
-    return this.permissionService.hasPermissionSync('admin:access');
+    return this.permissionService.hasPermissionSync('system:admin');
   }
 
   /**
    * Check if user has access to user management
    */
   hasUserManagementAccess(): boolean {
-    return this.permissionService.hasPermissionSync('users:list') ||
-           this.permissionService.hasPermissionSync('users:manage') ||
-           this.permissionService.hasPermissionSync('users:admin');
+    return this.permissionService.hasPermissionSync('users:read') ||
+           this.permissionService.hasPermissionSync('users:update') ||
+           this.permissionService.hasPermissionSync('system:admin');
   }
 
   /**

@@ -1,20 +1,5 @@
 // Essential utility mixins only - simplified theme architecture
 
-// Color functions for backward compatibility
-@function darken-color($color-name, $amount) {
-  @if $color-name == 'warning' {
-    @return darken(#ff9800, $amount);
-  } @else if $color-name == 'error' {
-    @return darken(#f44336, $amount);
-  } @else if $color-name == 'success' {
-    @return darken(#4caf50, $amount);
-  } @else if $color-name == 'primary' {
-    @return darken(#3f51b5, $amount);
-  } @else {
-    @return darken($color-name, $amount);
-  }
-}
-
 // Flexbox mixins
 @mixin flex-center {
   display: flex;

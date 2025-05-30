@@ -1,23 +1,36 @@
+@use '@angular/material' as mat;
+@use '../../../styles/abstracts' as abstracts;
+
 .app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   height: 100vh;
-  background-color: var(--background-dark);
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  background-color: var(--mdc-theme-background);
+  color: var(--mdc-theme-on-background);
+  overflow-x: hidden; // Prevent horizontal scroll
 }
 
 .sidenav-container {
   flex: 1;
   display: flex;
   min-height: 0;
-  background-color: var(--background-dark);
+  width: 100%;
+  background-color: var(--mdc-theme-background);
 }
 
 .sidebar {
-  width: 250px;
-  background-color: var(--background-card);
-  border-right: 1px solid var(--text-secondary);
-  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+  width: 280px; // Material Design recommended sidebar width
+  background-color: var(--mdc-theme-surface);
+  border-right: 1px solid var(--mdc-theme-outline);
+  box-shadow: abstracts.$elevation-2;
+  
+  @include abstracts.respond-to(lg) {
+    width: 320px; // Wider on large screens
+  }
 }
 
 .main-content {
@@ -25,16 +38,21 @@
   flex-direction: column;
   min-height: calc(100vh - 64px);
   margin-top: 64px;
-  background-color: var(--background-dark);
+  background-color: var(--mdc-theme-background);
+  color: var(--mdc-theme-on-background);
   flex: 1;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .content-wrapper {
-  padding: 24px;
+  padding: abstracts.$spacing-lg;
   flex: 1;
   min-height: 0;
-  background-color: var(--background-dark);
-  color: var(--text-primary);
+  background-color: var(--mdc-theme-background);
+  color: var(--mdc-theme-on-background);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Auth pages styles */
@@ -42,36 +60,41 @@
   height: 64px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  background-color: var(--primary-color);
-  color: var(--text-on-primary);
-  box-shadow: 0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px 0 rgba(0,0,0,.14), 0 1px 18px 0 rgba(0,0,0,.12);
+  padding: 0 abstracts.$spacing-md;
+  background-color: var(--mdc-theme-primary);
+  color: var(--mdc-theme-on-primary);
+  box-shadow: abstracts.$elevation-4;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 2;
+  width: 100%;
+  z-index: 1000;
+  box-sizing: border-box;
 }
 
 .auth-header .logo {
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 500;
-  color: var(--text-on-primary);
+  color: var(--mdc-theme-on-primary);
 }
 
 .auth-sidenav-container {
   margin-top: 64px;
-  background-color: var(--background-dark);
+  background-color: var(--mdc-theme-background);
   min-height: calc(100vh - 64px);
+  width: 100%;
 }
 
 .auth-content {
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 64px);
-  background-color: var(--background-dark);
-  color: var(--text-primary);
+  background-color: var(--mdc-theme-background);
+  color: var(--mdc-theme-on-background);
   flex: 1;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 /* Force auth pages to be visible */
@@ -81,19 +104,30 @@
   visibility: visible !important;
 }
 
-@media (max-width: 768px) {
+/* Material Design Responsive Breakpoints */
+@include abstracts.respond-to(md) {
   .sidebar {
-    width: 200px;
+    width: 280px;
   }
   
   .content-wrapper {
-    padding: 16px;
+    padding: abstracts.$spacing-lg abstracts.$spacing-xl;
   }
 }
 
-@media (max-width: 599px) {
+@include abstracts.respond-to(sm) {
+  .sidebar {
+    width: 256px; // Slightly narrower on tablets
+  }
+  
+  .content-wrapper {
+    padding: abstracts.$spacing-md;
+  }
+}
+
+@include abstracts.respond-to(xs) {
   .main-content {
-    margin-top: 56px;
+    margin-top: 56px; // Material Design mobile header height
     min-height: calc(100vh - 56px);
   }
   
@@ -111,32 +145,35 @@
   }
   
   .sidebar {
-    width: 280px;
+    width: 100vw;
+    max-width: 320px; // Don't exceed this even on small screens
   }
   
   .content-wrapper {
-    padding: 12px;
+    padding: abstracts.$spacing-sm;
   }
 }
 
+/* Touch-friendly improvements for mobile */
 @media (max-width: 480px) {
   .content-wrapper {
-    padding: 8px;
+    padding: abstracts.$spacing-xs abstracts.$spacing-sm;
   }
   
   .sidebar {
     width: 100vw;
-    max-width: 320px;
+    max-width: 280px;
   }
 }
 
+/* Accessibility improvements */
 @media (prefers-contrast: high) {
   .sidebar {
-    border-right: 2px solid var(--text-primary);
+    border-right: 2px solid var(--mdc-theme-on-surface);
   }
   
   .auth-header {
-    border-bottom: 2px solid var(--text-on-primary);
+    border-bottom: 2px solid var(--mdc-theme-on-primary);
   }
 }
 
@@ -144,21 +181,23 @@
   .sidebar,
   .main-content,
   .auth-content {
-    transition: none;
+    transition: none !important;
   }
 }
 
+/* Dark theme support */
 .dark-theme {
   .app-container,
   .sidenav-container,
   .main-content,
   .auth-content,
   .content-wrapper {
-    background-color: var(--background-dark);
+    background-color: var(--mdc-theme-background);
+    color: var(--mdc-theme-on-background);
   }
   
   .sidebar {
-    background-color: var(--background-card);
-    border-right-color: var(--text-secondary);
+    background-color: var(--mdc-theme-surface);
+    border-right-color: var(--mdc-theme-outline);
   }
 }

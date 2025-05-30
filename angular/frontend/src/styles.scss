@@ -1,5 +1,6 @@
 /* Import Angular Material and our custom theme */
 @use '@angular/material' as mat;
+@use 'styles/abstracts/typography';
 
 /* Define accessible Material Design palettes */
 /* Using Indigo instead of Purple for better contrast ratios (WCAG AA compliance) */
@@ -29,6 +30,8 @@ $light-theme: mat.define-light-theme((
   --mdc-theme-on-primary: #{mat.get-color-from-palette($primary-palette, default-contrast)};
   --mdc-theme-primary-light: #{mat.get-color-from-palette($primary-palette, lighter)};
   --mdc-theme-primary-dark: #{mat.get-color-from-palette($primary-palette, darker)};
+  --mdc-theme-primary-container: #{mat.get-color-from-palette($primary-palette, 50)};
+  --mdc-theme-on-primary-container: #{mat.get-color-from-palette($primary-palette, 900)};
   
   /* Accent colors */
   --mdc-theme-accent: #{mat.get-color-from-palette($accent-palette)};
@@ -63,6 +66,8 @@ $light-theme: mat.define-light-theme((
   --mdc-theme-background: #121212;
   --mdc-theme-on-surface: #{mat.get-color-from-palette(mat.$grey-palette, 100)};
   --mdc-theme-on-background: #{mat.get-color-from-palette(mat.$grey-palette, 100)};
+  --mdc-theme-primary-container: #{mat.get-color-from-palette($primary-palette, 900)};
+  --mdc-theme-on-primary-container: #{mat.get-color-from-palette($primary-palette, 100)};
   
   /* Dark theme text colors */
   --mdc-theme-text-primary: rgba(255, 255, 255, 0.87);

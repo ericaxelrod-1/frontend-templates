@@ -1,3 +1,9 @@
+@use '@angular/material' as mat;
+@use '../../../styles/abstracts' as abstracts;
+
+// Optimized Header Component Styles
+// BUG-037: Bundle size optimization
+
 .spacer {
   flex: 1 1 auto;
 }
@@ -7,50 +13,63 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 100;
-  background-color: var(--primary-color);
-  color: var(--text-on-primary);
+  width: 100%;
+  z-index: 1000;
+  background-color: var(--mdc-theme-primary);
+  color: var(--mdc-theme-on-primary);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 abstracts.$spacing-md;
   min-height: 64px;
-  box-shadow: 0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px 0 rgba(0,0,0,.14), 0 1px 18px 0 rgba(0,0,0,.12);
+  box-shadow: abstracts.$elevation-4;
+  box-sizing: border-box;
 }
 
 .left-section {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: abstracts.$spacing-sm;
   flex: 1;
+  min-width: 0;
 }
 
 .logo-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: abstracts.$spacing-sm;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: abstracts.$spacing-xs abstracts.$spacing-sm;
+  border-radius: abstracts.$border-radius-sm;
   transition: background-color 0.2s ease;
+  min-width: 0;
   
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);
   }
+  
+  &:focus-visible {
+    outline: 2px solid var(--mdc-theme-accent);
+    outline-offset: 2px;
+  }
 }
 
-.app-logo {
+.header-logo {
   height: 36px;
   width: auto;
   object-fit: contain;
+  flex-shrink: 0;
 }
 
 .app-name {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 500;
-  color: var(--text-on-primary);
+  color: var(--mdc-theme-on-primary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .right-section {
@@ -58,25 +77,35 @@
   align-items: center;
   justify-content: flex-end;
   flex: 0 0 auto;
+  gap: abstracts.$spacing-xs;
 }
 
 .user-menu-button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 4px;
+  gap: abstracts.$spacing-xs;
+  padding: abstracts.$spacing-xs abstracts.$spacing-sm;
+  border-radius: abstracts.$border-radius-sm;
   transition: background-color 0.2s ease;
+  min-width: 44px;
+  min-height: 44px;
   max-width: 200px;
-  color: var(--text-on-primary);
+  color: var(--mdc-theme-on-primary);
+  border: none;
+  background: transparent;
+  cursor: pointer;
   
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);
   }
   
-  &:focus {
-    outline: 2px solid var(--accent-color);
+  &:focus-visible {
+    outline: 2px solid var(--mdc-theme-accent);
     outline-offset: 2px;
+  }
+  
+  &[aria-expanded="true"] {
+    background-color: rgba(255, 255, 255, 0.15);
   }
 }
 
@@ -86,41 +115,45 @@
   white-space: nowrap;
   max-width: 120px;
   font-weight: 500;
+  font-size: 0.875rem;
 }
 
 .dropdown-icon {
   font-size: 18px;
   opacity: 0.7;
+  flex-shrink: 0;
 }
 
 .menu-button {
-  margin-right: 8px;
-  color: var(--text-on-primary);
+  margin-right: abstracts.$spacing-xs;
+  color: var(--mdc-theme-on-primary);
+  min-width: 44px;
+  min-height: 44px;
   
-  &:focus {
-    outline: 2px solid var(--accent-color);
+  &:focus-visible {
+    outline: 2px solid var(--mdc-theme-accent);
     outline-offset: 2px;
   }
 }
 
 .user-menu-header {
-  padding: 16px;
-  background-color: var(--surface);
-  border-bottom: 1px solid var(--text-secondary);
-  margin-bottom: 8px;
+  padding: abstracts.$spacing-md;
+  background-color: var(--mdc-theme-surface);
+  border-bottom: 1px solid var(--mdc-theme-outline);
+  margin-bottom: abstracts.$spacing-xs;
 }
 
 .user-name {
-  margin: 0 0 4px 0;
+  margin: 0 0 abstracts.$spacing-xs 0;
   font-weight: 500;
-  font-size: 14px;
-  color: var(--text-primary);
+  font-size: 0.875rem;
+  color: var(--mdc-theme-on-surface);
 }
 
 .user-email {
   margin: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 0.75rem;
+  color: var(--mdc-theme-text-secondary);
   word-break: break-word;
 }
 
@@ -128,14 +161,32 @@
   padding: 0 !important;
 }
 
-@media (max-width: 768px) {
+@include abstracts.respond-to(md) {
   .header-toolbar {
-    min-height: 56px;
-    padding: 0 12px;
+    padding: 0 abstracts.$spacing-lg;
   }
   
   .left-section {
-    gap: 8px;
+    gap: abstracts.$spacing-md;
+  }
+  
+  .user-menu-button {
+    max-width: 240px;
+  }
+  
+  .user-name-text {
+    max-width: 140px;
+  }
+}
+
+@include abstracts.respond-to(sm) {
+  .header-toolbar {
+    min-height: 56px;
+    padding: 0 abstracts.$spacing-sm;
+  }
+  
+  .left-section {
+    gap: abstracts.$spacing-sm;
   }
   
   .app-name {
@@ -143,51 +194,100 @@
   }
   
   .user-menu-button {
-    padding: 6px 8px;
-    max-width: 150px;
+    padding: abstracts.$spacing-xs;
+    max-width: 160px;
   }
   
   .user-name-text {
-    max-width: 80px;
+    max-width: 100px;
+    font-size: 0.8125rem;
+  }
+  
+  .header-logo {
+    height: 32px;
   }
 }
 
-@media (max-width: 480px) {
+@include abstracts.respond-to(xs) {
   .header-toolbar {
-    padding: 0 8px;
+    padding: 0 abstracts.$spacing-xs;
   }
   
   .app-name {
     font-size: 1rem;
-  }
-  
-  .user-menu-button {
-    padding: 4px 6px;
     max-width: 120px;
   }
   
+  .user-menu-button {
+    padding: abstracts.$spacing-xs;
+    max-width: 120px;
+    gap: 4px;
+  }
+  
   .user-name-text {
-    max-width: 60px;
-    font-size: 0.875rem;
+    max-width: 80px;
+    font-size: 0.75rem;
   }
   
   .dropdown-icon {
     display: none;
   }
+  
+  .header-logo {
+    height: 28px;
+  }
+  
+  .left-section {
+    gap: abstracts.$spacing-xs;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-menu-button {
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 100px;
+  }
+  
+  .menu-button {
+    min-width: 48px;
+    min-height: 48px;
+  }
+  
+  .user-name-text {
+    max-width: 60px;
+  }
+  
+  .app-name {
+    max-width: 100px;
+  }
 }
 
 button:focus-visible {
-  outline: 2px solid var(--accent-color);
+  outline: 2px solid var(--mdc-theme-accent);
   outline-offset: 2px;
 }
 
 @media (prefers-contrast: high) {
   .header-toolbar {
-    border-bottom: 2px solid var(--text-on-primary);
+    border-bottom: 2px solid var(--mdc-theme-on-primary);
   }
   
   .user-menu-button:hover,
   .logo-container:hover {
     background-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  .user-menu-button:focus-visible,
+  .logo-container:focus-visible,
+  .menu-button:focus-visible {
+    outline-width: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-menu-button,
+  .logo-container {
+    transition: none !important;
   }
 }

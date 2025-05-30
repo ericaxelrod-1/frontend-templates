@@ -1,105 +1,311 @@
-@use '../../../../styles/abstracts' as abstracts;
+@use '@angular/material' as mat;
+@use '../../../../styles/abstracts' as *;
 
+// Fullscreen login container
 .login-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: var(--background-dark);
-  padding: abstracts.$spacing-md;
+  width: 100vw;
+  background: linear-gradient(135deg, var(--mdc-theme-primary) 0%, rgba(var(--mdc-theme-primary-rgb), 0.8) 100%);
+  padding: $spacing-lg;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
 }
 
 .login-card {
   width: 100%;
-  max-width: 450px;
-  background-color: var(--background-card);
-  border-radius: abstracts.$border-radius-md;
-  box-shadow: abstracts.$shadow-md;
-  padding: abstracts.$spacing-xl;
-  color: var(--text-primary);
+  max-width: 700px;
+  background: var(--mdc-theme-surface);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  padding: $spacing-xxl;
+  color: var(--mdc-theme-on-surface);
+  
+  @media (max-width: 768px) {
+    max-width: 95vw;
+    padding: $spacing-xl;
+    border-radius: 16px;
+  }
+  
+  @media (max-width: 599px) {
+    max-width: 90vw;
+    padding: $spacing-lg;
+    border-radius: 12px;
+  }
 }
 
+// Enhanced logo and title area with much more space
 .logo-container {
   text-align: center;
-  margin-bottom: abstracts.$spacing-lg;
-}
-
-.logo-image {
-  max-width: 150px;
-  height: auto;
+  margin-bottom: $spacing-xl; // Reduced since we removed the redundant title
+  padding: $spacing-xl 0; // Added vertical padding for more space
+  
+  .logo-image {
+    max-width: 320px; // Updated to accommodate full logo width (320px)
+    width: 100%; // Allow it to scale down responsively
+    height: auto;
+    border-radius: 12px; // Slightly more rounded
+    margin-bottom: 0; // No margin needed since no title below
+    
+    @media (max-width: 768px) {
+      max-width: 280px; // Slightly smaller on tablets but still showing full logo
+    }
+    
+    @media (max-width: 599px) {
+      max-width: 240px; // Smaller on mobile but still showing full logo
+    }
+    
+    @media (max-width: 480px) {
+      max-width: 200px; // Minimum size that should still show the text
+    }
+  }
 }
 
 .login-title {
-  font-size: abstracts.$font-size-xl;
-  font-weight: abstracts.$font-weight-medium;
+  font-size: 2.5rem; // Increased from 2.25rem for more prominence
+  font-weight: 600; // Increased weight for better presence
   text-align: center;
-  margin-bottom: abstracts.$spacing-xl;
-  color: var(--text-primary);
+  margin-bottom: $spacing-xxl; // More space below title
+  color: var(--mdc-theme-on-surface);
+  line-height: 1.1; // Tighter line height for better appearance
+  letter-spacing: -0.03em; // Slightly more letter spacing
+  padding: 0 $spacing-lg; // Side padding for better text wrapping
+  
+  @media (max-width: 768px) {
+    font-size: 2.25rem;
+    padding: 0 $spacing-md;
+  }
+  
+  @media (max-width: 599px) {
+    font-size: 2rem;
+    padding: 0 $spacing-sm;
+  }
 }
 
 .login-form {
+  // Center the form content and constrain width
+  display: flex;
+  flex-direction: column;
+  align-items: center; // Center all form elements
+  gap: $spacing-lg;
+  max-width: 500px; // Constrain form width
+  margin: 0 auto; // Center the form
+  
   .form-group {
-    margin-bottom: abstracts.$spacing-lg;
+    width: 100%; // Full width within the constrained form
+    margin-bottom: 0;
+    
+    &.form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: $spacing-lg;
+      
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
+    }
+  }
+
+  label {
+    display: block;
+    color: var(--mdc-theme-on-surface);
+    font-weight: 500;
+    margin-bottom: $spacing-sm;
+    font-size: 0.875rem;
+    text-align: left; // Ensure labels are left-aligned
   }
 
   .form-control {
-    background-color: var(--surface);
-    border: 1px solid var(--text-secondary);
-    color: var(--text-primary);
+    width: 100%;
+    max-width: 400px; // Constrain input width
+    padding: $spacing-lg;
+    background: var(--mdc-theme-surface);
+    border: 2px solid rgba(var(--mdc-theme-on-surface-rgb), 0.12);
+    border-radius: 12px;
+    color: var(--mdc-theme-on-surface);
+    font-size: 1rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
     
     &::placeholder {
-      color: var(--text-secondary);
-      opacity: 0.7;
+      color: rgba(var(--mdc-theme-on-surface-rgb), 0.6);
     }
     
     &:focus {
-      background-color: var(--surface);
-      border-color: var(--primary-color);
-      box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+      outline: none;
+      border-color: var(--mdc-theme-primary);
+      box-shadow: 0 0 0 3px rgba(var(--mdc-theme-primary-rgb), 0.12);
+    }
+    
+    &.is-invalid {
+      border-color: var(--mdc-theme-error);
+      box-shadow: 0 0 0 3px rgba(var(--mdc-theme-error-rgb), 0.12);
     }
   }
   
-  label {
-    color: var(--text-primary);
-    margin-bottom: abstracts.$spacing-xs;
-    display: block;
+  // Material Design Button Styles
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-lg $spacing-xl;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 52px;
+    
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
   }
   
   .btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
+    background: var(--mdc-theme-primary);
+    color: var(--mdc-theme-on-primary);
+    box-shadow: 0 4px 12px rgba(var(--mdc-theme-primary-rgb), 0.3);
+    max-width: 400px; // Constrain button width
     
-    &:hover {
-      background-color: var(--primary-dark);
-      border-color: var(--primary-dark);
+    &:hover:not(:disabled) {
+      background: var(--mdc-theme-primary);
+      opacity: 0.9;
+      box-shadow: 0 6px 16px rgba(var(--mdc-theme-primary-rgb), 0.4);
+      transform: translateY(-2px);
+    }
+    
+    &:active {
+      transform: translateY(0);
+      box-shadow: 0 4px 12px rgba(var(--mdc-theme-primary-rgb), 0.3);
     }
   }
   
+  .btn-block {
+    width: 100%;
+  }
+  
   .btn-link {
-    color: var(--primary-light);
+    background: transparent;
+    color: var(--mdc-theme-primary);
+    padding: $spacing-md $spacing-lg;
+    min-height: auto;
+    font-size: 0.875rem;
     
     &:hover {
-      color: var(--primary-color);
+      background: rgba(var(--mdc-theme-primary-rgb), 0.04);
+      text-decoration: underline;
     }
+  }
+  
+  .spinner-border {
+    width: 18px;
+    height: 18px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border 0.75s linear infinite;
+  }
+  
+  .spinner-border-sm {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+  }
+  
+  .me-1 {
+    margin-right: $spacing-sm;
   }
 }
 
 .help-links {
   display: flex;
-  justify-content: space-between;
-  margin-top: abstracts.$spacing-md;
+  justify-content: center; // Center the help links
+  margin-top: $spacing-xl;
+  gap: $spacing-xl; // Increased gap for better spacing
+  width: 100%;
+  max-width: 400px; // Constrain width
+  
+  @media (max-width: 599px) {
+    flex-direction: column;
+    gap: $spacing-sm;
+    
+    .btn-link {
+      text-align: center;
+    }
+  }
 }
 
+// Enhanced CAPTCHA container with proper centering
 .captcha-container {
-  margin-top: abstracts.$spacing-lg;
-  margin-bottom: abstracts.$spacing-lg;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center; // Center the CAPTCHA content
+  width: 100%;
+  
+  label {
+    margin-bottom: $spacing-lg;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center; // Center the label
+  }
+  
+  app-captcha-selector {
+    display: flex;
+    justify-content: center; // Center the CAPTCHA component
+    width: 100%;
+    max-width: 600px; // Constrain CAPTCHA width
+    
+    // Style the CAPTCHA content to be centered and compact
+    ::ng-deep {
+      .captcha-challenge {
+        margin-bottom: $spacing-md;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      
+      .captcha-options {
+        gap: $spacing-sm;
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      
+      .captcha-button {
+        padding: $spacing-sm $spacing-md;
+        font-size: 0.875rem;
+      }
+      
+      // Center any CAPTCHA images or content
+      .captcha-image,
+      .captcha-content {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0 auto;
+      }
+    }
+  }
+  
+  .invalid-feedback {
+    text-align: center;
+    margin-top: $spacing-sm;
+  }
 }
 
 .recaptcha-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: abstracts.$spacing-lg 0;
+  margin: $spacing-lg 0;
   
   re-captcha {
     width: 100%;
@@ -110,27 +316,63 @@
   .invalid-feedback {
     width: 100%;
     text-align: center;
-    margin-top: abstracts.$spacing-sm;
+    margin-top: $spacing-sm;
   }
 }
 
 .alert-danger {
-  background-color: rgba(var(--error-rgb), 0.1);
-  border-color: var(--error);
-  color: var(--error);
-  padding: abstracts.$spacing-md;
-  border-radius: abstracts.$border-radius-sm;
-  margin-bottom: abstracts.$spacing-md;
+  background: rgba(var(--mdc-theme-error-rgb), 0.1);
+  border: 1px solid rgba(var(--mdc-theme-error-rgb), 0.3);
+  color: var(--mdc-theme-error);
+  padding: $spacing-lg;
+  border-radius: 12px;
+  margin-bottom: $spacing-lg;
+  font-size: 0.875rem;
+  text-align: center; // Center error messages
+  max-width: 400px; // Constrain width
 }
 
 .invalid-feedback {
-  color: var(--error);
-  font-size: abstracts.$font-size-sm;
-  margin-top: abstracts.$spacing-xs;
+  color: var(--mdc-theme-error);
+  font-size: 0.75rem;
+  margin-top: $spacing-sm;
+  display: block;
+  text-align: left; // Keep field validation left-aligned
 }
 
 .d-block {
   display: block !important;
+}
+
+// Spinner animation
+@keyframes spinner-border {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Focus management for accessibility
+.login-card {
+  &:focus-within {
+    .form-control:focus {
+      z-index: 1;
+    }
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  .login-card {
+    border: 2px solid var(--mdc-theme-on-surface);
+  }
+  
+  .btn-primary {
+    border: 2px solid var(--mdc-theme-on-primary);
+  }
+  
+  .form-control {
+    border-width: 3px;
+  }
 }
 
 // Component-specific styles only - everything else comes from shared styles

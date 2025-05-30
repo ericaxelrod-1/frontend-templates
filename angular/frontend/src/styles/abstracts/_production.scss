@@ -1,0 +1,408 @@
+// Production Optimization Utilities
+// Day 5: Production-ready optimizations and best practices
+
+// Critical CSS optimization
+@mixin critical-css {
+  // Inline critical styles for above-the-fold content
+  font-display: swap;
+  contain: layout style;
+  
+  // Prevent layout shifts
+  &[data-critical] {
+    min-height: 1px;
+    visibility: visible;
+  }
+}
+
+// Bundle splitting optimization
+@mixin code-splitting {
+  // Optimize for code splitting
+  contain: layout;
+  
+  &[data-lazy] {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 200px;
+  }
+}
+
+// Tree shaking optimization
+@mixin tree-shakeable {
+  // Ensure styles can be tree-shaken
+  @supports (contain: layout) {
+    contain: layout;
+  }
+  
+  // Only include if feature is used
+  &[data-feature-active] {
+    @content;
+  }
+}
+
+// Production font optimization
+@mixin production-fonts {
+  font-display: swap;
+  font-variant-ligatures: none;
+  text-rendering: optimizeSpeed;
+  
+  // Preload critical fonts
+  &[data-critical-font] {
+    font-display: block;
+  }
+}
+
+// Image optimization for production
+@mixin production-images {
+  object-fit: cover;
+  object-position: center;
+  
+  // Critical images
+  &[data-critical-image] {
+    // Critical images load immediately
+    opacity: 1;
+  }
+  
+  // Responsive images
+  &[data-responsive] {
+    width: 100%;
+    height: auto;
+  }
+}
+
+// Service Worker optimization
+@mixin sw-cacheable {
+  // Mark content for service worker caching
+  &[data-cache-strategy="cache-first"] {
+    // Static assets - cache control should be set via HTTP headers
+    // cache-control: public, max-age=31536000, immutable;
+  }
+  
+  &[data-cache-strategy="network-first"] {
+    // Dynamic content - cache control should be set via HTTP headers
+    // cache-control: public, max-age=300, stale-while-revalidate=86400;
+  }
+  
+  &[data-cache-strategy="stale-while-revalidate"] {
+    // Background updates - cache control should be set via HTTP headers
+    // cache-control: public, max-age=3600, stale-while-revalidate=86400;
+  }
+}
+
+// CDN optimization
+@mixin cdn-optimized {
+  // Optimize for CDN delivery
+  &[data-cdn-asset] {
+    // Enable compression hints for build tools
+    // Note: These are build-time hints, not CSS properties
+    
+    // Cache optimization hints
+    // These should be set via HTTP headers, not CSS
+    
+    // CORS optimization for cross-origin requests
+    // This should be handled by server configuration
+  }
+}
+
+// Performance monitoring
+@mixin performance-monitoring {
+  // Add performance markers
+  &[data-perf-mark] {
+    // Mark for performance measurement
+    contain: layout;
+  }
+  
+  &[data-perf-measure] {
+    // Measure performance
+    will-change: auto;
+  }
+}
+
+// Production utility classes
+.prod-critical { @include critical-css; }
+.prod-code-split { @include code-splitting; }
+.prod-fonts { @include production-fonts; }
+.prod-images { @include production-images; }
+.prod-sw-cache { @include sw-cacheable; }
+.prod-cdn { @include cdn-optimized; }
+.prod-perf-monitor { @include performance-monitoring; }
+
+// Bundle size optimization
+.prod-bundle-optimize {
+  // Minimize CSS output
+  contain: layout style;
+  
+  // Remove unused styles in production
+  &:not([data-used]) {
+    display: none !important;
+  }
+}
+
+// Memory optimization for production
+.prod-memory-optimize {
+  // Efficient memory usage
+  contain: strict;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 150px;
+  
+  // Cleanup on destroy
+  &.destroyed {
+    will-change: auto;
+    transform: none;
+    transition: none;
+    contain: none;
+  }
+}
+
+// Network optimization
+.prod-network-optimize {
+  // Optimize for slow networks
+  &[data-connection="slow-2g"] {
+    // Minimal styles for very slow connections
+    background-image: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  
+  &[data-connection="2g"] {
+    // Reduced styles for slow connections
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: none;
+  }
+  
+  &[data-connection="3g"] {
+    // Standard styles for moderate connections
+    transition: transform 0.2s ease;
+  }
+  
+  &[data-connection="4g"] {
+    // Full styles for fast connections
+    transition: all 0.2s ease;
+    will-change: transform;
+  }
+}
+
+// Progressive enhancement
+.prod-progressive-enhance {
+  // Base styles (no JS)
+  display: block;
+  
+  // Enhanced styles (with JS)
+  &[data-js-enabled] {
+    transition: transform 0.2s ease;
+  }
+  
+  // Modern browser features
+  @supports (contain: layout) {
+    contain: layout;
+  }
+  
+  @supports (content-visibility: auto) {
+    content-visibility: auto;
+  }
+  
+  @supports (aspect-ratio: 1) {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+// Security optimization
+.prod-security-optimize {
+  // Content Security Policy optimization
+  &[data-csp-safe] {
+    // No inline styles
+    style: none;
+  }
+  
+  // Prevent clickjacking
+  &[data-frame-guard] {
+    pointer-events: none;
+    
+    &:focus,
+    &:hover {
+      pointer-events: auto;
+    }
+  }
+}
+
+// Accessibility optimization for production
+.prod-a11y-optimize {
+  // Screen reader optimization
+  &[data-sr-only] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  
+  // Focus optimization
+  &[data-focus-optimize] {
+    &:focus {
+      outline: 2px solid var(--mdc-theme-primary);
+      outline-offset: 2px;
+    }
+    
+    &:focus:not(:focus-visible) {
+      outline: none;
+    }
+  }
+  
+  // High contrast optimization
+  @media (prefers-contrast: high) {
+    border: 1px solid currentColor;
+  }
+  
+  // Reduced motion optimization
+  @media (prefers-reduced-motion: reduce) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+// SEO optimization
+.prod-seo-optimize {
+  // Structured data optimization
+  &[data-structured-data] {
+    // Mark for structured data
+    contain: layout;
+  }
+  
+  // Schema.org markup
+  &[itemscope] {
+    contain: layout style;
+  }
+  
+  // Open Graph optimization
+  &[data-og-content] {
+    // Optimize for social sharing
+    aspect-ratio: 1.91 / 1; // Facebook recommended ratio
+  }
+}
+
+// Analytics optimization
+.prod-analytics-optimize {
+  // Google Analytics optimization
+  &[data-ga-track] {
+    // Mark for tracking
+    contain: layout;
+  }
+  
+  // Performance tracking
+  &[data-perf-track] {
+    // Performance measurement
+    will-change: auto;
+  }
+  
+  // User interaction tracking
+  &[data-interaction-track] {
+    // Track user interactions
+    cursor: pointer;
+  }
+}
+
+// Error handling optimization
+.prod-error-optimize {
+  // Graceful degradation
+  &[data-error-boundary] {
+    // Error boundary styles
+    contain: layout style;
+    
+    &.error-state {
+      background: rgba(244, 67, 54, 0.05);
+      border: 1px solid rgba(244, 67, 54, 0.2);
+      padding: 1rem;
+      border-radius: 4px;
+    }
+  }
+  
+  // Fallback styles
+  &[data-fallback] {
+    // Fallback content
+    display: none;
+    
+    &.active {
+      display: block;
+    }
+  }
+}
+
+// Production debugging (removed in production builds)
+.prod-debug {
+  // Debug styles removed in production builds via build configuration
+  // Note: Environment-specific optimizations should be handled by build tools
+}
+
+// Remove debug styles
+.debug,
+[data-debug] {
+  &::before,
+  &::after {
+    display: none !important;
+  }
+}
+
+// Optimize animations for production
+* {
+  animation-duration: 0.1s !important;
+  transition-duration: 0.1s !important;
+}
+
+// Remove development helpers
+.dev-only {
+  display: none !important;
+}
+
+// Critical path CSS
+.prod-critical-path {
+  // Above-the-fold content
+  @include critical-css;
+  
+  // Prevent layout shifts
+  min-height: 1px;
+  contain: layout style;
+  
+  // Optimize for first paint
+  &[data-first-paint] {
+    will-change: auto;
+    contain: layout;
+  }
+}
+
+// Lazy loading optimization
+.prod-lazy-optimize {
+  // Intersection observer optimization
+  &[data-lazy-load] {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    
+    &.loaded {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    @media (prefers-reduced-motion: reduce) {
+      transform: none;
+      transition: opacity 0.3s ease;
+    }
+  }
+  
+  // Placeholder optimization
+  &[data-placeholder] {
+    background: linear-gradient(90deg, 
+      rgba(var(--mdc-theme-on-surface-rgb), 0.1) 25%, 
+      rgba(var(--mdc-theme-on-surface-rgb), 0.05) 50%, 
+      rgba(var(--mdc-theme-on-surface-rgb), 0.1) 75%
+    );
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.5s infinite;
+    
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+      background: rgba(var(--mdc-theme-on-surface-rgb), 0.1);
+    }
+  }
+} 
