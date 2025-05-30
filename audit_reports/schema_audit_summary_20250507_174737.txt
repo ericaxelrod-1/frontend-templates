@@ -1,0 +1,27 @@
+Schema Alignment Audit Summary (2025-05-07 17:47:37)
+Database: ./src/database/database.sqlite
+Tables found: 15
+Entities found: 21
+Migrations analyzed: 23
+Total mismatches: 101
+
+Mismatches by type:
+  - missing_entity: 5
+  - missing_table: 11
+  - nullability_mismatch: 15
+  - missing_column: 25
+  - extra_column: 39
+  - extra_foreign_key: 6
+
+Top mismatches:
+  1. Table 'resources' exists in the database but has no corresponding entity
+  2. Table 'cache_permission_map' exists in the database but has no corresponding entity
+  3. Table 'cache_sync_status' exists in the database but has no corresponding entity
+  4. Table 'user_roles' exists in the database but has no corresponding entity
+  5. Table 'permission' exists in the database but has no corresponding entity
+  6. Entity 'Category' expects table 'category' which doesn't exist in the database
+  7. Entity 'Resource' expects table 'resource' which doesn't exist in the database
+  8. Entity 'GroupPermission' expects table 'group_permissions' which doesn't exist in the database
+  9. Entity 'Route' expects table 'routes' which doesn't exist in the database
+  10. Entity 'Permission' expects table 'permissions' which doesn't exist in the database
+  ... and 91 more (see full report)

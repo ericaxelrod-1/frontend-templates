@@ -36,7 +36,7 @@
         </div>
       </div>
       
-      <div class="form-group captcha-container">
+      <div class="form-group captcha-container" *ngIf="captchaEnabled">
         <label>Verify you're human</label>
         <app-captcha-selector 
           #captchaSelector

@@ -1,1 +1,33 @@
- 
+---
+description: "Strict rules for order of operations before code changes"
+globs: ["**/*"]
+tags: ["scripts", "code", "configuration","implementation","package"]
+priority: 2
+---
+
+# STRICT MANDATORY SEQUENCE - DO NOT SKIP ANY STEPS
+
+⚠️ **WARNING: It is ABSOLUTELY PROHIBITED to explore project files, run commands, or begin any implementation before completing steps 1-6 below. No exceptions!**
+
+⚠️ **You MUST NOT browse directories, check code files, or run any commands until you have thoroughly reviewed the implementation status files.**
+
+## Task Atomic Transaction
+
+⚠️ **Code and documentation are a single atomic transaction - they must be completed together or not at all.**
+
+Task sequence:
+1. Read documentation (@000-variables.mdc[current_state], @000-variables.mdc[backlog], @000-variables.mdc[changelog], @000-variables.mdc[implementation_steps])
+2. Make code changes
+3. Test code changes
+4. Update ALL documentation:
+   - @000-variables.mdc[changelog]
+   - @000-variables.mdc[backlog]
+   - @000-variables.mdc[implementation_steps]
+   - @000-variables.mdc[current_state]
+5. ONLY THEN report completion to user
+
+⚠️ **Breaking this sequence violates the atomic nature of task completion and creates invalid state. A task with updated code but missing documentation updates contains a critical bug.**
+
+## Task Evaluation Flow
+
+// ... existing code ... 

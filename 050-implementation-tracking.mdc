@@ -1,1 +1,49 @@
- 
+---
+description: "Guidelines for tracking implementation status of project tasks"
+globs: ["**/*"]
+tags: ["project", "tracking", "implementation"]
+priority: 3
+---
+
+# MANDATORY PRE-IMPLEMENTATION CHECKLIST
+
+⚠️ **STOP: You MUST complete this checklist before ANY code exploration or implementation**
+
+- [ ] Read @000-variables.mdc[current_state] in its entirety
+- [ ] Read @000-variables.mdc[backlog] for critical bugs and high priority items
+- [ ] Check @000-variables.mdc[changelog] for in-progress work
+- [ ] Read @000-variables.mdc[implementation_steps] to understand the project plan
+- [ ] Perform maintenance on @000-variables.mdc[changelog] and @000-variables.mdc[changelog_archive]
+- [ ] Report your understanding of the current state to the user
+- [ ] Identify the next task to work on based on the priority system
+- [e user before proceeding to
+
+⚠️ **Failure to complete this checklist before exploring code is a critical violation**
+
+# Definition of Done
+
+⚠️ **A task is ONLY considered complete when ALL of these are true:**
+1. Code changes work as expected
+2. Tests pass
+3. ALL documentation is updated:
+   - ✓ @000-variables.mdc[changelog] updated with current system date (not manually entered)
+   - ✓ @000-variables.mdc[implementation_steps] status updated
+   - ✓ @000-variables.mdc[current_state] reflects changes
+   - ✓ @000-variables.mdc[backlog] updated
+
+⚠️ **Any missing documentation item means the task is INCOMPLETE and contains a critical bug.**
+
+# Implementation Tracking Guidelines
+
+## Task Implementation Process
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐ │     │  IMPLEMENT      │     │  DOCUMENT       │
+│     │  -----       │     │  -----       │
+│ 1. Bugs first   │────▶│ 1. Edit files   │────▶│ 1. Update status│
+│ 2. In-progress  │     │ 2. Run tests    │     │ 2. Track issues │
+│ 3. High priority│     │ 3. Fix issues   │     │ 3. List changes │
+└─────────────────┘     └───────────────────────┘
+```
+
+// ... existing code ... 

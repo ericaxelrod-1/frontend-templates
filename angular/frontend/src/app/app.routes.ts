@@ -45,7 +45,7 @@ export const routes: Routes = [
         loadChildren: () => import('./features/users/users.routes').then(m => m.routes),
         canActivate: [PermissionGuard],
         data: { 
-          permissions: 'users:list'
+          permissions: 'users:read'
         }
       },
       {
@@ -61,7 +61,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent),
         canActivate: [PermissionGuard],
         data: { 
-          permissions: 'groups:list'
+          permissions: 'groups:read'
         }
       },
       {
@@ -69,7 +69,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/roles/roles.component').then(c => c.RolesComponent),
         canActivate: [PermissionGuard],
         data: { 
-          permissions: 'roles:list'
+          permissions: 'roles:read'
         }
       }
     ]
@@ -79,7 +79,7 @@ export const routes: Routes = [
     component: AdminLayoutComponent,
     canActivate: [AuthGuard, PasswordChangeGuard, PermissionGuard],
     data: { 
-      permissions: 'admin:access'
+      permissions: 'system:admin'
     },
     loadChildren: () => import('./modules/admin/admin.module').then(m => m.AdminModule)
   },

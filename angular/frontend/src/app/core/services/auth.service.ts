@@ -16,7 +16,6 @@ import {
 } from '../../models';
 import { environment } from '../../../environments/environment';
 import { Router } from '@angular/router';
-import { PermissionService } from './permission.service';
 
 // Interface for auth status response
 export interface AuthStatus {
@@ -60,8 +59,7 @@ export class AuthService {
 
   constructor(
     private http: HttpClient,
-    private router: Router,
-    private permissionService: PermissionService
+    private router: Router
   ) {
     // Subscribe to currentUser$ to keep currentUser property in sync
     this.currentUser$.subscribe(user => {
@@ -213,7 +211,8 @@ export class AuthService {
       return throwError(() => new Error('Invalid refresh token format'));
     }
     
-    const request: RefreshTokenRequest = { refreshToken: refreshTokenToUse };
+    // Using token property to match backend expectations
+    const request = { token: refreshTokenToUse };
     console.log('Sending refresh token request...');
     
     return this.http.post<AuthResponse>(`${this.API_URL}/refresh`, request)
@@ -221,11 +220,6 @@ export class AuthService {
         tap(response => {
           console.log('Token refresh HTTP call successful. Handling response...');
           this.handleAuthResponse(response); // Updates subjects and storage
-          // Load permissions AFTER successful refresh
-          this.permissionService.loadUserPermissions().subscribe(
-            () => console.log('User permissions refreshed successfully after token refresh.'),
-            error => console.error('Error refreshing user permissions after token refresh:', error)
-          );
         }),
         catchError(error => {
           console.error('Token refresh HTTP call failed:', error);
@@ -415,6 +409,10 @@ export class AuthService {
     this.refreshTokenSubject.next(null);
     this.csrfTokenSubject.next(null);
     
+    // Clear permissions
+    this.userPermissions = [];
+    this.permissionCache.clear();
+    
     // Check for browser environment before accessing localStorage
     if (isPlatformBrowser(this.platformId)) {
       localStorage.removeItem('user');
@@ -470,13 +468,6 @@ export class AuthService {
     return of({ isAuthenticated: false, user: null });
   }
 
-  // Update user permissions when profile is loaded
-  private updateUserPermissions(user: User): void {
-    this.currentUser = user;
-    this.userPermissions = user.permissions || [];
-    this.permissionCache.clear(); // Clear cache when permissions change
-  }
-
   /**
    * Logs the user out by clearing auth state and navigating to login.
    */
@@ -491,7 +482,7 @@ export class AuthService {
 
     // Call the backend logout endpoint if a refresh token existed
     if (refreshToken) {
-      return this.http.post<void>(`${this.API_URL}/logout`, { refreshToken }).pipe(
+      return this.http.post<void>(`${this.API_URL}/logout`, { token: refreshToken }).pipe(
         catchError(err => {
           console.error('Logout API call failed, but local state is cleared:', err);
           // Don't block logout if API call fails, just log error
@@ -511,8 +502,6 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials).pipe(
       tap(response => {
         this.handleAuthResponse(response);
-        // Load permissions AFTER successful login
-        this.permissionService.loadUserPermissions().subscribe();
       }),
       catchError((error) => {
         const typedError = error as HttpErrorResponse;
@@ -530,10 +519,6 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.API_URL}/register`, userData).pipe(
       tap(response => {
         this.handleAuthResponse(response);
-        // Load permissions after successful registration if user is auto-logged in
-        if (response.user) {
-          this.permissionService.loadUserPermissions().subscribe();
-        }
       }),
       catchError((error: HttpErrorResponse) => {
         console.error('Registration failed:', error);

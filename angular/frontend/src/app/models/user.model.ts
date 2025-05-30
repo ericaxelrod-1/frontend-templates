@@ -1,7 +1,7 @@
 import { Group, Permission as GroupPermission } from './group.model';
 
 export interface Permission {
-  id: string;
+  id: number;
   name: string;
   description: string;
   resourceName: string;
@@ -87,7 +87,7 @@ export interface VerificationResponse {
 }
 
 export interface RefreshTokenRequest {
-  refreshToken: string;
+  token: string;
 }
 
 export interface ForgotPasswordRequest {
@@ -106,7 +106,7 @@ export interface AdminUserCreation {
   lastName?: string;
   password?: string;
   permissions?: {
-    id: string;
+    id: number;
     resourceName: string;
     actionName: string;
     granted: boolean;
@@ -119,4 +119,9 @@ export interface PasswordChangeRequest {
   currentPassword?: string;
   newPassword: string;
   confirmPassword: string;
+}
+
+export interface UserWithPermissions extends User {
+  id: number;
+  // ... existing code ...
 } 

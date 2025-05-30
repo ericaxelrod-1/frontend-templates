@@ -1,0 +1,122 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+  ManyToMany,
+  Unique
+} from 'typeorm';
+import { RolePermission } from '../../roles/entities/role-permission.entity';
+import { GroupPermission } from './group-permission.entity';
+import { UserPermission } from './user-permission.entity';
+import { Action } from './action.entity';
+import { FrontendRoute } from './frontend-route.entity';
+import { ApiEndpoint } from './api-endpoint.entity';
+import { UiComponent } from './ui-component.entity';
+
+/**
+ * Permission entity representing access control for resources
+ */
+@Entity('permissions')
+@Unique(['resourceName', 'actionId'])
+export class Permission {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  /**
+   * The name of the permission
+   * Format: [resource]:[action]
+   * Example: 'users:create'
+   */
+  @Column({ length: 100, unique: true })
+  name: string;
+
+  /**
+   * A description of what this permission allows
+   */
+  @Column({ length: 255, nullable: true })
+  description: string;
+
+  /**
+   * The name of the resource this permission applies to
+   * Example: 'users', 'groups', 'reports'
+   */
+  @Column({ name: 'resource_name', length: 50 })
+  resourceName: string;
+
+  /**
+   * Reference to the Action entity (foreign key)
+   */
+  @Column({ name: 'action_id' })
+  actionId: number;
+
+  @ManyToOne(() => Action, { nullable: true, eager: true })
+  @JoinColumn({ name: 'action_id' })
+  actionEntity: Action;
+
+  /**
+   * Virtual column for backward compatibility with services expecting actionName
+   * This maps to the Action entity's name field
+   */
+  get actionName(): string {
+    return this.actionEntity?.name || '';
+  }
+
+  /**
+   * Setter for backward compatibility with services setting actionName
+   * This is a no-op since actionName should be set via the Action relationship
+   */
+  set actionName(value: string) {
+    // No-op: actionName should be set via the Action relationship
+    // This setter exists only for backward compatibility
+  }
+
+  /**
+   * Relationships with RolePermission join entity
+   */
+  @OneToMany(() => RolePermission, rolePermission => rolePermission.permission)
+  rolePermissions: RolePermission[];
+
+  /**
+   * Relationships with GroupPermission join entity
+   */
+  @OneToMany(() => GroupPermission, groupPermission => groupPermission.permission)
+  groupPermissions: GroupPermission[];
+
+  /**
+   * Relationships with UserPermission join entity
+   */
+  @OneToMany(() => UserPermission, userPermission => userPermission.permission)
+  userPermissions: UserPermission[];
+
+  /**
+   * Relationships with routes
+   * Used in permission-based routing
+   */
+  @ManyToMany(() => FrontendRoute, (route) => route.requiredPermissions)
+  routes: FrontendRoute[];
+
+  /**
+   * Relationships with API endpoints
+   * Used in permission-based API access control
+   */
+  @ManyToMany(() => ApiEndpoint, (endpoint) => endpoint.requiredPermissions)
+  endpoints: ApiEndpoint[];
+
+  /**
+   * Relationships with UI components
+   * Used in permission-based UI rendering
+   */
+  @ManyToMany(() => UiComponent, (component) => component.requiredPermissions)
+  components: UiComponent[];
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}

@@ -24,6 +24,87 @@ This project uses Swagger (OpenAPI) for API documentation. Swagger is integrated
 - `@ApiBearerAuth`: Indicates JWT authentication requirement
 - `@ApiProperty`: Documents DTO properties
 
+## ApiEndpointDto Integration
+
+The `ApiEndpointDto` is a core component of the permissions system that represents API endpoints and their metadata. It facilitates:
+
+1. **Endpoint Discovery and Registration**
+   - The `EndpointScannerService` scans the application to discover API endpoints
+   - Each endpoint is converted to an `ApiEndpointDto` containing:
+     - `path`: The URL path of the endpoint
+     - `method`: HTTP method (GET, POST, etc.)
+     - `description`: Human-readable description
+   - Endpoints are stored in the `api_endpoints` table
+
+2. **Permission Management**
+   - Each endpoint can have required permissions
+   - Permissions are stored in the `api_endpoint_permissions` join table
+   - The `PermissionsService` provides methods to:
+     - Update endpoint permissions
+     - Check user access to endpoints
+     - Parse permission strings into Permission entities
+
+3. **Caching System**
+   - Endpoint metadata is cached in the `cache_endpoints` table
+   - The `CacheSyncService` maintains synchronization between:
+     - In-memory endpoint definitions
+     - Database records
+     - Cache entries
+   - Cache includes:
+     - Endpoint metadata
+     - Required permissions
+     - Last sync timestamp
+
+4. **Controller Integration**
+   - The `PermissionsController` exposes endpoints for:
+     - Listing all endpoints (`GET /permissions/endpoints`)
+     - Getting endpoint by ID (`GET /permissions/endpoints/:id`)
+     - Updating permissions (`PATCH /permissions/endpoints/:id`)
+     - Testing access (`GET /permissions/endpoint-access-test/:id`)
+
+5. **Database Schema**
+   ```sql
+   CREATE TABLE "api_endpoints" (
+       "id" varchar PRIMARY KEY NOT NULL,
+       "method" varchar NOT NULL,
+       "path" varchar NOT NULL,
+       "description" varchar,
+       "controllerName" varchar,
+       "handlerName" varchar,
+       "overridePermissions" boolean NOT NULL DEFAULT (0),
+       "lastSynced" datetime,
+       "createdAt" datetime NOT NULL DEFAULT (datetime('now')),
+       "updatedAt" datetime NOT NULL DEFAULT (datetime('now'))
+   )
+   ```
+
+6. **Usage in Code**
+   ```typescript
+   // Scanning endpoints
+   const endpoints = await endpointScannerService.scanEndpoints();
+   
+   // Updating permissions
+   await permissionsService.updateEndpointPermissions(
+     endpointId,
+     ['users:read', 'users:write'],
+     false
+   );
+   
+   // Checking access
+   const hasAccess = await permissionsService.canUserAccessEndpoint(
+     userId,
+     endpointId,
+     'GET'
+   );
+   ```
+
+7. **Frontend Integration**
+   - The frontend uses endpoint metadata for:
+     - Displaying available endpoints
+     - Managing endpoint permissions
+     - Testing endpoint access
+     - Generating API documentation
+
 ## Endpoints
 
 ### Roles API

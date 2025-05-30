@@ -1,9 +1,9 @@
 export interface Permission {
-  id: string;
+  id: number;
   name: string;
   resourceName: string;
   actionName: string;
-  granted: boolean;
+  isGranted: boolean;
 }
 
 export interface Member {
@@ -24,16 +24,16 @@ export interface Group {
 
 export const GROUP_PERMISSION_SETS: Record<string, Permission[]> = {
   'OWNER': [
-    { id: 'group:manage', name: 'Manage Group', resourceName: 'group', actionName: 'manage', granted: true },
-    { id: 'group:delete', name: 'Delete Group', resourceName: 'group', actionName: 'delete', granted: true },
-    { id: 'member:manage', name: 'Manage Members', resourceName: 'member', actionName: 'manage', granted: true }
+    { id: 1, name: 'group:manage', resourceName: 'group', actionName: 'manage', isGranted: true },
+    { id: 2, name: 'group:delete', resourceName: 'group', actionName: 'delete', isGranted: true },
+    { id: 3, name: 'member:manage', resourceName: 'member', actionName: 'manage', isGranted: true }
   ],
   'ADMIN': [
-    { id: 'group:manage', name: 'Manage Group', resourceName: 'group', actionName: 'manage', granted: true },
-    { id: 'member:manage', name: 'Manage Members', resourceName: 'member', actionName: 'manage', granted: true }
+    { id: 1, name: 'group:manage', resourceName: 'group', actionName: 'manage', isGranted: true },
+    { id: 3, name: 'member:manage', resourceName: 'member', actionName: 'manage', isGranted: true }
   ],
   'MEMBER': [
-    { id: 'group:read', name: 'View Group', resourceName: 'group', actionName: 'read', granted: true },
-    { id: 'member:read', name: 'View Members', resourceName: 'member', actionName: 'read', granted: true }
+    { id: 4, name: 'group:read', resourceName: 'group', actionName: 'read', isGranted: true },
+    { id: 5, name: 'member:read', resourceName: 'member', actionName: 'read', isGranted: true }
   ]
 }; 

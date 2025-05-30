@@ -1,0 +1,35 @@
+Schema Alignment Audit Summary (2025-05-23 09:31:24)
+Database Type: SQLite
+Database Path: C:\Users\axelr\OneDrive\Documents\GitHub\frontend-templates\angular\backend\db.sqlite
+Database Name: db.sqlite
+Schema Name: N/A for SQLite
+Tables found: 25
+Entities found: 18
+Migrations analyzed: 29
+Total mismatches: 110
+
+File Processing:
+  - Entity files processed: 22
+  - Files skipped (invalid entities): 0
+  - Barrel files detected (re-exports): 5
+
+Mismatches by type:
+  - missing_entity: 11
+  - missing_table: 4
+  - nullability_mismatch: 19
+  - missing_column: 12
+  - extra_column: 53
+  - extra_foreign_key: 11
+
+Top mismatches:
+  1. Table 'api_endpoint_permissions' exists in the database but has no corresponding entity
+  2. Table 'user_roles' exists in the database but has no corresponding entity
+  3. Table 'cache_components' exists in the database but has no corresponding entity
+  4. Table 'resources' exists in the database but has no corresponding entity
+  5. Table 'frontend_route_permissions' exists in the database but has no corresponding entity
+  6. Table 'migrations_history' exists in the database but has no corresponding entity
+  7. Table 'ui_component_permissions' exists in the database but has no corresponding entity
+  8. Table 'login_attempts' exists in the database but has no corresponding entity
+  9. Table 'cache_routes' exists in the database but has no corresponding entity
+  10. Table 'cache_endpoints' exists in the database but has no corresponding entity
+  ... and 100 more (see full report)

@@ -1,0 +1,13 @@
+{
+  "name": "eslint-fix-script",
+  "version": "1.0.0",
+  "description": "Script to automatically fix common ESLint issues",
+  "main": "fix-eslint-issues.ts",
+  "scripts": {
+    "fix": "ts-node fix-eslint-issues.ts"
+  },
+  "dependencies": {
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+} 

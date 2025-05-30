@@ -216,13 +216,18 @@ export class RolesComponent implements OnInit {
   }
 
   editRole(role: Role): void {
+    if (!role.id) {
+      this.snackBar.open('Cannot edit role without an ID', 'Close', { duration: 3000 });
+      return;
+    }
+
     const dialogRef = this.dialog.open(RoleDialogComponent, {
       data: { role }
     });
 
     dialogRef.afterClosed().subscribe((result: Role | undefined) => {
       if (result) {
-        this.roleService.updateRole(role.id, result).subscribe({
+        this.roleService.updateRole(role.id!, result).subscribe({
           next: () => {
             Object.assign(role, result);
             this.snackBar.open('Role updated successfully', 'Close', { duration: 3000 });
@@ -237,13 +242,18 @@ export class RolesComponent implements OnInit {
   }
 
   deleteRole(role: Role): void {
+    if (!role.id) {
+      this.snackBar.open('Cannot delete role without an ID', 'Close', { duration: 3000 });
+      return;
+    }
+
     if (role.userCount && role.userCount > 0) {
       this.snackBar.open('Cannot delete role with assigned users', 'Close', { duration: 3000 });
       return;
     }
 
     if (confirm(`Are you sure you want to delete the role "${role.name}"?`)) {
-      this.roleService.deleteRole(role.id).subscribe({
+      this.roleService.deleteRole(role.id!).subscribe({
         next: () => {
           this.roles = this.roles.filter(r => r.id !== role.id);
           this.snackBar.open('Role deleted successfully', 'Close', { duration: 3000 });

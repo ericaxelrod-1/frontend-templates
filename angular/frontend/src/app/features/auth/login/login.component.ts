@@ -10,6 +10,7 @@ import { LoggerService } from '../../../services/logging/logger.service';
 import { CaptchaService } from '../../../core/services/captcha.service';
 import { CaptchaSelectorComponent } from '../../../shared/components/captcha/advanced/captcha-selector.component';
 import { AdvancedCaptchaService } from '../../../core/services/advanced-captcha.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -29,6 +30,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   loading = false;
   submitted = false;
   error = '';
+  captchaEnabled = environment.captcha.enabled && !environment.captcha.skipForDevelopment;
   
   // App configuration properties
   appName = 'Angular Template';
@@ -65,12 +67,18 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.logger.info('LoginComponent ngOnInit called');
-    // Initialize form with validation
-    this.loginForm = this.formBuilder.group({
+    // Initialize form with conditional validation
+    const formConfig: any = {
       email: ['', [Validators.required, Validators.email]],
-      password: ['', Validators.required],
-      captcha: [null, Validators.required]
-    });
+      password: ['', Validators.required]
+    };
+
+    // Only add CAPTCHA validation if CAPTCHA is enabled
+    if (this.captchaEnabled) {
+      formConfig.captcha = [null, Validators.required];
+    }
+
+    this.loginForm = this.formBuilder.group(formConfig);
 
     this.logger.debug('LoginForm initialized:', this.loginForm);
 
@@ -124,7 +132,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     
     // Mark fields as touched for validation
     this.loginForm.markAllAsTouched();
-    if (this.captchaSelector) {
+    if (this.captchaEnabled && this.captchaSelector) {
       this.captchaSelector.markAsTouched();
     }
 
@@ -143,32 +151,45 @@ export class LoginComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Get CAPTCHA data directly from the selector component
-    const captchaData = this.captchaSelector.getCaptchaData();
-    if (!captchaData) {
-      this.logger.warn('CAPTCHA data is missing');
-      return;
-    }
+    // If CAPTCHA is enabled, verify it before proceeding
+    if (this.captchaEnabled) {
+      // Get CAPTCHA data directly from the selector component
+      const captchaData = this.captchaSelector.getCaptchaData();
+      if (!captchaData) {
+        this.logger.warn('CAPTCHA data is missing');
+        return;
+      }
 
-    this.logger.info('Verifying CAPTCHA before login:', captchaData);
-    this.loading = true;
+      this.logger.info('Verifying CAPTCHA before login:', captchaData);
+      this.loading = true;
 
-    // Determine CAPTCHA type and verify with the appropriate service
-    const captchaType = this.determineCaptchaType(captchaData);
-    
-    this.advancedCaptchaService.verifyAdvancedCaptcha(
-      captchaData.challengeId, 
-      captchaData.selectedAnswer,
-      captchaType
-    ).subscribe({
-      next: (response) => {
-        this.logger.info('CAPTCHA verification response:', response);
-        if (response.success) {
-          this.logger.info('CAPTCHA verification successful, proceeding with login');
-          this.dispatchLogin();
-        } else {
-          this.logger.warn('CAPTCHA verification failed');
-          this.error = 'CAPTCHA verification failed. Please try again.';
+      // Determine CAPTCHA type and verify with the appropriate service
+      const captchaType = this.determineCaptchaType(captchaData);
+      
+      this.advancedCaptchaService.verifyAdvancedCaptcha(
+        captchaData.challengeId, 
+        captchaData.selectedAnswer,
+        captchaType
+      ).subscribe({
+        next: (response) => {
+          this.logger.info('CAPTCHA verification response:', response);
+          if (response.success) {
+            this.logger.info('CAPTCHA verification successful, proceeding with login');
+            this.dispatchLogin();
+          } else {
+            this.logger.warn('CAPTCHA verification failed');
+            this.error = 'CAPTCHA verification failed. Please try again.';
+            this.loading = false;
+            // Refresh the captcha
+            const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+            if (activeCaptcha?.refreshChallenge) {
+              activeCaptcha.refreshChallenge();
+            }
+          }
+        },
+        error: (err) => {
+          this.logger.error('Error verifying CAPTCHA:', err);
+          this.error = 'An error occurred while verifying CAPTCHA. Please try again.';
           this.loading = false;
           // Refresh the captcha
           const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
@@ -176,18 +197,13 @@ export class LoginComponent implements OnInit, OnDestroy {
             activeCaptcha.refreshChallenge();
           }
         }
-      },
-      error: (err) => {
-        this.logger.error('Error verifying CAPTCHA:', err);
-        this.error = 'An error occurred while verifying CAPTCHA. Please try again.';
-        this.loading = false;
-        // Refresh the captcha
-        const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-        if (activeCaptcha?.refreshChallenge) {
-          activeCaptcha.refreshChallenge();
-        }
-      }
-    });
+      });
+    } else {
+      // CAPTCHA is disabled, proceed directly with login
+      this.logger.info('CAPTCHA is disabled, proceeding directly with login');
+      this.loading = true;
+      this.dispatchLogin();
+    }
   }
 
   // Determine the CAPTCHA type based on the captcha data structure
@@ -207,7 +223,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     const loginData = {
       email: this.f['email'].value,
       password: this.f['password'].value,
-      recaptchaToken: 'verified-via-advanced-captcha' // Add a token to indicate captcha was verified
+      recaptchaToken: this.captchaEnabled ? 'verified-via-advanced-captcha' : 'captcha-disabled'
     };
     
     this.logger.debug('About to dispatch login action');
@@ -225,10 +241,12 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.error = result.auth.error;
           this.loading = false;
           
-          // Refresh captcha on error
-          const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-          if (activeCaptcha?.refreshChallenge) {
-            activeCaptcha.refreshChallenge();
+          // Refresh captcha on error if enabled
+          if (this.captchaEnabled && this.captchaSelector) {
+            const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+            if (activeCaptcha?.refreshChallenge) {
+              activeCaptcha.refreshChallenge();
+            }
           }
         }
       },
@@ -248,10 +266,12 @@ export class LoginComponent implements OnInit, OnDestroy {
         
         this.loading = false;
         
-        // Refresh captcha on error
-        const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-        if (activeCaptcha?.refreshChallenge) {
-          activeCaptcha.refreshChallenge();
+        // Refresh captcha on error if enabled
+        if (this.captchaEnabled && this.captchaSelector) {
+          const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
+          if (activeCaptcha?.refreshChallenge) {
+            activeCaptcha.refreshChallenge();
+          }
         }
       }
     });

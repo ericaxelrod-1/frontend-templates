@@ -55,18 +55,23 @@ export class RolesConstantsService {
   initialize(): Observable<void> {
     // If already initialized, return immediately
     if (this.isInitialized) {
+      console.log('RolesConstantsService: Already initialized, skipping fetch');
       return of(void 0);
     }
     
     // If initialization is already in progress, return the observable that will complete when done
     if (this.initializeInProgress) {
+      console.log('RolesConstantsService: Initialization already in progress, waiting for completion');
       return this.roles$.pipe(map(() => void 0));
     }
     
+    console.log('RolesConstantsService: Starting role initialization');
     this.initializeInProgress = true;
     
     return this.http.get<SystemRole[]>(this.apiUrl).pipe(
       tap(roles => {
+        console.log('RolesConstantsService: Received roles from backend:', roles);
+        
         // Reset the SystemRoles object
         Object.keys(SystemRoles).forEach(key => {
           delete SystemRoles[key];
@@ -75,20 +80,60 @@ export class RolesConstantsService {
         // Populate SystemRoles with values from API
         const rolesMap: Record<string, string> = {};
         roles.forEach(role => {
-          // Convert role name to UPPERCASE for key to maintain backwards compatibility
-          const key = role.normalizedName.toUpperCase();
-          SystemRoles[key] = role.normalizedName;
-          rolesMap[key] = role.normalizedName;
+          // Safely access normalizedName with null checking
+          if (role && role.normalizedName) {
+            // Store both uppercase and original case versions for maximum compatibility
+            const upperKey = role.normalizedName.toUpperCase();
+            const lowerKey = role.normalizedName.toLowerCase();
+            
+            // Add uppercase key for backward compatibility
+            SystemRoles[upperKey] = role.normalizedName;
+            rolesMap[upperKey] = role.normalizedName;
+            
+            // Add lowercase key for direct matches
+            SystemRoles[lowerKey] = role.normalizedName;
+            rolesMap[lowerKey] = role.normalizedName;
+            
+            // Also add the normalized name directly as a key
+            SystemRoles[role.normalizedName] = role.normalizedName;
+            rolesMap[role.normalizedName] = role.normalizedName;
+          } else {
+            console.warn('RolesConstantsService: Received a role with missing normalizedName:', role);
+          }
         });
         
         this.rolesSubject.next(rolesMap);
         this.isInitialized = true;
         this.initializeInProgress = false;
-        console.log('Loaded system roles:', SystemRoles);
+        console.log('RolesConstantsService: Loaded system roles:', SystemRoles);
       }),
       catchError(error => {
-        console.error('Failed to load system roles:', error);
+        console.error('RolesConstantsService: Failed to load system roles:', error);
         this.initializeInProgress = false;
+        
+        // Create fallback values for critical system roles to prevent total failure
+        console.warn('RolesConstantsService: Using fallback role values due to loading failure');
+        const fallbackRoles = {
+          'USER': 'user',
+          'ADMIN': 'admin',
+          'SUPERUSER': 'superuser',
+          'SUPERADMIN': 'superadmin',
+          'user': 'user',
+          'admin': 'admin',
+          'superuser': 'superuser',
+          'superadmin': 'superadmin'
+        };
+        
+        // Populate with fallback values
+        Object.keys(fallbackRoles).forEach(key => {
+          if (key) {
+            SystemRoles[key] = fallbackRoles[key as keyof typeof fallbackRoles];
+          }
+        });
+        
+        this.rolesSubject.next(fallbackRoles);
+        this.isInitialized = true; // Still mark as initialized with fallback values
+        
         return of(void 0);
       }),
       map(() => void 0),
@@ -110,7 +155,9 @@ export class RolesConstantsService {
   reset(): void {
     // Clear the SystemRoles object
     Object.keys(SystemRoles).forEach(key => {
-      delete SystemRoles[key];
+      if (key) {
+        delete SystemRoles[key];
+      }
     });
     
     this.rolesSubject.next({});

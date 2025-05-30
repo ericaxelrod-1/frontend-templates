@@ -8,6 +8,7 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { PermissionsModule } from '../../../shared/modules/permissions.module';
+import { RoleUtils } from '../../../core/utils/role-utils';
 
 @Component({
   selector: 'app-profile',
@@ -156,9 +157,6 @@ export class ProfileComponent implements OnInit {
   
   // Helper method to safely get role names for the template
   getRoleNames(): string {
-    if (!this.user || !this.user.roles || !this.user.roles.length) {
-      return '';
-    }
-    return this.user.roles.map(role => role.name).join(', ');
+    return RoleUtils.formatRoleNames(this.user?.roles);
   }
 } 

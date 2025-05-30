@@ -104,7 +104,7 @@ export class LoginMonitoringComponent implements OnInit {
 
   ngOnInit(): void {
     // Check permission using resource:action format
-    this.permissionService.hasPermission('monitoring:access').subscribe(hasPermission => {
+    this.permissionService.hasPermission('system:admin').subscribe(hasPermission => {
       this.hasPermission = hasPermission;
       
       if (hasPermission) {

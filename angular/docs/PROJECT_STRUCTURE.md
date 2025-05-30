@@ -89,6 +89,12 @@ backend/
 - **JSON (.json)**: Configuration files
 - **JavaScript (.js)**: Utility scripts
 
+### Backend Source Code (`/backend/src`)
+
+#### DTOs (`/modules/*/dtos`)
+Contains Data Transfer Objects used for API requests and responses:
+- `api-endpoint.dto.ts` - DTO for API endpoint information
+
 ## Documentation Structure (`angular/docs/`)
 
 ### Purpose

@@ -87,7 +87,7 @@ Before selecting a package:
 
 ## Documentation Requirements
 
-All dependencies must be documented in [000-variables.mdc](mdc:.cursor/rules/000-variables.mdc)[package_management] including:
+All dependencies must be documented in @000-variables.mdc[package_management] including:
 
 ```markdown
 ## [Package Name]

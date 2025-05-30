@@ -5,692 +5,387 @@
 This document outlines the database schema design for the Angular Template Application. The schema is designed to support:
 
 1. User authentication and authorization
-2. Role-based access control
-3. User groups for sharing data
-4. Dynamic permission management for UI components, routes, and API endpoints
-5. Migration path from SQLite to PostgreSQL
+2. Role-based access control (RBAC)
+3. User groups for logical user segmentation
+4. Dynamic permission management for UI components, frontend routes, and API endpoints
+5. Login attempt tracking and security monitoring (including IP reputation and CAPTCHA)
+6. A clear structure primarily for SQLite, with considerations for future PostgreSQL migration.
 
-## Entity Relationship Diagram
+**Naming Convention:**
+- **All database table names and column names MUST use `snake_case`**. This is the definitive convention for this project.
+- Entity property names in TypeScript code (TypeORM entities) will typically be `camelCase` as per JavaScript/TypeScript conventions.
+
+**TypeORM Naming Strategy vs. Migrations:**
+- TypeORM includes a naming strategy feature that can automatically translate between `camelCase` entity properties and `snake_case` database columns when TypeORM generates SQL (e.g., during `synchronize: true` or when using the query builder and repositories).
+- **However, this translation DOES NOT apply to raw SQL written in migration files.** Therefore, all `CREATE TABLE`, `ALTER TABLE`, and other SQL statements within migration scripts **MUST explicitly use `snake_case`** for table and column identifiers to ensure the database schema adheres to the project convention.
+
+## Entity Relationship Diagram (Conceptual)
 
 ```
-┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│    User     │       │    Role     │       │    Group    │
-├─────────────┤       ├─────────────┤       ├─────────────┤
-│ id          │       │ id          │       │ id          │
-│ username    │       │ name        │       │ name        │
-│ email       │       │ description │       │ description │
-│ password    │       │ createdAt   │       │ createdBy   │
-│ firstName   │       │ updatedAt   │       │ createdAt   │
-│ lastName    │       └──────┬──────┘       │ updatedAt   │
-│ roleId      │◄──────┘      │              └──────┬──────┘
-│ createdAt   │              │                     │
-│ updatedAt   │              │                     │
-│ lastLogin   │              │                     │
-└──────┬──────┘              │                     │
-       │                     │                     │
-       │                     │                     │
-       │                     ▼                     │
-       │           ┌─────────────────┐             │
-       │           │   Permission    │             │
-       │           ├─────────────────┤             │
-       │           │ id              │             │
-       │           │ resourceName    │             │
-       │           │ actionName      │             │
-       │           │ name            │             │
-       │           │ description     │             │
-       │           │ createdAt       │             │
-       │           │ updatedAt       │             │
-       │           └─────┬───────────┘             │
-       │                 │                         │
-       │                 │                         │
-       │                 ▼                         │
-       │    ┌────────────┬────────────┬────────────┘
-       │    │            │            │
-       │    ▼            ▼            ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│ UserGroup   │ │ UiComponent │ │FrontendRoute│
-├─────────────┤ ├─────────────┤ ├─────────────┤
-│ userId      │ │ id          │ │ id          │
-│ groupId     │ │ selector    │ │ path        │
-│ isAdmin     │ │ description │ │ description │
-│ joinedAt    │ │ filePath    │ │ component   │
-└─────────────┘ │ overridePerms│ │ overridePerms│
-                │ lastSynced   │ │ lastSynced   │
-                └─────┬───────┘ └─────┬────────┘
-                      │               │
-                      │               │
-                      ▼               ▼
-               ┌─────────────┐ ┌─────────────────┐
-               │ ApiEndpoint │ │ role_permissions │
-               ├─────────────┤ ├─────────────────┤
-               │ id          │ │ role_id         │
-               │ method      │ │ permission_id   │
-               │ path        │ └─────────────────┘
-               │ description │
-               │ controller  │ ┌─────────────────┐
-               │ handler     │ │group_permissions│
-               │ overridePerms│ ├─────────────────┤
-               │ lastSynced   │ │ group_id        │
-               └─────────────┘ │ permission_id    │
-                               └─────────────────┘
+[user] *--* [role] (via user_roles)
+[user] *--* [group] (via user_groups)
+[user] *--* [permission] (via user_permissions) - Direct user permissions
+[user] o-- [login_attempt] (via login_attempts.user_id)
+
+[role] *--* [permission] (via role_permissions)
+[role] o--o [role] (self-referencing for hierarchy - parent_id)
+
+[group] *--* [permission] (via group_permissions)
+[group] o-- [user_group] --o [user] (user_group is user_groups table)
+
+[permission] --o [action] (via permissions.action_id)
+[permission] --o [resource] (conceptually, via permissions.resource_name and resources table)
+[permission] *--* [frontend_route] (via frontend_route_permissions)
+[permission] *--* [api_endpoint] (via api_endpoint_permissions)
+[permission] *--* [ui_component] (via ui_component_permissions)
+
+[login_attempt] (login_attempts)
+[ip_reputation]
+[captcha]
 ```
+*(Note: The ASCII ERD above is a high-level conceptual representation and may require updates to fully detail all explicit join entities and foreign key names accurately based on the table specifications below. Table and column names here are illustrative and will follow `snake_case` in the specifications.)*
 
 ## Tables Specification
 
-### User Table
+General Conventions:
+- **Primary Keys (PK):** Unless otherwise specified (e.g., for M2M join tables without dedicated entities), primary keys are `id INTEGER PRIMARY KEY AUTOINCREMENT`. All PK columns are named `id`, unless the natural key is a `VARCHAR` (e.g. for `ui_components`, `frontend_routes`, `api_endpoints`).
+- **Timestamps:** Standard timestamp columns are `created_at` and `updated_at`, both `DATETIME NOT NULL DEFAULT (datetime('now'))`.
+- **Foreign Keys (FK):** Typically `ON DELETE CASCADE` for tight coupling where appropriate (e.g., join table entries), or `ON DELETE SET NULL` for optional relationships. Foreign key columns should be named `[referenced_table_singular]_id`. `ON UPDATE` actions are typically `NO ACTION` unless specified.
 
-Stores user account information.
+### `users` Table
+Stores user account information. Corresponds to `User` entity.
 
-| Column     | Type         | Constraints                 | Description                        |
-|------------|--------------|-----------------------------|------------------------------------|
-| id         | INTEGER      | PRIMARY KEY, AUTOINCREMENT  | Unique identifier                  |
-| username   | VARCHAR(50)  | NOT NULL, UNIQUE            | Username for login                 |
-| email      | VARCHAR(100) | NOT NULL, UNIQUE            | Email address                      |
-| password   | VARCHAR(255) | NOT NULL                    | Hashed password                    |
-| firstName  | VARCHAR(50)  | NULL                        | User's first name                  |
-| lastName   | VARCHAR(50)  | NULL                        | User's last name                   |
-| roleId     | INTEGER      | NOT NULL, FOREIGN KEY       | Reference to Role                  |
-| createdAt  | TIMESTAMP    | NOT NULL, DEFAULT NOW()     | Account creation timestamp         |
-| updatedAt  | TIMESTAMP    | NOT NULL, DEFAULT NOW()     | Last update timestamp              |
-| lastLogin  | TIMESTAMP    | NULL                        | Last login timestamp               |
-
-Indexes:
-- PRIMARY KEY (id)
-- UNIQUE (username)
-- UNIQUE (email)
-- INDEX (roleId)
-
-### Role Table
-
-Defines user roles for authorization.
-
-| Column      | Type         | Constraints                | Description                        |
-|-------------|--------------|----------------------------|------------------------------------|
-| id          | UUID         | PRIMARY KEY                | Unique identifier                  |
-| name        | VARCHAR(50)  | NOT NULL, UNIQUE           | Role name (e.g., USER, ADMIN, SUPERADMIN) |
-| description | TEXT         | NULL                       | Role description                   |
-| createdAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Creation timestamp                 |
-| updatedAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Last update timestamp              |
+| Column                              | Type         | Constraints                        | Description                             |
+|-------------------------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`                                | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `username`                          | VARCHAR(255) | NOT NULL, UNIQUE                   | Username for login                      |
+| `email`                             | VARCHAR(255) | NOT NULL, UNIQUE                   | Email address                           |
+| `password`                          | VARCHAR(255) | NOT NULL                           | Hashed password                         |
+| `first_name`                        | VARCHAR(255) | NULL                               | User's first name                       |
+| `last_name`                         | VARCHAR(255) | NULL                               | User's last name                        |
+| `is_active`                         | BOOLEAN      | NOT NULL, DEFAULT 0                | If the user account is active           |
+| `is_email_verified`                 | BOOLEAN      | NOT NULL, DEFAULT 0                | If the user's email is verified         |
+| `last_login_at`                     | DATETIME     | NULL                               | Last login timestamp                    |
+| `preferences`                       | TEXT         | NULL                               | User-specific preferences (JSON)        |
+| `email_verified_at`                 | DATETIME     | NULL                               | Timestamp user's email was verified     |
+| `registration_verification_sent_at` | DATETIME     | NULL                               | Timestamp for verification email sent   |
+| `user_verified_at`                  | DATETIME     | NULL                               | Timestamp user was verified             |
+| `is_deleted`                        | BOOLEAN      | NOT NULL, DEFAULT 0                | Soft delete flag                        |
+| `deleted_at`                        | DATETIME     | NULL                               | Timestamp of soft delete                |
+| `created_at`                        | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Account creation timestamp              |
+| `updated_at`                        | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
 
 Indexes:
-- PRIMARY KEY (id)
-- UNIQUE (name)
+- PRIMARY KEY (`id`)
+- UNIQUE (`username`)
+- UNIQUE (`email`)
 
-### Group Table
+### `roles` Table
+Defines user roles for authorization. Corresponds to `Role` entity.
 
-Stores information about user groups.
-
-| Column      | Type         | Constraints                | Description                        |
-|-------------|--------------|----------------------------|------------------------------------|
-| id          | UUID         | PRIMARY KEY                | Unique identifier                  |
-| name        | VARCHAR(100) | NOT NULL, UNIQUE           | Group name                         |
-| description | TEXT         | NULL                       | Group description                  |
-| ownerId     | INTEGER      | FOREIGN KEY                | Reference to User who created group |
-| createdAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Creation timestamp                 |
-| updatedAt   | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Last update timestamp              |
-
-Indexes:
-- PRIMARY KEY (id)
-- INDEX (ownerId)
-- UNIQUE (name)
-
-### UserGroup Table
-
-Junction table for many-to-many relationship between users and groups.
-
-| Column    | Type         | Constraints                           | Description                        |
-|-----------|--------------|---------------------------------------|------------------------------------|
-| userId    | INTEGER      | NOT NULL, FOREIGN KEY                 | Reference to User                  |
-| groupId   | UUID         | NOT NULL, FOREIGN KEY                 | Reference to Group                 |
-| isAdmin   | BOOLEAN      | NOT NULL, DEFAULT FALSE               | Whether user is admin in this group|
-| joinedAt  | TIMESTAMP    | NOT NULL, DEFAULT NOW()               | When user joined the group         |
+| Column            | Type         | Constraints                        | Description                             |
+|-------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`              | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `name`            | VARCHAR(100) | NOT NULL, UNIQUE                   | Role name (e.g., USER, ADMIN)           |
+| `description`     | VARCHAR(255) | NULL                               | Role description                        |
+| `is_system_role`  | BOOLEAN      | NOT NULL, DEFAULT 0                | If it's a system-managed role           |
+| `is_default`      | BOOLEAN      | NOT NULL, DEFAULT 0                | If it's a default role for new users    |
+| `parent_id`       | INTEGER      | NULL, FOREIGN KEY (roles.id ON DELETE SET NULL ON UPDATE NO ACTION) | For role hierarchy                      |
+| `priority`        | INTEGER      | NULL                               | Role priority for ordering/logic        |
+| `created_at`      | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`      | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
 
 Indexes:
-- PRIMARY KEY (userId, groupId)
-- INDEX (userId)
-- INDEX (groupId)
-
-### Permission Table
-
-Defines available permissions for the dynamic access control system.
-
-| Column        | Type         | Constraints                | Description                            |
-|---------------|--------------|----------------------------|----------------------------------------|
-| id            | UUID         | PRIMARY KEY                | Unique identifier                      |
-| resourceName  | VARCHAR(50)  | NOT NULL                   | Name of resource (users, dashboard, etc.) |
-| actionName    | VARCHAR(50)  | NOT NULL                   | Name of action (view, edit, etc.)      |
-| name          | VARCHAR(100) | NOT NULL, UNIQUE           | Combined resource:action format        |
-| description   | TEXT         | NULL                       | Permission description                 |
-| createdAt     | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Creation timestamp                     |
-| updatedAt     | TIMESTAMP    | NOT NULL, DEFAULT NOW()    | Last update timestamp                  |
-
-Indexes:
-- PRIMARY KEY (id)
-- UNIQUE (resourceName, actionName)
-- UNIQUE (name)
-
-### Role Permissions Table
-
-Junction table for many-to-many relationship between roles and permissions.
-
-| Column        | Type         | Constraints                 | Description                        |
-|---------------|--------------|-----------------------------|------------------------------------|
-| role_id       | UUID         | NOT NULL, FOREIGN KEY       | Reference to Role                  |
-| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
-
-Indexes:
-- PRIMARY KEY (role_id, permission_id)
-- INDEX (role_id)
-- INDEX (permission_id)
-
-### Group Permissions Table
-
-Junction table for many-to-many relationship between groups and permissions.
-
-| Column        | Type         | Constraints                 | Description                        |
-|---------------|--------------|-----------------------------|------------------------------------|
-| group_id      | UUID         | NOT NULL, FOREIGN KEY       | Reference to Group                 |
-| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
-
-Indexes:
-- PRIMARY KEY (group_id, permission_id)
-- INDEX (group_id)
-- INDEX (permission_id)
-
-### UI Component Table
-
-Stores information about UI components that require permissions.
-
-| Column             | Type         | Constraints                 | Description                                 |
-|--------------------|--------------|------------------------------|---------------------------------------------|
-| id                 | UUID         | PRIMARY KEY                  | Unique identifier                           |
-| selector           | VARCHAR(100) | NOT NULL, UNIQUE             | Component selector/name                     |
-| description        | TEXT         | NULL                         | Component description                       |
-| filePath           | VARCHAR(255) | NULL                         | Location in the codebase                    |
-| overridePermissions| BOOLEAN      | NOT NULL, DEFAULT FALSE      | Flag to override inherited permissions      |
-| lastSynced         | TIMESTAMP    | NULL                         | Timestamp of last component scan            |
-| createdAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Creation timestamp                          |
-| updatedAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Last update timestamp                       |
-
-Indexes:
-- PRIMARY KEY (id)
-- UNIQUE (selector)
-
-### UI Component Permissions Table
-
-Junction table for many-to-many relationship between UI components and permissions.
-
-| Column        | Type         | Constraints                 | Description                        |
-|---------------|--------------|-----------------------------|------------------------------------|
-| component_id  | UUID         | NOT NULL, FOREIGN KEY       | Reference to UI Component          |
-| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
-
-Indexes:
-- PRIMARY KEY (component_id, permission_id)
-- INDEX (component_id)
-- INDEX (permission_id)
-
-### Frontend Route Table
-
-Stores information about frontend routes that require permissions.
-
-| Column             | Type         | Constraints                 | Description                               |
-|--------------------|--------------|------------------------------|-------------------------------------------|
-| id                 | UUID         | PRIMARY KEY                  | Unique identifier                         |
-| path               | VARCHAR(255) | NOT NULL, UNIQUE             | Route path                                |
-| description        | TEXT         | NULL                         | Route description                         |
-| component          | VARCHAR(100) | NULL                         | Associated component name                 |
-| overridePermissions| BOOLEAN      | NOT NULL, DEFAULT FALSE      | Flag to override inherited permissions    |
-| lastSynced         | TIMESTAMP    | NULL                         | Timestamp of last route scan              |
-| createdAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Creation timestamp                        |
-| updatedAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Last update timestamp                     |
-
-Indexes:
-- PRIMARY KEY (id)
-- UNIQUE (path)
-
-### Frontend Route Permissions Table
-
-Junction table for many-to-many relationship between frontend routes and permissions.
-
-| Column        | Type         | Constraints                 | Description                        |
-|---------------|--------------|-----------------------------|------------------------------------|
-| route_id      | UUID         | NOT NULL, FOREIGN KEY       | Reference to Frontend Route        |
-| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
-
-Indexes:
-- PRIMARY KEY (route_id, permission_id)
-- INDEX (route_id)
-- INDEX (permission_id)
-
-### API Endpoint Table
-
-Stores information about API endpoints that require permissions.
-
-| Column             | Type         | Constraints                 | Description                               |
-|--------------------|--------------|------------------------------|-------------------------------------------|
-| id                 | UUID         | PRIMARY KEY                  | Unique identifier                         |
-| method             | VARCHAR(20)  | NOT NULL                     | HTTP method (GET, POST, etc.)             |
-| path               | VARCHAR(255) | NOT NULL                     | API endpoint path                         |
-| description        | TEXT         | NULL                         | Endpoint description                      |
-| controllerName     | VARCHAR(100) | NULL                         | Controller class name                     |
-| handlerName        | VARCHAR(100) | NULL                         | Handler method name                       |
-| overridePermissions| BOOLEAN      | NOT NULL, DEFAULT FALSE      | Flag to override inherited permissions    |
-| lastSynced         | TIMESTAMP    | NULL                         | Timestamp of last endpoint scan           |
-| createdAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Creation timestamp                        |
-| updatedAt          | TIMESTAMP    | NOT NULL, DEFAULT NOW()      | Last update timestamp                     |
-
-Indexes:
-- PRIMARY KEY (id)
-- UNIQUE (method, path)
-
-### API Endpoint Permissions Table
-
-Junction table for many-to-many relationship between API endpoints and permissions.
-
-| Column        | Type         | Constraints                 | Description                        |
-|---------------|--------------|-----------------------------|------------------------------------|
-| endpoint_id   | UUID         | NOT NULL, FOREIGN KEY       | Reference to API Endpoint          |
-| permission_id | UUID         | NOT NULL, FOREIGN KEY       | Reference to Permission            |
-
-Indexes:
-- PRIMARY KEY (endpoint_id, permission_id)
-- INDEX (endpoint_id)
-- INDEX (permission_id)
-
-## TypeORM Entity Definitions
-
-### User Entity
-
-```typescript
-// src/database/entities/user.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Role } from './role.entity';
-import { UserGroup } from './user-group.entity';
-import { Group } from './group.entity';
-
-@Entity()
-export class User {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column({ unique: true, length: 50 })
-  username: string;
-
-  @Column({ unique: true, length: 100 })
-  email: string;
-
-  @Column()
-  password: string;
-
-  @Column({ nullable: true, length: 50 })
-  firstName: string;
-
-  @Column({ nullable: true, length: 50 })
-  lastName: string;
-
-  @ManyToOne(() => Role, { eager: true })
-  @JoinColumn({ name: 'roleId' })
-  role: Role;
-
-  @Column()
-  roleId: number;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @Column({ nullable: true, type: 'datetime' })
-  lastLogin: Date;
-
-  @OneToMany(() => UserGroup, userGroup => userGroup.user)
-  userGroups: UserGroup[];
-
-  @OneToMany(() => Group, group => group.createdBy)
-  createdGroups: Group[];
-}
-```
-
-### Role Entity
-
-```typescript
-// src/database/entities/role.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { User } from './user.entity';
-import { Permission } from './permission.entity';
-
-@Entity()
-export class Role {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ unique: true, length: 50 })
-  name: string;
-
-  @Column({ nullable: true, type: 'text' })
-  description: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @OneToMany(() => User, user => user.role)
-  users: User[];
-
-  @ManyToMany(() => Permission)
-  @JoinTable({
-    name: 'role_permissions',
-    joinColumn: { name: 'role_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
-  })
-  permissions: Permission[];
-}
-```
-
-### Group Entity
-
-```typescript
-// src/database/entities/group.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, ManyToMany, JoinTable, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { User } from './user.entity';
-import { UserGroup } from './user-group.entity';
-import { Permission } from './permission.entity';
-
-@Entity()
-export class Group {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ unique: true, length: 100 })
-  name: string;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'ownerId' })
-  createdBy: User;
-
-  @Column({ nullable: true })
-  ownerId: number;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @OneToMany(() => UserGroup, userGroup => userGroup.group)
-  userGroups: UserGroup[];
-
-  @ManyToMany(() => Permission)
-  @JoinTable({
-    name: 'group_permissions',
-    joinColumn: { name: 'group_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
-  })
-  permissions: Permission[];
-}
-```
-
-### Permission Entity
-
-```typescript
-// src/database/entities/permission.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Role } from './role.entity';
-import { Group } from './group.entity';
-import { UiComponent } from './ui-component.entity';
-import { FrontendRoute } from './frontend-route.entity';
-import { ApiEndpoint } from './api-endpoint.entity';
-
-@Entity()
-export class Permission {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ length: 50 })
-  resourceName: string;
-
-  @Column({ length: 50 })
-  actionName: string;
-
-  @Column({ unique: true, length: 100 })
-  name: string;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @ManyToMany(() => Role, role => role.permissions)
-  roles: Role[];
-
-  @ManyToMany(() => Group, group => group.permissions)
-  groups: Group[];
-
-  @ManyToMany(() => UiComponent, component => component.requiredPermissions)
-  components: UiComponent[];
-
-  @ManyToMany(() => FrontendRoute, route => route.requiredPermissions)
-  routes: FrontendRoute[];
-
-  @ManyToMany(() => ApiEndpoint, endpoint => endpoint.requiredPermissions)
-  endpoints: ApiEndpoint[];
-}
-```
-
-### UI Component Entity
-
-```typescript
-// src/database/entities/ui-component.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Permission } from './permission.entity';
-
-@Entity('ui_components')
-export class UiComponent {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ unique: true, length: 100 })
-  selector: string;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
-  @Column({ nullable: true, length: 255 })
-  filePath: string;
-
-  @Column({ default: false })
-  overridePermissions: boolean;
-
-  @Column({ nullable: true })
-  lastSynced: Date;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @ManyToMany(() => Permission)
-  @JoinTable({
-    name: 'ui_component_permissions',
-    joinColumn: { name: 'component_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
-  })
-  requiredPermissions: Permission[];
-}
-```
-
-### Frontend Route Entity
-
-```typescript
-// src/database/entities/frontend-route.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Permission } from './permission.entity';
-
-@Entity('frontend_routes')
-export class FrontendRoute {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ unique: true, length: 255 })
-  path: string;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
-  @Column({ nullable: true, length: 100 })
-  component: string;
-
-  @Column({ default: false })
-  overridePermissions: boolean;
-
-  @Column({ nullable: true })
-  lastSynced: Date;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @ManyToMany(() => Permission)
-  @JoinTable({
-    name: 'frontend_route_permissions',
-    joinColumn: { name: 'route_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
-  })
-  requiredPermissions: Permission[];
-}
-```
-
-### API Endpoint Entity
-
-```typescript
-// src/database/entities/api-endpoint.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Permission } from './permission.entity';
-
-@Entity('api_endpoints')
-export class ApiEndpoint {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ length: 20 })
-  method: string;
-
-  @Column({ length: 255 })
-  path: string;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
-  @Column({ nullable: true, length: 100 })
-  controllerName: string;
-
-  @Column({ nullable: true, length: 100 })
-  handlerName: string;
-
-  @Column({ default: false })
-  overridePermissions: boolean;
-
-  @Column({ nullable: true })
-  lastSynced: Date;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @ManyToMany(() => Permission)
-  @JoinTable({
-    name: 'api_endpoint_permissions',
-    joinColumn: { name: 'endpoint_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' }
-  })
-  requiredPermissions: Permission[];
-}
-```
-
-## Migration Path from SQLite to PostgreSQL
-
-### SQLite Configuration (Development)
-
-```typescript
-// src/config/database.config.ts
-import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { User, Role, Group, UserGroup, Permission, UiComponent, FrontendRoute, ApiEndpoint } from '../database/entities';
-
-export const sqliteConfig: TypeOrmModuleOptions = {
-  type: 'sqlite',
-  database: 'database.sqlite',
-  entities: [User, Role, Group, UserGroup, Permission, UiComponent, FrontendRoute, ApiEndpoint],
-  synchronize: true, // Set to false in production
-  logging: true,
-};
-```
-
-### PostgreSQL Configuration (Production)
-
-```typescript
-// src/config/database.config.ts
-import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { User, Role, Group, UserGroup, Permission, UiComponent, FrontendRoute, ApiEndpoint } from '../database/entities';
-
-export const postgresConfig: TypeOrmModuleOptions = {
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'angular_template',
-  entities: [User, Role, Group, UserGroup, Permission, UiComponent, FrontendRoute, ApiEndpoint],
-  synchronize: false, // Always false in production
-  migrationsRun: true,
-  migrations: ['dist/migrations/*.js'],
-  logging: ['error'],
-  ssl: process.env.DB_SSL === 'true' ? {
-    rejectUnauthorized: false
-  } : false,
-};
-```
-
-## Best Practices
-
-1. **Use UUID for Primary Keys in Production**
-   - More secure and allows for distributed ID generation
-   - Use `@Column({ type: 'uuid', primary: true, generated: 'uuid' })` in PostgreSQL
-
-2. **Soft Deletes**
-   - Add `isDeleted` and `deletedAt` columns to entities
-   - Filter deleted records in queries
-
-3. **Indexes for Performance**
-   - Create indexes on columns frequently used in WHERE clauses
-   - Add indexes on foreign keys
-
-4. **Transactions for Data Integrity**
-   - Use TypeORM transactions when performing multiple related operations
-
-5. **Data Validation**
-   - Use class-validator for input validation
-   - Add constraints at the database level
-
-6. **Optimistic Locking**
-   - Add version column to prevent concurrent updates
-   - `@VersionColumn() version: number;`
-
-7. **Audit Trails**
-   - Track who created/updated records
-   - Consider a separate audit log table for sensitive operations 
+- PRIMARY KEY (`id`)
+- UNIQUE (`name`)
+- INDEX (`parent_id`)
+
+### `groups` Table
+Stores information about user groups. Corresponds to `Group` entity.
+
+| Column            | Type         | Constraints                        | Description                        |
+|-------------------|--------------|------------------------------------|------------------------------------|
+| `id`              | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                  |
+| `name`            | VARCHAR(50)  | NOT NULL, UNIQUE                   | Group name                         |
+| `description`     | VARCHAR(255) | NULL                               | Group description                  |
+| `settings`        | TEXT         | NULL                               | Group-specific settings (JSON)     |
+| `is_system_group` | BOOLEAN      | NOT NULL, DEFAULT 0                | If it's a system-managed group     |
+| `owner_id`        | INTEGER      | NULL, FOREIGN KEY (users.id ON DELETE SET NULL ON UPDATE NO ACTION) | User who owns/created the group  |
+| `created_at`      | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                 |
+| `updated_at`      | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp              |
+
+### `actions` Table
+Defines the granular, atomic operations or capabilities that can be performed within the application. Corresponds to the `Action` entity.
+
+| Column        | Type         | Constraints                        | Description                             |
+|---------------|--------------|------------------------------------|-----------------------------------------|
+| `id`          | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique numerical identifier for the action. |
+| `name`        | VARCHAR(255) | NOT NULL, UNIQUE                   | A human-readable and descriptive name for the action (e.g., 'Create New User', 'View Dashboard'). |
+| `description` | VARCHAR(255) | NULL                               | A more detailed explanation of what the action entails. |
+| `action_name` | VARCHAR(255) | NOT NULL                           | A system-level, programmatic key for the action (e.g., 'user_create', 'dashboard_view'). This is the stable code used internally. Not necessarily unique on its own, but combined with resource_name in permissions, it should be. |
+| `icon`        | VARCHAR(255) | NULL                               | Optional icon identifier (e.g., CSS class). |
+| `created_at`  | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Timestamp action definition was created. |
+| `updated_at`  | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Timestamp action definition was updated. |
+
+**Intended Functionality and Usage:**
+- The `permissions` table links to `actions` via an `action_id` foreign key.
+- An `action` (referenced by its `id` via the `action_id` foreign key in the `permissions` table) is combined with a `resource_name` (e.g., `permissions.resource_name = 'users'`) to define a granular permission like "users:create" (where 'create' would map to an action_id).
+- When logging user activities or for other system references, the `action_id` or the `actions.action_name` string (e.g., 'create', 'view') from this table should be recorded along with the resource context.
+
+### `permissions` Table
+Defines specific permissions by combining a resource and an action. Corresponds to `Permission` entity.
+
+| Column          | Type         | Constraints                        | Description                             |
+|-----------------|--------------|------------------------------------|-----------------------------------------|
+| `id`            | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `name`          | VARCHAR(100) | NOT NULL, UNIQUE                   | Permission name (e.g., 'users:create', 'dashboard:view'). Programmatic key. |
+| `description`   | VARCHAR(255) | NULL                               | Description of the permission           |
+| `resource_name` | VARCHAR(50)  | NOT NULL                           | Resource this permission applies to (e.g., 'users', 'dashboard') |
+| `action_id`     | INTEGER      | NOT NULL, FOREIGN KEY (actions.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to `actions` table. Defines the verb. |
+| `created_at`    | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`    | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+| UNIQUE (`resource_name`, `action_id`) |                             | Ensures a resource can only have a specific action once. |
+
+### `user_roles` Table (Explicit Join Entity)
+Links Users to Roles.
+
+| Column      | Type    | Constraints                                        | Description                      |
+|-------------|---------|----------------------------------------------------|----------------------------------|
+| `user_id`   | INTEGER | NOT NULL, FOREIGN KEY (users.id ON DELETE CASCADE ON UPDATE CASCADE) | Reference to User                |
+| `role_id`   | INTEGER | NOT NULL, FOREIGN KEY (roles.id ON DELETE CASCADE ON UPDATE CASCADE) | Reference to Role                |
+| PRIMARY KEY (`user_id`, `role_id`)        |                                                    |                                  |
+
+### `role_permissions` Table (Explicit Join Entity)
+Links Roles to Permissions. Corresponds to `RolePermission` entity.
+
+| Column          | Type    | Constraints                        | Description                        |
+|-----------------|---------|------------------------------------|------------------------------------|
+| `id`            | INTEGER | PRIMARY KEY AUTOINCREMENT          | Unique identifier for the link     |
+| `role_id`       | INTEGER | NOT NULL, FOREIGN KEY (roles.id ON DELETE CASCADE ON UPDATE NO ACTION)   | Reference to Role                  |
+| `permission_id` | INTEGER | NOT NULL, FOREIGN KEY (permissions.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to Permission            |
+| `is_granted`    | BOOLEAN | NOT NULL, DEFAULT 1                | If permission is granted           |
+| `created_at`    | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Link creation timestamp            |
+| `updated_at`    | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Link last update timestamp         |
+| UNIQUE (`role_id`, `permission_id`)      |                                    |                                    |
+
+
+### `user_permissions` Table (Explicit Join Entity)
+Links Users directly to Permissions. Corresponds to `UserPermission` entity.
+
+| Column          | Type    | Constraints                        | Description                        |
+|-----------------|---------|------------------------------------|------------------------------------|
+| `id`            | INTEGER | PRIMARY KEY AUTOINCREMENT          | Unique identifier for the link     |
+| `user_id`       | INTEGER | NOT NULL, FOREIGN KEY (users.id ON DELETE CASCADE ON UPDATE NO ACTION)   | Reference to User                  |
+| `permission_id` | INTEGER | NOT NULL, FOREIGN KEY (permissions.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to Permission            |
+| `is_granted`    | BOOLEAN | NOT NULL, DEFAULT 1                | If permission is granted           |
+| `created_at`    | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Link creation timestamp            |
+| `updated_at`    | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Link last update timestamp         |
+| UNIQUE (`user_id`, `permission_id`)      |                                    |                                    |
+
+### `group_permissions` Table (Explicit Join Entity)
+Links Groups to Permissions. Corresponds to `GroupPermission` entity.
+
+| Column          | Type    | Constraints                        | Description                        |
+|-----------------|---------|------------------------------------|------------------------------------|
+| `id`            | INTEGER | PRIMARY KEY AUTOINCREMENT          | Unique identifier for the link     |
+| `group_id`      | INTEGER | NOT NULL, FOREIGN KEY (groups.id ON DELETE CASCADE ON UPDATE NO ACTION)  | Reference to Group                 |
+| `permission_id` | INTEGER | NOT NULL, FOREIGN KEY (permissions.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to Permission            |
+| `is_granted`    | BOOLEAN | NOT NULL, DEFAULT 1                | If permission is granted           |
+| `created_at`    | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Link creation timestamp            |
+| `updated_at`    | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Link last update timestamp         |
+| UNIQUE (`group_id`, `permission_id`)     |                                    |                                    |
+
+### `user_groups` Table (Explicit Join Entity)
+Links Users to Groups. Corresponds to `UserGroup` entity.
+
+| Column                       | Type    | Constraints                        | Description                        |
+|------------------------------|---------|------------------------------------|------------------------------------|
+| `id`                         | INTEGER | PRIMARY KEY AUTOINCREMENT          | Unique identifier for the link     |
+| `user_id`                    | INTEGER | NOT NULL, FOREIGN KEY (users.id ON DELETE CASCADE ON UPDATE NO ACTION)   | Reference to User                  |
+| `group_id`                   | INTEGER | NOT NULL, FOREIGN KEY (groups.id ON DELETE CASCADE ON UPDATE NO ACTION)  | Reference to Group                 |
+| `is_admin`                   | BOOLEAN | NOT NULL, DEFAULT 0                | User is admin in this group        |
+| `group_permissions_override` | TEXT    | NULL                               | JSON array of permission strings specific to this user in this group |
+| `joined_at`                  | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Timestamp user joined group        |
+| `last_active_at`             | DATETIME| NULL                               | Last activity timestamp in group   |
+| UNIQUE (`user_id`, `group_id`)         |                                    |                                    |
+
+### `ui_components` Table
+Stores UI components requiring permissions. Corresponds to `UiComponent` entity.
+
+| Column                 | Type         | Constraints                        | Description                             |
+|------------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`                   | VARCHAR(255) | PRIMARY KEY NOT NULL               | Unique identifier (e.g., selector string) |
+| `description`          | TEXT         | NULL                               | Component description                   |
+| `file_path`            | VARCHAR(255) | NULL                               | Path in codebase                        |
+| `override_permissions` | BOOLEAN      | NOT NULL, DEFAULT 0                | Override inherited permissions          |
+| `last_synced_at`       | DATETIME     | NULL                               | Timestamp of last scan                  |
+| `created_at`           | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`           | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+
+### `ui_component_permissions` Table (Implicit M2M Join)
+Links UI Components to Permissions.
+
+| Column            | Type         | Constraints                        | Description                        |
+|-------------------|--------------|------------------------------------|------------------------------------|
+| `ui_component_id` | VARCHAR(255) | NOT NULL, FOREIGN KEY (ui_components.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to UI Component         |
+| `permission_id`   | INTEGER      | NOT NULL, FOREIGN KEY (permissions.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to Permission            |
+| PRIMARY KEY (`ui_component_id`, `permission_id`) |
+
+### `frontend_routes` Table
+Stores frontend routes requiring permissions. Corresponds to `FrontendRoute` entity. `id` is the route path.
+
+| Column                 | Type         | Constraints                        | Description                             |
+|------------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`                   | VARCHAR(255) | PRIMARY KEY NOT NULL               | Unique identifier (route path, e.g., '/users/list') |
+| `title`                | VARCHAR(255) | NULL                               | Display name for UI                     |
+| `description`          | TEXT         | NULL                               | Route description                       |
+| `component_name`       | VARCHAR(255) | NULL                               | Associated component name               |
+| `override_permissions` | BOOLEAN      | NOT NULL, DEFAULT 0                | Override inherited permissions          |
+| `last_synced_at`       | DATETIME     | NULL                               | Timestamp of last scan                  |
+| `is_disabled`          | BOOLEAN      | NOT NULL, DEFAULT 0                | If route is disabled                    |
+| `show_in_menu`         | BOOLEAN      | NOT NULL, DEFAULT 1                | Show in navigation menu                 |
+| `icon`                 | VARCHAR(255) | NULL                               | Icon name for menu                      |
+| `menu_order`           | INTEGER      | NOT NULL, DEFAULT 100              | Order in menu                           |
+| `created_at`           | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`           | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+
+### `frontend_route_permissions` Table (Implicit M2M Join)
+Links Frontend Routes to Permissions.
+
+| Column              | Type         | Constraints                        | Description                        |
+|---------------------|--------------|------------------------------------|------------------------------------|
+| `frontend_route_id` | VARCHAR(255) | NOT NULL, FOREIGN KEY (frontend_routes.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to Frontend Route    |
+| `permission_id`     | INTEGER      | NOT NULL, FOREIGN KEY (permissions.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to Permission            |
+| PRIMARY KEY (`frontend_route_id`, `permission_id`) |
+
+### `api_endpoints` Table
+Stores API endpoints requiring permissions. Corresponds to `ApiEndpoint` entity. `id` is a unique identifier for the endpoint (e.g., method+path hash).
+
+| Column                 | Type         | Constraints                        | Description                             |
+|------------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`                   | VARCHAR(255) | PRIMARY KEY NOT NULL               | Unique identifier (e.g., method + path hash or combination) |
+| `method`               | VARCHAR(20)  | NOT NULL                           | HTTP method (GET, POST, etc.)           |
+| `path`                 | VARCHAR(255) | NOT NULL                           | API endpoint path                       |
+| `description`          | TEXT         | NULL                               | Endpoint description                    |
+| `controller_name`      | VARCHAR(100) | NULL                               | Controller class name                   |
+| `handler_name`         | VARCHAR(100) | NULL                               | Handler method name                     |
+| `override_permissions` | BOOLEAN      | NOT NULL, DEFAULT 0                | Override inherited permissions          |
+| `last_synced_at`       | DATETIME     | NULL                               | Timestamp of last scan                  |
+| `created_at`           | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`           | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+| UNIQUE (`method`, `path`)             |                                    | Ensures method+path combination is unique |
+
+### `api_endpoint_permissions` Table (Implicit M2M Join)
+Links API Endpoints to Permissions.
+
+| Column            | Type         | Constraints                        | Description                        |
+|-------------------|--------------|------------------------------------|------------------------------------|
+| `api_endpoint_id` | VARCHAR(255) | NOT NULL, FOREIGN KEY (api_endpoints.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to API Endpoint         |
+| `permission_id`   | INTEGER      | NOT NULL, FOREIGN KEY (permissions.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to Permission            |
+| PRIMARY KEY (`api_endpoint_id`, `permission_id`) |
+
+### `login_attempts` Table
+Stores login attempts. Corresponds to `LoginAttempt` entity.
+
+| Column            | Type     | Constraints                        | Description                        |
+|-------------------|----------|------------------------------------|------------------------------------|
+| `id`              | INTEGER  | PRIMARY KEY AUTOINCREMENT          | Unique identifier                  |
+| `ip_address`      | TEXT     | NOT NULL                           | IP address of login attempt        |
+| `user_agent`      | TEXT     | NOT NULL                           | Client user agent                  |
+| `email_attempted` | TEXT     | NULL                               | Email used for attempt             |
+| `status`          | TEXT     | NOT NULL, DEFAULT 'failed'         | Status (success, failed, etc.)     |
+| `user_id`         | INTEGER  | NULL, FOREIGN KEY (users.id ON DELETE SET NULL ON UPDATE NO ACTION) | Associated user ID                 |
+| `failure_reason`  | TEXT     | NULL                               | Reason for failed login            |
+| `metadata`        | TEXT     | NULL                               | Additional JSON metadata           |
+| `attempted_at`    | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Timestamp of attempt               |
+
+Indexes: `ip_address`, `email_attempted`, `status`, `attempted_at`.
+
+### `ip_reputation` Table
+Stores IP address reputation data for security monitoring.
+
+| Column                   | Type    | Constraints                        | Description                               |
+|--------------------------|---------|------------------------------------|-------------------------------------------|
+| `id`                     | INTEGER | PRIMARY KEY AUTOINCREMENT          | Unique identifier                         |
+| `ip_address`             | TEXT    | NOT NULL, UNIQUE                   | IP address                                |
+| `status`                 | TEXT    | NOT NULL, DEFAULT 'good'           | Reputation status (good, suspicious, bad) |
+| `reputation_score`       | REAL    | DEFAULT 100                        | Numerical reputation score                |
+| `geo_location`           | TEXT    | NULL                               | Geo-location data (JSON)                  |
+| `statistics`             | TEXT    | NULL                               | Usage statistics (JSON)                   |
+| `block_history`          | TEXT    | NULL                               | History of blocks (JSON)                  |
+| `failed_attempts`        | INTEGER | NOT NULL, DEFAULT 0                | Count of failed attempts from this IP     |
+| `is_blocked`             | BOOLEAN | NOT NULL, DEFAULT 0                | If the IP is currently blocked            |
+| `blocked_until`          | DATETIME| NULL                               | Timestamp until which IP is blocked       |
+| `captcha_required_count` | INTEGER | NOT NULL, DEFAULT 0                | How many times CAPTCHA was required       |
+| `metadata`               | TEXT    | NULL                               | Additional JSON metadata                  |
+| `created_at`             | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Record creation timestamp                 |
+| `updated_at`             | DATETIME| NOT NULL, DEFAULT (datetime('now')) | Record last update timestamp              |
+
+Indexes: `ip_address` (UNIQUE), `is_blocked`.
+
+### `captcha` Table
+Stores CAPTCHA challenge data.
+
+| Column       | Type     | Constraints                        | Description                        |
+|--------------|----------|------------------------------------|------------------------------------|
+| `id`         | INTEGER  | PRIMARY KEY AUTOINCREMENT          | Unique identifier                  |
+| `type`       | TEXT     | NOT NULL, DEFAULT 'text'           | Type of CAPTCHA (text, image)      |
+| `token`      | TEXT     | NOT NULL, UNIQUE                   | Unique token for this CAPTCHA instance |
+| `challenge`  | TEXT     | NOT NULL                           | The CAPTCHA challenge data          |
+| `solution`   | TEXT     | NOT NULL                           | The correct solution to the challenge|
+| `is_used`    | BOOLEAN  | NOT NULL, DEFAULT 0                | If this CAPTCHA has been used       |
+| `expires_at` | DATETIME | NOT NULL                           | Expiration timestamp for the CAPTCHA |
+| `ip_address` | TEXT     | NULL                               | IP address for which it was generated|
+| `metadata`   | TEXT     | NULL                               | Additional JSON metadata           |
+| `created_at` | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Record creation timestamp          |
+| `updated_at` | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Record last update timestamp       |
+
+Indexes: `token` (UNIQUE), `expires_at`.
+
+### `resources` Table
+Corresponds to `Resource` entity. (A lookup/definition table for resource types).
+
+### `cache_components` Table
+Stores cached metadata about UI components for sync/scan purposes.
+
+| Column           | Type         | Constraints                        | Description                             |
+|------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`             | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `selector`       | VARCHAR(255) | NOT NULL, UNIQUE                   | Component selector string               |
+| `description`    | TEXT         | NULL                               | Description of the component            |
+| `file_path`      | VARCHAR(255) | NULL                               | Path to the component file              |
+| `last_synced_at` | DATETIME     | NULL                               | Timestamp of last sync                  |
+| `metadata`       | TEXT         | NULL                               | Additional metadata (JSON)              |
+| `created_at`     | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`     | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+
+### `cache_routes` Table
+Stores cached metadata about frontend routes for sync/scan purposes.
+
+| Column           | Type         | Constraints                        | Description                             |
+|------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`             | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `path`           | VARCHAR(255) | NOT NULL, UNIQUE                   | Route path                              |
+| `description`    | TEXT         | NULL                               | Description of the route                |
+| `component_name` | VARCHAR(255) | NULL                               | Name of the associated component        |
+| `last_synced_at` | DATETIME     | NULL                               | Timestamp of last sync                  |
+| `metadata`       | TEXT         | NULL                               | Additional metadata (JSON)              |
+| `created_at`     | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`     | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+
+### `cache_endpoints` Table
+Stores cached metadata about API endpoints for sync/scan purposes.
+
+| Column           | Type         | Constraints                        | Description                             |
+|------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`             | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `method`         | VARCHAR(20)  | NOT NULL                           | HTTP method (GET, POST, etc.)           |
+| `path`           | VARCHAR(255) | NOT NULL                           | API endpoint path                       |
+| `description`    | TEXT         | NULL                               | Description of the endpoint             |
+| `controller_name`| VARCHAR(100) | NULL                               | Controller class name                   |
+| `handler_name`   | VARCHAR(100) | NULL                               | Handler method name                     |
+| `last_synced_at` | DATETIME     | NULL                               | Timestamp of last sync                  |
+| `metadata`       | TEXT         | NULL                               | Additional metadata (JSON)              |
+| `created_at`     | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`     | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+| UNIQUE (`method`, `path`)        |                                    | Ensures method+path combination is unique |

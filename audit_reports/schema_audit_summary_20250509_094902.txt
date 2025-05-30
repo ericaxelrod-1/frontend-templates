@@ -1,0 +1,32 @@
+Schema Alignment Audit Summary (2025-05-09 09:49:03)
+Database: ./src/database/database.sqlite
+Tables found: 15
+Entities found: 21
+Migrations analyzed: 23
+Total mismatches: 101
+
+File Processing:
+  - Entity files processed: 25
+  - Files skipped (invalid entities): 0
+  - Barrel files detected (re-exports): 5
+
+Mismatches by type:
+  - missing_entity: 5
+  - missing_table: 11
+  - nullability_mismatch: 15
+  - missing_column: 25
+  - extra_column: 39
+  - extra_foreign_key: 6
+
+Top mismatches:
+  1. Table 'permission' exists in the database but has no corresponding entity
+  2. Table 'resources' exists in the database but has no corresponding entity
+  3. Table 'user_roles' exists in the database but has no corresponding entity
+  4. Table 'cache_sync_status' exists in the database but has no corresponding entity
+  5. Table 'cache_permission_map' exists in the database but has no corresponding entity
+  6. Entity 'Captcha' expects table 'captcha' which doesn't exist in the database
+  7. Entity 'Tag' expects table 'tag' which doesn't exist in the database
+  8. Entity 'GroupPermission' expects table 'group_permissions' which doesn't exist in the database
+  9. Entity 'Component' expects table 'components' which doesn't exist in the database
+  10. Entity 'IPReputation' expects table 'i_p_reputation' which doesn't exist in the database
+  ... and 91 more (see full report)

@@ -26,8 +26,9 @@ export const environment: Environment = {
     lockoutTime: 300 // 5 minutes
   },
   captcha: {
-    enabled: true,
-    difficulty: 'medium'
+    enabled: true, // Re-enabled for proper security
+    difficulty: 'medium', // Set to medium for production
+    skipForDevelopment: false // Don't skip CAPTCHA in production
   },
   debugMode: true
 }; 

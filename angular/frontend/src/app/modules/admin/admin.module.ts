@@ -34,7 +34,7 @@ const routes: Routes = [
     component: LoginMonitoringComponent,
     canActivate: [PermissionGuard],
     data: {
-      permissions: 'monitoring:access'
+      permissions: 'system:admin'
     }
   },
   {
@@ -42,7 +42,7 @@ const routes: Routes = [
     loadChildren: () => import('../../features/admin/permissions-management/permissions-management.module').then(m => m.PermissionsManagementModule),
     canActivate: [PermissionGuard],
     data: {
-      permissions: 'permissions:manage'
+      permissions: 'permissions:admin'
     }
   }
 ];
