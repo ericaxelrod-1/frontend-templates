@@ -78,6 +78,7 @@
   justify-content: flex-end;
   flex: 0 0 auto;
   gap: abstracts.$spacing-xs;
+  position: relative;
 }
 
 .user-menu-button {
@@ -94,6 +95,7 @@
   border: none;
   background: transparent;
   cursor: pointer;
+  position: relative;
   
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);
@@ -155,6 +157,11 @@
   font-size: 0.75rem;
   color: var(--mdc-theme-text-secondary);
   word-break: break-word;
+}
+
+::ng-deep .mat-mdc-menu-panel {
+  position: absolute !important;
+  z-index: 1001 !important;
 }
 
 ::ng-deep .mat-mdc-menu-content {

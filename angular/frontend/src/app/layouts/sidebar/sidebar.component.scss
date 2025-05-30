@@ -3,15 +3,15 @@
 
 // Ultra-optimized Sidebar Component - Target: <24kB
 .sidebar {
-  height: 100vh;
+  height: calc(100vh - 64px); // Account for fixed header height
   background: var(--mdc-theme-surface);
   border-right: 1px solid rgba(var(--mdc-theme-on-surface-rgb), 0.12);
   display: flex;
   flex-direction: column;
   position: fixed;
   left: 0;
-  top: 0;
-  z-index: 1000;
+  top: 64px; // Position below the fixed header
+  z-index: 999; // Below header (1000) but above content
   width: 280px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -22,6 +22,12 @@
     transition: transform 0.3s ease;
     
     &.open { transform: translateX(0); }
+  }
+  
+  // Mobile header height adjustment
+  @media (max-width: 599px) {
+    height: calc(100vh - 56px);
+    top: 56px;
   }
 }
 

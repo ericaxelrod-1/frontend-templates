@@ -17,9 +17,16 @@
 .sidenav-container {
   flex: 1;
   display: flex;
-  min-height: 0;
+  min-height: calc(100vh - 64px);
+  margin-top: 64px;
   width: 100%;
   background-color: var(--mdc-theme-background);
+  position: relative;
+  
+  @media (max-width: 599px) {
+    margin-top: 56px;
+    min-height: calc(100vh - 56px);
+  }
 }
 
 .sidebar {
@@ -27,9 +34,19 @@
   background-color: var(--mdc-theme-surface);
   border-right: 1px solid var(--mdc-theme-outline);
   box-shadow: abstracts.$elevation-2;
+  position: fixed !important; // Override Material sidenav positioning
+  top: 64px !important;
+  left: 0 !important;
+  height: calc(100vh - 64px) !important;
+  z-index: 999 !important;
   
   @include abstracts.respond-to(lg) {
     width: 320px; // Wider on large screens
+  }
+  
+  @media (max-width: 599px) {
+    top: 56px !important;
+    height: calc(100vh - 56px) !important;
   }
 }
 
@@ -38,11 +55,28 @@
   flex-direction: column;
   min-height: calc(100vh - 64px);
   margin-top: 64px;
+  margin-left: 280px; // Account for sidebar width
   background-color: var(--mdc-theme-background);
   color: var(--mdc-theme-on-background);
   flex: 1;
-  width: 100%;
+  width: calc(100% - 280px); // Adjust width for sidebar
   overflow-x: hidden;
+  
+  // Responsive adjustments
+  @media (max-width: 1279px) {
+    margin-left: 256px;
+    width: calc(100% - 256px);
+  }
+  
+  @media (max-width: 959px) {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  @media (max-width: 599px) {
+    margin-top: 56px;
+    min-height: calc(100vh - 56px);
+  }
 }
 
 .content-wrapper {

@@ -1,20 +1,11 @@
 <div class="dashboard-container">
-  <!-- Dashboard Header with Material Design Typography -->
-  <header class="dashboard-header">
-    <div class="header-content">
-      <div class="logo-section">
-        <img *ngIf="headerLogo" [src]="headerLogo" alt="{{appName}} Logo" class="dashboard-logo">
-        <h1 *ngIf="!headerLogo" class="mat-headline-medium app-title">{{appName}}</h1>
-      </div>
-      <div class="title-section">
-        <h1 class="mat-headline-large dashboard-title">Dashboard</h1>
-        <p class="mat-body-1 text-secondary dashboard-subtitle">Welcome back! Here's an overview of your system.</p>
-      </div>
-    </div>
-  </header>
-  
-  <!-- Dashboard Grid with Enhanced Material Design Cards -->
+  <!-- Dashboard Content with Proper Grid Layout -->
   <main class="dashboard-content" role="main">
+    <div class="dashboard-header">
+      <h1 class="mat-headline-large dashboard-title">Dashboard</h1>
+      <p class="mat-body-1 text-secondary dashboard-subtitle">Welcome back! Here's an overview of your system.</p>
+    </div>
+    
     <div class="dashboard-grid">
       <!-- Users Card -->
       <mat-card class="dashboard-card users-card" 

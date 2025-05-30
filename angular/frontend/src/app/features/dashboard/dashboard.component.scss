@@ -3,24 +3,30 @@
 
 // Ultra-optimized Dashboard Component - Target: <24kB
 .dashboard-container {
-  @include flex-center();
   padding: $spacing-lg;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: 100%;
+  width: 100%;
   
   @media (max-width: 959px) { padding: $spacing-md; }
   @media (max-width: 599px) { padding: $spacing-sm; }
 }
 
+.dashboard-content {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 .dashboard-header {
   margin-bottom: $spacing-xl;
+  text-align: left;
   
-  h1 {
+  .dashboard-title {
     margin: 0 0 $spacing-sm 0;
     color: var(--mdc-theme-on-surface);
   }
   
-  .subtitle {
+  .dashboard-subtitle {
     color: rgba(var(--mdc-theme-on-surface-rgb), 0.7);
     margin: 0;
   }
