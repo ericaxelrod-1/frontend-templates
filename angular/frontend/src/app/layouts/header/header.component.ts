@@ -31,6 +31,7 @@ import { MatDividerModule } from '@angular/material/divider';
 })
 export class HeaderComponent implements OnInit, OnDestroy {
   @Input() isFixedHeader = false;
+  @Input() sidebarOpened = true;
   @Output() sidebarToggle = new EventEmitter<void>();
   
   isAuthenticated = false;

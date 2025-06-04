@@ -2,7 +2,6 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterModule } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
-import { BreakpointObserver, Breakpoints, LayoutModule } from '@angular/cdk/layout';
 import { HeaderComponent } from '../header/header.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { FooterComponent } from '../footer/footer.component';
@@ -18,104 +17,66 @@ import { takeUntil } from 'rxjs/operators';
     RouterOutlet,
     RouterModule,
     MatSidenavModule,
-    LayoutModule,
     HeaderComponent,
     SidebarComponent,
     FooterComponent
   ],
   template: `
-    <div class="app-container">
-      <app-header (sidebarToggle)="toggleSidebar()"></app-header>
+    <!-- APPROACH 1: Header Outside Sidenav Container -->
+    <!-- This eliminates all z-index conflicts and positioning issues -->
+    <app-header 
+      [sidebarOpened]="layoutConfig.sidebarOpened"
+      (sidebarToggle)="toggleSidebar()">
+    </app-header>
+    
+    <!-- Sidenav container positioned below fixed header -->
+    <mat-sidenav-container 
+      class="layout-container"
+      [autosize]="false"
+      [hasBackdrop]="false">
       
-      <mat-sidenav-container class="sidenav-container" hasBackdrop="false">
-        <mat-sidenav 
-          [opened]="layoutConfig.sidebarOpened" 
-          [mode]="layoutConfig.sidebarMode"
-          position="start"
-          [disableClose]="false"
-          [fixedInViewport]="true"
-          [fixedTopGap]="64"
-          [fixedBottomGap]="0"
-          class="sidebar">
-          <app-sidebar></app-sidebar>
-        </mat-sidenav>
+      <mat-sidenav 
+        #drawer
+        mode="side"
+        [opened]="layoutConfig.sidebarOpened"
+        [disableClose]="true"
+        class="layout-sidenav">
+        <app-sidebar></app-sidebar>
+      </mat-sidenav>
+
+      <mat-sidenav-content class="layout-content">
+        <main class="main-content">
+          <router-outlet></router-outlet>
+        </main>
         
-        <mat-sidenav-content class="main-content">
-          <div class="content-wrapper">
-            <router-outlet></router-outlet>
-          </div>
-          <app-footer></app-footer>
-        </mat-sidenav-content>
-      </mat-sidenav-container>
-    </div>
+        <app-footer></app-footer>
+      </mat-sidenav-content>
+    </mat-sidenav-container>
   `,
-  styles: [`
-    .app-container {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-    
-    .sidenav-container {
-      flex: 1;
-      width: 100%;
-    }
-    
-    .sidebar {
-      background-color: var(--mdc-theme-surface);
-      border-right: 1px solid var(--mdc-theme-outline);
-      overflow-x: hidden;
-      overflow-y: auto;
-    }
-    
-    .main-content {
-      background-color: var(--mdc-theme-background);
-      color: var(--mdc-theme-on-background);
-      padding: 0;
-      overflow: auto;
-      flex: 1;
-    }
-    
-    .content-wrapper {
-      padding: 20px;
-      min-height: calc(100vh - 64px - 50px);
-      max-width: 100%;
-      box-sizing: border-box;
-    }
-  `]
+  styleUrls: ['./default.component.scss']
 })
 export class DefaultLayoutComponent implements OnInit, OnDestroy {
-  layoutConfig: LayoutConfig;
   private destroy$ = new Subject<void>();
+  
+  layoutConfig: LayoutConfig = {
+    sidebarWidth: 280,
+    sidebarMode: 'side',
+    sidebarOpened: true,
+    responsiveState: 'fixed',
+    isMobile: false
+  };
 
-  constructor(
-    private layoutService: LayoutService,
-    private breakpointObserver: BreakpointObserver
-  ) {
-    this.layoutConfig = this.layoutService.currentConfig;
-  }
+  constructor(private layoutService: LayoutService) {}
 
   ngOnInit(): void {
-    // Subscribe to layout config changes
+    // Set fixed sidebar configuration
+    this.layoutService.setFixedSidebarConfiguration();
+    
+    // Subscribe to layout config changes (for manual toggle only)
     this.layoutService.config$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(config => {
+      .subscribe((config: LayoutConfig) => {
         this.layoutConfig = config;
-      });
-
-    // Handle responsive breakpoints using Angular CDK
-    this.breakpointObserver
-      .observe([
-        Breakpoints.HandsetPortrait,
-        Breakpoints.HandsetLandscape,
-        Breakpoints.TabletPortrait,
-        '(max-width: 959px)'
-      ])
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(result => {
-        const isMobile = result.matches;
-        this.layoutService.setMobileState(isMobile);
       });
   }
 

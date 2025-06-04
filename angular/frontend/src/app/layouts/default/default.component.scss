@@ -1,0 +1,52 @@
+@use '../../../styles/abstracts' as *;
+
+// APPROACH 1: HEADER OUTSIDE SIDENAV ARCHITECTURE
+// This eliminates all responsive behavior and positioning conflicts
+
+.layout-container {
+  // Position below fixed header (64px height)
+  height: calc(100vh - 64px);
+  margin-top: 64px;
+  width: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+.layout-sidenav {
+  background-color: var(--mdc-theme-surface);
+  border-right: 1px solid var(--mdc-theme-outline);
+  overflow-x: hidden;
+  overflow-y: auto;
+  
+  // FIXED WIDTH - Angular Material respects this when header is outside
+  width: 280px !important;
+  min-width: 280px !important;
+  max-width: 280px !important;
+  flex: 0 0 280px !important;
+}
+
+.layout-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--mdc-theme-background);
+  color: var(--mdc-theme-on-background);
+  
+  // No margin adjustments needed - Angular Material handles this correctly
+}
+
+.main-content {
+  flex: 1;
+  overflow: auto;
+  padding: $spacing-lg;
+  min-height: 0; // Important for proper flex behavior
+}
+
+// Responsive header height adjustments
+@media (max-width: 599px) {
+  .layout-container {
+    height: calc(100vh - 56px); // Mobile header height
+    margin-top: 56px;
+  }
+} 

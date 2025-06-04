@@ -174,52 +174,13 @@ html, body {
   }
 }
 
-/* ANGULAR BEST PRACTICES: LAYOUT SYSTEM */
-/* Clean CSS custom properties approach for sidebar width control */
+/* APPROACH 1: MINIMAL OVERRIDES - LET ANGULAR MATERIAL WORK CORRECTLY */
+/* With header outside sidenav, we only need basic width enforcement */
 
-/* CRITICAL: Sidebar width is ALWAYS 280px regardless of screen size */
 .mat-sidenav {
   width: 280px !important;
   min-width: 280px !important;
   max-width: 280px !important;
-  flex-basis: 280px !important;
-  flex-grow: 0 !important;
-  flex-shrink: 0 !important;
 }
 
-/* Force override Angular Material's CSS custom properties */
-.mat-sidenav-container {
-  --mat-sidenav-container-width: 280px !important;
-}
-
-/* Additional overrides to prevent ANY responsive behavior */
-@media screen and (max-width: 2000px) {
-  .mat-sidenav {
-    width: 280px !important;
-    min-width: 280px !important;
-    max-width: 280px !important;
-    flex-basis: 280px !important;
-  }
-}
-
-/* Layout mode specific styles - only affects positioning, not width */
-.sidebar-mode-side .mat-sidenav {
-  position: relative;
-}
-
-.sidebar-mode-over .mat-sidenav {
-  position: absolute;
-  z-index: 999;
-}
-
-.sidebar-mode-push .mat-sidenav {
-  position: relative;
-}
-
-/* Mobile layout adjustments - affects mode only, width stays 280px */
-.mobile-layout .mat-sidenav {
-  /* Width remains 280px even on mobile */
-  width: 280px !important;
-  min-width: 280px !important;
-  max-width: 280px !important;
-} 
+/* End of styles - Angular Material handles the rest correctly with header outside sidenav */ 

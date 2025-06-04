@@ -2,11 +2,14 @@ import { Injectable, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { DOCUMENT } from '@angular/common';
 
+export type ResponsiveState = 'fixed'; // Simplified to only fixed state
+
 export interface LayoutConfig {
   sidebarWidth: number;
-  sidebarMode: 'side' | 'over' | 'push';
+  sidebarMode: 'side'; // Fixed to side mode only
   sidebarOpened: boolean;
-  isMobile: boolean;
+  responsiveState: ResponsiveState;
+  isMobile: boolean; // Kept for backward compatibility but always false
 }
 
 @Injectable({
@@ -17,6 +20,7 @@ export class LayoutService {
     sidebarWidth: 280,
     sidebarMode: 'side',
     sidebarOpened: true,
+    responsiveState: 'fixed',
     isMobile: false
   };
 
@@ -43,27 +47,48 @@ export class LayoutService {
     this.updateCssCustomProperties(newConfig);
   }
 
+  /**
+   * Set fixed, non-responsive sidebar configuration
+   * This ensures consistent behavior across all screen sizes
+   */
+  setFixedSidebarConfiguration(): void {
+    this.updateConfig({
+      sidebarWidth: 280,
+      sidebarMode: 'side',
+      sidebarOpened: true,
+      responsiveState: 'fixed',
+      isMobile: false
+    });
+  }
+
   setSidebarWidth(width: number): void {
+    // Allow width changes but maintain fixed mode
     this.updateConfig({ sidebarWidth: width });
   }
 
-  setSidebarMode(mode: 'side' | 'over' | 'push'): void {
-    this.updateConfig({ sidebarMode: mode });
-  }
-
   toggleSidebar(): void {
+    // Manual toggle for user preference - this is the only way sidebar state changes
     this.updateConfig({ 
       sidebarOpened: !this.currentConfig.sidebarOpened 
     });
   }
 
+  /** @deprecated No longer supported - sidebar is always fixed */
+  setSidebarMode(mode: 'side' | 'over' | 'push'): void {
+    // Maintain fixed side mode regardless of input
+    this.updateConfig({ sidebarMode: 'side' });
+  }
+
+  /** @deprecated No longer supported - sidebar is not responsive */
+  setResponsiveState(state: string): void {
+    // Do nothing - sidebar maintains fixed configuration
+    console.warn('setResponsiveState is deprecated - sidebar is now fixed at all screen sizes');
+  }
+
+  /** @deprecated No longer supported - sidebar is not responsive */
   setMobileState(isMobile: boolean): void {
-    this.updateConfig({ 
-      isMobile,
-      sidebarMode: isMobile ? 'over' : 'side',
-      sidebarOpened: true,
-      sidebarWidth: 280
-    });
+    // Do nothing - sidebar maintains fixed configuration
+    console.warn('setMobileState is deprecated - sidebar is now fixed at all screen sizes');
   }
 
   private initializeCssCustomProperties(): void {
@@ -73,15 +98,16 @@ export class LayoutService {
   private updateCssCustomProperties(config: LayoutConfig): void {
     const root = this.document.documentElement;
     
-    // Set sidebar mode class for positioning behavior only
-    root.classList.remove('sidebar-mode-side', 'sidebar-mode-over', 'sidebar-mode-push');
-    root.classList.add(`sidebar-mode-${config.sidebarMode}`);
+    // Clean up old responsive classes
+    root.classList.remove(
+      'sidebar-mode-side', 'sidebar-mode-over', 'sidebar-mode-push',
+      'mobile-layout', 'tablet-layout', 'desktop-layout'
+    );
     
-    // Set mobile state class for mode styling only
-    if (config.isMobile) {
-      root.classList.add('mobile-layout');
-    } else {
-      root.classList.remove('mobile-layout');
-    }
+    // Set fixed sidebar mode class only
+    root.classList.add('sidebar-mode-side');
+    
+    // Set fixed layout class
+    root.classList.add('fixed-layout');
   }
 } 
