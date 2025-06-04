@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterModule } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -140,12 +140,10 @@ import { FooterComponent } from '../footer/footer.component';
     }
   `]
 })
-export class AdminLayoutComponent implements OnInit {
+export class AdminLayoutComponent {
   sidebarOpened = true;
 
   constructor() {}
-
-  ngOnInit(): void {}
 
   toggleSidebar(): void {
     this.sidebarOpened = !this.sidebarOpened;

@@ -10,7 +10,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { provideAnimations } from '@angular/platform-browser/animations';
 import { AuthService } from '../../../core/services/auth.service';
 import { AppConfigService } from '../../../core/services';
 
@@ -28,9 +27,6 @@ import { AppConfigService } from '../../../core/services';
     MatButtonModule,
     MatInputModule,
     MatFormFieldModule
-  ],
-  providers: [
-    provideAnimations()
   ]
 })
 export class ForgotPasswordComponent implements OnInit, OnDestroy {

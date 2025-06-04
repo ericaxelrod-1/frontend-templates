@@ -1,10 +1,14 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterModule } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { BreakpointObserver, Breakpoints, LayoutModule } from '@angular/cdk/layout';
 import { HeaderComponent } from '../header/header.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { FooterComponent } from '../footer/footer.component';
+import { LayoutService, LayoutConfig } from '../../core/services/layout.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-default-layout',
@@ -14,6 +18,7 @@ import { FooterComponent } from '../footer/footer.component';
     RouterOutlet,
     RouterModule,
     MatSidenavModule,
+    LayoutModule,
     HeaderComponent,
     SidebarComponent,
     FooterComponent
@@ -22,10 +27,16 @@ import { FooterComponent } from '../footer/footer.component';
     <div class="app-container">
       <app-header (sidebarToggle)="toggleSidebar()"></app-header>
       
-      <mat-sidenav-container class="sidenav-container">
-        <mat-sidenav [opened]="sidebarOpened" 
-                     mode="side" 
-                     class="sidebar">
+      <mat-sidenav-container class="sidenav-container" hasBackdrop="false">
+        <mat-sidenav 
+          [opened]="layoutConfig.sidebarOpened" 
+          [mode]="layoutConfig.sidebarMode"
+          position="start"
+          [disableClose]="false"
+          [fixedInViewport]="true"
+          [fixedTopGap]="64"
+          [fixedBottomGap]="0"
+          class="sidebar">
           <app-sidebar></app-sidebar>
         </mat-sidenav>
         
@@ -52,31 +63,68 @@ import { FooterComponent } from '../footer/footer.component';
     }
     
     .sidebar {
-      width: 250px;
-      background-color: #f8f9fa;
-      border-right: 1px solid #dee2e6;
+      background-color: var(--mdc-theme-surface);
+      border-right: 1px solid var(--mdc-theme-outline);
+      overflow-x: hidden;
+      overflow-y: auto;
     }
     
     .main-content {
-      background-color: #f8f9fa;
+      background-color: var(--mdc-theme-background);
+      color: var(--mdc-theme-on-background);
       padding: 0;
       overflow: auto;
+      flex: 1;
     }
     
     .content-wrapper {
       padding: 20px;
-      min-height: calc(100vh - 64px - 50px); /* Viewport height - header - footer */
+      min-height: calc(100vh - 64px - 50px);
+      max-width: 100%;
+      box-sizing: border-box;
     }
   `]
 })
-export class DefaultLayoutComponent implements OnInit {
-  sidebarOpened = true;
+export class DefaultLayoutComponent implements OnInit, OnDestroy {
+  layoutConfig: LayoutConfig;
+  private destroy$ = new Subject<void>();
 
-  constructor() {}
+  constructor(
+    private layoutService: LayoutService,
+    private breakpointObserver: BreakpointObserver
+  ) {
+    this.layoutConfig = this.layoutService.currentConfig;
+  }
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    // Subscribe to layout config changes
+    this.layoutService.config$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(config => {
+        this.layoutConfig = config;
+      });
+
+    // Handle responsive breakpoints using Angular CDK
+    this.breakpointObserver
+      .observe([
+        Breakpoints.HandsetPortrait,
+        Breakpoints.HandsetLandscape,
+        Breakpoints.TabletPortrait,
+        '(max-width: 959px)'
+      ])
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(result => {
+        const isMobile = result.matches;
+        this.layoutService.setMobileState(isMobile);
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   toggleSidebar(): void {
-    this.sidebarOpened = !this.sidebarOpened;
+    this.layoutService.toggleSidebar();
   }
 } 

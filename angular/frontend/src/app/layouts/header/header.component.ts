@@ -7,6 +7,7 @@ import { AuthActions } from '../../store/auth/auth.state';
 import { User } from '../../models';
 import { AppConfigService } from '../../core/services';
 import { AuthService } from '../../core/services/auth.service';
+import { LayoutService, LayoutConfig } from '../../core/services/layout.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -30,11 +31,11 @@ import { MatDividerModule } from '@angular/material/divider';
 })
 export class HeaderComponent implements OnInit, OnDestroy {
   @Input() isFixedHeader = false;
-  @Input() sidebarOpened = false;
   @Output() sidebarToggle = new EventEmitter<void>();
   
   isAuthenticated = false;
   user: User | null = null;
+  layoutConfig: LayoutConfig;
   private subscription = new Subscription();
   
   // App configuration properties
@@ -45,10 +46,12 @@ export class HeaderComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private store: Store,
     private appConfig: AppConfigService,
-    private router: Router
+    private router: Router,
+    private layoutService: LayoutService
   ) {
     this.appName = this.appConfig.appName;
     this.headerLogo = this.appConfig.headerLogo;
+    this.layoutConfig = this.layoutService.currentConfig;
   }
   
   ngOnInit(): void {
@@ -57,6 +60,13 @@ export class HeaderComponent implements OnInit, OnDestroy {
       this.authService.currentUser$.subscribe(user => {
         this.user = user;
         this.isAuthenticated = this.authService.isAuthenticated;
+      })
+    );
+
+    // Subscribe to layout config changes
+    this.subscription.add(
+      this.layoutService.config$.subscribe(config => {
+        this.layoutConfig = config;
       })
     );
   }

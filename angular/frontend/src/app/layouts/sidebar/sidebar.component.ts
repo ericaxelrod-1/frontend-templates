@@ -1,8 +1,6 @@
 import { Component, Input, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatDividerModule } from '@angular/material/divider';
 import { RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
@@ -15,9 +13,7 @@ import { User } from '../../models/user.model';
   standalone: true,
   imports: [
     CommonModule,
-    MatListModule,
     MatIconModule,
-    MatSidenavModule,
     MatDividerModule,
     RouterModule
   ],

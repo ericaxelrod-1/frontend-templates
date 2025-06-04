@@ -1,12 +1,31 @@
 /* Import Angular Material and our custom theme */
 @use '@angular/material' as mat;
-@use 'styles/abstracts/typography';
+
+/* Include the common styles for Angular Material */
+@include mat.core();
+
+/* Define the Material Design typography configuration */
+$material-typography: mat.define-typography-config(
+  $font-family: 'Roboto, "Helvetica Neue", sans-serif',
+  $headline-1: mat.define-typography-level(112px, 112px, 300, $letter-spacing: -0.05em),
+  $headline-2: mat.define-typography-level(56px, 56px, 400, $letter-spacing: -0.02em),
+  $headline-3: mat.define-typography-level(45px, 48px, 400, $letter-spacing: -0.005em),
+  $headline-4: mat.define-typography-level(34px, 40px, 400),
+  $headline-5: mat.define-typography-level(24px, 32px, 400),
+  $headline-6: mat.define-typography-level(20px, 32px, 500),
+  $subtitle-1: mat.define-typography-level(16px, 28px, 400),
+  $subtitle-2: mat.define-typography-level(15px, 24px, 400),
+  $body-1: mat.define-typography-level(14px, 20px, 400),
+  $body-2: mat.define-typography-level(14px, 24px, 500),
+  $caption: mat.define-typography-level(12px, 20px, 400),
+  $button: mat.define-typography-level(14px, 14px, 500)
+);
 
 /* Define accessible Material Design palettes */
 /* Using Indigo instead of Purple for better contrast ratios (WCAG AA compliance) */
-$primary-palette: mat.define-palette(mat.$indigo-palette, 600);
-$accent-palette: mat.define-palette(mat.$green-palette, A400);
-$warn-palette: mat.define-palette(mat.$red-palette, 500);
+$primary-palette: mat.define-palette(mat.$indigo-palette);
+$accent-palette: mat.define-palette(mat.$pink-palette, A200, A100, A400);
+$warn-palette: mat.define-palette(mat.$red-palette);
 
 /* Create light theme with WCAG AA compliance */
 $light-theme: mat.define-light-theme((
@@ -15,37 +34,48 @@ $light-theme: mat.define-light-theme((
     accent: $accent-palette,
     warn: $warn-palette,
   ),
-  typography: mat.define-typography-config(),
+  typography: $material-typography,
+  density: 0,
+));
+
+/* Create dark theme with WCAG AA compliance */
+$dark-theme: mat.define-dark-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  ),
+  typography: $material-typography,
   density: 0,
 ));
 
 /* Apply theme to all Material components */
 @include mat.all-component-themes($light-theme);
 
-/* CSS Custom Properties for non-Material components */
-/* These provide a single source of truth for colors */
+/* CSS Custom Properties for Layout System */
 :root {
   /* Primary colors with proper contrast */
-  --mdc-theme-primary: #{mat.get-color-from-palette($primary-palette)};
-  --mdc-theme-on-primary: #{mat.get-color-from-palette($primary-palette, default-contrast)};
+  --mdc-theme-primary: #{mat.get-color-from-palette($primary-palette, 500)};
+  --mdc-theme-primary-rgb: #{red(mat.get-color-from-palette($primary-palette, 500))}, #{green(mat.get-color-from-palette($primary-palette, 500))}, #{blue(mat.get-color-from-palette($primary-palette, 500))};
+  --mdc-theme-on-primary: #{mat.get-contrast-color-from-palette($primary-palette, 500)};
   --mdc-theme-primary-light: #{mat.get-color-from-palette($primary-palette, lighter)};
   --mdc-theme-primary-dark: #{mat.get-color-from-palette($primary-palette, darker)};
   --mdc-theme-primary-container: #{mat.get-color-from-palette($primary-palette, 50)};
   --mdc-theme-on-primary-container: #{mat.get-color-from-palette($primary-palette, 900)};
   
   /* Accent colors */
-  --mdc-theme-accent: #{mat.get-color-from-palette($accent-palette)};
-  --mdc-theme-on-accent: #{mat.get-color-from-palette($accent-palette, default-contrast)};
+  --mdc-theme-accent: #{mat.get-color-from-palette($accent-palette, A200)};
+  --mdc-theme-on-accent: #{mat.get-contrast-color-from-palette($accent-palette, A200)};
   
   /* Surface and background colors */
-  --mdc-theme-surface: #{mat.get-color-from-palette(mat.$grey-palette, 50)};
+  --mdc-theme-surface: #ffffff;
   --mdc-theme-background: #fafafa;
-  --mdc-theme-on-surface: #{mat.get-color-from-palette(mat.$grey-palette, 900)};
-  --mdc-theme-on-background: #{mat.get-color-from-palette(mat.$grey-palette, 900)};
+  --mdc-theme-on-surface: #000000;
+  --mdc-theme-on-background: #000000;
   
   /* Semantic colors */
-  --mdc-theme-error: #{mat.get-color-from-palette($warn-palette)};
-  --mdc-theme-on-error: #{mat.get-color-from-palette($warn-palette, default-contrast)};
+  --mdc-theme-error: #{mat.get-color-from-palette($warn-palette, 500)};
+  --mdc-theme-on-error: #{mat.get-contrast-color-from-palette($warn-palette, 500)};
   --mdc-theme-success: #4caf50;
   --mdc-theme-warning: #ff9800;
   --mdc-theme-info: #2196f3;
@@ -62,10 +92,10 @@ $light-theme: mat.define-light-theme((
 
 /* Dark theme support */
 .dark-theme {
-  --mdc-theme-surface: #{mat.get-color-from-palette(mat.$grey-palette, 800)};
+  --mdc-theme-surface: #121212;
   --mdc-theme-background: #121212;
-  --mdc-theme-on-surface: #{mat.get-color-from-palette(mat.$grey-palette, 100)};
-  --mdc-theme-on-background: #{mat.get-color-from-palette(mat.$grey-palette, 100)};
+  --mdc-theme-on-surface: #ffffff;
+  --mdc-theme-on-background: #ffffff;
   --mdc-theme-primary-container: #{mat.get-color-from-palette($primary-palette, 900)};
   --mdc-theme-on-primary-container: #{mat.get-color-from-palette($primary-palette, 100)};
   
@@ -140,5 +170,56 @@ html, body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
+}
+
+/* ANGULAR BEST PRACTICES: LAYOUT SYSTEM */
+/* Clean CSS custom properties approach for sidebar width control */
+
+/* CRITICAL: Sidebar width is ALWAYS 280px regardless of screen size */
+.mat-sidenav {
+  width: 280px !important;
+  min-width: 280px !important;
+  max-width: 280px !important;
+  flex-basis: 280px !important;
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+/* Force override Angular Material's CSS custom properties */
+.mat-sidenav-container {
+  --mat-sidenav-container-width: 280px !important;
+}
+
+/* Additional overrides to prevent ANY responsive behavior */
+@media screen and (max-width: 2000px) {
+  .mat-sidenav {
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+    flex-basis: 280px !important;
+  }
+}
+
+/* Layout mode specific styles - only affects positioning, not width */
+.sidebar-mode-side .mat-sidenav {
+  position: relative;
+}
+
+.sidebar-mode-over .mat-sidenav {
+  position: absolute;
+  z-index: 999;
+}
+
+.sidebar-mode-push .mat-sidenav {
+  position: relative;
+}
+
+/* Mobile layout adjustments - affects mode only, width stays 280px */
+.mobile-layout .mat-sidenav {
+  /* Width remains 280px even on mobile */
+  width: 280px !important;
+  min-width: 280px !important;
+  max-width: 280px !important;
 } 

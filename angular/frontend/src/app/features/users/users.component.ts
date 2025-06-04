@@ -15,8 +15,6 @@ import { LoggerService } from '../../services/logging/logger.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { User } from '../../models/user.model';
 import { Group } from '../../models/group.model';
-// Import kept for legacy display purposes only, not used for access control
-import { SystemRoles } from '../../core/constants/roles';
 import { PermissionsModule } from '../../shared/modules/permissions.module';
 
 @Component({

@@ -1,8 +1,8 @@
-<div class="sidenav-content">
+<div class="sidebar">
   <!-- Sidebar Header with User Info -->
-  <div class="sidenav-header">
+  <div class="sidebar-header">
     <div class="logo-container">
-      <img src="assets/logos/logo.png" alt="Application Logo" class="sidebar-logo">
+      <img src="assets/logos/logo.png" alt="Application Logo" class="logo">
     </div>
     
     <div class="user-info" *ngIf="currentUser">
@@ -14,98 +14,106 @@
   <mat-divider></mat-divider>
 
   <!-- Main Navigation -->
-  <nav role="navigation" aria-label="Main navigation" class="menu-items">
+  <div class="sidebar-content">
     <!-- Primary Navigation Section -->
     <div class="nav-section">
-      <h3 class="section-header mat-caption" id="primary-nav-heading">Navigation</h3>
+      <h3 class="section-title" id="primary-nav-heading">Navigation</h3>
       
-      <ng-container *ngFor="let item of commonNavItems">
-        <a mat-list-item 
-           *ngIf="!item.permission || hasPermission(item.permission)" 
-           [routerLink]="item.route" 
-           routerLinkActive="active-link"
-           [attr.aria-label]="'Navigate to ' + item.label"
-           class="menu-item"
-           role="menuitem">
-          <mat-icon matListItemIcon [attr.aria-hidden]="true">{{ item.icon }}</mat-icon>
-          <span matListItemTitle class="mat-body-1">{{ item.label }}</span>
-        </a>
-      </ng-container>
+      <ul class="nav-list" role="menu" aria-labelledby="primary-nav-heading">
+        <li *ngFor="let item of commonNavItems">
+          <a *ngIf="!item.permission || hasPermission(item.permission)" 
+             [routerLink]="item.route" 
+             routerLinkActive="active"
+             [attr.aria-label]="'Navigate to ' + item.label"
+             class="nav-link"
+             role="menuitem">
+            <span class="nav-icon" [attr.aria-hidden]="true">{{ item.icon }}</span>
+            <span class="nav-text">{{ item.label }}</span>
+          </a>
+        </li>
+      </ul>
     </div>
 
     <!-- Management Section -->
     <div class="nav-section" *ngIf="isAdminOrManager">
-      <h3 class="section-header mat-caption" id="management-nav-heading">Management</h3>
+      <h3 class="section-title" id="management-nav-heading">Management</h3>
       
-      <ng-container *ngFor="let item of adminNavItems">
-        <a mat-list-item 
-           *ngIf="hasPermission(item.permission)" 
-           [routerLink]="item.route" 
-           routerLinkActive="active-link"
-           [attr.aria-label]="'Navigate to ' + item.label"
-           class="menu-item"
-           role="menuitem">
-          <mat-icon matListItemIcon [attr.aria-hidden]="true">{{ item.icon }}</mat-icon>
-          <span matListItemTitle class="mat-body-1">{{ item.label }}</span>
-        </a>
-      </ng-container>
+      <ul class="nav-list" role="menu" aria-labelledby="management-nav-heading">
+        <li *ngFor="let item of adminNavItems">
+          <a *ngIf="hasPermission(item.permission)" 
+             [routerLink]="item.route" 
+             routerLinkActive="active"
+             [attr.aria-label]="'Navigate to ' + item.label"
+             class="nav-link"
+             role="menuitem">
+            <span class="nav-icon" [attr.aria-hidden]="true">{{ item.icon }}</span>
+            <span class="nav-text">{{ item.label }}</span>
+          </a>
+        </li>
+      </ul>
     </div>
 
     <!-- Admin Section -->
     <div class="nav-section" *ngIf="hasAdminAccess()">
-      <h3 class="section-header mat-caption" id="admin-nav-heading">Administration</h3>
+      <h3 class="section-title" id="admin-nav-heading">Administration</h3>
       
-      <ng-container *ngFor="let item of adminItems">
-        <a mat-list-item 
-           *ngIf="hasPermission(item.permission)" 
-           [routerLink]="item.route" 
-           routerLinkActive="active-link"
-           [attr.aria-label]="'Navigate to ' + item.label + ' (Admin section)'"
-           class="menu-item admin-item"
-           role="menuitem">
-          <mat-icon matListItemIcon [attr.aria-hidden]="true">{{ item.icon }}</mat-icon>
-          <span matListItemTitle class="mat-body-1">{{ item.label }}</span>
-        </a>
-      </ng-container>
+      <ul class="nav-list" role="menu" aria-labelledby="admin-nav-heading">
+        <li *ngFor="let item of adminItems">
+          <a *ngIf="hasPermission(item.permission)" 
+             [routerLink]="item.route" 
+             routerLinkActive="active"
+             [attr.aria-label]="'Navigate to ' + item.label + ' (Admin section)'"
+             class="nav-link"
+             role="menuitem">
+            <span class="nav-icon" [attr.aria-hidden]="true">{{ item.icon }}</span>
+            <span class="nav-text">{{ item.label }}</span>
+          </a>
+        </li>
+      </ul>
     </div>
-  </nav>
+  </div>
 
   <!-- Account Section Footer -->
-  <div class="sidenav-footer">
+  <div class="sidebar-footer">
     <mat-divider></mat-divider>
     
     <div class="nav-section">
-      <h3 class="section-header mat-caption" id="account-nav-heading">Account</h3>
+      <h3 class="section-title" id="account-nav-heading">Account</h3>
       
-      <a mat-list-item 
-         [routerLink]="'/profile'" 
-         routerLinkActive="active-link"
-         aria-label="Navigate to Profile page"
-         class="menu-item"
-         role="menuitem">
-        <mat-icon matListItemIcon aria-hidden="true">person</mat-icon>
-        <span matListItemTitle class="mat-body-1">Profile</span>
-      </a>
-      
-      <a mat-list-item 
-         [routerLink]="'/profile/password-change'" 
-         routerLinkActive="active-link"
-         aria-label="Navigate to Change Password page"
-         class="menu-item"
-         role="menuitem">
-        <mat-icon matListItemIcon aria-hidden="true">lock</mat-icon>
-        <span matListItemTitle class="mat-body-1">Change Password</span>
-      </a>
-      
-      <a mat-list-item 
-         class="menu-item delete-account-link" 
-         [routerLink]="'/profile/delete-account'" 
-         routerLinkActive="active-link"
-         aria-label="Navigate to Delete Account page (Warning: This action is destructive)"
-         role="menuitem">
-        <mat-icon matListItemIcon aria-hidden="true">delete_forever</mat-icon>
-        <span matListItemTitle class="mat-body-1">Delete Account</span>
-      </a>
+      <ul class="nav-list" role="menu" aria-labelledby="account-nav-heading">
+        <li>
+          <a [routerLink]="'/profile'" 
+             routerLinkActive="active"
+             aria-label="Navigate to Profile page"
+             class="nav-link"
+             role="menuitem">
+            <span class="nav-icon" aria-hidden="true">person</span>
+            <span class="nav-text">Profile</span>
+          </a>
+        </li>
+        
+        <li>
+          <a [routerLink]="'/profile/password-change'" 
+             routerLinkActive="active"
+             aria-label="Navigate to Change Password page"
+             class="nav-link"
+             role="menuitem">
+            <span class="nav-icon" aria-hidden="true">lock</span>
+            <span class="nav-text">Change Password</span>
+          </a>
+        </li>
+        
+        <li>
+          <a class="nav-link" 
+             [routerLink]="'/profile/delete-account'" 
+             routerLinkActive="active"
+             aria-label="Navigate to Delete Account page (Warning: This action is destructive)"
+             role="menuitem">
+            <span class="nav-icon" aria-hidden="true">delete_forever</span>
+            <span class="nav-text">Delete Account</span>
+          </a>
+        </li>
+      </ul>
     </div>
   </div>
 </div>
