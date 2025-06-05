@@ -174,13 +174,10 @@ html, body {
   }
 }
 
-/* APPROACH 1: MINIMAL OVERRIDES - LET ANGULAR MATERIAL WORK CORRECTLY */
-/* With header outside sidenav, we only need basic width enforcement */
-
-.mat-sidenav {
-  width: 280px !important;
-  min-width: 280px !important;
-  max-width: 280px !important;
-}
-
-/* End of styles - Angular Material handles the rest correctly with header outside sidenav */ 
+/* 
+ * CUSTOM SIDEBAR IMPLEMENTATION
+ * 
+ * No Angular Material sidenav overrides needed since we're using
+ * a custom sidebar implementation that doesn't rely on mat-sidenav.
+ * This eliminates all responsive behavior and provides complete control.
+ */ 

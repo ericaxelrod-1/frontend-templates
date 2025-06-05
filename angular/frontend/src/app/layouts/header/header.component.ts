@@ -7,13 +7,19 @@ import { AuthActions } from '../../store/auth/auth.state';
 import { User } from '../../models';
 import { AppConfigService } from '../../core/services';
 import { AuthService } from '../../core/services/auth.service';
-import { LayoutService, LayoutConfig } from '../../core/services/layout.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 
+/**
+ * Header Component - Simplified for Custom Layout System
+ * 
+ * Updated to work with the new custom layout system that doesn't require
+ * complex responsive state management. The header now simply receives
+ * sidebar state as input and emits toggle events.
+ */
 @Component({
   selector: 'app-header',
   templateUrl: './header.component.html',
@@ -36,7 +42,6 @@ export class HeaderComponent implements OnInit, OnDestroy {
   
   isAuthenticated = false;
   user: User | null = null;
-  layoutConfig: LayoutConfig;
   private subscription = new Subscription();
   
   // App configuration properties
@@ -47,12 +52,10 @@ export class HeaderComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private store: Store,
     private appConfig: AppConfigService,
-    private router: Router,
-    private layoutService: LayoutService
+    private router: Router
   ) {
     this.appName = this.appConfig.appName;
     this.headerLogo = this.appConfig.headerLogo;
-    this.layoutConfig = this.layoutService.currentConfig;
   }
   
   ngOnInit(): void {
@@ -63,19 +66,16 @@ export class HeaderComponent implements OnInit, OnDestroy {
         this.isAuthenticated = this.authService.isAuthenticated;
       })
     );
-
-    // Subscribe to layout config changes
-    this.subscription.add(
-      this.layoutService.config$.subscribe(config => {
-        this.layoutConfig = config;
-      })
-    );
   }
   
   ngOnDestroy(): void {
     this.subscription.unsubscribe();
   }
   
+  /**
+   * Toggle sidebar - simple event emission
+   * No complex state management needed with custom layout
+   */
   toggleSidebar(): void {
     this.sidebarToggle.emit();
   }

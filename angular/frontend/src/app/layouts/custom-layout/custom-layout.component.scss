@@ -1,0 +1,123 @@
+@use '../../../styles/abstracts' as *;
+
+/**
+ * RESPONSIVE SIDEBAR LAYOUT - Following dev.to Guide
+ * 
+ * This CSS implements proper responsive sidebar behavior:
+ * - Mobile: over mode with toggle (open/close)
+ * - Desktop: side mode with collapse (expanded/icons only)
+ * 
+ * Key Principles:
+ * - Mobile: Sidebar toggles completely
+ * - Desktop: Sidebar never fully closes, only collapses to icons
+ * - Smooth animations for state transitions
+ * - Material Design integration
+ */
+
+// Header positioning
+mat-toolbar {
+  position: fixed;
+  top: 0;
+  z-index: 1000;
+}
+
+// Sidenav container
+.sidenav-container {
+  height: 100vh;
+  padding-top: 64px; // Account for fixed header
+  
+  @media screen and (max-width: 599px) {
+    padding-top: 56px; // Mobile header height
+  }
+}
+
+// Sidenav styling following the guide
+.sidenav {
+  width: 280px; // Default expanded width
+  
+  // Collapsed state for desktop (icons only)
+  &:not(.expanded) {
+    @media screen and (min-width: 600px) {
+      width: 64px; // Collapsed width for icons only
+    }
+  }
+  
+  // Expanded state for desktop
+  &.expanded {
+    width: 280px; // Full width with text
+  }
+  
+  // Mobile behavior - full width when open
+  @media screen and (max-width: 599px) {
+    width: 280px;
+  }
+}
+
+// Sidenav content
+.sidenav-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; // Important for proper flex behavior
+}
+
+// Main content area
+.main-content {
+  flex: 1;
+  overflow: auto;
+  padding: $spacing-lg;
+  min-height: 0; // Important for proper flex behavior
+  
+  // Smooth scrolling for better UX
+  scroll-behavior: smooth;
+  
+  // Focus management for accessibility
+  &:focus {
+    outline: 2px solid var(--mdc-theme-accent);
+    outline-offset: -2px;
+  }
+}
+
+/**
+ * RESPONSIVE ADJUSTMENTS
+ */
+@media (max-width: 599px) {
+  .sidenav-container {
+    padding-top: 56px; // Mobile header height
+  }
+}
+
+/**
+ * HIGH CONTRAST MODE SUPPORT
+ */
+@media (prefers-contrast: high) {
+  .sidenav {
+    border-right-color: var(--mdc-theme-outline);
+    border-right-width: 2px;
+  }
+}
+
+/**
+ * REDUCED MOTION SUPPORT
+ */
+@media (prefers-reduced-motion: reduce) {
+  .sidenav {
+    transition: none;
+  }
+  
+  .main-content {
+    scroll-behavior: auto;
+  }
+}
+
+/**
+ * PRINT STYLES
+ */
+@media print {
+  .sidenav {
+    display: none;
+  }
+  
+  .sidenav-container {
+    padding-top: 0;
+  }
+} 

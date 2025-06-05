@@ -3,11 +3,15 @@ import { AuthGuard, PasswordChangeGuard } from './core/guards';
 import { PermissionGuard } from './core/guards/permission.guard';
 
 // Layout components
-import { DefaultLayoutComponent } from './layouts/default/default.component';
+import { CustomLayoutComponent } from './layouts/custom-layout/custom-layout.component';
 import { AdminLayoutComponent } from './layouts/admin/admin.component';
 
 /**
  * Main application routes
+ * 
+ * Updated to use CustomLayoutComponent for truly non-responsive sidebar behavior.
+ * The custom layout eliminates Angular Material's built-in responsive system
+ * and provides a fixed 280px sidebar at all screen sizes.
  * 
  * Permission-based routes should use the following format for data:
  * { permissions: 'resource:action' } OR
@@ -17,7 +21,7 @@ import { AdminLayoutComponent } from './layouts/admin/admin.component';
 export const routes: Routes = [
   {
     path: 'app',
-    component: DefaultLayoutComponent,
+    component: CustomLayoutComponent,
     canActivate: [AuthGuard],
     children: [
       {

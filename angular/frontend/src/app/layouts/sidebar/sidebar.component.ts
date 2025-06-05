@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
@@ -21,6 +21,8 @@ import { User } from '../../models/user.model';
   styleUrl: './sidebar.component.scss'
 })
 export class SidebarComponent implements OnInit, OnDestroy {
+  @Input() isCollapsed = false; // Controls whether sidebar shows only icons or full text
+  
   currentUser: User | null = null;
   private destroy$ = new Subject<void>();
   

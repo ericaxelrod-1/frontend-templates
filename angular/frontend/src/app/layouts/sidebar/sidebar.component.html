@@ -5,7 +5,7 @@
       <img src="assets/logos/logo.png" alt="Application Logo" class="logo">
     </div>
     
-    <div class="user-info" *ngIf="currentUser">
+    <div class="user-info" *ngIf="currentUser && !isCollapsed">
       <div class="user-name mat-body-1">{{ (currentUser.firstName || '') + ' ' + (currentUser.lastName || '') || currentUser.email }}</div>
       <div class="user-email mat-body-2">{{ currentUser.email }}</div>
     </div>
@@ -17,7 +17,7 @@
   <div class="sidebar-content">
     <!-- Primary Navigation Section -->
     <div class="nav-section">
-      <h3 class="section-title" id="primary-nav-heading">Navigation</h3>
+      <h3 class="section-title" id="primary-nav-heading" *ngIf="!isCollapsed">Navigation</h3>
       
       <ul class="nav-list" role="menu" aria-labelledby="primary-nav-heading">
         <li *ngFor="let item of commonNavItems">
@@ -28,7 +28,7 @@
              class="nav-link"
              role="menuitem">
             <span class="nav-icon" [attr.aria-hidden]="true">{{ item.icon }}</span>
-            <span class="nav-text">{{ item.label }}</span>
+            <span class="nav-text" *ngIf="!isCollapsed">{{ item.label }}</span>
           </a>
         </li>
       </ul>
@@ -36,7 +36,7 @@
 
     <!-- Management Section -->
     <div class="nav-section" *ngIf="isAdminOrManager">
-      <h3 class="section-title" id="management-nav-heading">Management</h3>
+      <h3 class="section-title" id="management-nav-heading" *ngIf="!isCollapsed">Management</h3>
       
       <ul class="nav-list" role="menu" aria-labelledby="management-nav-heading">
         <li *ngFor="let item of adminNavItems">
@@ -47,7 +47,7 @@
              class="nav-link"
              role="menuitem">
             <span class="nav-icon" [attr.aria-hidden]="true">{{ item.icon }}</span>
-            <span class="nav-text">{{ item.label }}</span>
+            <span class="nav-text" *ngIf="!isCollapsed">{{ item.label }}</span>
           </a>
         </li>
       </ul>
@@ -55,7 +55,7 @@
 
     <!-- Admin Section -->
     <div class="nav-section" *ngIf="hasAdminAccess()">
-      <h3 class="section-title" id="admin-nav-heading">Administration</h3>
+      <h3 class="section-title" id="admin-nav-heading" *ngIf="!isCollapsed">Administration</h3>
       
       <ul class="nav-list" role="menu" aria-labelledby="admin-nav-heading">
         <li *ngFor="let item of adminItems">
@@ -66,7 +66,7 @@
              class="nav-link"
              role="menuitem">
             <span class="nav-icon" [attr.aria-hidden]="true">{{ item.icon }}</span>
-            <span class="nav-text">{{ item.label }}</span>
+            <span class="nav-text" *ngIf="!isCollapsed">{{ item.label }}</span>
           </a>
         </li>
       </ul>
@@ -78,7 +78,7 @@
     <mat-divider></mat-divider>
     
     <div class="nav-section">
-      <h3 class="section-title" id="account-nav-heading">Account</h3>
+      <h3 class="section-title" id="account-nav-heading" *ngIf="!isCollapsed">Account</h3>
       
       <ul class="nav-list" role="menu" aria-labelledby="account-nav-heading">
         <li>
@@ -88,7 +88,7 @@
              class="nav-link"
              role="menuitem">
             <span class="nav-icon" aria-hidden="true">person</span>
-            <span class="nav-text">Profile</span>
+            <span class="nav-text" *ngIf="!isCollapsed">Profile</span>
           </a>
         </li>
         
@@ -99,7 +99,7 @@
              class="nav-link"
              role="menuitem">
             <span class="nav-icon" aria-hidden="true">lock</span>
-            <span class="nav-text">Change Password</span>
+            <span class="nav-text" *ngIf="!isCollapsed">Change Password</span>
           </a>
         </li>
         
@@ -110,7 +110,7 @@
              aria-label="Navigate to Delete Account page (Warning: This action is destructive)"
              role="menuitem">
             <span class="nav-icon" aria-hidden="true">delete_forever</span>
-            <span class="nav-text">Delete Account</span>
+            <span class="nav-text" *ngIf="!isCollapsed">Delete Account</span>
           </a>
         </li>
       </ul>

@@ -1,21 +1,15 @@
 @use '../../../styles/abstracts' as *;
 
-// Fixed-width Sidebar Component - NO RESPONSIVENESS
+// Responsive Sidebar Component - Following dev.to Guide
 .sidebar {
   height: 100%;
   background: var(--mdc-theme-surface);
   border-right: 1px solid rgba(var(--mdc-theme-on-surface-rgb), 0.12);
   display: flex;
   flex-direction: column;
-  width: 280px !important; // FIXED WIDTH - NO RESPONSIVE CHANGES
-  min-width: 280px !important; // Prevent shrinking
-  max-width: 280px !important; // Prevent growing
   overflow-y: auto;
   overflow-x: hidden;
-  
-  // Remove all responsive width changes
-  // NO @media queries for width changes
-  // NO responsive behavior at any screen size
+  transition: width 0.3s ease;
 }
 
 .sidebar-header {
@@ -128,12 +122,15 @@
       align-items: center;
       justify-content: center;
       font-family: 'Material Icons';
+      flex-shrink: 0; // Prevent icon from shrinking
     }
     
     .nav-text {
       flex: 1;
       font-size: 0.875rem;
       font-weight: 500;
+      white-space: nowrap; // Prevent text wrapping
+      overflow: hidden; // Hide overflow when collapsed
     }
     
     .nav-badge {
@@ -199,8 +196,8 @@
 }
 
 .sidebar-footer {
-  padding: $spacing-md $spacing-lg;
   border-top: 1px solid rgba(var(--mdc-theme-on-surface-rgb), 0.08);
+  padding: $spacing-md 0;
 }
 
 /* REMOVED ALL RESPONSIVE OVERLAY BEHAVIOR */
