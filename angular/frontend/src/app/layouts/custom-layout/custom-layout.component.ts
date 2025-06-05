@@ -11,7 +11,9 @@ import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
 /**
  * Custom Layout Component - Proper Responsive Sidebar Implementation
  * 
- * Following the dev.to guide for responsive sidebar behavior:
+ * Following Angular best practices and Material Design guidelines:
+ * - Semantic HTML structure with single main element
+ * - Proper flex container hierarchy
  * - Mobile: over mode with toggle (open/close)
  * - Desktop: side mode with collapse (expanded/collapsed to icons only)
  * 
@@ -53,10 +55,13 @@ import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
         <app-sidebar [isCollapsed]="isCollapsed"></app-sidebar>
       </mat-sidenav>
       
-      <!-- Sidenav Content -->
-      <mat-sidenav-content class="sidenav-content">
+      <!-- Sidenav Content - Angular Best Practice: Single main element -->
+      <mat-sidenav-content>
         <main class="main-content">
-          <router-outlet></router-outlet>
+          <!-- Content wrapper for proper centering -->
+          <div class="content-wrapper">
+            <router-outlet></router-outlet>
+          </div>
         </main>
         
         <app-footer></app-footer>

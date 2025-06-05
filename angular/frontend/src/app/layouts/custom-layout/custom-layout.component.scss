@@ -1,17 +1,18 @@
 @use '../../../styles/abstracts' as *;
 
 /**
- * RESPONSIVE SIDEBAR LAYOUT - Following dev.to Guide
+ * RESPONSIVE SIDEBAR LAYOUT - Following Angular Best Practices
  * 
- * This CSS implements proper responsive sidebar behavior:
+ * This CSS implements proper responsive sidebar behavior with layout constraints:
  * - Mobile: over mode with toggle (open/close)
  * - Desktop: side mode with collapse (expanded/icons only)
+ * - Layout Component Responsibility: Handles all layout constraints and spacing
  * 
  * Key Principles:
- * - Mobile: Sidebar toggles completely
- * - Desktop: Sidebar never fully closes, only collapses to icons
- * - Smooth animations for state transitions
- * - Material Design integration
+ * - Layout component manages layout concerns (Angular best practices)
+ * - Feature components focus on content, not layout
+ * - Consistent max-width and centering across all pages
+ * - Mobile-first responsive design approach
  */
 
 // Header positioning
@@ -53,19 +54,38 @@ mat-toolbar {
   }
 }
 
-// Sidenav content
-.sidenav-content {
-  display: flex;
-  flex-direction: column;
-  min-height: 0; // Important for proper flex behavior
-}
+// Note: mat-sidenav-content (mat-drawer-content) flex styles moved to global styles.scss
+// following Angular best practices (avoiding ::ng-deep)
 
-// Main content area
+// Main content area - Angular Best Practice: Layout Component Responsibility
 .main-content {
   flex: 1;
   overflow: auto;
-  padding: $spacing-lg;
   min-height: 0; // Important for proper flex behavior
+  display: flex;
+  flex-direction: column;
+  
+  // Create inner wrapper for centering
+  .content-wrapper {
+    flex: 1;
+    width: 100%;
+    max-width: 1200px; // Consistent with header and Material Design guidelines
+    margin: 0 auto; // Center content horizontally
+    box-sizing: border-box;
+    
+    // Mobile-first responsive padding (Angular/Material Design best practice)
+    padding: $spacing-sm;
+    
+    // Tablet and up
+    @media (min-width: 768px) {
+      padding: $spacing-md;
+    }
+    
+    // Desktop and up
+    @media (min-width: 1024px) {
+      padding: $spacing-lg;
+    }
+  }
   
   // Smooth scrolling for better UX
   scroll-behavior: smooth;

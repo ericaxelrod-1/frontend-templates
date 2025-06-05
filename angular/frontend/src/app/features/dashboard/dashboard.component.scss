@@ -2,19 +2,23 @@
 @use '../../../styles/abstracts' as *;
 
 // Ultra-optimized Dashboard Component - Target: <24kB
+// Layout constraints now handled by layout component (Angular best practices)
 .dashboard-container {
-  padding: $spacing-lg;
-  max-width: 100%;
+  // Remove redundant padding - now handled by layout component
   width: 100%;
   
-  @media (max-width: 959px) { padding: $spacing-md; }
-  @media (max-width: 599px) { padding: $spacing-sm; }
+  @media (max-width: 959px) { 
+    // Minimal responsive adjustments only
+  }
+  @media (max-width: 599px) { 
+    // Minimal responsive adjustments only
+  }
 }
 
+// Remove redundant layout constraints - handled by layout component
 .dashboard-content {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  // Removed: max-width: 1200px; margin: 0 auto; (now handled by layout)
 }
 
 .dashboard-header {

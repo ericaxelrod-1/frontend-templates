@@ -1,13 +1,14 @@
 @use '@angular/material' as mat;
 @use '../../../styles/abstracts' as abstracts;
 
-// Optimized Header Component Styles
-// BUG-037: Bundle size optimization
+// Angular Material Best Practices: Outer/Inner Container Pattern
+// BUG-037: Fixes navbar shifting at 1200px by implementing proper responsive container pattern
 
 .spacer {
   flex: 1 1 auto;
 }
 
+// OUTER CONTAINER: Full-width background (Angular Material pattern)
 .header-toolbar {
   position: fixed !important;
   top: 0 !important;
@@ -17,12 +18,23 @@
   z-index: 1000 !important;
   background-color: var(--mdc-theme-primary);
   color: var(--mdc-theme-on-primary);
+  box-shadow: abstracts.$elevation-4;
+  box-sizing: border-box;
+  // Remove centering properties - this is the outer container
+  padding: 0; // Remove padding from outer container
+  min-height: 64px; // Angular Material standard toolbar height
+}
+
+// INNER CONTAINER: Centered content with max-width (Angular Material pattern)
+.header-container {
+  max-width: 1200px; // Prevent content from expanding beyond this width
+  margin: 0 auto; // Center the content horizontally
+  padding: 0 abstracts.$spacing-md; // Apply padding to inner container
+  width: 100%; // Take full width up to max-width
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 abstracts.$spacing-md;
-  min-height: 64px;
-  box-shadow: abstracts.$elevation-4;
+  min-height: 64px; // Match toolbar height
   box-sizing: border-box;
 }
 
@@ -178,9 +190,10 @@
   padding: 0 !important;
 }
 
+// Responsive breakpoints following Angular Material best practices
 @include abstracts.respond-to(md) {
-  .header-toolbar {
-    padding: 0 abstracts.$spacing-lg;
+  .header-container {
+    padding: 0 abstracts.$spacing-lg; // Increase padding on larger screens
   }
   
   .left-section {
@@ -198,7 +211,11 @@
 
 @include abstracts.respond-to(sm) {
   .header-toolbar {
-    min-height: 56px;
+    min-height: 56px; // Smaller toolbar on mobile
+  }
+  
+  .header-container {
+    min-height: 56px; // Match toolbar height
     padding: 0 abstracts.$spacing-sm;
   }
   
@@ -226,7 +243,7 @@
 }
 
 @include abstracts.respond-to(xs) {
-  .header-toolbar {
+  .header-container {
     padding: 0 abstracts.$spacing-xs;
   }
   
