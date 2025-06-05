@@ -1,6 +1,12 @@
 @use '@angular/material' as mat;
 @use '../../../styles/abstracts' as abstracts;
 
+// Component host element - ensure full viewport control
+:host {
+  display: block;
+  width: 100%;
+}
+
 footer {
   background-color: var(--mdc-theme-surface);
   color: var(--mdc-theme-on-surface);
@@ -13,12 +19,11 @@ footer {
 }
 
 .footer-content {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  padding: 0 abstracts.$spacing-lg;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 abstracts.$spacing-md;
   box-sizing: border-box;
 }
 

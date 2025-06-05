@@ -4,6 +4,12 @@
 // Angular Material Best Practices: Outer/Inner Container Pattern
 // BUG-037: Fixes navbar shifting at 1200px by implementing proper responsive container pattern
 
+// Component host element - ensure full viewport control
+:host {
+  display: block;
+  width: 100%;
+}
+
 .spacer {
   flex: 1 1 auto;
 }
@@ -25,12 +31,11 @@
   min-height: 64px; // Angular Material standard toolbar height
 }
 
-// INNER CONTAINER: Centered content with max-width (Angular Material pattern)
+// INNER CONTAINER: Full-width content with strategic padding (Modern Web App pattern)
 .header-container {
-  max-width: 1200px; // Prevent content from expanding beyond this width
-  margin: 0 auto; // Center the content horizontally
-  padding: 0 abstracts.$spacing-md; // Apply padding to inner container
-  width: 100%; // Take full width up to max-width
+  // Remove max-width constraint for modern full-width layout
+  width: 100%; // Take full viewport width
+  padding: 0 abstracts.$spacing-lg; // Strategic padding instead of centering
   display: flex;
   justify-content: space-between;
   align-items: center;
