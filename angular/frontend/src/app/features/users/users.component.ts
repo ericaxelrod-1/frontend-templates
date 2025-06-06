@@ -386,12 +386,12 @@ export class UsersComponent implements OnInit {
   createUser(): void {
     // Check permission before navigating
     if (this.permissionService.hasPermissionSync('users:create')) {
-      this.router.navigate(['/users/create']);
+      this.router.navigate(['/app/users/create']);
     }
   }
 
   editUser(user: User): void {
-    this.router.navigate(['/users', user.id, 'edit']);
+    this.router.navigate(['/app/users', user.id, 'edit']);
   }
 
   deleteUser(user: User): void {

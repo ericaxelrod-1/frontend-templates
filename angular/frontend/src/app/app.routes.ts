@@ -53,14 +53,6 @@ export const routes: Routes = [
         }
       },
       {
-        path: 'users/create',
-        loadComponent: () => import('./features/users/create-user.component').then(c => c.CreateUserComponent),
-        canActivate: [PermissionGuard],
-        data: { 
-          permissions: 'users:create'
-        }
-      },
-      {
         path: 'groups',
         loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent),
         canActivate: [PermissionGuard],

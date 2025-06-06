@@ -3,6 +3,54 @@ Last Updated: 2025-01-25
 
 ## Completed Today
 
+### BUG-051: Navigation Path Fixes - Add User Button and Route Ordering Issue ✅
+- **Started**: 2025-01-25
+- **Completed**: 2025-01-25
+- **Status**: Complete ✅
+- **Priority**: HIGH - FIXES BROKEN NAVIGATION
+- **Implementation Notes**: **NAVIGATION PATHS FIXED** - Fixed incorrect navigation paths causing buttons to redirect to main dashboard instead of their intended destinations. Also resolved route ordering conflicts in the Angular routing configuration.
+
+#### **ISSUES RESOLVED** ✅
+1. **Add User Button Navigation**:
+   - Fixed Users component `createUser()` method path from `/users/create` to `/app/users/create`
+   - Fixed Users component `editUser()` method path from `/users/:id/edit` to `/app/users/:id/edit`
+   
+2. **Groups Component Navigation**:
+   - Fixed `goToDashboard()` method path from `/dashboard` to `/app/dashboard`
+   
+3. **Route Ordering Conflict**:
+   - Removed duplicate `users/create` route from app.routes.ts
+   - Route was conflicting with users module's loadChildren
+   - Moved create route to users.routes.ts for proper hierarchical routing
+   
+4. **Users Module Routes**:
+   - Added proper child routes in users.routes.ts
+   - Added `create` route with proper PermissionGuard and permission requirements
+   - Ensured proper route hierarchy for users module
+
+#### **ROOT CAUSE** ✅
+- Navigation paths were missing the `/app` prefix required by the routing structure
+- Route ordering conflict: `users/create` was defined at the same level as `users` with loadChildren
+- When using loadChildren, parent route handles all child routes, making separate sibling definitions unreachable
+
+#### **TECHNICAL DETAILS** ✅
+- All app routes are under the `/app` path with AuthGuard protection
+- Fixed navigation to use complete paths: `/app/users/create`, `/app/dashboard`, etc.
+- Proper route hierarchy: parent routes with loadChildren should contain all child route definitions
+- Permission guards maintained at appropriate route levels
+
+#### **FILES MODIFIED** ✅
+- `angular/frontend/src/app/features/users/users.component.ts`: Fixed navigation paths
+- `angular/frontend/src/app/features/groups/groups.component.ts`: Fixed dashboard navigation
+- `angular/frontend/src/app/app.routes.ts`: Removed duplicate users/create route
+- `angular/frontend/src/app/features/users/users.routes.ts`: Added create route as child
+
+#### **TESTING NOTES** ✅
+- Add User button should now navigate to create user form
+- Edit User buttons should navigate to edit forms
+- Groups error page "Go to Dashboard" button should work correctly
+- No more redirects to login page when clicking navigation buttons
+
 ### BUG-037: Angular Material Navbar Responsive Layout Fix ✅
 - **Started**: 2025-01-25
 - **Completed**: 2025-01-25

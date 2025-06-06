@@ -326,6 +326,6 @@ export class GroupsComponent implements OnInit {
   }
 
   goToDashboard(): void {
-    this.router.navigate(['/dashboard']);
+    this.router.navigate(['/app/dashboard']);
   }
 }
