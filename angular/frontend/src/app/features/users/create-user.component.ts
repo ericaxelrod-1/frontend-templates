@@ -72,20 +72,11 @@ import { PasswordGeneratorService, PasswordStrengthResult } from '../../core/ser
             <mat-label>Password</mat-label>
             <input 
               matInput 
-              [type]="showPassword ? 'text' : 'password'" 
+              type="password" 
               formControlName="password" 
               required
               (input)="onPasswordChange()"
             >
-            <button 
-              mat-icon-button 
-              matSuffix 
-              type="button"
-              (click)="togglePasswordVisibility()"
-              matTooltip="{{showPassword ? 'Hide' : 'Show'}} password"
-            >
-              <mat-icon>{{showPassword ? 'visibility_off' : 'visibility'}}</mat-icon>
-            </button>
             <mat-error *ngIf="f['password'].hasError('required')">Password is required</mat-error>
             <mat-error *ngIf="f['password'].hasError('minlength')">Password must be at least 8 characters</mat-error>
           </mat-form-field>
@@ -299,7 +290,6 @@ export class CreateUserComponent implements OnInit {
   availableRoles: Role[] = [];
   loading = false;
   hasPermission = false;
-  showPassword = false;
   passwordStrength: PasswordStrengthResult | null = null;
   passwordRequirements: string[] = [];
   showRequirements = false;
@@ -368,10 +358,6 @@ export class CreateUserComponent implements OnInit {
 
   // Convenience getter for form fields
   get f() { return this.userForm.controls; }
-
-  togglePasswordVisibility(): void {
-    this.showPassword = !this.showPassword;
-  }
 
   onPasswordChange(): void {
     const password = this.f['password'].value;
