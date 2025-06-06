@@ -14,19 +14,15 @@
   flex: 1 1 auto;
 }
 
-// OUTER CONTAINER: Full-width background (Angular Material pattern)
+// OUTER CONTAINER: Full-width background (CSS Grid positioned)
 .header-toolbar {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
+  // Remove fixed positioning - now positioned by CSS Grid
   width: 100% !important;
   z-index: 1000 !important;
   background-color: var(--mdc-theme-primary);
   color: var(--mdc-theme-on-primary);
   box-shadow: abstracts.$elevation-4;
   box-sizing: border-box;
-  // Remove centering properties - this is the outer container
   padding: 0; // Remove padding from outer container
   min-height: 64px; // Angular Material standard toolbar height
 }

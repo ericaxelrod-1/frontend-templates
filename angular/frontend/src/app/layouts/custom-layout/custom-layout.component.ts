@@ -9,20 +9,20 @@ import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
 
 /**
- * Custom Layout Component - Proper Responsive Sidebar Implementation
+ * Custom Layout Component - CSS Grid Layout Implementation
  * 
- * Following Angular best practices and Material Design guidelines:
- * - Semantic HTML structure with single main element
- * - Proper flex container hierarchy
- * - Mobile: over mode with toggle (open/close)
- * - Desktop: side mode with collapse (expanded/collapsed to icons only)
+ * Following modern web app layout patterns with CSS Grid:
+ * - Header: Fixed at top, full viewport width
+ * - Sidebar: Responsive behavior (over/side mode)
+ * - Main Content: Flexible content area with proper scrolling
+ * - Footer: Fixed at bottom, full viewport width
  * 
  * Key Features:
- * - Mobile: Sidebar toggles completely open/closed
- * - Desktop: Sidebar never fully closes, only collapses to icons
+ * - CSS Grid for automatic height management
+ * - No manual height calculations needed
+ * - Proper navigation menu scrolling
  * - Responsive breakpoint detection
- * - Proper Angular Material integration
- * - Smooth animations and transitions
+ * - Modern layout architecture
  */
 @Component({
   selector: 'app-custom-layout',
@@ -37,36 +37,44 @@ import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
     MatSidenavModule
   ],
   template: `
-    <!-- Fixed Header (outside of sidebar system) -->
-    <app-header 
-      [sidebarOpened]="!isCollapsed"
-      (sidebarToggle)="toggleMenu()">
-    </app-header>
-    
-    <!-- Material Sidenav Container -->
-    <mat-sidenav-container class="sidenav-container">
-      <!-- Material Sidenav with proper responsive behavior -->
-      <mat-sidenav 
-        #sidenav
-        [mode]="isMobile ? 'over' : 'side'" 
-        [opened]="isMobile ? false : true"
-        [ngClass]="!isCollapsed ? 'expanded' : ''"
-        class="sidenav">
-        <app-sidebar [isCollapsed]="isCollapsed"></app-sidebar>
-      </mat-sidenav>
+    <!-- CSS Grid Layout Container -->
+    <div class="app-layout">
+      <!-- Header: Fixed at top, full viewport width -->
+      <app-header 
+        class="layout-header"
+        [sidebarOpened]="!isCollapsed"
+        (sidebarToggle)="toggleMenu()">
+      </app-header>
       
-      <!-- Sidenav Content - Angular Best Practice: Single main element -->
-      <mat-sidenav-content>
-        <main class="main-content">
-          <!-- Content wrapper for proper centering -->
-          <div class="content-wrapper">
-            <router-outlet></router-outlet>
-          </div>
-        </main>
-        
-        <app-footer></app-footer>
-      </mat-sidenav-content>
-    </mat-sidenav-container>
+      <!-- Main Area: Contains sidebar and content -->
+      <div class="layout-main">
+        <!-- Material Sidenav Container with proper height constraints -->
+        <mat-sidenav-container class="sidenav-container">
+          <!-- Material Sidenav with proper responsive behavior -->
+          <mat-sidenav 
+            #sidenav
+            [mode]="isMobile ? 'over' : 'side'" 
+            [opened]="isMobile ? false : true"
+            [ngClass]="!isCollapsed ? 'expanded' : ''"
+            class="sidenav">
+            <app-sidebar [isCollapsed]="isCollapsed"></app-sidebar>
+          </mat-sidenav>
+          
+          <!-- Sidenav Content - Main content area -->
+          <mat-sidenav-content class="sidenav-content">
+            <main class="main-content">
+              <!-- Content wrapper for proper centering -->
+              <div class="content-wrapper">
+                <router-outlet></router-outlet>
+              </div>
+            </main>
+          </mat-sidenav-content>
+        </mat-sidenav-container>
+      </div>
+      
+      <!-- Footer: Fixed at bottom, full viewport width -->
+      <app-footer class="layout-footer"></app-footer>
+    </div>
   `,
   styleUrls: ['./custom-layout.component.scss']
 })

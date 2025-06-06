@@ -72,7 +72,11 @@ export class SidebarComponent implements OnInit, OnDestroy {
   constructor(
     private authService: AuthService,
     private permissionService: PermissionService
-  ) {}
+  ) {
+    // Debug: Log navigation items and permissions
+    console.log('Sidebar: Common nav items:', this.commonNavItems);
+    console.log('Sidebar: Admin nav items:', this.adminNavItems);
+  }
   
   ngOnInit() {
     // Subscribe to current user changes
@@ -125,6 +129,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
    * Check if the user has a specific permission
    */
   hasPermission(permission: string): boolean {
-    return this.permissionService.hasPermissionSync(permission);
+    const hasPermission = this.permissionService.hasPermissionSync(permission);
+    console.log(`Sidebar: Checking permission '${permission}':`, hasPermission);
+    return hasPermission;
   }
 }
