@@ -10,6 +10,13 @@ import { Role } from '../entities/role.entity';
 
 export class CreateUserDto {
   @ApiProperty({
+    example: 'john.doe',
+    description: 'Username (unique identifier)',
+  })
+  @IsString()
+  username: string;
+
+  @ApiProperty({
     example: 'user@example.com',
     description: 'User email address',
   })
@@ -21,7 +28,7 @@ export class CreateUserDto {
     description: 'User password',
   })
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   password: string;
 
   @ApiPropertyOptional({

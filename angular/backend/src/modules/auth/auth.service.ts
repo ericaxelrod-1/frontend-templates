@@ -373,9 +373,22 @@ export class AuthService {
       );
     }
 
+    // Generate username from email (before @ symbol) with fallback
+    let username = email.split('@')[0];
+    
+    // Check if username already exists and make it unique if needed
+    let usernameExists = await this.usersService.findByUsername(username);
+    let counter = 1;
+    while (usernameExists) {
+      username = `${email.split('@')[0]}${counter}`;
+      usernameExists = await this.usersService.findByUsername(username);
+      counter++;
+    }
+
     // Create user with hashed password
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await this.usersService.create({
+      username,
       email,
       password: hashedPassword,
       firstName,

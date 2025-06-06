@@ -4,6 +4,64 @@ Last Updated: 2025-06-02
 
 ## In Progress
 
+### BUG-052: Duplicate Roles in Database - Data Cleanup Required
+- **Started**: 2025-01-25
+- **Completed**: 2025-01-25
+- **Status**: Complete
+- **Priority**: High (Data Integrity Issue)
+- **Implementation Notes**: 
+  - **Root Cause**: Multiple seed scripts and migration files created duplicate role entries with different naming conventions
+  - **Database Investigation**: Confirmed 8 duplicate roles across 4 role types:
+    1. **User roles**: "User" (id: 5) and "user" (id: 1) - **PREFERRED: id: 1 "user"**
+    2. **Administrator roles**: "Administrator" (id: 6) and "admin" (id: 9) - **PREFERRED: id: 6 "Administrator"**  
+    3. **Super user roles**: "Super User" (id: 7) and "superuser" (id: 3) - **PREFERRED: id: 3 "superuser" and id: 7 "Super User"**
+    4. **Super admin roles**: "Super Administrator" (id: 8) and "superadmin" (id: 10) - **PREFERRED: id: 8 "Super Administrator"**
+  
+  **Data Impact Assessment**:
+  - **Role Permissions**: Both sets of duplicate roles have permissions assigned
+  - **User Assignments**: Users assigned to various role IDs (need to verify which roles are in use)
+  - **Seed Script Sources**: 
+    - `angular/backend/src/scripts/seed-roles.ts`: Creates roles with proper case (User, Administrator, Super User, Super Administrator)
+    - `angular/backend/src/database/seeds/initial.seed.ts`: Creates lowercase roles (user, admin, superuser, superadmin)
+    - Multiple migration files may also be creating roles
+
+  **Investigation Findings**:
+  - **SystemRoles enum**: Defines canonical role names that should be used
+  - **Role Seeder Script**: Creates roles following enum definitions  
+  - **Initial Seed**: Creates conflicting lowercase versions
+  - **Previous Fix**: Found changelog entry for BUG-XXX about role duplicates (needs location verification)
+
+  **Cleanup Strategy (Smallest IDs Preferred)**:
+  1. **Keep roles with smallest IDs**: user (1), superuser (3), Administrator (6), Super User (7), Super Administrator (8)
+  2. **Remove duplicate roles**: User (5), admin (9), superadmin (10)
+  3. **Migrate permissions**: Transfer permissions from removed roles to kept roles
+  4. **Update user assignments**: Reassign users from removed roles to corresponding kept roles
+  5. **Update seed scripts**: Fix conflicting seed scripts to prevent future duplicates
+  6. **Verify SystemRoles enum**: Ensure canonical role names match database
+
+  **Files Requiring Investigation**:
+  - `angular/backend/src/scripts/seed-roles.ts`: Main role seeding script
+  - `angular/backend/src/database/seeds/initial.seed.ts`: Initial data seeding
+  - `angular/backend/src/database/migrations/`: Check for role-creating migrations
+  - `angular/backend/src/modules/roles/entities/role.entity.ts`: SystemRoles enum verification
+  - Package.json scripts: `seed-roles` and `db:seed:permissions` commands
+
+  **Completed Actions**:
+  1. **Root Cause Identified**: `RolesService.ensureSystemRoles()` runs on server startup and creates missing roles with hardcoded names that didn't match existing database role names
+  2. **Fixed RolesService**: Updated `ensureSystemRoles()` method to use preferred role names:
+     - 'user' (id: 1) ✅
+     - 'Administrator' (id: 6) ✅ (was creating 'admin')
+     - 'superuser' (id: 3) ✅
+     - 'Super Administrator' (id: 8) ✅ (was creating 'superadmin')
+  3. **Database Cleanup**: 
+     - Removed newly created duplicate roles (admin id: 11, superadmin id: 12) and their permissions
+     - Removed remaining duplicate "Super User" (id: 7), transferred user assignment to "superuser" (id: 3)
+  4. **SystemRoles Enum**: Updated to match final 4-role database state
+  
+  **Files Modified**:
+  - `angular/backend/src/modules/users/roles.service.ts`: Fixed role names in ensureSystemRoles()
+  - Database: Cleaned up duplicate entries created by startup script
+
 ### BUG-029: Fix Unit Test File Errors
 - **Started**: 2025-05-27
 - **Status**: Not Started

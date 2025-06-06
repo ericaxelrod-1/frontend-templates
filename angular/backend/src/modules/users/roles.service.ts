@@ -44,7 +44,8 @@ export class RolesService {
   }
 
   async ensureSystemRoles() {
-    // Define standard system roles
+    // Define standard system roles using preferred (numerically lowest ID) role names
+    // Only the 4 roles we want to keep in the database
     const standardRoles = [
       {
         name: 'user',
@@ -52,17 +53,17 @@ export class RolesService {
         isDefault: true,
       },
       {
-        name: 'admin',
-        description: 'Administrator with elevated permissions',
-        isDefault: false,
-      },
-      {
         name: 'superuser',
         description: 'Super user with advanced permissions',
         isDefault: false,
       },
       {
-        name: 'superadmin',
+        name: 'Administrator',
+        description: 'Administrator with elevated permissions',
+        isDefault: false,
+      },
+      {
+        name: 'Super Administrator',
         description: 'Super administrator with all permissions',
         isDefault: false,
       },
@@ -95,7 +96,7 @@ export class RolesService {
     // Define permission mappings for standard roles
     const permissionMappings = {
       user: ['self:profile:read', 'self:profile:update'],
-      admin: [
+      Administrator: [
         'users:create',
         'users:read',
         'users:update',
@@ -120,7 +121,7 @@ export class RolesService {
         'roles:read',
         'roles:create',
       ],
-      superadmin: [
+      'Super Administrator': [
         'users:create',
         'users:read',
         'users:update',

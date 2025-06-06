@@ -31,12 +31,21 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     // Check if email already exists
-    const existingUser = await this.userRepository.findOne({
+    const existingUserByEmail = await this.userRepository.findOne({
       where: { email: createUserDto.email },
     });
 
-    if (existingUser) {
+    if (existingUserByEmail) {
       throw new ConflictException('Email already exists');
+    }
+
+    // Check if username already exists
+    const existingUserByUsername = await this.userRepository.findOne({
+      where: { username: createUserDto.username },
+    });
+
+    if (existingUserByUsername) {
+      throw new ConflictException('Username already exists');
     }
 
     // Validate password if provided
@@ -183,6 +192,38 @@ export class UsersService {
       return undefined;
     } catch (error) {
       console.error(`Critical error finding user by email ${email}:`, error);
+      throw error;
+    }
+  }
+
+  async findByUsername(username: string): Promise<User | undefined> {
+    console.log(`Looking up user by username: ${username}`);
+
+    try {
+      const user = await this.userRepository.findOne({
+        where: { username },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          isActive: true,
+          isEmailVerified: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (user) {
+        console.log(`User lookup success for username ${username} with ID ${user.id}`);
+      } else {
+        console.log(`User not found for username: ${username}`);
+      }
+
+      return user;
+    } catch (error) {
+      console.error(`Critical error finding user by username ${username}:`, error);
       throw error;
     }
   }

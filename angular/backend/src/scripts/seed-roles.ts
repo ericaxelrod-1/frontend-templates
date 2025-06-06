@@ -200,7 +200,7 @@ const permissionsToSeed = [
 
 const rolesToSeed = [
   {
-    name: 'ADMIN',
+    name: 'Administrator',
     description: 'System Administrator',
     isSystemRole: true,
     isDefault: false,
@@ -208,7 +208,7 @@ const rolesToSeed = [
     parentRole: null,
   },
   {
-    name: 'USER',
+    name: 'user',
     description: 'Regular User',
     isSystemRole: true,
     isDefault: true,
@@ -216,8 +216,8 @@ const rolesToSeed = [
     parentRole: null,
   },
   {
-    name: 'MANAGER',
-    description: 'Team Manager',
+    name: 'Super User',
+    description: 'Team Manager with Super User permissions',
     isSystemRole: true,
     isDefault: false,
     permissions: [
@@ -229,11 +229,11 @@ const rolesToSeed = [
       'report:list',
       'report:export',
     ],
-    parentRole: 'USER',
+    parentRole: 'user',
   },
   {
-    name: 'AUDITOR',
-    description: 'System Auditor',
+    name: 'superuser',
+    description: 'Superuser with advanced permissions',
     isSystemRole: true,
     isDefault: false,
     permissions: [
@@ -242,6 +242,14 @@ const rolesToSeed = [
       'report:list',
       'report:export',
     ],
+    parentRole: null,
+  },
+  {
+    name: 'Super Administrator',
+    description: 'Super Administrator with full system access',
+    isSystemRole: true,
+    isDefault: false,
+    permissions: ['*'], // All permissions
     parentRole: null,
   },
 ];

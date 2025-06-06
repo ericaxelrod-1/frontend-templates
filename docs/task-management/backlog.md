@@ -4,6 +4,54 @@ Last Updated: 2025-05-28
 
 ## High Priority
 
+### BUG-052: Duplicate Roles in Database - Data Cleanup Required
+- **Status**: Complete
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-25
+- **Description**: Database contains duplicate role entries created by conflicting seed scripts and migration files. This affects data integrity and could cause issues with role-based access control.
+
+#### Implementation Notes
+- **Database Investigation Completed**: 2025-01-25
+- **Duplicate Roles Identified**: 8 duplicate roles across 4 role types:
+  1. **User roles**: "User" (id: 5) and "user" (id: 1) - **KEEP: id: 1 "user"**
+  2. **Administrator roles**: "Administrator" (id: 6) and "admin" (id: 9) - **KEEP: id: 6 "Administrator"**
+  3. **Super user roles**: "Super User" (id: 7) and "superuser" (id: 3) - **KEEP: id: 3 "superuser" and id: 7 "Super User"**
+  4. **Super admin roles**: "Super Administrator" (id: 8) and "superadmin" (id: 10) - **KEEP: id: 8 "Super Administrator"**
+
+**Root Cause Analysis**:
+- `angular/backend/src/scripts/seed-roles.ts`: Creates proper case roles (User, Administrator, Super User, Super Administrator)
+- `angular/backend/src/database/seeds/initial.seed.ts`: Creates lowercase roles (user, admin, superuser, superadmin)
+- Migration files may also be creating conflicting role entries
+- No validation to prevent duplicate role creation during seeding
+
+**Data Impact**:
+- ❌ **Role Permissions**: Both sets of duplicate roles have permissions assigned
+- ❌ **User Assignments**: Users may be assigned to various duplicate role IDs
+- ❌ **Inconsistent Access**: Different role IDs for same logical role creates access inconsistencies
+
+**Files Requiring Updates**:
+- `angular/backend/src/scripts/seed-roles.ts`: Role seeding script
+- `angular/backend/src/database/seeds/initial.seed.ts`: Initial data seeding
+- `angular/backend/src/database/migrations/`: Check all migration files for role creation
+- `angular/backend/src/modules/roles/entities/role.entity.ts`: SystemRoles enum verification
+- Package.json scripts: Review `seed-roles` and `db:seed:permissions` commands
+
+**Cleanup Strategy (Prefer Smallest IDs)**:
+1. **Direct Database Updates using SQLite MCP tools**:
+   - Update role_permissions foreign key references to point to preferred role IDs
+   - Update user_roles foreign key references to point to preferred role IDs  
+   - Delete duplicate role entries: User (5), admin (9), superadmin (10)
+
+2. **Seed Script Fixes**:
+   - Fix `angular/backend/src/database/seeds/initial.seed.ts` to align with preferred role names
+   - Ensure consistency with `angular/backend/src/scripts/seed-roles.ts`
+
+**Testing Requirements**:
+- Verify role permissions are preserved after cleanup
+- Confirm user access remains consistent after role ID updates
+- Test that seed scripts no longer create duplicates
+
 ### TECH-001: Code Documentation Update
 - **Status**: In Progress
 - **Testing**: Passed (TECH-001.1), Not Started (TECH-001.2)

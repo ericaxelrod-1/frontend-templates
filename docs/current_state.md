@@ -118,6 +118,39 @@ This repository contains tools for managing and validating database schemas and 
 
 ## Known Issues
 
+### **BUG-052: DUPLICATE ROLES IN DATABASE - RESOLVED** ✅
+
+**Status**: 🟢 **RESOLVED** - Root cause identified and fixed
+**Impact**: Data integrity, access control inconsistencies, potential security implications
+**Added**: 2025-01-25
+
+**Issue Summary**:
+Database contains 8 duplicate roles created by conflicting seed scripts, causing inconsistent role-based access control and potential data integrity issues.
+
+**Duplicate Roles Identified**:
+1. **User roles**: "User" (id: 5) and "user" (id: 1) - **KEEP: id: 1**
+2. **Administrator roles**: "Administrator" (id: 6) and "admin" (id: 9) - **KEEP: id: 6**
+3. **Super user roles**: "Super User" (id: 7) and "superuser" (id: 3) - **KEEP: ids: 3, 7**
+4. **Super admin roles**: "Super Administrator" (id: 8) and "superadmin" (id: 10) - **KEEP: id: 8**
+
+**Root Cause**:
+- Conflicting seed scripts: `seed-roles.ts` creates proper case roles, `initial.seed.ts` creates lowercase variants
+- No validation to prevent duplicate role creation during seeding process
+- Multiple migration files may also be creating conflicting role entries
+
+**Data Impact**:
+- Both sets of duplicate roles have permissions assigned
+- Users assigned to various duplicate role IDs
+- Inconsistent access control across the application
+- Potential security implications from role confusion
+
+**Required Actions**:
+1. Use SQLite MCP tools to update foreign key references to preferred role IDs
+2. Delete duplicate role entries: User (5), admin (9), superadmin (10)
+3. Fix conflicting seed scripts to align role names and prevent future duplicates
+
+**Priority**: HIGH - Data integrity issue affecting access control
+
 ### **SCHEMA ALIGNMENT ISSUES - MAJOR PROGRESS MADE**
 
 **Database Status: ✅ EXCELLENT** - Database schema uses consistent snake_case naming throughout
