@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject } from '@angular/core';
+import { Component, OnInit, Inject, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,7 +10,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatDialog, MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { UserService } from '../../services/user.service';
 import { LoggerService } from '../../services/logging/logger.service';
@@ -72,11 +71,21 @@ import { PasswordGeneratorService, PasswordStrengthResult } from '../../core/ser
             <mat-label>Password</mat-label>
             <input 
               matInput 
-              type="password" 
+              [type]="hidePassword ? 'password' : 'text'" 
               formControlName="password" 
               required
               (input)="onPasswordChange()"
             >
+            <button 
+              mat-icon-button 
+              matSuffix 
+              type="button"
+              (click)="togglePasswordVisibility()"
+              [attr.aria-label]="'Hide password'"
+              [attr.aria-pressed]="!hidePassword"
+            >
+              <mat-icon>{{hidePassword ? 'visibility' : 'visibility_off'}}</mat-icon>
+            </button>
             <mat-error *ngIf="f['password'].hasError('required')">Password is required</mat-error>
             <mat-error *ngIf="f['password'].hasError('minlength')">Password must be at least 8 characters</mat-error>
           </mat-form-field>
@@ -91,16 +100,6 @@ import { PasswordGeneratorService, PasswordStrengthResult } from '../../core/ser
             >
               <mat-icon>refresh</mat-icon>
               Generate Password
-            </button>
-            <button 
-              *ngIf="generatedPassword && !passwordViewed" 
-              type="button" 
-              mat-stroked-button 
-              (click)="showGeneratedPassword()"
-              matTooltip="View the generated password ONE TIME only"
-            >
-              <mat-icon>visibility</mat-icon>
-              View Password
             </button>
           </div>
 
@@ -169,6 +168,10 @@ import { PasswordGeneratorService, PasswordStrengthResult } from '../../core/ser
       max-width: 600px;
       margin: 0 auto;
       padding: 20px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      min-height: calc(100vh - 40px);
     }
 
     .form-field {
@@ -259,29 +262,11 @@ import { PasswordGeneratorService, PasswordStrengthResult } from '../../core/ser
     .permission-error {
       text-align: center;
       padding: 20px;
-      background-color: #f5f5f5;
-      border-radius: 4px;
+      background-color: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
       margin: 20px 0;
-    }
-
-    .password-dialog {
-      text-align: center;
-      padding: 20px;
-    }
-
-    .generated-password {
-      font-family: monospace;
-      font-size: 18px;
-      font-weight: bold;
-      background: #f5f5f5;
-      padding: 12px;
-      border-radius: 4px;
-      margin: 16px 0;
-      word-break: break-all;
-    }
-
-    .copy-button {
-      margin-top: 12px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
   `]
 })
@@ -294,8 +279,10 @@ export class CreateUserComponent implements OnInit {
   passwordRequirements: string[] = [];
   showRequirements = false;
   generatedPassword: string | null = null;
-  passwordViewed = false;
+  hidePassword = true;
 
+
+  
   constructor(
     private formBuilder: FormBuilder,
     private userService: UserService,
@@ -304,7 +291,6 @@ export class CreateUserComponent implements OnInit {
     private passwordGeneratorService: PasswordGeneratorService,
     private router: Router,
     private snackBar: MatSnackBar,
-    private dialog: MatDialog,
     private logger: LoggerService
   ) {
     this.passwordRequirements = this.passwordGeneratorService.getPasswordRequirements();
@@ -374,24 +360,11 @@ export class CreateUserComponent implements OnInit {
     this.generatedPassword = this.passwordGeneratorService.generatePassword(12);
     this.f['password'].setValue(this.generatedPassword);
     this.onPasswordChange();
-    this.passwordViewed = false;
-    this.snackBar.open('Password generated! Click "View Password" to see it.', 'Close', { duration: 5000 });
+    this.snackBar.open('Password generated!', 'Close', { duration: 5000 });
   }
 
-  showGeneratedPassword(): void {
-    if (this.generatedPassword) {
-      this.passwordViewed = true;
-      
-      // Create a simple dialog content
-      const dialogRef = this.dialog.open(PasswordViewDialog, {
-        width: '400px',
-        data: { password: this.generatedPassword }
-      });
-
-      dialogRef.afterClosed().subscribe(() => {
-        this.snackBar.open('Password can no longer be viewed. Please save it securely.', 'Close', { duration: 5000 });
-      });
-    }
+  togglePasswordVisibility(): void {
+    this.hidePassword = !this.hidePassword;
   }
 
   getStrengthClass(): string {
@@ -441,6 +414,7 @@ export class CreateUserComponent implements OnInit {
   onSubmit(): void {
     if (this.userForm.invalid) {
       this.logger.warn('Form is invalid', this.userForm.errors);
+      this.snackBar.open('Please fill in all required fields correctly', 'Close', { duration: 5000 });
       return;
     }
 
@@ -477,70 +451,5 @@ export class CreateUserComponent implements OnInit {
 
   cancel(): void {
     this.router.navigate(['/app/users']);
-  }
-}
-
-@Component({
-  selector: 'app-password-view-dialog',
-  standalone: true,
-  imports: [CommonModule, MatDialogModule, MatButtonModule, MatIconModule],
-  template: `
-    <div class="password-dialog">
-      <h2 mat-dialog-title>Generated Password</h2>
-      <div mat-dialog-content>
-        <p><strong>⚠️ Important:</strong> This password will only be shown once. Please copy it now and provide it to the user securely.</p>
-        <div class="generated-password">
-          {{ data.password }}
-        </div>
-        <button mat-raised-button color="primary" class="copy-button" (click)="copyPassword()">
-          <mat-icon>content_copy</mat-icon>
-          Copy Password
-        </button>
-      </div>
-      <div mat-dialog-actions>
-        <button mat-button (click)="close()">I've Saved the Password</button>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .password-dialog {
-      text-align: center;
-      padding: 20px;
-    }
-
-    .generated-password {
-      font-family: monospace;
-      font-size: 18px;
-      font-weight: bold;
-      background: #f5f5f5;
-      padding: 12px;
-      border-radius: 4px;
-      margin: 16px 0;
-      word-break: break-all;
-      border: 2px solid #ddd;
-    }
-
-    .copy-button {
-      margin-top: 12px;
-    }
-  `]
-})
-export class PasswordViewDialog {
-  constructor(
-    public dialogRef: MatDialogRef<PasswordViewDialog>,
-    @Inject(MAT_DIALOG_DATA) public data: { password: string },
-    private snackBar: MatSnackBar
-  ) {}
-
-  copyPassword(): void {
-    navigator.clipboard.writeText(this.data.password).then(() => {
-      this.snackBar.open('Password copied to clipboard', 'Close', { duration: 3000 });
-    }).catch(() => {
-      this.snackBar.open('Failed to copy password', 'Close', { duration: 3000 });
-    });
-  }
-
-  close(): void {
-    this.dialogRef.close();
   }
 }

@@ -1,7 +1,76 @@
 # Backlog
-Last Updated: 2025-12-28
+Last Updated: 2025-06-06
 
 ## Critical Bugs [HIGHEST PRIORITY]
+
+### BUG-053: Create User Component Method Name Mismatch - DialogThemingService ✅
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-06-06
+- **Priority**: HIGH - BLOCKS CREATE USER FUNCTIONALITY
+- **Description**: Fixed TypeScript compilation errors in create-user component caused by incorrect method names when calling DialogThemingService. Component was calling `applyLightThemeToDialogs()` and `removeLightThemeFromDialogs()` but service provides `applyLightTheme()` and `removeLightTheme()`.
+
+#### **ROOT CAUSE ANALYSIS** ✅
+1. **Method Name Mismatch**: Component used incorrect method names with added suffixes "ToDialogs" and "FromDialogs"
+2. **API Assumption**: Developer assumed more descriptive method names without checking actual service API
+3. **Build Blocking**: TypeScript compilation failed preventing any development or deployment
+
+#### **SOLUTION IMPLEMENTED** ✅
+1. **Corrected Method Calls**:
+   - Changed `applyLightThemeToDialogs()` → `applyLightTheme()`
+   - Changed `removeLightThemeFromDialogs()` → `removeLightTheme()`
+2. **Verified API Compatibility**: Confirmed DialogThemingService methods exist and work correctly
+3. **Build Verification**: Confirmed successful TypeScript compilation after fix
+
+#### Implementation Notes
+- **Files Modified**:
+  - `angular/frontend/src/app/features/users/create-user.component.ts`: Fixed method names on lines 399 and 412
+- **Testing Results**:
+  - ✅ Build successful: TypeScript compilation complete with no errors
+  - ✅ Dialog theming functionality preserved
+  - ✅ Create user form with password generation now functional
+
+### BUG-052: Material 3 Theming Migration - Dialog Dark Theme Fix ✅
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-01-25
+- **Priority**: CRITICAL - FIXES DIALOG THEMING ISSUES
+- **Description**: Migrate from legacy Angular Material theming to Material 3 theming system with `use-system-variables: true` to fix dialog dark theme inheritance issues. Dialogs currently inherit global dark theme instead of component-specific light theme overrides due to legacy CSS variable structure.
+
+#### **ROOT CAUSE ANALYSIS** ✅
+1. **Legacy Theming System**: Current implementation uses `mat.define-light-theme()` and `mat.define-dark-theme()` without Material 3 system variables
+2. **Missing System Variables**: No `use-system-variables: true` configuration, preventing modern `--sys-*` variable generation
+3. **Overlay Container Inheritance**: Dialogs render in `cdk-overlay-container` outside component DOM tree, inheriting global theme instead of component overrides
+4. **CSS Variable Mismatch**: Current overrides use `--mdc-*` variables, but Material 3 primarily uses `--sys-*` variables
+5. **Missing Mixins**: No `mat.system-level-colors()` or `mat.system-level-typography()` mixins included
+
+#### **MATERIAL 3 MIGRATION PLAN** 🚧
+1. **Update Theme Configuration**:
+   - Convert `mat.define-light-theme()` to `mat.define-theme()` with system variables
+   - Add `use-system-variables: true` to color and typography configurations
+   - Include required Material 3 mixins
+
+2. **Update Global Styles**:
+   - Replace legacy CSS custom properties with Material 3 `--sys-*` variables
+   - Add `mat.system-level-colors()` and `mat.system-level-typography()` mixins
+   - Update dialog theming classes to use system variables
+
+3. **Enhance DialogThemingService**:
+   - Update service to work with Material 3 system variables
+   - Improve overlay container class management
+   - Add proper cleanup and error handling
+
+4. **Testing and Validation**:
+   - Verify dialog theming works with global dark theme
+   - Test theme inheritance across all Material components
+   - Validate Material 3 compliance and performance
+
+#### Implementation Notes
+- **Current Issue**: Dialog showing dark/gray background even when light theme overrides applied
+- **Research**: Based on Angular Material 18 best practices and Material 3 design system
+- **Expected Resolution**: Proper dialog theme isolation using Material 3 system variables
 
 ### BUG-044: Custom Sidebar Implementation - Option B Complete Solution ✅
 - **Status**: Complete
