@@ -1,0 +1,141 @@
+.group-selector-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background-color: var(--mdc-theme-surface);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  transform: translateX(100%);
+  transition: transform 0.3s ease-in-out;
+  z-index: 1100;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  
+  &.sidebar-open {
+    transform: translateX(0);
+  }
+  
+  .sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 24px;
+    background-color: var(--mdc-theme-primary);
+    color: var(--mdc-theme-on-primary);
+    
+    .header-content {
+      flex: 1;
+      
+      h2 {
+        margin: 0 0 8px 0;
+        font-size: 20px;
+        font-weight: 500;
+      }
+      
+      .user-info {
+        margin: 0;
+        font-size: 14px;
+        opacity: 0.9;
+      }
+    }
+    
+    button {
+      color: var(--mdc-theme-on-primary);
+    }
+  }
+  
+  .group-list-container {
+    flex: 1;
+    overflow-y: auto;
+    
+    mat-nav-list {
+      padding-top: 0;
+      
+      .group-item {
+        cursor: pointer;
+        padding: 16px 24px;
+        
+        &:hover {
+          background-color: rgba(0, 0, 0, 0.04);
+        }
+        
+        mat-icon {
+          margin-right: 16px;
+          color: var(--mdc-theme-primary);
+        }
+        
+        .group-description {
+          color: rgba(0, 0, 0, 0.6);
+          font-size: 14px;
+          margin-top: 4px;
+        }
+      }
+    }
+  }
+  
+  .no-groups-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    color: rgba(0, 0, 0, 0.54);
+    text-align: center;
+    
+    mat-icon {
+      font-size: 48px;
+      height: 48px;
+      width: 48px;
+      margin-bottom: 16px;
+    }
+    
+    p {
+      margin: 0;
+      font-size: 16px;
+    }
+  }
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1099;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+  
+  &.backdrop-visible {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+// Mobile adjustments
+@media (max-width: 599px) {
+  .group-selector-sidebar {
+    width: 100%;
+    max-width: 320px;
+    
+    .sidebar-header {
+      padding: 16px;
+      
+      .header-content {
+        h2 {
+          font-size: 18px;
+        }
+      }
+    }
+    
+    .group-list-container {
+      .group-item {
+        padding: 12px 16px;
+      }
+    }
+  }
+} 

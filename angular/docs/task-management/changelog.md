@@ -3,6 +3,29 @@ Last Updated: 2025-06-06
 
 ## In Progress
 
+### BUG-054: Add-to-Group Functionality - Sidebar Pattern Implementation
+- **Started**: 2025-12-15
+- **Status**: In Progress - Implementing group selector sidebar
+- **Priority**: HIGH - IMPROVING USER EXPERIENCE
+- **Implementation Notes**: **IMPLEMENTING SIDEBAR PATTERN** - After thorough investigation, converting the bottom sheet approach to a right sidebar pattern similar to the user menu. This avoids CDK overlay issues entirely and provides a consistent UX.
+
+#### Implementation Progress:
+1. ✅ Created GroupSelectorSidebarComponent following user sidebar pattern
+2. ✅ Added proper event-driven architecture for group selection
+3. ✅ Updated users component to use sidebar instead of bottom sheet
+4. ✅ Build successful with no compilation errors
+5. ⏳ Testing functionality and user experience
+
+#### Files Modified:
+- **Created**: `angular/frontend/src/app/features/users/group-selector-sidebar/group-selector-sidebar.component.ts`
+- **Created**: `angular/frontend/src/app/features/users/group-selector-sidebar/group-selector-sidebar.component.scss`
+- **Updated**: `angular/frontend/src/app/features/users/users.component.ts`
+  - Removed MatBottomSheet imports and references
+  - Added GroupSelectorSidebarComponent import
+  - Added sidebar state management properties
+  - Replaced openGroupSelector method to use sidebar pattern
+  - Added closeGroupSelector and onGroupSelected methods
+
 ## Completed Today
 
 ### BUG-054: MatMenu Click Issues - Event-Driven Architecture Solution ✅

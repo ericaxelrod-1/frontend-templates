@@ -3,13 +3,13 @@ Last Updated: 2025-06-06
 
 ## Critical Bugs [HIGHEST PRIORITY]
 
-### BUG-054: Add User to Group Button and User Menu Not Clickable ✅
-- **Status**: Complete ✅
-- **Testing**: Passed
+### BUG-054: Add User to Group Button and User Menu Not Clickable
+- **Status**: In Progress 🔄
+- **Testing**: In Progress
 - **Dependencies**: None
 - **Added**: 2025-06-06
-- **Completed**: 2025-12-15
 - **Priority**: HIGH - IMPROVING USER EXPERIENCE
+- **Current Work**: Implementing group selector sidebar pattern to replace bottom sheet
 - **Description**: Two critical UI elements are not clickable: (1) The "Add User to Group" button in the users management table, and (2) The user menu dropdown in the header. Both use Angular Material menus that fail to respond to clicks due to CSS pointer-events and event handling issues.
 
 #### **ROOT CAUSE ANALYSIS** ✅

@@ -4,7 +4,6 @@ import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { UserService } from '../../services/user.service';
 import { GroupService } from '../../services/group.service';
@@ -16,7 +15,7 @@ import { PermissionService } from '../../core/services/permission.service';
 import { User } from '../../models/user.model';
 import { Group } from '../../models/group.model';
 import { PermissionsModule } from '../../shared/modules/permissions.module';
-import { GroupSelectorSheetComponent } from './group-selector-sheet/group-selector-sheet.component';
+import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-selector-sidebar.component';
 
 @Component({
   selector: 'app-users',
@@ -27,8 +26,8 @@ import { GroupSelectorSheetComponent } from './group-selector-sheet/group-select
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatBottomSheetModule,
-    PermissionsModule
+    PermissionsModule,
+    GroupSelectorSidebarComponent
   ],
   template: `
     <div class="users-container">
@@ -122,6 +121,15 @@ import { GroupSelectorSheetComponent } from './group-selector-sheet/group-select
         </table>
       </ng-container>
     </div>
+    
+    <!-- Group Selector Sidebar -->
+    <app-group-selector-sidebar
+      [isOpen]="isGroupSelectorOpen"
+      [user]="selectedUserForGroup"
+      [availableGroups]="selectedUserForGroup ? getAvailableGroupsForUser(selectedUserForGroup) : []"
+      (closeSidebar)="closeGroupSelector()"
+      (groupSelected)="onGroupSelected($event)">
+    </app-group-selector-sidebar>
   `,
   styles: [`
     .users-container {
@@ -214,13 +222,16 @@ export class UsersComponent implements OnInit {
   currentUser: User | null = null;
   hasManageUsersPermission = false;
   hasManageGroupsPermission = false;
+  
+  // Group selector sidebar state
+  isGroupSelectorOpen = false;
+  selectedUserForGroup: User | null = null;
 
   constructor(
     private userService: UserService,
     private groupService: GroupService,
     private authService: AuthService,
     private snackBar: MatSnackBar,
-    private bottomSheet: MatBottomSheet,
     private router: Router,
     private logger: LoggerService,
     private permissionService: PermissionService,
@@ -509,19 +520,19 @@ export class UsersComponent implements OnInit {
   }
   
   openGroupSelector(user: User): void {
-    const bottomSheetRef = this.bottomSheet.open(GroupSelectorSheetComponent, {
-      data: {
-        user: user,
-        availableGroups: this.getAvailableGroupsForUser(user)
-      },
-      panelClass: 'group-selector-bottom-sheet'
-    });
-    
-    bottomSheetRef.afterDismissed().subscribe(selectedGroup => {
-      if (selectedGroup) {
-        this.addToGroup(user, selectedGroup);
-      }
-    });
+    this.selectedUserForGroup = user;
+    this.isGroupSelectorOpen = true;
+  }
+  
+  closeGroupSelector(): void {
+    this.isGroupSelectorOpen = false;
+    this.selectedUserForGroup = null;
+  }
+  
+  onGroupSelected(group: Group): void {
+    if (this.selectedUserForGroup && group) {
+      this.addToGroup(this.selectedUserForGroup, group);
+    }
   }
 
   getDisplayName(user: User | null): string {
