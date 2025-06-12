@@ -1,12 +1,11 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
-  Unique
+  PrimaryColumn
 } from 'typeorm';
 import { Role } from './role.entity';
 import { Permission } from '../../permissions/entities/permission.entity';
@@ -17,15 +16,11 @@ import { Permission } from '../../permissions/entities/permission.entity';
  * Aligned with database schema as of 2025-05-16
  */
 @Entity('role_permissions')
-@Unique(['roleId', 'permissionId'])
 export class RolePermission {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column({ name: 'role_id' })
+  @PrimaryColumn({ name: 'role_id' })
   roleId: number;
 
-  @Column({ name: 'permission_id' })
+  @PrimaryColumn({ name: 'permission_id' })
   permissionId: number;
 
   /**
@@ -56,11 +51,11 @@ export class RolePermission {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne(() => Role, role => role.rolePermissions, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'role_id', referencedColumnName: 'id' })
+  @ManyToOne(() => Role, (role) => role.rolePermissions)
+  @JoinColumn({ name: 'role_id' })
   role: Role;
 
-  @ManyToOne(() => Permission, permission => permission.rolePermissions, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'permission_id', referencedColumnName: 'id' })
+  @ManyToOne(() => Permission, (permission) => permission.rolePermissions)
+  @JoinColumn({ name: 'permission_id' })
   permission: Permission;
 }

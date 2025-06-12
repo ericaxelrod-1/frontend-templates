@@ -8,7 +8,8 @@ import {
   ManyToOne,
   JoinColumn,
   ManyToMany,
-  Unique
+  Unique,
+  JoinTable
 } from 'typeorm';
 import { RolePermission } from '../../roles/entities/role-permission.entity';
 import { GroupPermission } from './group-permission.entity';
@@ -97,7 +98,12 @@ export class Permission {
    * Relationships with routes
    * Used in permission-based routing
    */
-  @ManyToMany(() => FrontendRoute, (route) => route.requiredPermissions)
+  @ManyToMany(() => FrontendRoute, (route) => route.requiredPermissions, { eager: false })
+  @JoinTable({
+    name: 'frontend_route_permissions',
+    joinColumn: { name: 'permission_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'frontend_route_id', referencedColumnName: 'id' },
+  })
   routes: FrontendRoute[];
 
   /**

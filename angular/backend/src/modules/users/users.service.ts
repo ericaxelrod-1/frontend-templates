@@ -90,14 +90,14 @@ export class UsersService {
         'createdAt',
         'updatedAt',
       ],
-      relations: ['roles'],
+      relations: ['roles', 'groups'],
     });
   }
 
   async findOne(id: number): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['roles'],
+      relations: ['roles', 'groups'],
     });
 
     if (!user) {

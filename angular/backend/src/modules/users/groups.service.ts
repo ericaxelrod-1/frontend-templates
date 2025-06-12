@@ -162,8 +162,8 @@ export class GroupsService {
     // Check if current user has permission to manage group members
     const hasPermission = await this.permissionChecker.checkUserPermission(
       currentUser.id,
-      'member',
-      'manage',
+      'groups:members',
+      'add',
     );
     if (!hasPermission) {
       throw new ForbiddenException(
@@ -220,8 +220,8 @@ export class GroupsService {
     // Check if current user has permission to manage group members
     const hasPermission = await this.permissionChecker.checkUserPermission(
       currentUser.id,
-      'member',
-      'manage',
+      'groups:members',
+      'remove',
     );
     if (!hasPermission) {
       throw new ForbiddenException(
@@ -326,12 +326,12 @@ export class GroupsService {
     // Check if current user has permission to manage group members
     const hasPermission = await this.permissionChecker.checkUserPermission(
       currentUser.id,
-      'member',
-      'manage',
+      'groups:members',
+      'update',
     );
     if (!hasPermission) {
       throw new ForbiddenException(
-        'You do not have permission to manage group members',
+        'You do not have permission to manage group member permissions',
       );
     }
 

@@ -106,28 +106,41 @@ export class UserService {
 
   addUserToGroup(userId: number, groupId: number): Observable<GroupMembershipResponse> {
     this.logger.debug(`Adding user ${userId} to group ${groupId}`);
-    return this.http.post<GroupMembershipResponse>(`${this.apiUrl}/${userId}/groups/${groupId}`, {}).pipe(
-      map(response => {
+    return this.http.post<any>(`${environment.apiUrl}/groups/${groupId}/members/${userId}`, {}).pipe(
+      map((userGroup: any) => {
         this.logger.debug(`Successfully added user ${userId} to group ${groupId}`);
-        return response;
+        // Transform UserGroup response to expected GroupMembershipResponse format
+        return {
+          success: true,
+          message: 'User added to group successfully',
+          group: userGroup.group
+        } as GroupMembershipResponse;
       }),
       catchError(error => {
         this.logger.error(`Failed to add user ${userId} to group ${groupId}:`, error);
-        throw error;
+        // Handle error properly with fallback message
+        const errorMessage = error.error?.message || error.message || 'Failed to add user to group';
+        throw { message: errorMessage };
       })
     );
   }
 
   removeUserFromGroup(userId: number, groupId: number): Observable<GroupMembershipResponse> {
     this.logger.debug(`Removing user ${userId} from group ${groupId}`);
-    return this.http.delete<GroupMembershipResponse>(`${this.apiUrl}/${userId}/groups/${groupId}`).pipe(
-      map(response => {
+    return this.http.delete<any>(`${environment.apiUrl}/groups/${groupId}/members/${userId}`).pipe(
+      map(() => {
         this.logger.debug(`Successfully removed user ${userId} from group ${groupId}`);
-        return response;
+        // Transform void response to expected GroupMembershipResponse format
+        return {
+          success: true,
+          message: 'User removed from group successfully'
+        } as GroupMembershipResponse;
       }),
       catchError(error => {
         this.logger.error(`Failed to remove user ${userId} from group ${groupId}:`, error);
-        throw error;
+        // Handle error properly with fallback message
+        const errorMessage = error.error?.message || error.message || 'Failed to remove user from group';
+        throw { message: errorMessage };
       })
     );
   }

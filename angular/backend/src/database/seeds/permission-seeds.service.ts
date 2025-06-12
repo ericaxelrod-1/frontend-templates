@@ -6,9 +6,14 @@ import { Role } from '../../modules/roles/entities/role.entity';
 import { RolePermission } from '../../modules/roles/entities/role-permission.entity';
 import { Action } from '../../modules/permissions/entities/action.entity';
 import { PermissionsService } from '../../modules/permissions/services/permissions.service';
+import { Connection } from 'typeorm';
+import { Logger } from '@nestjs/common';
+import { In } from 'typeorm';
 
 @Injectable()
 export class PermissionSeedsService {
+  private readonly logger = new Logger(PermissionSeedsService.name);
+
   constructor(
     @InjectRepository(Permission)
     private permissionRepository: Repository<Permission>,
@@ -19,6 +24,7 @@ export class PermissionSeedsService {
     @InjectRepository(Action)
     private actionRepository: Repository<Action>,
     private permissionsService: PermissionsService,
+    private connection: Connection,
   ) {}
 
   /**
@@ -33,77 +39,92 @@ export class PermissionSeedsService {
    * Seed permissions
    */
   private async seedPermissions() {
-    console.log('Seeding permissions...');
+    const actionRepository = this.connection.getRepository(Action);
+    const permissionRepository = this.connection.getRepository(Permission);
 
-    // Define valid combinations of resources and actions
+    // Define all valid resource-action combinations
     const validCombinations = [
       // Users permissions
       {
         resource: 'users',
-        actions: ['create', 'read', 'update', 'delete', 'list', 'manage'],
+        actions: ['create', 'read', 'update', 'delete', 'list', 'manage', 'admin'],
       },
       // Roles permissions
       {
         resource: 'roles',
-        actions: ['create', 'read', 'update', 'delete', 'list', 'manage'],
+        actions: ['create', 'read', 'update', 'delete', 'list', 'manage', 'admin'],
       },
       // Groups permissions
       {
         resource: 'groups',
-        actions: ['create', 'read', 'update', 'delete', 'list', 'manage'],
+        actions: ['create', 'read', 'update', 'delete', 'list', 'manage', 'admin', 'view'],
+      },
+      // Group members permissions
+      {
+        resource: 'groups:members',
+        actions: ['add', 'remove', 'update', 'read'],
+      },
+      // Group settings permissions
+      {
+        resource: 'groups:settings',
+        actions: ['update'],
       },
       // Permissions management
-      { resource: 'permissions', actions: ['read', 'update', 'manage'] },
-      // Reports
-      { resource: 'reports', actions: ['read', 'list', 'export'] },
-      // Dashboard
-      { resource: 'dashboard', actions: ['read'] },
-      // Settings
-      { resource: 'settings', actions: ['read', 'update', 'manage'] },
+      {
+        resource: 'permissions',
+        actions: ['create', 'read', 'update', 'delete', 'list', 'manage', 'admin', 'view'],
+      },
+      // Self profile permissions
+      {
+        resource: 'self:profile',
+        actions: ['read', 'update'],
+      },
+      // System permissions
+      {
+        resource: 'system',
+        actions: ['admin', 'manage'],
+      },
+      // Login monitoring permissions
+      {
+        resource: 'login-monitoring',
+        actions: ['read', 'manage'],
+      },
     ];
 
+    // Get all existing actions
+    const actions = await actionRepository.find();
+    const actionMap = new Map(actions.map(action => [action.actionCode, action]));
+
+    // Create permissions for each valid combination
     for (const combination of validCombinations) {
-      const resourceName = combination.resource;
-
-      for (const actionName of combination.actions) {
-        // Find or create the Action entity
-        let action = await this.actionRepository.findOne({
-          where: { name: actionName },
-        });
-
+      for (const actionCode of combination.actions) {
+        const action = actionMap.get(actionCode);
         if (!action) {
-          action = await this.actionRepository.save({
-            name: actionName,
-            actionCode: actionName,
-            description: `${actionName} action`,
-          });
-          console.log(`Created action: ${actionName}`);
+          this.logger.warn(`Action ${actionCode} not found in actions table`);
+          continue;
         }
 
-        // Check if permission already exists
-        const existingPermission = await this.permissionRepository.findOne({
+        const permissionName = `${combination.resource}:${actionCode}`;
+        const existingPermission = await permissionRepository.findOne({
           where: {
-            resourceName,
+            resourceName: combination.resource,
             actionId: action.id,
           },
         });
 
         if (!existingPermission) {
-          const name = `${resourceName}:${actionName}`;
-          const description = `${actionName} ${resourceName}`;
-
-          // Create permission with actionId reference
-          const permissionData: DeepPartial<Permission> = {
-            resourceName,
-            actionId: action.id,
-            name,
-            description,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-
-          await this.permissionRepository.save(permissionData);
-          console.log(`Created permission: ${name}`);
+          const permission = new Permission();
+          permission.name = permissionName;
+          permission.resourceName = combination.resource;
+          permission.actionId = action.id;
+          permission.description = `Permission to ${action.description?.toLowerCase() || actionCode} ${combination.resource}`;
+          
+          try {
+            await permissionRepository.save(permission);
+            this.logger.log(`Created permission: ${permissionName}`);
+          } catch (error) {
+            this.logger.error(`Failed to create permission ${permissionName}: ${error.message}`);
+          }
         }
       }
     }
@@ -113,22 +134,14 @@ export class PermissionSeedsService {
    * Seed role permissions
    */
   private async seedRolePermissions() {
-    console.log('Seeding role permissions...');
-
-    // Get all system roles
-    const roles = await this.roleRepository.find({
-      where: { isSystemRole: true },
-    });
-
-    // Get all permissions with their action relationships
-    const permissions = await this.permissionRepository.find({
-      relations: ['actionEntity'],
-    });
-
-    // Define permission assignments by role
     const rolePermissionMap = {
       // Regular user permissions
-      user: ['users:read', 'dashboard:read'],
+      user: [
+        'users:read',
+        'dashboard:read',
+        'self:profile:read',
+        'self:profile:update'
+      ],
 
       // Admin permissions
       admin: [
@@ -137,94 +150,80 @@ export class PermissionSeedsService {
         'users:update',
         'users:list',
         'groups:manage',
+        'groups:members:read',
+        'groups:members:add',
+        'groups:members:remove',
+        'groups:settings:update',
         'roles:read',
-        'roles:list',
-        'reports:read',
-        'reports:list',
-        'reports:export',
-        'dashboard:read',
-        'settings:read',
-        'settings:update',
-      ],
-
-      // Superuser permissions
-      superuser: [
-        'users:create',
-        'users:read',
-        'users:update',
-        'users:delete',
-        'users:list',
-        'users:manage',
-        'groups:create',
-        'groups:read',
-        'groups:update',
-        'groups:delete',
-        'groups:list',
-        'groups:manage',
-        'roles:read',
-        'roles:update',
         'roles:list',
         'permissions:read',
-        'permissions:update',
-        'reports:read',
-        'reports:list',
-        'reports:export',
-        'dashboard:read',
-        'settings:read',
-        'settings:update',
+        'permissions:list',
+        'permissions:view',
+        'system:manage'
       ],
 
-      // Superadmin permissions (all permissions)
-      superadmin: permissions.map((p) => `${p.resourceName}:${p.actionEntity?.name || ''}`),
+      // Super Administrator permissions
+      superadmin: [
+        // User management
+        'users:create', 'users:read', 'users:update', 'users:delete', 'users:list', 'users:manage', 'users:admin',
+        
+        // Role management
+        'roles:create', 'roles:read', 'roles:update', 'roles:delete', 'roles:list', 'roles:manage', 'roles:admin',
+        
+        // Group management
+        'groups:create', 'groups:read', 'groups:update', 'groups:delete', 'groups:list', 'groups:manage', 'groups:admin', 'groups:view',
+        'groups:members:add', 'groups:members:remove', 'groups:members:update', 'groups:members:read',
+        'groups:settings:update',
+        
+        // Permission management
+        'permissions:create', 'permissions:read', 'permissions:update', 'permissions:delete', 'permissions:list', 'permissions:manage', 'permissions:admin', 'permissions:view',
+        
+        // Profile management
+        'self:profile:read', 'self:profile:update',
+        
+        // System management
+        'system:admin', 'system:manage',
+        
+        // Login monitoring
+        'login-monitoring:read', 'login-monitoring:manage'
+      ]
     };
 
-    // Assign permissions to roles
-    for (const role of roles) {
-      // Normalize role name: lowercase and remove spaces
-      const normalizedRoleName = role.name.toLowerCase().replace(/\s+/g, '');
-      const isSuperAdmin =
-        normalizedRoleName === 'superadmin' ||
-        normalizedRoleName === 'superadministrator';
-      let permissionList = rolePermissionMap[role.name];
-      if (isSuperAdmin) {
-        permissionList = permissions.map((p) => `${p.resourceName}:${p.actionEntity?.name || ''}`);
+    // Create roles and assign permissions
+    for (const [roleName, permissions] of Object.entries(rolePermissionMap)) {
+      let role = await this.roleRepository.findOne({ where: { name: roleName } });
+      
+      if (!role) {
+        role = await this.roleRepository.save({
+          name: roleName,
+          description: `${roleName.charAt(0).toUpperCase() + roleName.slice(1)} role with predefined permissions`,
+        });
+        this.logger.log(`Created role: ${roleName}`);
       }
-      if (permissionList) {
-        for (const permissionStr of permissionList) {
-          const [resourceName, actionName] = permissionStr.split(':');
 
-          // Find the permission
-          const permission = permissions.find(
-            (p) =>
-              p.resourceName === resourceName && p.actionEntity?.name === actionName,
-          );
+      // Get all permission entities for this role
+      const permissionEntities = await this.permissionRepository.find({
+        where: {
+          name: In(permissions)
+        }
+      });
 
-          if (permission) {
-            // Check if role permission already exists
-            const existingRolePermission =
-              await this.rolePermissionRepository.findOne({
-                where: {
-                  roleId: role.id,
-                  permissionId: permission.id,
-                },
-              });
-
-            if (!existingRolePermission) {
-              // Create role permission with numeric IDs
-              const rolePermissionData: DeepPartial<RolePermission> = {
-                roleId: role.id,
-                permissionId: permission.id,
-                isGranted: true,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              };
-
-              await this.rolePermissionRepository.save(rolePermissionData);
-              console.log(
-                `Granted permission ${permissionStr} to role ${role.name}`,
-              );
-            }
+      // Create role-permission associations
+      for (const permission of permissionEntities) {
+        const existingRolePermission = await this.rolePermissionRepository.findOne({
+          where: {
+            roleId: role.id,
+            permissionId: permission.id
           }
+        });
+
+        if (!existingRolePermission) {
+          await this.rolePermissionRepository.save({
+            roleId: role.id,
+            permissionId: permission.id,
+            isGranted: true
+          });
+          this.logger.log(`Assigned permission ${permission.name} to role ${roleName}`);
         }
       }
     }

@@ -1,11 +1,11 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  PrimaryColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
@@ -17,24 +17,13 @@ import { Group } from './group.entity';
  */
 @Entity('user_groups')
 export class UserGroup {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column({ name: 'user_id' })
+  @PrimaryColumn({ name: 'user_id' })
   userId: number;
 
-  @Column({ name: 'group_id' })
+  @PrimaryColumn({ name: 'group_id' })
   groupId: number;
 
-  @ManyToOne(() => User, (user) => user.userGroups)
-  @JoinColumn({ name: 'user_id' })
-  user: User;
-
-  @ManyToOne(() => Group, (group) => group.userGroups)
-  @JoinColumn({ name: 'group_id' })
-  group: Group;
-
-  @Column({ name: 'is_admin', type: 'boolean', default: false })
+  @Column({ name: 'is_admin', default: false })
   isAdmin: boolean;
 
   /**
@@ -43,9 +32,17 @@ export class UserGroup {
   @Column({ name: 'group_permissions_override', type: 'text', nullable: true })
   groupPermissionsOverride: string;
 
-  @CreateDateColumn({ name: 'joined_at' })
+  @Column({ name: 'joined_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   joinedAt: Date;
 
-  @Column({ name: 'last_active_at', nullable: true })
+  @Column({ name: 'last_active_at', type: 'datetime', nullable: true })
   lastActiveAt: Date;
+
+  @ManyToOne(() => User, (user) => user.userGroups)
+  @JoinColumn({ name: 'user_id' })
+  user: User;
+
+  @ManyToOne(() => Group, (group) => group.userGroups)
+  @JoinColumn({ name: 'group_id' })
+  group: Group;
 }
