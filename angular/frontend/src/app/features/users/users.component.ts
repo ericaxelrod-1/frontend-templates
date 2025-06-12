@@ -1,10 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { UserService } from '../../services/user.service';
 import { GroupService } from '../../services/group.service';
@@ -16,6 +16,7 @@ import { PermissionService } from '../../core/services/permission.service';
 import { User } from '../../models/user.model';
 import { Group } from '../../models/group.model';
 import { PermissionsModule } from '../../shared/modules/permissions.module';
+import { GroupSelectorSheetComponent } from './group-selector-sheet/group-selector-sheet.component';
 
 @Component({
   selector: 'app-users',
@@ -25,8 +26,8 @@ import { PermissionsModule } from '../../shared/modules/permissions.module';
     MatTableModule,
     MatButtonModule,
     MatIconModule,
-    MatMenuModule,
     MatChipsModule,
+    MatBottomSheetModule,
     PermissionsModule
   ],
   template: `
@@ -58,7 +59,7 @@ import { PermissionsModule } from '../../shared/modules/permissions.module';
           <!-- Name Column -->
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef>Name</th>
-            <td mat-cell *matCellDef="let user">{{ user.name || 'Unknown' }}</td>
+            <td mat-cell *matCellDef="let user">{{ getDisplayName(user) || 'Unknown' }}</td>
           </ng-container>
           
           <!-- Email Column -->
@@ -90,17 +91,16 @@ import { PermissionsModule } from '../../shared/modules/permissions.module';
                   </mat-chip>
                 </ng-container>
               </mat-chip-listbox>
-              <button *ngIf="canManageGroups(user)" mat-icon-button [matMenuTriggerFor]="groupMenu">
-                <mat-icon>add_circle</mat-icon>
+              
+              <button *ngIf="canManageGroups(user) && getAvailableGroupsForUser(user).length > 0"
+                      mat-raised-button
+                      color="primary"
+                      class="add-group-button"
+                      (click)="openGroupSelector(user)"
+                      style="z-index: 10; position: relative;">
+                <mat-icon>add</mat-icon>
+                Add to group
               </button>
-              <mat-menu #groupMenu="matMenu">
-                <div class="no-groups-available" *ngIf="getAvailableGroupsForUser(user).length === 0">
-                  <span class="menu-item-text">No available groups</span>
-                </div>
-                <button mat-menu-item *ngFor="let group of getAvailableGroupsForUser(user)" (click)="addToGroup(user, group)">
-                  {{ group.name }}
-                </button>
-              </mat-menu>
             </td>
           </ng-container>
           
@@ -141,7 +141,7 @@ import { PermissionsModule } from '../../shared/modules/permissions.module';
     }
 
     .mat-column-groups {
-      min-width: 200px;
+      min-width: 300px;
     }
     
     .mat-chip-listbox {
@@ -149,6 +149,29 @@ import { PermissionsModule } from '../../shared/modules/permissions.module';
       flex-wrap: wrap;
       gap: 4px;
       margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .add-group-button {
+      display: inline-block;
+      margin-left: 8px;
+      vertical-align: middle;
+      position: relative;
+      z-index: 10;
+      pointer-events: auto;
+      
+      mat-icon {
+        margin-right: 4px;
+      }
+    }
+
+    .add-group-button:not([disabled]) {
+      cursor: pointer;
+    }
+
+    .add-group-button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .permission-error {
@@ -168,13 +191,17 @@ import { PermissionsModule } from '../../shared/modules/permissions.module';
       font-style: italic;
       color: #666;
     }
-    
-    .menu-item-text {
-      padding: 0 16px;
-      display: block;
-      line-height: 48px;
-      color: #666;
-      font-style: italic;
+
+    /* Ensure table cells don't have overflow issues */
+    .mat-cell {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Fix any potential overlay issues */
+    .users-table .mat-row {
+      position: relative;
+      z-index: 1;
     }
   `]
 })
@@ -193,24 +220,33 @@ export class UsersComponent implements OnInit {
     private groupService: GroupService,
     private authService: AuthService,
     private snackBar: MatSnackBar,
+    private bottomSheet: MatBottomSheet,
     private router: Router,
     private logger: LoggerService,
-    private permissionService: PermissionService
+    private permissionService: PermissionService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
     // Get current user
     this.authService.currentUser$.subscribe(user => {
       this.currentUser = user;
+      this.cdr.detectChanges(); // Trigger change detection
     });
 
-    // Check permissions
+    // Check permissions with proper change detection
     this.permissionService.hasPermission('users:manage').subscribe(
-      hasPermission => this.hasManageUsersPermission = hasPermission
+      hasPermission => {
+        this.hasManageUsersPermission = hasPermission;
+        this.cdr.detectChanges(); // Trigger change detection
+      }
     );
     
     this.permissionService.hasPermission('groups:manage').subscribe(
-      hasPermission => this.hasManageGroupsPermission = hasPermission
+      hasPermission => {
+        this.hasManageGroupsPermission = hasPermission;
+        this.cdr.detectChanges(); // Trigger change detection
+      }
     );
 
     // Load data
@@ -239,7 +275,15 @@ export class UsersComponent implements OnInit {
 
   // Check if the current user can manage groups for a given user
   canManageGroups(user: User): boolean {
-    return this.hasManageGroupsPermission && user.id !== this.currentUser?.id;
+    // Use both async loaded permission and sync check as fallback
+    const hasAsyncPermission = this.hasManageGroupsPermission;
+    const hasSyncPermission = this.permissionService.hasPermissionSync('groups:manage');
+    const hasPermission = hasAsyncPermission || hasSyncPermission;
+    
+    // Don't allow users to manage their own groups
+    const isNotSelf = user.id !== this.currentUser?.id;
+    
+    return hasPermission && isNotSelf;
   }
 
   loadData(): void {
@@ -459,4 +503,33 @@ export class UsersComponent implements OnInit {
   canEditUsers(): boolean {
     return this.permissionService.hasPermissionSync('users:update');
   }
+
+  trackByGroupId(index: number, group: Group): number {
+    return group.id;
+  }
+  
+  openGroupSelector(user: User): void {
+    const bottomSheetRef = this.bottomSheet.open(GroupSelectorSheetComponent, {
+      data: {
+        user: user,
+        availableGroups: this.getAvailableGroupsForUser(user)
+      },
+      panelClass: 'group-selector-bottom-sheet'
+    });
+    
+    bottomSheetRef.afterDismissed().subscribe(selectedGroup => {
+      if (selectedGroup) {
+        this.addToGroup(user, selectedGroup);
+      }
+    });
+  }
+
+  getDisplayName(user: User | null): string {
+    if (!user) return '';
+    if (user.firstName || user.lastName) {
+      return `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    }
+    return user.email || 'Unknown';
+  }
+
 }

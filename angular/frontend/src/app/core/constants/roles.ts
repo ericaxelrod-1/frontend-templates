@@ -17,7 +17,7 @@ export interface SystemRole {
   id: number;
   name: string;
   description?: string;
-  normalizedName: string;
+  normalizedName?: string; // Make optional since we'll generate it
 }
 
 /**
@@ -80,25 +80,31 @@ export class RolesConstantsService {
         // Populate SystemRoles with values from API
         const rolesMap: Record<string, string> = {};
         roles.forEach(role => {
-          // Safely access normalizedName with null checking
-          if (role && role.normalizedName) {
+          // Generate normalizedName from name if not provided
+          const normalizedName = role.normalizedName || role.name.toLowerCase().replace(/\s+/g, '');
+          
+          if (role && normalizedName) {
             // Store both uppercase and original case versions for maximum compatibility
-            const upperKey = role.normalizedName.toUpperCase();
-            const lowerKey = role.normalizedName.toLowerCase();
+            const upperKey = normalizedName.toUpperCase();
+            const lowerKey = normalizedName.toLowerCase();
             
             // Add uppercase key for backward compatibility
-            SystemRoles[upperKey] = role.normalizedName;
-            rolesMap[upperKey] = role.normalizedName;
+            SystemRoles[upperKey] = normalizedName;
+            rolesMap[upperKey] = normalizedName;
             
             // Add lowercase key for direct matches
-            SystemRoles[lowerKey] = role.normalizedName;
-            rolesMap[lowerKey] = role.normalizedName;
+            SystemRoles[lowerKey] = normalizedName;
+            rolesMap[lowerKey] = normalizedName;
             
             // Also add the normalized name directly as a key
-            SystemRoles[role.normalizedName] = role.normalizedName;
-            rolesMap[role.normalizedName] = role.normalizedName;
+            SystemRoles[normalizedName] = normalizedName;
+            rolesMap[normalizedName] = normalizedName;
+            
+            // Also add the original name as a key for direct lookups
+            SystemRoles[role.name] = normalizedName;
+            rolesMap[role.name] = normalizedName;
           } else {
-            console.warn('RolesConstantsService: Received a role with missing normalizedName:', role);
+            console.warn('RolesConstantsService: Received a role with missing name:', role);
           }
         });
         

@@ -1,3 +1,103 @@
+// Angular Material Theme Variables
+// Import Angular Material theming functions
+@use '@angular/material' as mat;
+
+// Define the palettes (these should match styles.scss)
+$primary-palette: mat.define-palette(mat.$indigo-palette);
+$accent-palette: mat.define-palette(mat.$pink-palette, A200, A100, A400);
+$warn-palette: mat.define-palette(mat.$red-palette);
+
+// Create the theme (this should match styles.scss)
+$light-theme: mat.define-light-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  )
+));
+
+// Extract colors from the theme
+$primary-color: mat.get-color-from-palette($primary-palette, 500);
+$primary-light: mat.get-color-from-palette($primary-palette, 100);
+$primary-dark: mat.get-color-from-palette($primary-palette, 700);
+$accent-color: mat.get-color-from-palette($accent-palette, A200);
+$warn-color: mat.get-color-from-palette($warn-palette, 500);
+
+// Background colors from theme
+$background-color: mat.get-color-from-palette(mat.$grey-palette, 50);
+$background-card: #ffffff;
+$background-hover: mat.get-color-from-palette(mat.$grey-palette, 100);
+
+// Text colors from theme
+$text-primary: rgba(0, 0, 0, 0.87);
+$text-secondary: rgba(0, 0, 0, 0.6);
+$text-disabled: rgba(0, 0, 0, 0.38);
+$text-hint: rgba(0, 0, 0, 0.38);
+
+// Border and divider colors
+$border-color: rgba(0, 0, 0, 0.12);
+$divider-color: rgba(0, 0, 0, 0.12);
+
+// Semantic colors
+$success-color: #4caf50;
+$warning-color: #ff9800;
+$info-color: #2196f3;
+$error-color: $warn-color;
+
+// Material Design spacing system (8dp grid)
+$spacing-xs: 4px;   // 0.5 * 8dp
+$spacing-sm: 8px;   // 1 * 8dp
+$spacing-md: 16px;  // 2 * 8dp
+$spacing-lg: 24px;  // 3 * 8dp
+$spacing-xl: 32px;  // 4 * 8dp
+$spacing-xxl: 48px; // 6 * 8dp
+
+// Material Design elevation shadows
+$elevation-0: none;
+$elevation-1: 0 2px 1px -1px rgba(0, 0, 0, 0.2), 0 1px 1px 0 rgba(0, 0, 0, 0.14), 0 1px 3px 0 rgba(0, 0, 0, 0.12);
+$elevation-2: 0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12);
+$elevation-3: 0 3px 3px -2px rgba(0, 0, 0, 0.2), 0 3px 4px 0 rgba(0, 0, 0, 0.14), 0 1px 8px 0 rgba(0, 0, 0, 0.12);
+$elevation-4: 0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12);
+$elevation-6: 0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12);
+$elevation-8: 0 5px 5px -3px rgba(0, 0, 0, 0.2), 0 8px 10px 1px rgba(0, 0, 0, 0.14), 0 3px 14px 2px rgba(0, 0, 0, 0.12);
+
+// Border radius values
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+
+// Transition durations
+$transition-fast: 150ms;
+$transition-normal: 300ms;
+$transition-slow: 500ms;
+
+// Typography variables
+$font-family-base: 'Roboto', 'Helvetica Neue', sans-serif;
+$font-size-base: 1rem;
+$font-size-sm: 0.875rem;
+$font-size-lg: 1.25rem;
+$font-size-xl: 1.5rem;
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-bold: 700;
+$line-height-base: 1.5;
+
+// Breakpoint variables
+$breakpoint-xs: 0;
+$breakpoint-sm: 600px;
+$breakpoint-md: 960px;
+$breakpoint-lg: 1280px;
+$breakpoint-xl: 1920px;
+
+// Z-index layers
+$z-index-dropdown: 1000;
+$z-index-sticky: 1020;
+$z-index-fixed: 1030;
+$z-index-modal-backdrop: 1040;
+$z-index-modal: 1050;
+$z-index-popover: 1060;
+$z-index-tooltip: 1070;
+
 // Material Design Typography Scale
 // These classes can be used directly in HTML or extended in SCSS
 
@@ -85,62 +185,6 @@
   letter-spacing: 0.0892857143em;
   text-transform: uppercase;
 }
-
-// Material Design spacing system (8dp grid)
-$spacing-xs: 4px;   // 0.5 * 8dp
-$spacing-sm: 8px;   // 1 * 8dp
-$spacing-md: 16px;  // 2 * 8dp
-$spacing-lg: 24px;  // 3 * 8dp
-$spacing-xl: 32px;  // 4 * 8dp
-$spacing-xxl: 48px; // 6 * 8dp
-
-// Material Design elevation shadows
-$elevation-0: none;
-$elevation-1: 0 2px 1px -1px rgba(0, 0, 0, 0.2), 0 1px 1px 0 rgba(0, 0, 0, 0.14), 0 1px 3px 0 rgba(0, 0, 0, 0.12);
-$elevation-2: 0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12);
-$elevation-3: 0 3px 3px -2px rgba(0, 0, 0, 0.2), 0 3px 4px 0 rgba(0, 0, 0, 0.14), 0 1px 8px 0 rgba(0, 0, 0, 0.12);
-$elevation-4: 0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12);
-$elevation-6: 0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12);
-$elevation-8: 0 5px 5px -3px rgba(0, 0, 0, 0.2), 0 8px 10px 1px rgba(0, 0, 0, 0.14), 0 3px 14px 2px rgba(0, 0, 0, 0.12);
-
-// Border radius values
-$border-radius-sm: 4px;
-$border-radius-md: 8px;
-$border-radius-lg: 12px;
-
-// Transition durations
-$transition-fast: 150ms;
-$transition-normal: 300ms;
-$transition-slow: 500ms;
-
-// Typography variables for backward compatibility
-$font-family-base: 'Roboto', 'Helvetica Neue', sans-serif;
-$font-size-base: 1rem;
-$font-size-sm: 0.875rem;
-$font-size-lg: 1.25rem;
-$font-size-xl: 1.5rem;
-$font-weight-normal: 400;
-$font-weight-medium: 500;
-$font-weight-bold: 700;
-$line-height-base: 1.5;
-
-// Text color variables for backward compatibility
-$text-primary: var(--mdc-theme-text-primary);
-$text-secondary: var(--mdc-theme-text-secondary);
-
-// Color variables for backward compatibility
-$primary: var(--mdc-theme-primary);
-$accent: var(--mdc-theme-accent);
-$error: var(--mdc-theme-error);
-$success: var(--mdc-theme-success);
-$warning: var(--mdc-theme-warning);
-$info: var(--mdc-theme-info);
-
-// Breakpoint variables for backward compatibility
-$breakpoint-sm: 600px;
-$breakpoint-md: 960px;
-$breakpoint-lg: 1280px;
-$breakpoint-xl: 1920px;
 
 // Shadow variables for backward compatibility
 $shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);

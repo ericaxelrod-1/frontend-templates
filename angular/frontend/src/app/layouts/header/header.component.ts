@@ -1,17 +1,18 @@
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { Store } from '@ngxs/store';
-import { Observable, Subscription } from 'rxjs';
-import { AuthActions } from '../../store/auth/auth.state';
-import { User } from '../../models';
-import { AppConfigService } from '../../core/services';
+import { Observable, Subscription, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { AppConfigService } from '../../core/services/app-config.service';
+import { User } from '../../models';
+import { AuthActions } from '../../store/auth/auth.state';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
+import { LoggerService } from '../../services/logging/logger.service';
 
 /**
  * Header Component - Simplified for Custom Layout System
@@ -22,8 +23,6 @@ import { MatDividerModule } from '@angular/material/divider';
  */
 @Component({
   selector: 'app-header',
-  templateUrl: './header.component.html',
-  styleUrls: ['./header.component.scss'],
   standalone: true,
   imports: [
     CommonModule,
@@ -33,49 +32,56 @@ import { MatDividerModule } from '@angular/material/divider';
     MatIconModule,
     MatMenuModule,
     MatDividerModule
-  ]
+  ],
+  templateUrl: './header.component.html',
+  styleUrls: ['./header.component.scss']
 })
 export class HeaderComponent implements OnInit, OnDestroy {
   @Input() isFixedHeader = false;
   @Input() sidebarOpened = true;
   @Output() sidebarToggle = new EventEmitter<void>();
+  @Output() userMenuToggle = new EventEmitter<void>();
+  
+  isAuthenticated$: Observable<boolean>;
+  currentUser$: Observable<User | null>;
   
   isAuthenticated = false;
   user: User | null = null;
   private subscription = new Subscription();
   
-  // App configuration properties
   appName: string;
   headerLogo: string;
-  
+
   constructor(
     private authService: AuthService,
     private store: Store,
     private appConfig: AppConfigService,
-    private router: Router
+    private router: Router,
+    private logger: LoggerService,
+    private cdr: ChangeDetectorRef
   ) {
     this.appName = this.appConfig.appName;
     this.headerLogo = this.appConfig.headerLogo;
-  }
-  
-  ngOnInit(): void {
-    // Subscribe to auth service's user observable
-    this.subscription.add(
-      this.authService.currentUser$.subscribe(user => {
-        this.user = user;
-        this.isAuthenticated = this.authService.isAuthenticated;
-      })
+    
+    this.currentUser$ = this.authService.currentUser$;
+    this.isAuthenticated$ = this.authService.currentUser$.pipe(
+      map(user => !!user)
     );
   }
   
+  ngOnInit(): void {
+    this.subscription.add(
+      this.authService.currentUser$.subscribe(user => {
+        this.user = user;
+        this.isAuthenticated = !!user;
+      })
+    );
+  }
+
   ngOnDestroy(): void {
     this.subscription.unsubscribe();
   }
   
-  /**
-   * Toggle sidebar - simple event emission
-   * No complex state management needed with custom layout
-   */
   toggleSidebar(): void {
     this.sidebarToggle.emit();
   }
@@ -90,5 +96,29 @@ export class HeaderComponent implements OnInit, OnDestroy {
         this.router.navigate(['/login']);
       }
     });
+  }
+
+  navigateToProfile(): void {
+    // Implement the logic to navigate to the user's profile
+  }
+
+  navigateToSettings(): void {
+    // Implement the logic to navigate to the user's settings
+  }
+
+  onSidebarToggle(): void {
+    this.sidebarToggle.emit();
+  }
+
+  onUserMenuToggle(): void {
+    this.userMenuToggle.emit();
+  }
+
+  getDisplayName(user: User | null): string {
+    if (!user) return '';
+    if (user.firstName || user.lastName) {
+      return `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    }
+    return user.email;
   }
 }

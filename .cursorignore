@@ -1,0 +1,217 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build/dist directories
+dist/
+**/dist/
+build/
+**/build/
+out/
+**/out/
+.angular/
+**/.angular/
+
+# Server/application files
+*.server.js
+*.server.ts
+server.js
+server.ts
+
+# Environment and configuration files with sensitive data
+#.env
+#.env.*
+#!.env.example
+#!.env.template
+#*.env
+config/production.json
+config/local.json
+
+# Key files and certificates
+*.key
+*.pem
+*.cert
+*.crt
+*.csr
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+private/
+secrets/
+certificates/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.mdb
+*.accdb
+database/*.sql
+**/db/*.sql
+
+# Log files
+# *.log
+#logs/
+#**/logs/
+#*.log.*
+#npm-debug.log*
+#yarn-debug.log*
+#yarn-error.log*
+#lerna-debug.log*
+
+# Cache directories
+cache/
+**/cache/
+.cache/
+**/.cache/
+.parcel-cache/
+.next/
+.nuxt/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Testing
+#coverage/
+#**/coverage/
+#.nyc_output/
+#**/.nyc_output/
+#test-results/
+#**/test-results/
+#*.lcov
+
+# Temporary files
+#tmp/
+#**/tmp/
+#temp/
+#**/temp/
+#.tmp/
+#**/.tmp/
+
+# Package manager files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+.pnp
+.pnp.js
+
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o 
+*.so
+*.dylib
+
+# Archives
+#*.7z
+#*.dmg
+#*.gz
+#*.iso
+#*.jar
+#*.rar
+#*.tar
+#*.zip
+
+# Media files (optional - uncomment if needed)
+# *.jpg
+# *.jpeg
+# *.png
+# *.gif
+# *.svg
+# *.ico
+# *.mov
+# *.mp4
+# *.avi
+# *.mpg
+# *.mpeg
+# *.mp3
+# *.wav
+
+# Documentation build output
+#docs/_build/
+#docs/.docusaurus/
+#documentation/build/
+
+# Backup files
+backup/
+**/backup/
+backups/
+**/backups/
+*.bak
+*.backup
+
+# Session files
+sessions/
+**/sessions/
+*.session
+
+# Angular specific
+.angular/
+.sass-cache/
+connect.lock
+libpeerconnection.log
+testem.log
+typings/
+
+# NestJS specific
+ormconfig.json
+ormconfig.js
+
+# Webpack
+.webpack/
+
+# Other
+.grunt/
+.lock-wscript
+.node_repl_history
+.npm/
+.yarn-integrity
+.yarn/
+#.pnpm-debug.log
+.turbo/
+
+# Python files (from your validator scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Migration lock files
+migrations/*.lock
+
+# Sensitive data patterns
+**/credentials/**
+**/private/**
+**/secret/**
+**/keys/** 

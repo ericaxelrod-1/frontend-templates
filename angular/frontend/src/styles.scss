@@ -308,6 +308,53 @@ html, body {
 }
 
 /* 
+ * CDK OVERLAY Z-INDEX FIXES FOR BUG-054
+ * 
+ * Ensures Material menus appear above all other elements and are clickable
+ * Fixes issues with add-user-to-group button and user menu not being clickable
+ */
+
+/* CDK Overlay Container - Highest z-index to ensure menus appear above everything */
+.cdk-overlay-container {
+  z-index: 10000 !important;
+  position: fixed !important;
+  /* REMOVED: pointer-events: none - this was blocking all menu clicks */
+}
+
+/* CDK Overlay Pane - Enable pointer events for actual menu content */
+.cdk-overlay-pane {
+  pointer-events: auto !important; /* Enable clicks on menu content */
+  z-index: 10001 !important;
+}
+
+/* Material Menu Panel - Ensure proper positioning and interaction */
+.mat-mdc-menu-panel {
+  z-index: 10002 !important;
+  pointer-events: auto !important;
+  position: fixed !important;
+  max-width: 280px !important;
+}
+
+/* CDK Overlay Backdrop - Lower z-index but still above app content */
+.cdk-overlay-backdrop {
+  z-index: 9999 !important;
+  pointer-events: auto !important; /* Allow backdrop clicks to close menu */
+}
+
+/* Ensure table cells don't block menu interactions */
+.mat-mdc-table .mat-mdc-cell {
+  overflow: visible !important;
+  position: relative !important;
+}
+
+/* Fix for menu triggers in table cells */
+.mat-mdc-table .mat-mdc-cell .mat-mdc-icon-button {
+  pointer-events: auto !important;
+  z-index: 1 !important;
+  position: relative !important;
+}
+
+/* 
  * ANGULAR MATERIAL DIALOG THEMING SERVICE CLASSES
  * 
  * These classes are applied by DialogThemingService to provide

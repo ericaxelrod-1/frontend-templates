@@ -4,11 +4,11 @@
     <!-- Left side -->
     <div class="left-section">
       <button mat-icon-button 
-              (click)="toggleSidebar()" 
+              (click)="onSidebarToggle()" 
               aria-label="Toggle navigation menu"
               [attr.aria-expanded]="sidebarOpened"
               aria-controls="main-sidebar">
-        <mat-icon>menu</mat-icon>
+        <mat-icon>{{ sidebarOpened ? 'close' : 'menu' }}</mat-icon>
       </button>
       <div class="logo-container">
         <img [src]="headerLogo" 
@@ -21,46 +21,18 @@
 
     <!-- Right side -->
     <div class="right-section">
-      <ng-container *ngIf="isAuthenticated; else loginButton">
+      <ng-container *ngIf="isAuthenticated$ | async; else loginButton">
+        <ng-container *ngIf="currentUser$ | async as currentUser">
         <button mat-button 
-                [matMenuTriggerFor]="userMenu" 
+                  type="button"
                 class="user-menu-button"
-                [attr.aria-label]="'User menu for ' + (user?.firstName || 'User') + ' ' + (user?.lastName || '')"
-                [attr.aria-expanded]="false">
-          <mat-icon aria-hidden="true">account_circle</mat-icon>
-          <span class="user-name-text">{{ user?.firstName || 'User' }}</span>
-          <mat-icon class="dropdown-icon" aria-hidden="true">arrow_drop_down</mat-icon>
-        </button>
-        
-        <mat-menu #userMenu="matMenu" role="menu">
-          <div class="user-menu-header" role="presentation">
-            <p class="user-name" aria-label="Full name">{{ user?.firstName || 'User' }} {{ user?.lastName || '' }}</p>
-            <p class="user-email" aria-label="Email address">{{ user?.email }}</p>
-          </div>
-          <mat-divider role="separator"></mat-divider>
-          <button mat-menu-item 
-                  routerLink="/profile"
-                  role="menuitem"
-                  aria-label="Go to profile page">
-            <mat-icon aria-hidden="true">person</mat-icon>
-            <span>Profile</span>
+                  (click)="onUserMenuToggle()"
+                  [attr.aria-label]="'User menu for ' + getDisplayName(currentUser)">
+            <mat-icon>account_circle</mat-icon>
+            <span class="user-name-text">{{ getDisplayName(currentUser) }}</span>
+            <mat-icon class="dropdown-icon">arrow_drop_down</mat-icon>
           </button>
-          <button mat-menu-item 
-                  routerLink="/settings"
-                  role="menuitem"
-                  aria-label="Go to settings page">
-            <mat-icon aria-hidden="true">settings</mat-icon>
-            <span>Settings</span>
-          </button>
-          <mat-divider role="separator"></mat-divider>
-          <button mat-menu-item 
-                  (click)="logout()"
-                  role="menuitem"
-                  aria-label="Logout from application">
-            <mat-icon aria-hidden="true">exit_to_app</mat-icon>
-            <span>Logout</span>
-          </button>
-        </mat-menu>
+        </ng-container>
       </ng-container>
       
       <ng-template #loginButton>

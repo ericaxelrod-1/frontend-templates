@@ -172,24 +172,12 @@
   word-break: break-word;
 }
 
-::ng-deep .cdk-overlay-container {
-  z-index: 1002 !important;
-  position: fixed !important;
-}
-
-::ng-deep .cdk-overlay-backdrop {
-  z-index: 1001 !important;
-}
-
-::ng-deep .mat-mdc-menu-panel {
-  z-index: 1003 !important;
-  position: fixed !important;
-  max-width: 280px !important;
-}
-
-::ng-deep .mat-mdc-menu-content {
-  padding: 0 !important;
-}
+/* 
+ * REMOVED CONFLICTING CDK OVERLAY RULES FOR BUG-054 FIX
+ * 
+ * These rules were causing z-index conflicts with the global CDK overlay fixes.
+ * The global styles.scss now handles all CDK overlay z-index management.
+ */
 
 // Responsive breakpoints following Angular Material best practices
 @include abstracts.respond-to(md) {

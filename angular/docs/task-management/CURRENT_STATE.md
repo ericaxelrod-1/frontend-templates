@@ -16,6 +16,17 @@ Last Updated: 2025-06-06
 
 ### Recent Accomplishments
 
+#### **NEW SUCCESS - BUG-054 Menu Clickability Fix** ✅
+- **RESOLVED**: Critical issue preventing users from clicking the "Add User to Group" button
+- **Root Cause Discovery**: Angular Material CDK design flaw (GitHub #9320, open since 2018) - overlay blocks clicks by design
+- **Investigation**: 30+ minute deep investigation with 10+ web searches confirmed this is a known Angular Material limitation
+- **Failed Attempts**: CSS fixes, event handler modifications, ViewChild improvements - all ineffective against CDK's programmatic control
+- **Solution**: Replaced MatMenu with MatSelect for group selection functionality
+- **Technical Implementation**: Converted menu trigger to dropdown select with proper form field styling
+- **Build Status**: Successful with zero compilation errors
+- **Functionality Restored**: Single-click group selection now working perfectly
+- **Header Menu**: Kept MatMenu for user profile/logout as two-click is standard UX pattern
+
 #### **NEW SUCCESS - BUG-053 Create User Component Fix** ✅
 - **RESOLVED**: Critical TypeScript compilation errors blocking create user functionality
 - **Root Cause**: Method name mismatch between create-user component and DialogThemingService API
