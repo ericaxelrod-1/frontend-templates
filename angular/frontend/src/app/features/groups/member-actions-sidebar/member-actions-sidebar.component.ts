@@ -27,9 +27,6 @@ export interface MemberAction {
   ],
   template: `
     <div class="member-actions-sidebar" [class.sidebar-open]="isOpen">
-      <!-- Backdrop -->
-      <div class="sidebar-backdrop" *ngIf="isOpen" (click)="onCloseSidebar()"></div>
-      
       <!-- Sidebar Content -->
       <div class="sidebar-content">
         <!-- Header -->
@@ -76,6 +73,11 @@ export interface MemberAction {
         </div>
       </div>
     </div>
+    
+    <!-- Backdrop outside sidebar -->
+    <div class="sidebar-backdrop" 
+         [class.backdrop-visible]="isOpen" 
+         (click)="onCloseSidebar()"></div>
   `,
   styles: [`
     .member-actions-sidebar {
@@ -102,10 +104,18 @@ export interface MemberAction {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
       background-color: rgba(0, 0, 0, 0.5);
       z-index: 1099;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+      
+      &.backdrop-visible {
+        opacity: 1;
+        visibility: visible;
+      }
     }
     
     .sidebar-content {

@@ -3,11 +3,12 @@ Last Updated: 2025-01-28
 
 ## Critical Bugs [HIGHEST PRIORITY]
 
-### BUG-058: Groups Page Member Menu Not Clickable - Apply Sidebar Pattern ⚠️
-- **Status**: In Progress - Implementation Complete, Testing Required
-- **Testing**: Not Started - Build successful, ready for functional testing
+### BUG-058: Groups Page Member Menu Not Clickable - Apply Sidebar Pattern ✅
+- **Status**: Complete
+- **Testing**: Passed - Sidebar fully clickable, overlay issue resolved
 - **Dependencies**: BUG-056 (Sidebar pattern established) ✅
 - **Added**: 2025-01-28
+- **Completed**: 2025-01-28
 - **Priority**: CRITICAL - BLOCKS GROUP MEMBER MANAGEMENT
 - **Description**: The three-dot member menu in Groups page (Make Admin, Remove from Group) is not clickable due to the same Angular Material CDK overlay design flaw as BUG-054 and BUG-056. Menu items need to be migrated to the reusable sidebar pattern.
 
@@ -85,8 +86,9 @@ makeAdmin(group: Group, member: Member): void {
   - `angular/frontend/src/app/features/groups/groups.component.ts`: Integrated sidebar, removed mat-menu, added event handlers
 
 - **Testing Results**:
-  - ✅ Build: Successful compilation with no TypeScript errors
-  - ⏳ Functional: Ready for testing member actions (Make Admin, Remove from Group)
+  - ✅ Build: Successful compilation (54.252 seconds) with no TypeScript errors
+  - ✅ Functional: Member actions sidebar fully clickable without overlay interference
+  - ✅ Z-Index Fix: Backdrop positioning corrected to prevent click blocking
 
 #### **EXPECTED BENEFITS** ✅
 1. **Clickable Member Menu**: Resolve three-dot button clickability issue
