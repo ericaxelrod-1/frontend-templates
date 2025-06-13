@@ -61,10 +61,10 @@ export class Permission {
 
   /**
    * Virtual column for backward compatibility with services expecting actionName
-   * This maps to the Action entity's name field
+   * This maps to the Action entity's actionCode field for consistent lowercase permissions
    */
   get actionName(): string {
-    return this.actionEntity?.name || '';
+    return this.actionEntity?.actionCode || '';
   }
 
   /**

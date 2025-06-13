@@ -33,7 +33,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
       label: 'Users', 
       icon: 'people', 
       route: '/app/users', 
-      permission: 'users:read'
+      permission: 'users:view'
     },
   ];
 
@@ -43,13 +43,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
       label: 'Groups', 
       icon: 'group_work', 
       route: '/app/groups', 
-      permission: 'groups:read'
+      permission: 'groups:view'
     },
     { 
       label: 'Roles', 
       icon: 'admin_panel_settings', 
       route: '/app/roles', 
-      permission: 'roles:read'
+      permission: 'roles:view'
     }
   ];
 
@@ -103,9 +103,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
    * Determines if the user has access to manage users, roles, or groups
    */
   get isAdminOrManager(): boolean {
-    return this.permissionService.hasPermissionSync('users:read') ||
-           this.permissionService.hasPermissionSync('roles:read') ||
-           this.permissionService.hasPermissionSync('groups:read') ||
+    return this.permissionService.hasPermissionSync('users:view') ||
+           this.permissionService.hasPermissionSync('roles:view') ||
+           this.permissionService.hasPermissionSync('groups:view') ||
            this.permissionService.hasPermissionSync('system:admin');
   }
 
@@ -120,7 +120,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
    * Check if user has access to user management
    */
   hasUserManagementAccess(): boolean {
-    return this.permissionService.hasPermissionSync('users:read') ||
+    return this.permissionService.hasPermissionSync('users:view') ||
            this.permissionService.hasPermissionSync('users:update') ||
            this.permissionService.hasPermissionSync('system:admin');
   }
