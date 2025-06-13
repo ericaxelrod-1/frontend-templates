@@ -37,7 +37,7 @@ export class ActionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
   @Get()
-  @RequirePermission('actions:read')
+  @RequirePermission('actions:view')
   @ApiOperation({ summary: 'Get all unique actions' })
   @ApiResponse({ status: 200, description: 'Return all actions' })
   async getAllActions() {
@@ -54,7 +54,7 @@ export class ActionsController {
   }
 
   @Get(':id')
-  @RequirePermission('actions:read')
+  @RequirePermission('actions:view')
   @ApiOperation({ summary: 'Get action by ID' })
   @ApiResponse({ status: 200, description: 'Return the action' })
   @ApiResponse({ status: 404, description: 'Action not found' })

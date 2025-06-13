@@ -47,22 +47,22 @@ export class PermissionSeedsService {
       // Users permissions
       {
         resource: 'users',
-        actions: ['create', 'read', 'update', 'delete', 'list', 'manage', 'admin'],
+        actions: ['create', 'view', 'update', 'delete', 'list', 'manage', 'admin'],
       },
       // Roles permissions
       {
         resource: 'roles',
-        actions: ['create', 'read', 'update', 'delete', 'list', 'manage', 'admin'],
+        actions: ['create', 'view', 'update', 'delete', 'list', 'manage', 'admin'],
       },
       // Groups permissions
       {
         resource: 'groups',
-        actions: ['create', 'read', 'update', 'delete', 'list', 'manage', 'admin', 'view'],
+        actions: ['create', 'view', 'update', 'delete', 'list', 'manage', 'admin'],
       },
       // Group members permissions
       {
         resource: 'groups:members',
-        actions: ['add', 'remove', 'update', 'read'],
+        actions: ['add', 'remove', 'update', 'view'],
       },
       // Group settings permissions
       {
@@ -72,7 +72,7 @@ export class PermissionSeedsService {
       // Permissions management
       {
         resource: 'permissions',
-        actions: ['create', 'read', 'update', 'delete', 'list', 'manage', 'admin', 'view'],
+        actions: ['create', 'view', 'update', 'delete', 'list', 'manage', 'admin'],
       },
       // Self profile permissions
       {
@@ -87,7 +87,7 @@ export class PermissionSeedsService {
       // Login monitoring permissions
       {
         resource: 'login-monitoring',
-        actions: ['read', 'manage'],
+        actions: ['view', 'manage'],
       },
     ];
 
@@ -137,8 +137,8 @@ export class PermissionSeedsService {
     const rolePermissionMap = {
       // Regular user permissions
       user: [
-        'users:read',
-        'dashboard:read',
+        'users:view',
+        'dashboard:view',
         'self:profile:read',
         'self:profile:update'
       ],
@@ -146,37 +146,36 @@ export class PermissionSeedsService {
       // Admin permissions
       admin: [
         'users:create',
-        'users:read',
+        'users:view',
         'users:update',
         'users:list',
         'groups:manage',
-        'groups:members:read',
+        'groups:members:view',
         'groups:members:add',
         'groups:members:remove',
         'groups:settings:update',
-        'roles:read',
+        'roles:view',
         'roles:list',
-        'permissions:read',
-        'permissions:list',
         'permissions:view',
+        'permissions:list',
         'system:manage'
       ],
 
       // Super Administrator permissions
       superadmin: [
         // User management
-        'users:create', 'users:read', 'users:update', 'users:delete', 'users:list', 'users:manage', 'users:admin',
+        'users:create', 'users:view', 'users:update', 'users:delete', 'users:list', 'users:manage', 'users:admin',
         
         // Role management
-        'roles:create', 'roles:read', 'roles:update', 'roles:delete', 'roles:list', 'roles:manage', 'roles:admin',
+        'roles:create', 'roles:view', 'roles:update', 'roles:delete', 'roles:list', 'roles:manage', 'roles:admin',
         
         // Group management
-        'groups:create', 'groups:read', 'groups:update', 'groups:delete', 'groups:list', 'groups:manage', 'groups:admin', 'groups:view',
-        'groups:members:add', 'groups:members:remove', 'groups:members:update', 'groups:members:read',
+        'groups:create', 'groups:view', 'groups:update', 'groups:delete', 'groups:list', 'groups:manage', 'groups:admin',
+        'groups:members:add', 'groups:members:remove', 'groups:members:update', 'groups:members:view',
         'groups:settings:update',
         
         // Permission management
-        'permissions:create', 'permissions:read', 'permissions:update', 'permissions:delete', 'permissions:list', 'permissions:manage', 'permissions:admin', 'permissions:view',
+        'permissions:create', 'permissions:view', 'permissions:update', 'permissions:delete', 'permissions:list', 'permissions:manage', 'permissions:admin',
         
         // Profile management
         'self:profile:read', 'self:profile:update',
@@ -185,7 +184,7 @@ export class PermissionSeedsService {
         'system:admin', 'system:manage',
         
         // Login monitoring
-        'login-monitoring:read', 'login-monitoring:manage'
+        'login-monitoring:view', 'login-monitoring:manage'
       ]
     };
 

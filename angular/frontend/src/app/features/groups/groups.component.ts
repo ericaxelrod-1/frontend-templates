@@ -206,7 +206,7 @@ export class GroupsComponent implements OnInit {
 
   ngOnInit(): void {
     // Check permission to view groups using resource:action format
-    this.permissionService.hasPermission('groups:read').subscribe(hasPermission => {
+    this.permissionService.hasPermission('groups:view').subscribe(hasPermission => {
       console.log('[GroupsComponent] Permission check result:', hasPermission);
       this.hasPermission = hasPermission;
       

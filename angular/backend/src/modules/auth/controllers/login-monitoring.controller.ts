@@ -36,7 +36,7 @@ export class LoginMonitoringController {
 
   @Get('attempts/recent')
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission('login-monitoring:read')
+  @RequirePermission('login-monitoring:view')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get recent login attempts' })
   @ApiResponse({ status: 200, description: 'List of recent login attempts' })
@@ -70,7 +70,7 @@ export class LoginMonitoringController {
 
   @Get('ip/:ipAddress')
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission('login-monitoring:read')
+  @RequirePermission('login-monitoring:view')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get IP reputation and history' })
   @ApiResponse({ status: 200, description: 'IP reputation data' })
@@ -137,7 +137,7 @@ export class LoginMonitoringController {
 
   @Get('stats')
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission('login-monitoring:read')
+  @RequirePermission('login-monitoring:view')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get login statistics' })
   @ApiResponse({ status: 200, description: 'Login statistics' })

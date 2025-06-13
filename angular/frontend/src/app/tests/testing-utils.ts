@@ -24,11 +24,11 @@ export const createMockUser = (overrides?: Partial<User>): User => ({
   isVerified: true,
   permissions: [
     {
-      id: 'user:read',
-      name: 'Read User',
-      description: 'Can read user data',
+      id: 'user:view',
+      name: 'View User',
+      description: 'Can view user data',
       resourceName: 'user',
-      actionName: 'read'
+      actionName: 'view'
     },
     {
       id: 'user:create',
@@ -52,12 +52,12 @@ export const setupTestBed = ({
 } = {}) => {
   // Create mock services
   const mockPermissionService = jasmine.createSpyObj('PermissionService', {
-    loadUserPermissions: of(['user:read', 'user:create']),
+    loadUserPermissions: of(['user:view', 'user:create']),
     hasPermission: of(true),
     hasAllPermissions: of(true),
     hasAnyPermission: of(true),
     clearCache: undefined,
-    refreshPermissions: of(['user:read', 'user:create'])
+    refreshPermissions: of(['user:view', 'user:create'])
   });
 
   const mockAuthService = jasmine.createSpyObj('AuthService', {

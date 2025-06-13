@@ -385,25 +385,24 @@ export class AuthService {
       counter++;
     }
 
-    // Create user with hashed password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await this.usersService.create({
-      username,
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      role: defaultRole,
+    // Create user with default role
+    const newUser = await this.usersService.create({
+      username: registerDto.email,
+      email: registerDto.email,
+      password: registerDto.password,
+      firstName: registerDto.firstName,
+      lastName: registerDto.lastName,
+      roleIds: [defaultRole.id],
     });
 
     // Generate and send verification token
     // This would typically generate a token and send an email
     // For now, we'll just return the user
     return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      id: newUser.id,
+      email: newUser.email,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
     };
   }
 

@@ -56,7 +56,7 @@ export class UsersController {
   })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission('users:read')
+  @RequirePermission('users:view')
   @Get()
   findAll() {
     return this.usersService.findAll();
@@ -70,7 +70,7 @@ export class UsersController {
   })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission('users:read')
+  @RequirePermission('users:view')
   @Get('search')
   search(@Query('q') query: string) {
     return this.usersService.searchUsers(query || '');
@@ -95,14 +95,14 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission(['users:read', 'self:profile:read'])
+  @RequirePermission(['users:view', 'self:profile:read'])
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() currentUser) {
     // Users with only self:profile:read can only view their own profile
     const hasGeneralUserAccess = await this.usersService.checkUserHasPermission(
       currentUser.id,
       'users',
-      'read',
+      'view',
     );
 
     if (!hasGeneralUserAccess && currentUser.id !== +id) {
@@ -145,7 +145,7 @@ export class UsersController {
       }
 
       // Regular users cannot update their role
-      if (updateUserDto.role) {
+      if (updateUserDto.roleIds && updateUserDto.roleIds.length > 0) {
         throw new ForbiddenException('Regular users cannot update their role');
       }
     } else {

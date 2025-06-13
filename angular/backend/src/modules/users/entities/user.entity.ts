@@ -81,6 +81,9 @@ export class User {
     this.lastLoginAt = value;
   }
 
+  @Column({ name: 'requires_password_change', default: false })
+  requiresPasswordChange: boolean;
+
   @Column({ type: 'simple-json', nullable: true })
   preferences: Record<string, any>;
 

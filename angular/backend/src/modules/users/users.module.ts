@@ -8,11 +8,12 @@ import { RolesService } from './roles.service';
 import { GroupsService } from './groups.service';
 import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
-import { Group } from './entities/group.entity';
+import { Group } from '../permissions/entities/group.entity';
 import { UserGroup } from './entities/user-group.entity';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { PermissionsSharedModule } from '../permissions/shared/permissions-shared.module';
+import { PasswordValidationService } from '../auth/password-validation.service';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { PermissionsSharedModule } from '../permissions/shared/permissions-share
     PermissionsSharedModule,
   ],
   controllers: [UsersController, RolesController, GroupsController],
-  providers: [UsersService, RolesService, GroupsService],
-  exports: [UsersService, RolesService, GroupsService],
+  providers: [UsersService, RolesService, GroupsService, PasswordValidationService],
+  exports: [UsersService, RolesService, GroupsService, TypeOrmModule],
 })
 export class UsersModule {}

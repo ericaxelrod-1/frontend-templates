@@ -1,12 +1,13 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { UserService } from '../../services/user.service';
+import { UserService, UpdateUserRequest } from '../../services/user.service';
 import { GroupService } from '../../services/group.service';
+import { RoleService } from '../../services/role.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { forkJoin, of, catchError, mergeMap, map } from 'rxjs';
@@ -14,8 +15,10 @@ import { LoggerService } from '../../services/logging/logger.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { User } from '../../models/user.model';
 import { Group } from '../../models/group.model';
+import { Role } from '../../services/role.service';
 import { PermissionsModule } from '../../shared/modules/permissions.module';
 import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-selector-sidebar.component';
+import { RoleSelectorSidebarComponent } from './role-selector-sidebar/role-selector-sidebar.component';
 
 @Component({
   selector: 'app-users',
@@ -27,7 +30,8 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
     MatIconModule,
     MatChipsModule,
     PermissionsModule,
-    GroupSelectorSidebarComponent
+    GroupSelectorSidebarComponent,
+    RoleSelectorSidebarComponent
   ],
   template: `
     <div class="users-container">
@@ -69,8 +73,32 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
           
           <!-- Role Column -->
           <ng-container matColumnDef="role">
-            <th mat-header-cell *matHeaderCellDef>Role</th>
-            <td mat-cell *matCellDef="let user">{{ user.role || 'User' }}</td>
+            <th mat-header-cell *matHeaderCellDef>Roles</th>
+            <td mat-cell *matCellDef="let user">
+              <div *ngIf="!user.roles || user.roles.length === 0" class="no-roles">
+                No roles
+              </div>
+              <mat-chip-listbox *ngIf="user.roles && user.roles.length > 0">
+                <ng-container *ngFor="let role of user.roles">
+                  <mat-chip *ngIf="role">
+                    {{ role.name }}
+                    <button *ngIf="canManageRoles(user)" matChipRemove (click)="removeFromRole(user, role)">
+                      <mat-icon>cancel</mat-icon>
+                    </button>
+                  </mat-chip>
+                </ng-container>
+              </mat-chip-listbox>
+              
+              <button *ngIf="canManageRoles(user) && getAvailableRolesForUser(user).length > 0"
+                      mat-raised-button
+                      color="accent"
+                      class="add-role-button"
+                      (click)="openRoleSelector(user)"
+                      style="z-index: 10; position: relative;">
+                <mat-icon>add</mat-icon>
+                Add to role
+              </button>
+            </td>
           </ng-container>
 
           <!-- Groups Column -->
@@ -125,11 +153,18 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
     <!-- Group Selector Sidebar -->
     <app-group-selector-sidebar
       [isOpen]="isGroupSelectorOpen"
-      [user]="selectedUserForGroup"
-      [availableGroups]="selectedUserForGroup ? getAvailableGroupsForUser(selectedUserForGroup) : []"
-      (closeSidebar)="closeGroupSelector()"
-      (groupSelected)="onGroupSelected($event)">
+      [selectedGroupIds]="[]"
+      (groupSelectionChange)="onGroupSelectionChange($event)"
+      (closeSidebar)="closeGroupSelector()">
     </app-group-selector-sidebar>
+
+    <!-- Role Selector Sidebar -->
+    <app-role-selector-sidebar
+      [isOpen]="isRoleSelectorOpen"
+      [selectedRoleIds]="[]"
+      (roleSelectionChange)="onRoleSelectionChange($event)"
+      (closeSidebar)="closeRoleSelector()">
+    </app-role-selector-sidebar>
   `,
   styles: [`
     .users-container {
@@ -151,6 +186,10 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
     .mat-column-groups {
       min-width: 300px;
     }
+
+    .mat-column-role {
+      min-width: 300px;
+    }
     
     .mat-chip-listbox {
       display: inline-flex;
@@ -160,7 +199,7 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
       vertical-align: middle;
     }
 
-    .add-group-button {
+    .add-group-button, .add-role-button {
       display: inline-block;
       margin-left: 8px;
       vertical-align: middle;
@@ -173,11 +212,11 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
       }
     }
 
-    .add-group-button:not([disabled]) {
+    .add-group-button:not([disabled]), .add-role-button:not([disabled]) {
       cursor: pointer;
     }
 
-    .add-group-button[disabled] {
+    .add-group-button[disabled], .add-role-button[disabled] {
       opacity: 0.6;
       cursor: not-allowed;
     }
@@ -195,21 +234,9 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
       padding: 20px;
     }
     
-    .no-groups {
+    .no-groups, .no-roles {
       font-style: italic;
       color: #666;
-    }
-
-    /* Ensure table cells don't have overflow issues */
-    .mat-cell {
-      position: relative;
-      z-index: 1;
-    }
-
-    /* Fix any potential overlay issues */
-    .users-table .mat-row {
-      position: relative;
-      z-index: 1;
     }
   `]
 })
@@ -217,50 +244,36 @@ export class UsersComponent implements OnInit {
   displayedColumns: string[] = ['id', 'name', 'email', 'role', 'groups', 'actions'];
   users: User[] = [];
   availableGroups: Group[] = [];
+  availableRoles: Role[] = [];
   loading = true;
   currentUserGroups: Group[] = [];
   currentUser: User | null = null;
   hasManageUsersPermission = false;
   hasManageGroupsPermission = false;
+  hasManageRolesPermission = false;
   
   // Group selector sidebar state
   isGroupSelectorOpen = false;
   selectedUserForGroup: User | null = null;
 
+  // Role selector state
+  isRoleSelectorOpen = false;
+  selectedUserForRole: User | null = null;
+
   constructor(
     private userService: UserService,
     private groupService: GroupService,
+    private roleService: RoleService,
     private authService: AuthService,
     private snackBar: MatSnackBar,
     private router: Router,
     private logger: LoggerService,
     private permissionService: PermissionService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {}
 
   ngOnInit(): void {
-    // Get current user
-    this.authService.currentUser$.subscribe(user => {
-      this.currentUser = user;
-      this.cdr.detectChanges(); // Trigger change detection
-    });
-
-    // Check permissions with proper change detection
-    this.permissionService.hasPermission('users:manage').subscribe(
-      hasPermission => {
-        this.hasManageUsersPermission = hasPermission;
-        this.cdr.detectChanges(); // Trigger change detection
-      }
-    );
-    
-    this.permissionService.hasPermission('groups:manage').subscribe(
-      hasPermission => {
-        this.hasManageGroupsPermission = hasPermission;
-        this.cdr.detectChanges(); // Trigger change detection
-      }
-    );
-
-    // Load data
     this.loadData();
   }
 
@@ -299,83 +312,45 @@ export class UsersComponent implements OnInit {
 
   loadData(): void {
     this.loading = true;
-
-    // Use the permissionService directly
-    this.permissionService.hasPermission('users:read').subscribe(canListAllUsers => {
-      if (canListAllUsers) {
-        // For users with management permissions, load all users and groups
+    
+    // Load permissions first
+    forkJoin({
+      manageUsers: this.permissionService.hasPermission('users:update'),
+      manageGroups: this.permissionService.hasPermission('groups:manage'),
+      manageRoles: this.permissionService.hasPermission('roles:assign')
+    }).subscribe({
+      next: (permissions) => {
+        this.hasManageUsersPermission = permissions.manageUsers;
+        this.hasManageGroupsPermission = permissions.manageGroups;
+        this.hasManageRolesPermission = permissions.manageRoles;
+        
+        // Load data - get current user synchronously and load other data
+        this.currentUser = this.authService.currentUser;
+        
         forkJoin({
-          users: this.userService.getUsers().pipe(
-            catchError(error => {
-              console.error('Error loading all users:', error);
-              this.snackBar.open('Error loading users', 'Close', { duration: 3000 });
-              return of([]);
-            })
-          ),
-          groups: this.groupService.getGroups().pipe(
-            catchError(error => {
-              console.error('Error loading all groups:', error);
-              this.snackBar.open('Error loading groups', 'Close', { duration: 3000 });
-              return of([]);
-            })
-          )
-        }).subscribe(result => {
-          this.users = result.users.map(user => {
-            if (!user.groups) {
-              user.groups = [];
-            }
-            return user;
-          });
-          this.availableGroups = result.groups;
-          this.loading = false;
+          users: this.userService.getUsers(),
+          groups: this.groupService.getGroups(),
+          roles: this.roleService.getRoles()
+        }).subscribe({
+          next: (data) => {
+            this.users = data.users;
+            this.availableGroups = data.groups;
+            this.availableRoles = data.roles;
+            this.loading = false;
+            this.cdr.detectChanges();
+          },
+          error: (error) => {
+            this.logger.error('Error loading data:', error);
+            this.loading = false;
+            this.snackBar.open('Error loading data. Please try again.', 'Close', {
+              duration: 5000
+            });
+          }
         });
-      } else {
-        // For regular users, directly load their profile since we already have basic info
-        if (this.currentUser) {
-          this.users = [this.currentUser];
-          
-          // Try to get a more complete profile with groups
-          this.userService.getUser(this.currentUser.id).pipe(
-            catchError(error => {
-              console.error('Error loading user profile:', error);
-              return of(this.currentUser); // Use the basic info we already have
-            })
-          ).subscribe(userProfile => {
-            // If we got a profile, update the user in our list
-            if (userProfile) {
-              // Ensure userProfile has a groups array
-              if (!userProfile.groups) {
-                userProfile.groups = [];
-              }
-              this.users[0] = userProfile;
-              
-              // If the user has groups, update currentUserGroups
-              if (userProfile.groups && userProfile.groups.length > 0) {
-                this.currentUserGroups = userProfile.groups.map(group => ({
-                  id: group.id || 0,
-                  name: group.name || '',
-                  description: group.description || '',
-                  owner: group.owner || '',
-                  members: group.members || [],
-                  permissions: group.permissions || []
-                }));
-                
-                // Set available groups
-                this.availableGroups = this.currentUserGroups;
-                
-                // Try to get members of each group
-                this.loadGroupMembers();
-              } else {
-                // No groups, get them separately
-                this.loadUserGroups();
-              }
-            } else {
-              this.loading = false;
-            }
-          });
-        } else {
-          this.loading = false;
-        }
+      },
+      error: (error) => {
+        this.logger.error('Error checking permissions:', error);
+        this.loading = false;
       }
     });
   }
@@ -441,12 +416,16 @@ export class UsersComponent implements OnInit {
   createUser(): void {
     // Check permission before navigating
     if (this.permissionService.hasPermissionSync('users:create')) {
-      this.router.navigate(['/app/users/create']);
+      this.ngZone.run(() => {
+        this.router.navigate(['/app/users/create']);
+      });
     }
   }
 
   editUser(user: User): void {
-    this.router.navigate(['/app/users', user.id, 'edit']);
+    this.ngZone.run(() => {
+      this.router.navigate(['/app/users', user.id, 'edit']);
+    });
   }
 
   deleteUser(user: User): void {
@@ -529,9 +508,14 @@ export class UsersComponent implements OnInit {
     this.selectedUserForGroup = null;
   }
   
-  onGroupSelected(group: Group): void {
-    if (this.selectedUserForGroup && group) {
-      this.addToGroup(this.selectedUserForGroup, group);
+  onGroupSelectionChange(groupIds: number[]): void {
+    if (this.selectedUserForGroup && groupIds.length > 0) {
+      // For now, just handle the first selected group
+      const groupId = groupIds[0];
+      const group = this.availableGroups.find(g => g.id === groupId);
+      if (group) {
+        this.addToGroup(this.selectedUserForGroup, group);
+      }
     }
   }
 
@@ -541,6 +525,141 @@ export class UsersComponent implements OnInit {
       return `${user.firstName || ''} ${user.lastName || ''}`.trim();
     }
     return user.email || 'Unknown';
+  }
+
+  canManageRoles(user: User): boolean {
+    // Check if current user has permission to manage roles
+    if (!this.hasManageRolesPermission) {
+      return false;
+    }
+
+    // Additional business logic can be added here
+    // For example, prevent managing roles of superadmins
+    return true;
+  }
+
+  getAvailableRolesForUser(user: User): Role[] {
+    if (!user.roles) {
+      return this.availableRoles;
+    }
+    
+    const userRoleIds = user.roles.map(role => role.id).filter((id): id is number => id !== undefined);
+    return this.availableRoles.filter(role => role.id && !userRoleIds.includes(role.id));
+  }
+
+  addToRole(user: User, role: Role): void {
+    if (!role.id) return;
+    
+    const currentRoleIds = user.roles?.map(r => r.id).filter((id): id is number => id !== undefined) || [];
+    const updateData: UpdateUserRequest = {
+      roleIds: [...currentRoleIds, role.id]
+    };
+
+    this.userService.updateUser(user.id, updateData).subscribe({
+      next: (updatedUser) => {
+        // Update the user in the local array
+        const index = this.users.findIndex(u => u.id === user.id);
+        if (index !== -1) {
+          this.users[index] = updatedUser;
+          // Force change detection by creating a new array reference
+          this.users = [...this.users];
+        }
+        this.snackBar.open(`User added to role "${role.name}" successfully`, 'Close', {
+          duration: 3000
+        });
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        this.logger.error('Error adding user to role:', error);
+        this.snackBar.open(error.message || 'Error adding user to role', 'Close', {
+          duration: 5000
+        });
+      }
+    });
+  }
+
+  removeFromRole(user: User, role: Role): void {
+    if (!user.roles || !role.id) return;
+    
+    const updatedRoleIds = user.roles
+      .filter(r => r.id !== role.id)
+      .map(r => r.id)
+      .filter(id => id !== undefined) as number[];
+    
+    const updateData: UpdateUserRequest = {
+      roleIds: updatedRoleIds
+    };
+    
+    this.userService.updateUser(user.id, updateData).subscribe({
+      next: (updatedUser) => {
+        // Update the user in the local array
+        const index = this.users.findIndex(u => u.id === user.id);
+        if (index !== -1) {
+          this.users[index] = updatedUser;
+          // Force change detection by creating a new array reference
+          this.users = [...this.users];
+        }
+        this.snackBar.open(`User removed from role "${role.name}" successfully`, 'Close', {
+          duration: 3000
+        });
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        this.logger.error('Error removing user from role:', error);
+        this.snackBar.open(error.message || 'Error removing user from role', 'Close', {
+          duration: 5000
+        });
+      }
+    });
+  }
+
+  openRoleSelector(user: User): void {
+    this.selectedUserForRole = user;
+    this.isRoleSelectorOpen = true;
+  }
+
+  closeRoleSelector(): void {
+    this.isRoleSelectorOpen = false;
+    this.selectedUserForRole = null;
+  }
+
+  onRoleSelectionChange(roleIds: number[]): void {
+    if (!this.selectedUserForRole || roleIds.length === 0) return;
+
+    const user = this.selectedUserForRole;
+    const currentRoleIds = user.roles?.map(r => r.id).filter(id => id !== undefined) as number[] || [];
+    const newRoleIds = [...currentRoleIds, ...roleIds];
+
+    const updateData: UpdateUserRequest = {
+      roleIds: newRoleIds
+    };
+
+    this.userService.updateUser(user.id, updateData).subscribe({
+      next: (updatedUser) => {
+        // Update the user in the local array
+        const index = this.users.findIndex(u => u.id === user.id);
+        if (index !== -1) {
+          this.users[index] = updatedUser;
+          // Force change detection by creating a new array reference
+          this.users = [...this.users];
+        }
+        
+        const addedRoles = this.availableRoles.filter(role => roleIds.includes(role.id!));
+        const roleNames = addedRoles.map(role => role.name).join(', ');
+        
+        this.snackBar.open(`User added to role(s): ${roleNames}`, 'Close', {
+          duration: 3000
+        });
+        this.closeRoleSelector();
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        this.logger.error('Error adding user to roles:', error);
+        this.snackBar.open(error.message || 'Error adding user to roles', 'Close', {
+          duration: 5000
+        });
+      }
+    });
   }
 
 }

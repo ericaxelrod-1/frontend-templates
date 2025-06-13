@@ -23,7 +23,7 @@ export class ApiEndpointDto {
   method: HttpMethod;
 
   @ApiProperty({
-    example: ['users:read'],
+    example: ['users:view'],
     description: 'Required permissions for the endpoint',
   })
   @IsArray()

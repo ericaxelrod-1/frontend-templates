@@ -59,7 +59,7 @@ export class GroupsController {
   }
 
   @Get()
-  @RequirePermission(['groups:read', 'groups:list'])
+  @RequirePermission(['groups:view', 'groups:list'])
   @ApiOperation({ summary: 'Get all accessible groups' })
   @ApiResponse({
     status: 200,
@@ -71,7 +71,7 @@ export class GroupsController {
   }
 
   @Get(':id')
-  @RequirePermission(['groups:read', 'groups:view'])
+  @RequirePermission(['groups:view'])
   @ApiOperation({ summary: 'Get group by ID' })
   @ApiResponse({ status: 200, description: 'Group details', type: Group })
   @ApiResponse({
@@ -203,7 +203,7 @@ export class GroupsController {
   }
 
   @Get(':id/members')
-  @RequirePermission(['groups:members:read', 'groups:read', 'groups:view'])
+  @RequirePermission(['groups:members:view', 'groups:view'])
   @ApiOperation({ summary: 'Get all group members' })
   @ApiResponse({
     status: 200,

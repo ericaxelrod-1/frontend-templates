@@ -4,11 +4,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
-import { GroupService } from '../../../services/group.service';
-import { Group } from '../../../models/group.model';
+import { RoleService, Role } from '../../../services/role.service';
 
 @Component({
-  selector: 'app-group-selector-sidebar',
+  selector: 'app-role-selector-sidebar',
   standalone: true,
   imports: [
     CommonModule,
@@ -22,7 +21,7 @@ import { Group } from '../../../models/group.model';
     
     <div class="sidebar" [class.sidebar-open]="isOpen">
       <div class="sidebar-header">
-        <h3>Select Groups</h3>
+        <h3>Select Roles</h3>
         <button mat-icon-button (click)="close()" class="close-button">
           <mat-icon>close</mat-icon>
         </button>
@@ -32,40 +31,35 @@ import { Group } from '../../../models/group.model';
 
       <div class="sidebar-content">
         <div class="selection-info">
-          <p>{{ selectedGroupIds.length }} group(s) selected</p>
+          <p>{{ selectedRoleIds.length }} role(s) selected</p>
         </div>
 
-        <div class="groups-list">
+        <div class="roles-list">
           <div 
-            *ngFor="let group of availableGroups" 
-            class="group-item"
-            [class.selected]="isGroupSelected(group.id)"
+            *ngFor="let role of availableRoles" 
+            class="role-item"
+            [class.selected]="role.id && isRoleSelected(role.id)"
           >
             <mat-checkbox 
-              [checked]="isGroupSelected(group.id)"
-              (change)="toggleGroup(group.id)"
-              class="group-checkbox"
+              [checked]="role.id && isRoleSelected(role.id)"
+              (change)="role.id && toggleRole(role.id)"
+              class="role-checkbox"
             >
-              <div class="group-info">
-                <div class="group-name">{{ group.name }}</div>
-                <div class="group-description" *ngIf="group.description">
-                  {{ group.description }}
+              <div class="role-info">
+                <div class="role-name">{{ role.name }}</div>
+                <div class="role-description" *ngIf="role.description">
+                  {{ role.description }}
                 </div>
               </div>
             </mat-checkbox>
           </div>
-        </div>
-
-        <div class="empty-state" *ngIf="availableGroups.length === 0">
-          <mat-icon>group</mat-icon>
-          <p>No groups available</p>
         </div>
       </div>
 
       <mat-divider></mat-divider>
 
       <div class="sidebar-actions">
-        <button mat-button (click)="clearAll()" [disabled]="selectedGroupIds.length === 0">
+        <button mat-button (click)="clearAll()" [disabled]="selectedRoleIds.length === 0">
           Clear All
         </button>
         <button mat-raised-button color="primary" (click)="apply()">
@@ -144,13 +138,13 @@ import { Group } from '../../../models/group.model';
       color: #666;
     }
 
-    .groups-list {
+    .roles-list {
       display: flex;
       flex-direction: column;
       gap: 8px;
     }
 
-    .group-item {
+    .role-item {
       padding: 12px;
       border: 1px solid #e0e0e0;
       border-radius: 4px;
@@ -158,48 +152,34 @@ import { Group } from '../../../models/group.model';
       cursor: pointer;
     }
 
-    .group-item:hover {
+    .role-item:hover {
       background-color: #f5f5f5;
       border-color: #ccc;
     }
 
-    .group-item.selected {
-      background-color: #e8f5e8;
-      border-color: #4caf50;
+    .role-item.selected {
+      background-color: #e3f2fd;
+      border-color: #2196f3;
     }
 
-    .group-checkbox {
+    .role-checkbox {
       width: 100%;
     }
 
-    .group-info {
+    .role-info {
       margin-left: 8px;
     }
 
-    .group-name {
+    .role-name {
       font-weight: 500;
       color: #333;
       margin-bottom: 4px;
     }
 
-    .group-description {
+    .role-description {
       font-size: 12px;
       color: #666;
       line-height: 1.4;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 40px 20px;
-      color: #666;
-    }
-
-    .empty-state mat-icon {
-      font-size: 48px;
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
-      opacity: 0.5;
     }
 
     .sidebar-actions {
@@ -218,50 +198,50 @@ import { Group } from '../../../models/group.model';
     }
   `]
 })
-export class GroupSelectorSidebarComponent implements OnInit {
+export class RoleSelectorSidebarComponent implements OnInit {
   @Input() isOpen = false;
-  @Input() selectedGroupIds: number[] = [];
-  @Output() groupSelectionChange = new EventEmitter<number[]>();
+  @Input() selectedRoleIds: number[] = [];
+  @Output() roleSelectionChange = new EventEmitter<number[]>();
   @Output() closeSidebar = new EventEmitter<void>();
 
-  availableGroups: Group[] = [];
+  availableRoles: Role[] = [];
 
-  constructor(private groupService: GroupService) {}
+  constructor(private roleService: RoleService) {}
 
   ngOnInit(): void {
-    this.loadGroups();
+    this.loadRoles();
   }
 
-  loadGroups(): void {
-    this.groupService.getGroups().subscribe({
-      next: (groups) => {
-        this.availableGroups = groups;
+  loadRoles(): void {
+    this.roleService.getRoles().subscribe({
+      next: (roles) => {
+        this.availableRoles = roles;
       },
       error: (error) => {
-        console.error('Error loading groups:', error);
+        console.error('Error loading roles:', error);
       }
     });
   }
 
-  isGroupSelected(groupId: number): boolean {
-    return this.selectedGroupIds.includes(groupId);
+  isRoleSelected(roleId: number): boolean {
+    return this.selectedRoleIds.includes(roleId);
   }
 
-  toggleGroup(groupId: number): void {
-    const currentSelection = [...this.selectedGroupIds];
-    const index = currentSelection.indexOf(groupId);
+  toggleRole(roleId: number): void {
+    const currentSelection = [...this.selectedRoleIds];
+    const index = currentSelection.indexOf(roleId);
     
     if (index > -1) {
       currentSelection.splice(index, 1);
     } else {
-      currentSelection.push(groupId);
+      currentSelection.push(roleId);
     }
     
-    this.groupSelectionChange.emit(currentSelection);
+    this.roleSelectionChange.emit(currentSelection);
   }
 
   clearAll(): void {
-    this.groupSelectionChange.emit([]);
+    this.roleSelectionChange.emit([]);
   }
 
   apply(): void {

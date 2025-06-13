@@ -56,10 +56,10 @@ import { Observable, forkJoin, map } from 'rxjs';
             <td>{{ resource.name }}</td>
             <td>{{ resource.description }}</td>
             <td class="action-buttons">
-              <!-- View button - requires read permission -->
+              <!-- View button - requires view permission -->
               <button 
                 class="btn btn-sm btn-info" 
-                *appHasPermission="'resources:read'"
+                *appHasPermission="'resources:view'"
                 (click)="viewResource(resource.id)">
                 View
               </button>
@@ -181,7 +181,7 @@ export class ResourceListComponent implements OnInit {
   canViewAnalytics(resourceId: number): Observable<boolean> {
     // Check for both required permissions
     return forkJoin([
-      this.permissionService.hasPermission('resources', 'read'),
+      this.permissionService.hasPermission('resources', 'view'),
       this.permissionService.hasPermission('analytics', 'access')
     ]).pipe(
       map(([canReadResource, canAccessAnalytics]) => canReadResource && canAccessAnalytics)

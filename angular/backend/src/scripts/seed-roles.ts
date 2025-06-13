@@ -77,10 +77,10 @@ const permissionsToSeed = [
     actionCode: 'create',
   },
   {
-    name: 'user:read',
+    name: 'user:view',
     description: 'View user details',
     resourceName: 'user',
-    actionCode: 'read',
+    actionCode: 'view',
   },
   {
     name: 'user:update',
@@ -109,10 +109,10 @@ const permissionsToSeed = [
     actionCode: 'create',
   },
   {
-    name: 'permission:read',
+    name: 'permission:view',
     description: 'View permission details',
     resourceName: 'permission',
-    actionCode: 'read',
+    actionCode: 'view',
   },
   {
     name: 'permission:update',
@@ -147,10 +147,10 @@ const permissionsToSeed = [
     actionCode: 'create',
   },
   {
-    name: 'report:read',
+    name: 'report:view',
     description: 'View report details',
     resourceName: 'report',
-    actionCode: 'read',
+    actionCode: 'view',
   },
   {
     name: 'report:update',
@@ -212,7 +212,7 @@ const rolesToSeed = [
     description: 'Regular User',
     isSystemRole: true,
     isDefault: true,
-    permissions: ['user:read', 'user:update', 'report:read', 'report:list'],
+    permissions: ['user:view', 'user:update', 'report:view', 'report:list'],
     parentRole: null,
   },
   {
@@ -221,10 +221,10 @@ const rolesToSeed = [
     isSystemRole: true,
     isDefault: false,
     permissions: [
-      'user:read',
+      'user:view',
       'user:list',
       'report:create',
-      'report:read',
+      'report:view',
       'report:update',
       'report:list',
       'report:export',
@@ -238,7 +238,7 @@ const rolesToSeed = [
     isDefault: false,
     permissions: [
       'system:audit',
-      'report:read',
+      'report:view',
       'report:list',
       'report:export',
     ],

@@ -18,8 +18,28 @@ export interface CreateUserRequest {
   password: string;
   firstName?: string;
   lastName?: string;
-  roleId?: number;
+  roleIds?: number[];
+  groupIds?: number[];
   requiresPasswordChange: boolean;
+}
+
+export interface UpdateUserRequest {
+  username?: string;
+  email?: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
+  roleIds?: number[];
+  groupIds?: number[];
+  requiresPasswordChange?: boolean;
+  preferences?: {
+    theme?: string;
+    language?: string;
+    notifications?: {
+      email?: boolean;
+      push?: boolean;
+    };
+  };
 }
 
 export interface GroupMembershipResponse {
@@ -70,9 +90,9 @@ export class UserService {
     return this.http.post<User>(this.apiUrl, user);
   }
 
-  updateUser(id: number, user: Partial<User>): Observable<User> {
+  updateUser(id: number, user: UpdateUserRequest): Observable<User> {
     this.logger.debug(`Updating user with id ${id}`, user);
-    return this.http.put<User>(`${this.apiUrl}/${id}`, user);
+    return this.http.patch<User>(`${this.apiUrl}/${id}`, user);
   }
 
   deleteUser(id: number): Observable<void> {

@@ -19,9 +19,9 @@ export type PermissionRule = string | string[] | { all: string[] };
 /**
  * Guard that protects routes based on permissions
  * Supports multiple formats:
- * - Single permission: 'users:read'
- * - Any permission: ['users:read', 'users:admin']
- * - All permissions: { all: ['users:read', 'settings:view'] }
+ * - Single permission: 'users:view'
+ * - Any permission: ['users:view', 'users:admin']
+ * - All permissions: { all: ['users:view', 'settings:view'] }
  */
 @Injectable({
   providedIn: 'root'

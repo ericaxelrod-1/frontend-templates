@@ -40,7 +40,7 @@ export class RolesController {
   @ApiOperation({ summary: 'Get all roles' })
   @ApiResponse({ status: 200, description: 'List of all roles', type: [Role] })
   @UseGuards(PermissionGuard)
-  @RequirePermission('roles:read')
+  @RequirePermission('roles:view')
   findAll(): Promise<Role[]> {
     this.logger.debug('Getting all roles');
     return this.rolesService.findAll();
@@ -51,7 +51,7 @@ export class RolesController {
   @ApiResponse({ status: 200, description: 'Role details', type: Role })
   @ApiResponse({ status: 404, description: 'Role not found' })
   @UseGuards(PermissionGuard)
-  @RequirePermission('roles:read')
+  @RequirePermission('roles:view')
   findOne(@Param('id') id: number): Promise<Role> {
     return this.rolesService.findOne(id);
   }

@@ -7,7 +7,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, FindOptionsWhere } from 'typeorm';
+import { Repository, Like, FindOptionsWhere, In } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -15,6 +15,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PasswordValidationService } from '../auth/password-validation.service';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/services/permissions.service';
+import { Group } from '../permissions/entities/group.entity';
+import { UserGroup } from './entities/user-group.entity';
 
 @Injectable()
 export class UsersService {
@@ -23,6 +25,10 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
+    @InjectRepository(Group)
+    private readonly groupRepository: Repository<Group>,
+    @InjectRepository(UserGroup)
+    private readonly userGroupRepository: Repository<UserGroup>,
     @Inject(forwardRef(() => PasswordValidationService))
     private readonly passwordValidationService: PasswordValidationService,
     @Inject(forwardRef(() => PermissionsService))
@@ -54,8 +60,18 @@ export class UsersService {
       createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
     }
 
-    // If role is not provided, use default role
-    if (!createUserDto.role) {
+    // Handle roles
+    let roles: Role[] = [];
+    if (createUserDto.roleIds && createUserDto.roleIds.length > 0) {
+      roles = await this.roleRepository.find({
+        where: { id: In(createUserDto.roleIds) },
+      });
+      
+      if (roles.length !== createUserDto.roleIds.length) {
+        throw new BadRequestException('One or more role IDs are invalid');
+      }
+    } else {
+      // If no roles provided, use default role
       const defaultRole = await this.roleRepository.findOne({
         where: { isDefault: true },
       });
@@ -64,12 +80,52 @@ export class UsersService {
         throw new BadRequestException('Default role not found');
       }
 
-      createUserDto.role = defaultRole;
+      roles = [defaultRole];
+    }
+
+    // Handle groups
+    let groups: Group[] = [];
+    if (createUserDto.groupIds && createUserDto.groupIds.length > 0) {
+      groups = await this.groupRepository.find({
+        where: { id: In(createUserDto.groupIds) },
+      });
+      
+      if (groups.length !== createUserDto.groupIds.length) {
+        throw new BadRequestException('One or more group IDs are invalid');
+      }
     }
 
     // Create and save the user
-    const user = this.userRepository.create(createUserDto);
-    return this.userRepository.save(user);
+    const user = this.userRepository.create({
+      username: createUserDto.username,
+      email: createUserDto.email,
+      password: createUserDto.password,
+      firstName: createUserDto.firstName,
+      lastName: createUserDto.lastName,
+      preferences: createUserDto.preferences,
+      requiresPasswordChange: createUserDto.requiresPasswordChange || false,
+      roles: roles,
+    });
+
+    const savedUser = await this.userRepository.save(user);
+
+    // Create user-group relationships
+    if (groups.length > 0) {
+      const userGroups = groups.map(group => 
+        this.userGroupRepository.create({
+          user: savedUser,
+          group: group,
+        })
+      );
+      
+      await this.userGroupRepository.save(userGroups);
+    }
+
+    // Return user with relations
+    return this.userRepository.findOne({
+      where: { id: savedUser.id },
+      relations: ['roles', 'groups'],
+    });
   }
 
   async findAll(search?: string): Promise<Partial<User>[]> {
@@ -237,10 +293,54 @@ export class UsersService {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
-    // Update user data
+    // Handle roles if provided
+    if (updateUserDto.roleIds) {
+      const roles = await this.roleRepository.find({
+        where: { id: In(updateUserDto.roleIds) },
+      });
+      
+      if (roles.length !== updateUserDto.roleIds.length) {
+        throw new BadRequestException('One or more role IDs are invalid');
+      }
+      
+      user.roles = roles;
+      delete updateUserDto.roleIds; // Remove from DTO to prevent TypeORM issues
+    }
+
+    // Handle groups if provided
+    if (updateUserDto.groupIds) {
+      const groups = await this.groupRepository.find({
+        where: { id: In(updateUserDto.groupIds) },
+      });
+      
+      if (groups.length !== updateUserDto.groupIds.length) {
+        throw new BadRequestException('One or more group IDs are invalid');
+      }
+      
+      // Clear existing user-group relationships
+      await this.userGroupRepository.delete({ user: { id: user.id } });
+      
+      // Create new user-group relationships
+      if (groups.length > 0) {
+        const userGroups = groups.map(group => 
+          this.userGroupRepository.create({
+            user: user,
+            group: group,
+          })
+        );
+        
+        await this.userGroupRepository.save(userGroups);
+      }
+      
+      delete updateUserDto.groupIds; // Remove from DTO to prevent TypeORM issues
+    }
+
+    // Update user data (excluding roleIds and groupIds which are now handled above)
     Object.assign(user, updateUserDto);
 
-    return this.userRepository.save(user);
+    // Save the user and reload with fresh relations
+    await this.userRepository.save(user);
+    return this.findOne(id);
   }
 
   async remove(id: number): Promise<void> {

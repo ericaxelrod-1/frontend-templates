@@ -169,7 +169,7 @@ export class PermissionsController {
 
   // Get permission by ID
   @Get(':id')
-  @RequirePermissions('permissions:read')
+  @RequirePermissions('permissions:view')
   @ApiOperation({ summary: 'Get permission by ID' })
   @ApiParam({ name: 'id', description: 'Permission ID' })
   @ApiResponse({
@@ -245,7 +245,7 @@ export class PermissionsController {
   // Get all resources
   @Get('resources/all')
   @UseGuards(PermissionGuard)
-  @RequirePermission('permissions:read')
+  @RequirePermission('permissions:view')
   @ApiOperation({ summary: 'Get all resources' })
   async getAllResources() {
     return this.permissionsService.findAllResources();
@@ -254,7 +254,7 @@ export class PermissionsController {
   // Get all actions
   @Get('actions/all')
   @UseGuards(PermissionGuard)
-  @RequirePermission('permissions:read')
+  @RequirePermission('permissions:view')
   @ApiOperation({ summary: 'Get all actions' })
   async getAllActions() {
     return this.permissionsService.findAllActions();
@@ -351,7 +351,7 @@ export class PermissionsController {
    * Get a specific UI component by ID
    */
   @Get('component/:id')
-  @RequirePermissions('permissions:read')
+  @RequirePermissions('permissions:view')
   @ApiOperation({ summary: 'Get a specific UI component by ID' })
   @ApiParam({ name: 'id', description: 'Component ID' })
   @ApiResponse({
@@ -400,7 +400,7 @@ export class PermissionsController {
    * Get a specific route by ID
    */
   @Get('route/:id')
-  @RequirePermissions('permissions:read')
+  @RequirePermissions('permissions:view')
   @ApiOperation({ summary: 'Get a specific route by ID' })
   @ApiParam({ name: 'id', description: 'Route ID' })
   @ApiResponse({
@@ -461,7 +461,7 @@ export class PermissionsController {
    * Get a specific API endpoint by ID
    */
   @Get('endpoint/:id')
-  @RequirePermissions('permissions:read')
+  @RequirePermissions('permissions:view')
   @ApiOperation({ summary: 'Get a specific API endpoint by ID' })
   @ApiParam({ name: 'id', description: 'Endpoint ID' })
   @ApiResponse({

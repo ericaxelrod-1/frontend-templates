@@ -36,7 +36,7 @@ export class ResourcesController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
   @Get()
-  @RequirePermission('resources:read')
+  @RequirePermission('resources:view')
   @ApiOperation({ summary: 'Get all resources' })
   @ApiResponse({ status: 200, description: 'Return all resources' })
   async getAllResources(): Promise<string[]> {
