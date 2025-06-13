@@ -87,9 +87,11 @@ export class GroupsService {
       'read',
     );
     
-    // If global permission, return all groups
+    // If global permission, return all groups with member relations
     if (hasPermission) {
-      return this.groupsRepository.find();
+      return this.groupsRepository.find({
+        relations: ['userGroups', 'userGroups.user'],
+      });
     }
     
     // Otherwise, return only groups the user is a member of

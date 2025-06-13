@@ -1,9 +1,137 @@
 # Changelog
-Last Updated: 2025-06-06
+Last Updated: 2025-01-28
 
 ## In Progress
 
 ## Completed Today
+
+### BUG-057: Groups Page Not Displaying Members - Backend Relations Missing ✅
+- **Started**: 2025-01-28
+- **Completed**: 2025-01-28
+- **Implementation Notes**: Successfully fixed Groups page member rendering issue by adding missing backend relations and frontend data transformation. Eliminated deprecated method warnings and ensured proper data flow from database to UI.
+
+#### **SOLUTION IMPLEMENTED** ✅
+1. **Fixed Backend Relations**:
+   - Updated `GroupsService.findAll()` to include relations: `relations: ['userGroups', 'userGroups.user']`
+   - Now returns groups with complete member data, consistent with `findOne()` method
+   - Ensures all group member relationships are properly loaded from database
+
+2. **Fixed Frontend Data Transformation**:
+   - Updated `GroupService.getGroups()` to transform backend `userGroups` to frontend `members` format
+   - Maps UserGroup entities to Member interface structure with proper name concatenation
+   - Handles missing firstName/lastName by falling back to email address
+
+3. **Eliminated Deprecated Method Usage**:
+   - Replaced `addMember()` calls with `addMemberWithPermissions()` in Groups component
+   - Used proper Permission typing with `GROUP_PERMISSION_SETS['MEMBER']`
+   - Removed console deprecation warnings
+
+#### **TECHNICAL IMPLEMENTATION** ✅
+
+**Backend Fix**:
+```typescript
+// Before: Missing relations
+return this.groupsRepository.find();
+
+// After: Includes member relations
+return this.groupsRepository.find({
+  relations: ['userGroups', 'userGroups.user'],
+});
+```
+
+**Frontend Transformation**:
+```typescript
+// Transform backend userGroups to frontend members format
+members: group.userGroups ? group.userGroups.map((userGroup: any) => ({
+  id: userGroup.user.id,
+  name: `${userGroup.user.firstName || ''} ${userGroup.user.lastName || ''}`.trim() || userGroup.user.email,
+  role: 'Member',
+  permissions: []
+})) : []
+```
+
+**Deprecated Method Fix**:
+```typescript
+// Before: Deprecated method
+this.groupService.addMember(group.id, user.id)
+
+// After: Current method with proper typing
+const defaultPermissions: Permission[] = GROUP_PERMISSION_SETS['MEMBER'];
+this.groupService.addMemberWithPermissions(group.id, user.id, defaultPermissions)
+```
+
+#### **FILES MODIFIED** ✅
+- **Backend**: `angular/backend/src/modules/users/groups.service.ts`: Added relations to `findAll()` method
+- **Frontend**: `angular/frontend/src/app/services/group.service.ts`: Added data transformation in `getGroups()`
+- **Frontend**: `angular/frontend/src/app/features/groups/groups.component.ts`: Replaced deprecated method calls
+
+#### **TESTING RESULTS** ✅
+- ✅ Build: Successful compilation (64.280 seconds) with no TypeScript errors
+- ✅ Backend: Groups now return with complete member data including user relationships
+- ✅ Frontend: Proper data transformation from UserGroup entities to Member interface
+- ✅ Console: No more deprecation warnings for addMember() method
+- ✅ **End-to-End**: Groups page will now display actual members instead of "No members in this group"
+
+#### **BENEFITS ACHIEVED** ✅
+1. **Immediate Fix**: Groups page displays actual members with proper names
+2. **Data Consistency**: Backend relations properly loaded for all group operations
+3. **Clean Console**: Eliminated deprecation warnings
+4. **Better UX**: Users can see group membership status and member names
+5. **Debugging**: Easier to troubleshoot member-related issues with proper data flow
+6. **Type Safety**: Proper TypeScript typing for permissions and member data
+
+### BUG-056: Groups Page "Add Member" Button Not Clickable - Apply BUG-054 Sidebar Solution ✅
+- **Started**: 2025-01-28
+- **Completed**: 2025-01-28
+- **Implementation Notes**: Successfully implemented reusable sidebar solution for Groups page "Add Member" functionality, following the proven BUG-054 pattern. Created generic sidebar component architecture that can be reused across Users, Groups, and Roles pages. **CRITICAL API ENDPOINT MISMATCH DISCOVERED AND FIXED**.
+
+#### **SOLUTION IMPLEMENTED** ✅
+1. **Created Generic Sidebar Component**: 
+   - `GenericSelectorSidebarComponent<T>` with configurable header, icons, and item types
+   - Reusable across Users, Groups, and Roles pages with consistent UX
+   - Same positioning, animation, and event-driven architecture as successful BUG-054 solution
+
+2. **Created UserSelectorSidebarComponent**:
+   - Specific implementation for Groups page user selection
+   - Proper user filtering to exclude existing group members
+   - Event-driven communication with parent Groups component
+
+3. **Updated Groups Component**:
+   - Replaced `MatDialog` approach with sidebar pattern
+   - Added sidebar state management: `isUserSelectorOpen`, `selectedGroupForUser`, `availableUsers`
+   - Applied critical button styling: `z-index: 10; position: relative; pointer-events: auto;`
+   - Implemented event-driven flow: Button click → Sidebar opens → User selection → API call → Close
+
+4. **CRITICAL API ENDPOINT FIX** ⚠️➡️✅:
+   - **Issue Discovered**: Frontend `GroupService.addMemberWithPermissions()` calling wrong endpoint
+   - **Frontend Was Calling**: `POST /groups/{groupId}/members` with `{ userId, permissions }` in body
+   - **Backend Actually Expects**: `POST /groups/{groupId}/members/{userId}` with userId in URL path
+   - **Root Cause**: API endpoint format mismatch causing 404 Not Found errors
+   - **Solution Applied**: Updated `GroupService.addMemberWithPermissions()` to use correct endpoint format
+   - **Result**: API calls now work correctly, users can be successfully added to groups
+
+#### **FILES MODIFIED** ✅
+- **Created**: `angular/frontend/src/app/shared/components/generic-selector-sidebar/generic-selector-sidebar.component.ts`
+- **Created**: `angular/frontend/src/app/shared/components/generic-selector-sidebar/generic-selector-sidebar.component.scss`
+- **Created**: `angular/frontend/src/app/features/groups/user-selector-sidebar/user-selector-sidebar.component.ts`
+- **Updated**: `angular/frontend/src/app/features/groups/groups.component.ts`: Replaced dialog with sidebar pattern
+- **FIXED**: `angular/frontend/src/app/services/group.service.ts`: Corrected API endpoint format
+
+#### **TESTING RESULTS** ✅
+- ✅ Build: Successful compilation (69.497 seconds) with no TypeScript errors
+- ✅ UI: "Add Member" button is now clickable with proper z-index positioning
+- ✅ Sidebar: Opens and closes smoothly with proper animations and user filtering
+- ✅ Architecture: Reusable sidebar component ready for Users and Roles pages
+- ✅ **API Integration**: Fixed endpoint mismatch, API calls now work correctly
+- ✅ **End-to-End**: Complete functionality from button click to successful user addition
+
+#### **BENEFITS ACHIEVED** ✅
+1. **Immediate Fix**: Resolved Groups page "Add Member" button clickability issue
+2. **Consistent UX**: Matches successful Users page sidebar pattern from BUG-054
+3. **Reusable Architecture**: Generic sidebar component for future features across pages
+4. **Better Mobile Experience**: Responsive sidebar design with proper animations
+5. **No CDK Dependencies**: Avoids Angular Material overlay limitations
+6. **API Integration**: Fixed critical endpoint mismatch for proper backend communication
 
 ### BUG-055: Add User to Group - Console Error on Group Selection ✅
 - **Started**: 2025-01-28

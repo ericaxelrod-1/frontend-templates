@@ -14,11 +14,17 @@ export class GroupService {
   constructor(private http: HttpClient) {}
 
   getGroups(): Observable<Group[]> {
-    return this.http.get<Group[]>(this.apiUrl).pipe(
+    return this.http.get<any[]>(this.apiUrl).pipe(
       map(groups => groups.map(group => ({
         ...group,
         permissions: group.permissions || [],
-        members: group.members || []
+        // Transform backend userGroups to frontend members format
+        members: group.userGroups ? group.userGroups.map((userGroup: any) => ({
+          id: userGroup.user.id,
+          name: `${userGroup.user.firstName || ''} ${userGroup.user.lastName || ''}`.trim() || userGroup.user.email,
+          role: 'Member', // Default role, could be enhanced later
+          permissions: [] // Default permissions, could be enhanced later
+        })) : []
       }))),
       catchError(error => {
         console.error('Error getting groups:', error);
@@ -118,10 +124,9 @@ export class GroupService {
   }
 
   addMemberWithPermissions(groupId: number, userId: number, permissions: Permission[]): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/${groupId}/members`, { 
-      userId, 
-      permissions 
-    }).pipe(
+    // Backend expects: POST /groups/{groupId}/members/{userId}
+    // No request body needed - backend uses URL parameters only
+    return this.http.post<void>(`${this.apiUrl}/${groupId}/members/${userId}`, {}).pipe(
       catchError(error => {
         console.error(`Error adding member to group ${groupId}:`, error);
         return throwError(() => error);

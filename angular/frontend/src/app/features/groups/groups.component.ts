@@ -9,9 +9,11 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { GroupService } from '../../services/group.service';
-import { Group, Member } from '../../models/group.model';
+import { UserService } from '../../services/user.service';
+import { Group, Member, Permission, GROUP_PERMISSION_SETS } from '../../models/group.model';
+import { User } from '../../models/user.model';
 import { GroupDialogComponent } from './group-dialog/group-dialog.component';
-import { AddMemberDialogComponent } from './add-member-dialog/add-member-dialog.component';
+import { UserSelectorSidebarComponent } from './user-selector-sidebar/user-selector-sidebar.component';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
@@ -27,7 +29,8 @@ import { PermissionService } from '../../core/services/permission.service';
     MatChipsModule,
     MatDialogModule,
     MatMenuModule,
-    MatListModule
+    MatListModule,
+    UserSelectorSidebarComponent
   ],
   template: `
     <div class="groups-container">
@@ -84,7 +87,7 @@ import { PermissionService } from '../../core/services/permission.service';
                   No members in this group.
                 </div>
                 
-                <button mat-button color="primary" (click)="addMember(group)">
+                <button mat-button color="primary" (click)="addMember(group)" class="add-member-button">
                   <mat-icon>person_add</mat-icon> Add Member
                 </button>
               </div>
@@ -101,6 +104,15 @@ import { PermissionService } from '../../core/services/permission.service';
           </mat-card>
         </div>
       </ng-container>
+      
+      <!-- User Selector Sidebar -->
+      <app-user-selector-sidebar
+        [isOpen]="isUserSelectorOpen"
+        [group]="selectedGroupForUser"
+        [availableUsers]="availableUsers"
+        (closeSidebar)="closeUserSelector()"
+        (userSelected)="onUserSelected($event)">
+      </app-user-selector-sidebar>
     </div>
   `,
   styles: [`
@@ -153,6 +165,12 @@ import { PermissionService } from '../../core/services/permission.service';
       color: #666;
       margin: 16px 0;
     }
+    
+    .add-member-button {
+      z-index: 10;
+      position: relative;
+      pointer-events: auto;
+    }
   `]
 })
 export class GroupsComponent implements OnInit {
@@ -160,8 +178,14 @@ export class GroupsComponent implements OnInit {
   hasPermission = false;
   loading = true;
   
+  // Sidebar state management
+  isUserSelectorOpen = false;
+  selectedGroupForUser: Group | null = null;
+  availableUsers: User[] = [];
+  
   constructor(
     private groupService: GroupService,
+    private userService: UserService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private authService: AuthService,
@@ -275,22 +299,46 @@ export class GroupsComponent implements OnInit {
   }
 
   addMember(group: Group): void {
-    const dialogRef = this.dialog.open(AddMemberDialogComponent, {
-      data: { group }
+    this.selectedGroupForUser = group;
+    this.loadAvailableUsers(group);
+    this.isUserSelectorOpen = true;
+  }
+  
+  private loadAvailableUsers(group: Group): void {
+    this.userService.getUsers().subscribe({
+      next: (users) => {
+        // Filter out users who are already members of the group
+        const memberIds = group.members?.map(member => member.id) || [];
+        this.availableUsers = users.filter(user => !memberIds.includes(user.id));
+      },
+      error: (error) => {
+        console.error('Error loading available users:', error);
+        this.snackBar.open('Error loading available users', 'Close', { duration: 3000 });
+        this.availableUsers = [];
+      }
     });
-
-    dialogRef.afterClosed().subscribe(userId => {
-      if (userId) {
-        this.groupService.addMember(group.id, userId).subscribe({
-          next: () => {
-            this.loadGroups(); // Reload to get updated member list
-            this.snackBar.open('Member added successfully', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            console.error('Error adding member:', error);
-            this.snackBar.open('Error adding member', 'Close', { duration: 3000 });
-          }
-        });
+  }
+  
+  closeUserSelector(): void {
+    this.isUserSelectorOpen = false;
+    this.selectedGroupForUser = null;
+    this.availableUsers = [];
+  }
+  
+  onUserSelected(event: { user: User; group: Group }): void {
+    const { user, group } = event;
+    
+    // Use non-deprecated method with default member permissions
+    const defaultPermissions: Permission[] = GROUP_PERMISSION_SETS['MEMBER'];
+    this.groupService.addMemberWithPermissions(group.id, user.id, defaultPermissions).subscribe({
+      next: () => {
+        this.loadGroups(); // Reload to get updated member list
+        this.snackBar.open(`${user.firstName} ${user.lastName} added to ${group.name} successfully`, 'Close', { duration: 3000 });
+        this.closeUserSelector();
+      },
+      error: (error) => {
+        console.error('Error adding member:', error);
+        this.snackBar.open('Error adding member to group', 'Close', { duration: 3000 });
       }
     });
   }
