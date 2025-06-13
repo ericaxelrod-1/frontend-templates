@@ -3,6 +3,97 @@ Last Updated: 2025-01-28
 
 ## Critical Bugs [HIGHEST PRIORITY]
 
+### BUG-058: Groups Page Member Menu Not Clickable - Apply Sidebar Pattern ⚠️
+- **Status**: In Progress - Implementation Complete, Testing Required
+- **Testing**: Not Started - Build successful, ready for functional testing
+- **Dependencies**: BUG-056 (Sidebar pattern established) ✅
+- **Added**: 2025-01-28
+- **Priority**: CRITICAL - BLOCKS GROUP MEMBER MANAGEMENT
+- **Description**: The three-dot member menu in Groups page (Make Admin, Remove from Group) is not clickable due to the same Angular Material CDK overlay design flaw as BUG-054 and BUG-056. Menu items need to be migrated to the reusable sidebar pattern.
+
+#### **ROOT CAUSE ANALYSIS** ✅
+1. **Angular Material CDK Overlay Design Flaw**: 
+   - Member menu uses `mat-menu` with `matMenuTriggerFor` directive
+   - Same fundamental issue as BUG-054 and BUG-056: CDK overlay system blocks clicks by design
+   - GitHub issue #9320 (open since 2018) - known Angular Material limitation
+
+2. **Current Implementation Issues**:
+   - **Menu-Based Approach**: Uses `mat-menu` for "Make Admin" and "Remove from Group" actions
+   - **Button Implementation**: Three-dot button with `[matMenuTriggerFor]="memberMenu"`
+   - **User Actions**: Traditional dropdown menu within CDK overlay
+   - **Event Flow**: Button click → Menu opens → Action selection → Menu closes
+
+3. **Comparison with Successful BUG-056 Solution**:
+   - **Add Member**: Successfully fixed using sidebar pattern with event-driven architecture
+   - **Reusable Components**: `GenericSelectorSidebarComponent` and `UserSelectorSidebarComponent` available
+   - **No CDK Overlay Dependencies**: Avoids Angular Material's problematic overlay system
+   - **Consistent UX Pattern**: Should match add member sidebar behavior
+
+#### **SOLUTION IMPLEMENTATION PLAN** ✅
+
+**Phase 1: Create Member Actions Sidebar Component**
+1. **Create MemberActionsSidebarComponent**:
+   - Extend the `GenericSelectorSidebarComponent` pattern for member actions
+   - Display member information and available actions (Make Admin, Remove from Group)
+   - Use event-driven architecture for action selection
+
+**Phase 2: Update Groups Component**
+1. **Replace mat-menu with Sidebar Pattern**:
+   - Remove `mat-menu` and `matMenuTriggerFor` from member list items
+   - Add sidebar state management for member actions
+   - Implement event handlers for opening/closing member actions sidebar
+   - Apply critical button styling for clickability
+
+**Phase 3: Integrate with Existing Sidebar Architecture**
+1. **Reuse Established Patterns**:
+   - Follow same positioning, animation, and styling as `UserSelectorSidebarComponent`
+   - Use consistent event-driven communication
+   - Maintain same z-index and backdrop behavior
+
+#### **TECHNICAL DETAILS** ✅
+
+**Current Implementation (Deprecated)**:
+```typescript
+makeAdmin(group: Group, member: Member): void {
+  this.groupService.updateMemberRole(group.id, member.id, 'Admin').subscribe({
+    // ... rest of implementation
+  });
+}
+```
+
+**Target Implementation**:
+```typescript
+makeAdmin(group: Group, member: Member): void {
+  const adminPermissions: Permission[] = GROUP_PERMISSION_SETS['ADMIN'];
+  this.groupService.updateMemberPermissions(group.id, member.id, adminPermissions).subscribe({
+    // ... rest of implementation
+  });
+}
+```
+
+#### **FILES TO BE MODIFIED** ✅
+- `angular/frontend/src/app/features/groups/groups.component.ts`: Replace deprecated method call
+
+#### **IMPLEMENTATION NOTES** ✅
+- **2025-01-28**: 
+  - **Issue**: Member menu (three-dot button) not clickable due to Angular Material CDK overlay design flaw
+  - **Solution**: Created `MemberActionsSidebarComponent` following successful BUG-056 pattern
+  - **Architecture**: Event-driven flow: Button click → Sidebar opens → Action selection → API call → Close
+
+- **Files Modified**:
+  - `angular/frontend/src/app/features/groups/member-actions-sidebar/member-actions-sidebar.component.ts`: Created new sidebar component
+  - `angular/frontend/src/app/features/groups/groups.component.ts`: Integrated sidebar, removed mat-menu, added event handlers
+
+- **Testing Results**:
+  - ✅ Build: Successful compilation with no TypeScript errors
+  - ⏳ Functional: Ready for testing member actions (Make Admin, Remove from Group)
+
+#### **EXPECTED BENEFITS** ✅
+1. **Clickable Member Menu**: Resolve three-dot button clickability issue
+2. **Consistent UX**: Match successful sidebar pattern from BUG-056
+3. **Reusable Architecture**: Sidebar component can be used across other pages
+4. **No CDK Dependencies**: Avoid Angular Material overlay limitations
+
 ### BUG-057: Groups Page Not Displaying Members - Backend Relations Missing ✅
 - **Status**: Complete
 - **Testing**: Passed

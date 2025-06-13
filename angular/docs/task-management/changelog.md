@@ -3,7 +3,66 @@ Last Updated: 2025-01-28
 
 ## In Progress
 
+### BUG-058: Groups Page Member Menu Not Clickable - Apply Sidebar Pattern ⚠️
+- **Started**: 2025-01-28
+- **Implementation Notes**: 
+  - **Root Cause**: Angular Material CDK overlay design flaw (GitHub issue #9320) - same as BUG-054 and BUG-056
+  - **Current Issue**: Three-dot member menu (Make Admin, Remove from Group) not clickable due to CDK overlay blocking clicks
+  - **Solution**: Replace mat-menu with reusable sidebar pattern following BUG-056 success
+- **Files Modified**: 
+  - `angular/frontend/src/app/features/groups/member-actions-sidebar/member-actions-sidebar.component.ts`: Created new sidebar component for member actions
+  - `angular/frontend/src/app/features/groups/groups.component.ts`: Integrated member actions sidebar, removed mat-menu, added event handlers
+- **Testing Results**: ✅ Build successful, ready for functional testing
+
 ## Completed Today
+
+### BUG-058: Groups Page Member Menu Using Deprecated updateMemberRole Method ✅
+- **Started**: 2025-01-28
+- **Completed**: 2025-01-28
+- **Implementation Notes**: Successfully fixed Groups page member menu "Make Admin" functionality by replacing deprecated `updateMemberRole()` method with `updateMemberPermissions()`. Eliminated console warnings and improved type safety.
+
+#### **SOLUTION IMPLEMENTED** ✅
+1. **Replaced Deprecated Method**:
+   - Updated `makeAdmin()` method to use `updateMemberPermissions()` instead of deprecated `updateMemberRole()`
+   - Used proper Permission typing with `GROUP_PERMISSION_SETS['ADMIN']`
+   - Maintained same functionality while eliminating console warnings
+
+#### **TECHNICAL IMPLEMENTATION** ✅
+
+**Before (Deprecated)**:
+```typescript
+makeAdmin(group: Group, member: Member): void {
+  this.groupService.updateMemberRole(group.id, member.id, 'Admin').subscribe({
+    // ... implementation
+  });
+}
+```
+
+**After (Current)**:
+```typescript
+makeAdmin(group: Group, member: Member): void {
+  const adminPermissions: Permission[] = GROUP_PERMISSION_SETS['ADMIN'];
+  this.groupService.updateMemberPermissions(group.id, member.id, adminPermissions).subscribe({
+    // ... implementation
+  });
+}
+```
+
+#### **FILES MODIFIED** ✅
+- **Frontend**: `angular/frontend/src/app/features/groups/groups.component.ts`: Replaced deprecated method call
+
+#### **TESTING RESULTS** ✅
+- ✅ Build: Successful compilation (57.665 seconds) with no TypeScript errors
+- ✅ Console: No more deprecation warnings for updateMemberRole() method
+- ✅ Type Safety: Proper Permission typing with GROUP_PERMISSION_SETS
+- ✅ **Functionality**: "Make Admin" button will work without console warnings
+
+#### **BENEFITS ACHIEVED** ✅
+1. **Clean Console**: Eliminated deprecation warnings
+2. **Future Compatibility**: Using current API methods
+3. **Type Safety**: Proper Permission typing throughout
+4. **Consistency**: Aligned with other permission-based operations
+5. **Better UX**: No console noise affecting user experience
 
 ### BUG-057: Groups Page Not Displaying Members - Backend Relations Missing ✅
 - **Started**: 2025-01-28

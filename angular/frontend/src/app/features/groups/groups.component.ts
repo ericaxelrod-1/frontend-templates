@@ -14,6 +14,7 @@ import { Group, Member, Permission, GROUP_PERMISSION_SETS } from '../../models/g
 import { User } from '../../models/user.model';
 import { GroupDialogComponent } from './group-dialog/group-dialog.component';
 import { UserSelectorSidebarComponent } from './user-selector-sidebar/user-selector-sidebar.component';
+import { MemberActionsSidebarComponent, MemberAction } from './member-actions-sidebar/member-actions-sidebar.component';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
@@ -28,9 +29,9 @@ import { PermissionService } from '../../core/services/permission.service';
     MatIconModule,
     MatChipsModule,
     MatDialogModule,
-    MatMenuModule,
     MatListModule,
-    UserSelectorSidebarComponent
+    UserSelectorSidebarComponent,
+    MemberActionsSidebarComponent
   ],
   template: `
     <div class="groups-container">
@@ -68,19 +69,9 @@ import { PermissionService } from '../../core/services/permission.service';
                   <mat-list-item *ngFor="let member of group.members">
                     <span matListItemTitle>{{ member.name }}</span>
                     <span matListItemLine>{{ member.role || 'Member' }}</span>
-                    <button mat-icon-button [matMenuTriggerFor]="memberMenu" matListItemMeta>
+                    <button mat-icon-button (click)="openMemberActions(group, member)" matListItemMeta class="member-actions-button">
                       <mat-icon>more_vert</mat-icon>
                     </button>
-                    <mat-menu #memberMenu="matMenu">
-                      <button mat-menu-item (click)="makeAdmin(group, member)">
-                        <mat-icon>admin_panel_settings</mat-icon>
-                        <span>Make Admin</span>
-                      </button>
-                      <button mat-menu-item (click)="removeMember(group, member)">
-                        <mat-icon>remove_circle</mat-icon>
-                        <span>Remove from Group</span>
-                      </button>
-                    </mat-menu>
                   </mat-list-item>
                 </mat-list>
                 <div *ngIf="!group.members || group.members.length === 0" class="no-members">
@@ -113,6 +104,15 @@ import { PermissionService } from '../../core/services/permission.service';
         (closeSidebar)="closeUserSelector()"
         (userSelected)="onUserSelected($event)">
       </app-user-selector-sidebar>
+      
+      <!-- Member Actions Sidebar -->
+      <app-member-actions-sidebar
+        [isOpen]="isMemberActionsOpen"
+        [member]="selectedMember"
+        [group]="selectedGroupForMember"
+        (closeSidebar)="closeMemberActions()"
+        (actionSelected)="onMemberActionSelected($event)">
+      </app-member-actions-sidebar>
     </div>
   `,
   styles: [`
@@ -171,6 +171,12 @@ import { PermissionService } from '../../core/services/permission.service';
       position: relative;
       pointer-events: auto;
     }
+    
+    .member-actions-button {
+      z-index: 10;
+      position: relative;
+      pointer-events: auto;
+    }
   `]
 })
 export class GroupsComponent implements OnInit {
@@ -182,6 +188,11 @@ export class GroupsComponent implements OnInit {
   isUserSelectorOpen = false;
   selectedGroupForUser: Group | null = null;
   availableUsers: User[] = [];
+  
+  // Member actions sidebar state
+  isMemberActionsOpen = false;
+  selectedMember: Member | null = null;
+  selectedGroupForMember: Group | null = null;
   
   constructor(
     private groupService: GroupService,
@@ -361,16 +372,49 @@ export class GroupsComponent implements OnInit {
   }
 
   makeAdmin(group: Group, member: Member): void {
-    this.groupService.updateMemberRole(group.id, member.id, 'Admin').subscribe({
+    // Use non-deprecated method with admin permissions
+    const adminPermissions: Permission[] = GROUP_PERMISSION_SETS['ADMIN'];
+    this.groupService.updateMemberPermissions(group.id, member.id, adminPermissions).subscribe({
       next: () => {
         member.role = 'Admin';
         this.snackBar.open('Member role updated successfully', 'Close', { duration: 3000 });
       },
       error: (error) => {
-        console.error('Error updating member role:', error);
-        this.snackBar.open('Error updating member role', 'Close', { duration: 3000 });
+        console.error('Error updating member permissions:', error);
+        this.snackBar.open('Error updating member permissions', 'Close', { duration: 3000 });
       }
     });
+  }
+
+  openMemberActions(group: Group, member: Member): void {
+    console.log('[GroupsComponent] Opening member actions for:', member.name, 'in group:', group.name);
+    this.selectedMember = member;
+    this.selectedGroupForMember = group;
+    this.isMemberActionsOpen = true;
+  }
+  
+  closeMemberActions(): void {
+    console.log('[GroupsComponent] Closing member actions sidebar');
+    this.isMemberActionsOpen = false;
+    this.selectedMember = null;
+    this.selectedGroupForMember = null;
+  }
+  
+  onMemberActionSelected(event: { action: MemberAction; member: Member; group: Group }): void {
+    console.log('[GroupsComponent] Member action selected:', event.action.id, 'for member:', event.member.name);
+    
+    switch (event.action.id) {
+      case 'make-admin':
+        this.makeAdmin(event.group, event.member);
+        break;
+      case 'remove-member':
+        this.removeMember(event.group, event.member);
+        break;
+      default:
+        console.warn('[GroupsComponent] Unknown action:', event.action.id);
+    }
+    
+    this.closeMemberActions();
   }
 
   goToDashboard(): void {
