@@ -9,8 +9,8 @@ import { GroupPermission } from '../modules/permissions/entities/group-permissio
 import { UserPermission } from '../modules/permissions/entities/user-permission.entity';
 import { RolePermission } from '../modules/roles/entities/role-permission.entity';
 import { User } from '../modules/users/entities/user.entity';
-import { Group } from '../modules/users/entities/group.entity';
-import { UserGroup } from '../modules/users/entities/user-group.entity';
+import { Group } from '../modules/permissions/entities/group.entity';
+
 import { Action } from '../modules/permissions/entities/action.entity';
 import { Resource } from '../modules/permissions/entities/resource.entity';
 import { LoginAttempt } from '../modules/auth/entities/login-attempt.entity';
@@ -35,7 +35,6 @@ export const dataSourceOptions: DataSourceOptions = {
     UserPermission,
     RolePermission,
     User,
-    UserGroup,
     Action,
     Resource,
     LoginAttempt,

@@ -20,7 +20,7 @@ import { CacheModule } from '../cache/cache.module';
 import { PERMISSION_CHECKER } from './shared/permissions-shared.module';
 import { GroupPermission } from './entities/group-permission.entity';
 import { UserPermission } from './entities/user-permission.entity';
-import { Group } from '../users/entities/group.entity';
+import { Group } from './entities/group.entity';
 import { User } from '../users/entities/user.entity';
 import { PermissionSeedsService } from '../../../src/database/seeds/permission-seeds.service';
 

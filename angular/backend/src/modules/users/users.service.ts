@@ -16,7 +16,6 @@ import { PasswordValidationService } from '../auth/password-validation.service';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { Group } from '../permissions/entities/group.entity';
-import { UserGroup } from './entities/user-group.entity';
 
 @Injectable()
 export class UsersService {
@@ -27,8 +26,6 @@ export class UsersService {
     private readonly roleRepository: Repository<Role>,
     @InjectRepository(Group)
     private readonly groupRepository: Repository<Group>,
-    @InjectRepository(UserGroup)
-    private readonly userGroupRepository: Repository<UserGroup>,
     @Inject(forwardRef(() => PasswordValidationService))
     private readonly passwordValidationService: PasswordValidationService,
     @Inject(forwardRef(() => PermissionsService))
@@ -109,16 +106,10 @@ export class UsersService {
 
     const savedUser = await this.userRepository.save(user);
 
-    // Create user-group relationships
+    // Assign groups using pure many-to-many relationship
     if (groups.length > 0) {
-      const userGroups = groups.map(group => 
-        this.userGroupRepository.create({
-          user: savedUser,
-          group: group,
-        })
-      );
-      
-      await this.userGroupRepository.save(userGroups);
+      savedUser.groups = groups;
+      await this.userRepository.save(savedUser);
     }
 
     // Return user with relations
@@ -300,6 +291,11 @@ export class UsersService {
       });
       
       if (roles.length !== updateUserDto.roleIds.length) {
+        console.error('Role validation failed:', {
+          requestedRoleIds: updateUserDto.roleIds,
+          foundRoles: roles.map(r => r.id),
+          missingRoleIds: updateUserDto.roleIds.filter(id => !roles.some(r => r.id === id))
+        });
         throw new BadRequestException('One or more role IDs are invalid');
       }
       
@@ -309,28 +305,64 @@ export class UsersService {
 
     // Handle groups if provided
     if (updateUserDto.groupIds) {
+      console.log('Processing group update for user:', {
+        userId: id,
+        requestedGroupIds: updateUserDto.groupIds,
+        currentUserGroups: user.groups?.map(g => g.id) || []
+      });
+
+      // Validate that all group IDs are valid numbers
+      const validGroupIds = updateUserDto.groupIds.filter(id => 
+        typeof id === 'number' && id > 0 && Number.isInteger(id)
+      );
+
+      if (validGroupIds.length !== updateUserDto.groupIds.length) {
+        console.error('Invalid group IDs detected:', {
+          originalIds: updateUserDto.groupIds,
+          validIds: validGroupIds,
+          invalidIds: updateUserDto.groupIds.filter(id => 
+            !(typeof id === 'number' && id > 0 && Number.isInteger(id))
+          )
+        });
+        throw new BadRequestException('One or more group IDs are invalid (not valid numbers)');
+      }
+
+      // Remove duplicates
+      const uniqueGroupIds = [...new Set(validGroupIds)];
+      
+      if (uniqueGroupIds.length !== validGroupIds.length) {
+        console.warn('Duplicate group IDs detected and removed:', {
+          originalIds: validGroupIds,
+          uniqueIds: uniqueGroupIds
+        });
+      }
+
       const groups = await this.groupRepository.find({
-        where: { id: In(updateUserDto.groupIds) },
+        where: { id: In(uniqueGroupIds) },
       });
       
-      if (groups.length !== updateUserDto.groupIds.length) {
-        throw new BadRequestException('One or more group IDs are invalid');
-      }
-      
-      // Clear existing user-group relationships
-      await this.userGroupRepository.delete({ user: { id: user.id } });
-      
-      // Create new user-group relationships
-      if (groups.length > 0) {
-        const userGroups = groups.map(group => 
-          this.userGroupRepository.create({
-            user: user,
-            group: group,
-          })
-        );
+      if (groups.length !== uniqueGroupIds.length) {
+        const foundGroupIds = groups.map(g => g.id);
+        const missingGroupIds = uniqueGroupIds.filter(id => !foundGroupIds.includes(id));
         
-        await this.userGroupRepository.save(userGroups);
+        console.error('Group validation failed:', {
+          requestedGroupIds: uniqueGroupIds,
+          foundGroups: foundGroupIds,
+          missingGroupIds: missingGroupIds,
+          allGroupsInDb: await this.groupRepository.find({ select: ['id', 'name'] })
+        });
+        
+        throw new BadRequestException(`One or more group IDs are invalid: ${missingGroupIds.join(', ')}`);
       }
+      
+      // Update user groups using pure many-to-many relationship
+      user.groups = groups;
+      
+      console.log('Successfully updated user groups:', {
+        userId: id,
+        newGroupIds: groups.map(g => g.id),
+        groupNames: groups.map(g => g.name)
+      });
       
       delete updateUserDto.groupIds; // Remove from DTO to prevent TypeORM issues
     }

@@ -9,7 +9,6 @@ import { GroupsService } from './groups.service';
 import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
 import { Group } from '../permissions/entities/group.entity';
-import { UserGroup } from './entities/user-group.entity';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { PermissionsSharedModule } from '../permissions/shared/permissions-shared.module';
@@ -17,7 +16,7 @@ import { PasswordValidationService } from '../auth/password-validation.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Role, Group, UserGroup]),
+    TypeOrmModule.forFeature([User, Role, Group]),
     forwardRef(() => AuthModule),
     forwardRef(() => PermissionsModule),
     PermissionsSharedModule,

@@ -5,6 +5,7 @@ import { environment } from '../../environments/environment';
 import { LoggerService } from './logging/logger.service';
 import { User } from '../models/user.model';
 import { Group, Member, Permission } from '../models/group.model';
+import { GroupMembershipResult } from '../models/group-membership-result.interface';
 
 export interface PasswordChange {
   currentPassword: string;
@@ -40,12 +41,6 @@ export interface UpdateUserRequest {
       push?: boolean;
     };
   };
-}
-
-export interface GroupMembershipResponse {
-  success: boolean;
-  message: string;
-  group?: Group;
 }
 
 export interface PasswordRequirements {
@@ -124,41 +119,56 @@ export class UserService {
     );
   }
 
-  addUserToGroup(userId: number, groupId: number): Observable<GroupMembershipResponse> {
+  addUserToGroup(userId: number, groupId: number): Observable<GroupMembershipResult> {
     this.logger.debug(`Adding user ${userId} to group ${groupId}`);
-    return this.http.post<any>(`${environment.apiUrl}/groups/${groupId}/members/${userId}`, {}).pipe(
-      map((userGroup: any) => {
-        this.logger.debug(`Successfully added user ${userId} to group ${groupId}`);
-        // Transform UserGroup response to expected GroupMembershipResponse format
-        return {
-          success: true,
-          message: 'User added to group successfully',
-          group: userGroup.group
-        } as GroupMembershipResponse;
+    return this.http.post<GroupMembershipResult>(`${environment.apiUrl}/groups/${groupId}/members/${userId}`, {}).pipe(
+      map((result: GroupMembershipResult) => {
+        this.logger.debug(`Group membership operation result:`, {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          groupName: result.group.name
+        });
+        
+        if (result.success) {
+          this.logger.info(`Successfully added user ${userId} to group ${groupId}: ${result.message}`);
+        } else {
+          this.logger.warn(`Failed to add user ${userId} to group ${groupId}: ${result.message}`);
+        }
+        
+        return result;
       }),
       catchError(error => {
-        this.logger.error(`Failed to add user ${userId} to group ${groupId}:`, error);
-        // Handle error properly with fallback message
+        this.logger.error(`HTTP error adding user ${userId} to group ${groupId}:`, error);
         const errorMessage = error.error?.message || error.message || 'Failed to add user to group';
         throw { message: errorMessage };
       })
     );
   }
 
-  removeUserFromGroup(userId: number, groupId: number): Observable<GroupMembershipResponse> {
+  removeUserFromGroup(userId: number, groupId: number): Observable<GroupMembershipResult> {
     this.logger.debug(`Removing user ${userId} from group ${groupId}`);
-    return this.http.delete<any>(`${environment.apiUrl}/groups/${groupId}/members/${userId}`).pipe(
-      map(() => {
-        this.logger.debug(`Successfully removed user ${userId} from group ${groupId}`);
-        // Transform void response to expected GroupMembershipResponse format
-        return {
-          success: true,
-          message: 'User removed from group successfully'
-        } as GroupMembershipResponse;
+    return this.http.delete<GroupMembershipResult>(`${environment.apiUrl}/groups/${groupId}/members/${userId}`).pipe(
+      map((result: GroupMembershipResult) => {
+        this.logger.debug(`Group membership operation result:`, {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          groupName: result.group.name
+        });
+        
+        if (result.success) {
+          this.logger.info(`Successfully removed user ${userId} from group ${groupId}: ${result.message}`);
+        } else {
+          this.logger.warn(`Failed to remove user ${userId} from group ${groupId}: ${result.message}`);
+        }
+        
+        return result;
       }),
       catchError(error => {
-        this.logger.error(`Failed to remove user ${userId} from group ${groupId}:`, error);
-        // Handle error properly with fallback message
+        this.logger.error(`HTTP error removing user ${userId} from group ${groupId}:`, error);
         const errorMessage = error.error?.message || error.message || 'Failed to remove user from group';
         throw { message: errorMessage };
       })

@@ -8,7 +8,7 @@ import {
   PrimaryColumn
 } from 'typeorm';
 import { Permission } from './permission.entity';
-import { Group } from '../../users/entities/group.entity';
+import { Group } from './group.entity';
 
 /**
  * Represents the many-to-many relationship between groups and permissions

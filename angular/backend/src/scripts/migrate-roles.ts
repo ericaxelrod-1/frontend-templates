@@ -15,7 +15,7 @@ import { UiComponent } from '../modules/permissions/entities/ui-component.entity
 import { FrontendRoute } from '../modules/permissions/entities/frontend-route.entity';
 import { ApiEndpoint } from '../modules/permissions/entities/api-endpoint.entity';
 import { User } from '../modules/users/entities/user.entity';
-import { UserGroup } from '../modules/users/entities/user-group.entity';
+// import { UserGroup } from '../modules/users/entities/user-group.entity'; // Temporarily disabled
 import { Injectable } from '@nestjs/common';
 import environmentConfig from '../config/environment.config';
 import { DataSource } from 'typeorm';
@@ -264,7 +264,7 @@ class RoleMigrationSeed {
           FrontendRoute,
           ApiEndpoint,
           User,
-          UserGroup,
+          // UserGroup, // Temporarily disabled
         ],
         synchronize: false,
         logging: configService.get('NODE_ENV') === 'development',

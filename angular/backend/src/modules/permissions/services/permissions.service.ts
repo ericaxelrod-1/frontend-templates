@@ -18,7 +18,7 @@ import { CacheService } from '../../cache/cache.service';
 import { RolePermission } from '../entities/role-permission.entity';
 import { GroupPermission } from '../entities/group-permission.entity';
 import { UserPermission } from '../entities/user-permission.entity';
-import { Group } from '../../users/entities/group.entity';
+import { Group } from '../entities/group.entity';
 import { EntityManager } from 'typeorm';
 import {
   FrontendRouteDto,

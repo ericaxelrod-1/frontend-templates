@@ -10,9 +10,9 @@ import { RolePermission } from '../../modules/permissions/entities/role-permissi
 import { GroupPermission } from '../../modules/permissions/entities/group-permission.entity';
 import { UserPermission } from '../../modules/permissions/entities/user-permission.entity';
 import { Role } from '../../modules/users/entities/role.entity';
-import { Group } from '../../modules/users/entities/group.entity';
+import { Group } from '../../modules/permissions/entities/group.entity';
 import { User } from '../../modules/users/entities/user.entity';
-import { UserGroup } from '../../modules/users/entities/user-group.entity';
+
 import { FrontendRoute } from '../../modules/permissions/entities/frontend-route.entity';
 import { ApiEndpoint } from '../../modules/permissions/entities/api-endpoint.entity';
 import { UiComponent } from '../../modules/permissions/entities/ui-component.entity';
@@ -33,7 +33,6 @@ import { UiComponent } from '../../modules/permissions/entities/ui-component.ent
         Role,
         Group,
         User,
-        UserGroup,
         FrontendRoute,
         ApiEndpoint,
         UiComponent,
@@ -51,7 +50,6 @@ import { UiComponent } from '../../modules/permissions/entities/ui-component.ent
       Role,
       Group,
       User,
-      UserGroup,
       FrontendRoute,
       ApiEndpoint,
       UiComponent,

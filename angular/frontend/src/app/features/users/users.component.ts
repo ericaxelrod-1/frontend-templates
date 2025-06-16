@@ -153,7 +153,7 @@ import { RoleSelectorSidebarComponent } from './role-selector-sidebar/role-selec
     <!-- Group Selector Sidebar -->
     <app-group-selector-sidebar
       [isOpen]="isGroupSelectorOpen"
-      [selectedGroupIds]="[]"
+      [selectedGroupIds]="getSelectedGroupIds()"
       (groupSelectionChange)="onGroupSelectionChange($event)"
       (closeSidebar)="closeGroupSelector()">
     </app-group-selector-sidebar>
@@ -161,7 +161,7 @@ import { RoleSelectorSidebarComponent } from './role-selector-sidebar/role-selec
     <!-- Role Selector Sidebar -->
     <app-role-selector-sidebar
       [isOpen]="isRoleSelectorOpen"
-      [selectedRoleIds]="[]"
+      [selectedRoleIds]="getSelectedRoleIds()"
       (roleSelectionChange)="onRoleSelectionChange($event)"
       (closeSidebar)="closeRoleSelector()">
     </app-role-selector-sidebar>
@@ -255,6 +255,7 @@ export class UsersComponent implements OnInit {
   // Group selector sidebar state
   isGroupSelectorOpen = false;
   selectedUserForGroup: User | null = null;
+  originalGroupIds: number[] = []; // Track original group memberships for change detection
 
   // Role selector state
   isRoleSelectorOpen = false;
@@ -452,19 +453,56 @@ export class UsersComponent implements OnInit {
   }
 
   addToGroup(user: User, group: Group): void {
+    if (!group.id) {
+      this.logger.error('Cannot add user to group: group.id is undefined', { group });
+      return;
+    }
+    
+    // Use incremental API endpoint with meaningful response handling
     this.userService.addUserToGroup(user.id, group.id).subscribe({
-      next: () => {
-        if (!user.groups) {
-          user.groups = [];
-        }
-        user.groups.push(group);
-        this.snackBar.open(`Added ${user.firstName || user.email} to group ${group.name}`, 'Close', {
-          duration: 3000
+      next: (result) => {
+        this.logger.debug('Group membership operation completed', {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          groupName: result.group.name
         });
+
+        if (result.success) {
+          // Fetch fresh user data to update the UI
+          this.userService.getUser(user.id).subscribe({
+            next: (updatedUser) => {
+              // Update the user in the local array
+              const index = this.users.findIndex(u => u.id === user.id);
+              if (index !== -1) {
+                this.users[index] = updatedUser;
+                // Force change detection by creating a new array reference
+                this.users = [...this.users];
+              }
+              this.snackBar.open(result.message, 'Close', {
+                duration: 3000
+              });
+              this.cdr.detectChanges();
+            },
+            error: (error) => {
+              this.logger.error('Error fetching updated user data:', error);
+              // Still show success message since the operation succeeded
+              this.snackBar.open(result.message, 'Close', {
+                duration: 3000
+              });
+            }
+          });
+        } else {
+          // Operation failed but didn't throw an error (e.g., user already in group)
+          this.snackBar.open(result.message, 'Close', {
+            duration: 4000
+          });
+        }
       },
       error: (error) => {
         this.logger.error('Error adding user to group:', error);
-        this.snackBar.open(`Error adding user to group: ${error.message}`, 'Close', {
+        this.snackBar.open(error.message || 'Error adding user to group', 'Close', {
           duration: 5000
         });
       }
@@ -472,18 +510,58 @@ export class UsersComponent implements OnInit {
   }
 
   removeFromGroup(user: User, group: Group): void {
+    if (!group.id) {
+      this.logger.error('Cannot remove user from group: missing group ID', { 
+        groupId: group.id 
+      });
+      return;
+    }
+    
+    // Use incremental API endpoint with meaningful response handling
     this.userService.removeUserFromGroup(user.id, group.id).subscribe({
-      next: () => {
-        if (user.groups) {
-          user.groups = user.groups.filter(g => g.id !== group.id);
-        }
-        this.snackBar.open(`Removed ${user.firstName || user.email} from group ${group.name}`, 'Close', {
-          duration: 3000
+      next: (result) => {
+        this.logger.debug('Group membership operation completed', {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          groupName: result.group.name
         });
+
+        if (result.success) {
+          // Fetch fresh user data to update the UI
+          this.userService.getUser(user.id).subscribe({
+            next: (updatedUser) => {
+              // Update the user in the local array
+              const index = this.users.findIndex(u => u.id === user.id);
+              if (index !== -1) {
+                this.users[index] = updatedUser;
+                // Force change detection by creating a new array reference
+                this.users = [...this.users];
+              }
+              this.snackBar.open(result.message, 'Close', {
+                duration: 3000
+              });
+              this.cdr.detectChanges();
+            },
+            error: (error) => {
+              this.logger.error('Error fetching updated user data:', error);
+              // Still show success message since the operation succeeded
+              this.snackBar.open(result.message, 'Close', {
+                duration: 3000
+              });
+            }
+          });
+        } else {
+          // Operation failed but didn't throw an error (e.g., user not in group)
+          this.snackBar.open(result.message, 'Close', {
+            duration: 4000
+          });
+        }
       },
       error: (error) => {
         this.logger.error('Error removing user from group:', error);
-        this.snackBar.open(`Error removing user from group: ${error.message}`, 'Close', {
+        this.snackBar.open(error.message || 'Error removing user from group', 'Close', {
           duration: 5000
         });
       }
@@ -499,8 +577,27 @@ export class UsersComponent implements OnInit {
   }
   
   openGroupSelector(user: User): void {
-    this.selectedUserForGroup = user;
-    this.isGroupSelectorOpen = true;
+    // Fetch fresh user data to ensure we have current group memberships
+    this.userService.getUser(user.id).subscribe({
+      next: (freshUser) => {
+        this.selectedUserForGroup = freshUser;
+        // Store original group IDs as baseline for change detection
+        this.originalGroupIds = freshUser.groups?.map(g => g.id).filter((id): id is number => id !== undefined) || [];
+        this.isGroupSelectorOpen = true;
+        
+        this.logger.debug('Opened group selector with fresh user data', {
+          userId: freshUser.id,
+          currentGroups: this.originalGroupIds,
+          groupNames: freshUser.groups?.map(g => g.name) || []
+        });
+      },
+      error: (error) => {
+        this.logger.error('Error fetching fresh user data for group selector:', error);
+        this.snackBar.open('Error loading user data. Please refresh and try again.', 'Close', {
+          duration: 5000
+        });
+      }
+    });
   }
   
   closeGroupSelector(): void {
@@ -509,14 +606,49 @@ export class UsersComponent implements OnInit {
   }
   
   onGroupSelectionChange(groupIds: number[]): void {
-    if (this.selectedUserForGroup && groupIds.length > 0) {
-      // For now, just handle the first selected group
-      const groupId = groupIds[0];
-      const group = this.availableGroups.find(g => g.id === groupId);
-      if (group) {
-        this.addToGroup(this.selectedUserForGroup, group);
-      }
+    if (!this.selectedUserForGroup) {
+      return;
     }
+
+    // Calculate changes from the original baseline
+    const addedGroupIds = groupIds.filter(groupId => !this.originalGroupIds.includes(groupId));
+    const removedGroupIds = this.originalGroupIds.filter(groupId => !groupIds.includes(groupId));
+    
+    this.logger.debug('Group selection change detected', {
+      userId: this.selectedUserForGroup.id,
+      originalGroups: this.originalGroupIds,
+      selectedGroups: groupIds,
+      addedGroups: addedGroupIds,
+      removedGroups: removedGroupIds
+    });
+
+    // Process additions
+    if (addedGroupIds.length > 0) {
+      addedGroupIds.forEach(groupId => {
+        const group = this.availableGroups.find(g => g.id === groupId);
+        if (group) {
+          this.addToGroup(this.selectedUserForGroup!, group);
+        }
+      });
+    }
+
+    // Process removals
+    if (removedGroupIds.length > 0) {
+      removedGroupIds.forEach(groupId => {
+        const group = this.availableGroups.find(g => g.id === groupId);
+        if (group) {
+          this.removeFromGroup(this.selectedUserForGroup!, group);
+        }
+      });
+    }
+
+    // If no changes were made, inform the user
+    if (addedGroupIds.length === 0 && removedGroupIds.length === 0) {
+      this.snackBar.open('No changes made to group memberships', 'Close', { duration: 3000 });
+    }
+
+    // Close the selector after processing
+    this.closeGroupSelector();
   }
 
   getDisplayName(user: User | null): string {
@@ -550,28 +682,60 @@ export class UsersComponent implements OnInit {
   addToRole(user: User, role: Role): void {
     if (!role.id) return;
     
-    const currentRoleIds = user.roles?.map(r => r.id).filter((id): id is number => id !== undefined) || [];
-    const updateData: UpdateUserRequest = {
-      roleIds: [...currentRoleIds, role.id]
-    };
-
-    this.userService.updateUser(user.id, updateData).subscribe({
-      next: (updatedUser) => {
-        // Update the user in the local array
-        const index = this.users.findIndex(u => u.id === user.id);
-        if (index !== -1) {
-          this.users[index] = updatedUser;
-          // Force change detection by creating a new array reference
-          this.users = [...this.users];
+    // First, fetch fresh user data to ensure we have accurate role assignments
+    this.userService.getUser(user.id).subscribe({
+      next: (freshUser) => {
+        // Check if user already has this role
+        const hasRole = freshUser.roles?.some(r => r.id === role.id);
+        if (hasRole) {
+          this.logger.warn('User already has this role', {
+            userId: user.id,
+            roleId: role.id,
+            roleName: role.name
+          });
+          this.snackBar.open(`${freshUser.firstName || freshUser.email} already has role "${role.name}"`, 'Close', {
+            duration: 3000
+          });
+          return;
         }
-        this.snackBar.open(`User added to role "${role.name}" successfully`, 'Close', {
-          duration: 3000
+
+        const currentRoleIds = freshUser.roles?.map(r => r.id).filter((id): id is number => id !== undefined) || [];
+        const updateData: UpdateUserRequest = {
+          roleIds: [...currentRoleIds, role.id!]
+        };
+
+        this.logger.debug('Adding user to role:', {
+          userId: user.id,
+          roleId: role.id,
+          currentRoleIds,
+          newRoleIds: updateData.roleIds
         });
-        this.cdr.detectChanges();
+
+        this.userService.updateUser(user.id, updateData).subscribe({
+          next: (updatedUser) => {
+            // Update the user in the local array
+            const index = this.users.findIndex(u => u.id === user.id);
+            if (index !== -1) {
+              this.users[index] = updatedUser;
+              // Force change detection by creating a new array reference
+              this.users = [...this.users];
+            }
+            this.snackBar.open(`User added to role "${role.name}" successfully`, 'Close', {
+              duration: 3000
+            });
+            this.cdr.detectChanges();
+          },
+          error: (error) => {
+            this.logger.error('Error adding user to role:', error);
+            this.snackBar.open(error.error?.message || error.message || 'Error adding user to role', 'Close', {
+              duration: 5000
+            });
+          }
+        });
       },
       error: (error) => {
-        this.logger.error('Error adding user to role:', error);
-        this.snackBar.open(error.message || 'Error adding user to role', 'Close', {
+        this.logger.error('Error fetching fresh user data for role assignment:', error);
+        this.snackBar.open('Error loading user data. Please refresh and try again.', 'Close', {
           duration: 5000
         });
       }
@@ -579,34 +743,77 @@ export class UsersComponent implements OnInit {
   }
 
   removeFromRole(user: User, role: Role): void {
-    if (!user.roles || !role.id) return;
+    if (!role.id) return;
     
-    const updatedRoleIds = user.roles
-      .filter(r => r.id !== role.id)
-      .map(r => r.id)
-      .filter(id => id !== undefined) as number[];
-    
-    const updateData: UpdateUserRequest = {
-      roleIds: updatedRoleIds
-    };
-    
-    this.userService.updateUser(user.id, updateData).subscribe({
-      next: (updatedUser) => {
-        // Update the user in the local array
-        const index = this.users.findIndex(u => u.id === user.id);
-        if (index !== -1) {
-          this.users[index] = updatedUser;
-          // Force change detection by creating a new array reference
-          this.users = [...this.users];
+    // First, fetch fresh user data to ensure we have accurate role assignments
+    this.userService.getUser(user.id).subscribe({
+      next: (freshUser) => {
+        if (!freshUser.roles || freshUser.roles.length === 0) {
+          this.logger.warn('User has no roles to remove', { 
+            userId: user.id
+          });
+          this.snackBar.open(`${freshUser.firstName || freshUser.email} has no roles assigned`, 'Close', {
+            duration: 3000
+          });
+          return;
         }
-        this.snackBar.open(`User removed from role "${role.name}" successfully`, 'Close', {
-          duration: 3000
+
+        // Check if user actually has this role
+        const hasRole = freshUser.roles.some(r => r.id === role.id);
+        if (!hasRole) {
+          this.logger.warn('User does not have this role', {
+            userId: user.id,
+            roleId: role.id,
+            roleName: role.name,
+            userRoles: freshUser.roles.map(r => ({ id: r.id, name: r.name })).filter(r => r.id !== undefined)
+          });
+          this.snackBar.open(`${freshUser.firstName || freshUser.email} does not have role "${role.name}"`, 'Close', {
+            duration: 3000
+          });
+          return;
+        }
+        
+        const updatedRoleIds = freshUser.roles
+          .filter(r => r.id !== role.id)
+          .map(r => r.id)
+          .filter((id): id is number => id !== undefined);
+        
+        const updateData: UpdateUserRequest = {
+          roleIds: updatedRoleIds
+        };
+
+        this.logger.debug('Removing user from role:', {
+          userId: user.id,
+          roleId: role.id,
+          originalRoleIds: freshUser.roles.map(r => r.id).filter((id): id is number => id !== undefined),
+          updatedRoleIds
         });
-        this.cdr.detectChanges();
+
+        this.userService.updateUser(user.id, updateData).subscribe({
+          next: (updatedUser) => {
+            // Update the user in the local array
+            const index = this.users.findIndex(u => u.id === user.id);
+            if (index !== -1) {
+              this.users[index] = updatedUser;
+              // Force change detection by creating a new array reference
+              this.users = [...this.users];
+            }
+            this.snackBar.open(`Removed role "${role.name}" from user successfully`, 'Close', {
+              duration: 3000
+            });
+            this.cdr.detectChanges();
+          },
+          error: (error) => {
+            this.logger.error('Error removing user from role:', error);
+            this.snackBar.open(error.error?.message || error.message || 'Error removing user from role', 'Close', {
+              duration: 5000
+            });
+          }
+        });
       },
       error: (error) => {
-        this.logger.error('Error removing user from role:', error);
-        this.snackBar.open(error.message || 'Error removing user from role', 'Close', {
+        this.logger.error('Error fetching fresh user data for role removal:', error);
+        this.snackBar.open('Error loading user data. Please refresh and try again.', 'Close', {
           duration: 5000
         });
       }
@@ -627,7 +834,7 @@ export class UsersComponent implements OnInit {
     if (!this.selectedUserForRole || roleIds.length === 0) return;
 
     const user = this.selectedUserForRole;
-    const currentRoleIds = user.roles?.map(r => r.id).filter(id => id !== undefined) as number[] || [];
+    const currentRoleIds = user.roles?.map(r => r.id).filter((id): id is number => id !== undefined) || [];
     const newRoleIds = [...currentRoleIds, ...roleIds];
 
     const updateData: UpdateUserRequest = {
@@ -660,6 +867,25 @@ export class UsersComponent implements OnInit {
         });
       }
     });
+  }
+
+  getSelectedGroupIds(): number[] {
+    // Return current group memberships for visual feedback
+    if (!this.selectedUserForGroup?.groups) {
+      return [];
+    }
+    return this.selectedUserForGroup.groups
+      .map(g => g.id)
+      .filter((id): id is number => id !== undefined);
+  }
+
+  getSelectedRoleIds(): number[] {
+    if (!this.selectedUserForRole?.roles) {
+      return [];
+    }
+    return this.selectedUserForRole.roles
+      .map(r => r.id)
+      .filter((id): id is number => id !== undefined);
   }
 
 }
