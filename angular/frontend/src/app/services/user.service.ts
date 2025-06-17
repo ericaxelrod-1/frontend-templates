@@ -6,6 +6,7 @@ import { LoggerService } from './logging/logger.service';
 import { User } from '../models/user.model';
 import { Group, Member, Permission } from '../models/group.model';
 import { GroupMembershipResult } from '../models/group-membership-result.interface';
+import { RoleMembershipResult } from '../models/role-membership-result.interface';
 
 export interface PasswordChange {
   currentPassword: string;
@@ -195,5 +196,61 @@ export class UserService {
     return this.http.get<LoginAttemptStatus>(`${this.apiUrl}/login-attempt-status`, {
       params: { email }
     });
+  }
+
+  addUserToRole(userId: number, roleId: number): Observable<RoleMembershipResult> {
+    this.logger.debug(`Adding user ${userId} to role ${roleId}`);
+    return this.http.post<RoleMembershipResult>(`${this.apiUrl}/${userId}/roles/${roleId}`, {}).pipe(
+      map((result: RoleMembershipResult) => {
+        this.logger.debug(`Role membership operation result:`, {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          roleName: result.role.name
+        });
+        
+        if (result.success) {
+          this.logger.info(`Successfully added user ${userId} to role ${roleId}: ${result.message}`);
+        } else {
+          this.logger.warn(`Failed to add user ${userId} to role ${roleId}: ${result.message}`);
+        }
+        
+        return result;
+      }),
+      catchError(error => {
+        this.logger.error(`HTTP error adding user ${userId} to role ${roleId}:`, error);
+        const errorMessage = error.error?.message || error.message || 'Failed to add user to role';
+        throw { message: errorMessage };
+      })
+    );
+  }
+
+  removeUserFromRole(userId: number, roleId: number): Observable<RoleMembershipResult> {
+    this.logger.debug(`Removing user ${userId} from role ${roleId}`);
+    return this.http.delete<RoleMembershipResult>(`${this.apiUrl}/${userId}/roles/${roleId}`).pipe(
+      map((result: RoleMembershipResult) => {
+        this.logger.debug(`Role membership operation result:`, {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          roleName: result.role.name
+        });
+        
+        if (result.success) {
+          this.logger.info(`Successfully removed user ${userId} from role ${roleId}: ${result.message}`);
+        } else {
+          this.logger.warn(`Failed to remove user ${userId} from role ${roleId}: ${result.message}`);
+        }
+        
+        return result;
+      }),
+      catchError(error => {
+        this.logger.error(`HTTP error removing user ${userId} from role ${roleId}:`, error);
+        const errorMessage = error.error?.message || error.message || 'Failed to remove user from role';
+        throw { message: errorMessage };
+      })
+    );
   }
 } 

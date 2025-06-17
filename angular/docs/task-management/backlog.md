@@ -3,6 +3,133 @@ Last Updated: 2025-01-28
 
 ## Critical Bugs [HIGHEST PRIORITY]
 
+### BUG-078: Implement Role Management with Dedicated API Endpoints (Like Groups)
+- **Status**: Not Started
+- **Priority**: High
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-28
+- **Description**: Role management currently uses generic user update endpoints and lacks meaningful API responses, causing poor user experience and potential null reference errors. Need to implement dedicated role management endpoints similar to the working group management system.
+
+#### **CURRENT ARCHITECTURE PROBLEMS** 🚨
+
+**Role Management (Problematic):**
+- **Generic endpoint**: Uses `/api/users/:id` (PATCH) for all user updates
+- **No dedicated methods**: No specific role assignment/removal endpoints
+- **Bulk operations**: Frontend sends complete `roleIds` array, backend replaces all roles
+- **No meaningful responses**: Returns updated User object, no operation feedback
+- **Complex frontend logic**: Frontend must fetch fresh data, calculate differences, handle validation
+- **Poor error handling**: Generic user update errors, no role-specific context
+- **No operation tracking**: No way to know what actually changed
+
+**Group Management (Working):**
+- **Dedicated endpoints**: `/api/groups/:id/members/:userId` (POST/DELETE)
+- **Specific service methods**: `GroupsService.addMember()` and `removeMember()`
+- **Incremental operations**: Add/remove individual memberships
+- **Meaningful responses**: Returns `GroupMembershipResult` with operation details
+- **Simple frontend logic**: Direct API calls with clear success/failure handling
+- **Excellent error handling**: Specific error messages with context
+- **Operation tracking**: Detailed logs of what changed and when
+
+#### **IMPLEMENTATION PLAN** 📋
+
+**Phase 1: Backend API Endpoints**
+1. **Create RoleMembershipResult DTO** (`angular/backend/src/modules/users/dto/role-membership-result.dto.ts`):
+   ```typescript
+   export interface RoleMembershipResult {
+     success: boolean;
+     operation: 'added' | 'removed';
+     user: { id: number; email: string; firstName?: string; lastName?: string; };
+     role: { id: number; name: string; description?: string; };
+     timestamp: Date;
+     message: string;
+     previousState?: { wasAlreadyMember: boolean; memberSince?: Date; };
+     currentState: { isMember: boolean; memberSince?: Date; totalRoleMembers: number; };
+   }
+   ```
+
+2. **Add Role Management Methods to UsersService** (`angular/backend/src/modules/users/users.service.ts`):
+   ```typescript
+   async addUserToRole(userId: number, roleId: number): Promise<RoleMembershipResult>
+   async removeUserFromRole(userId: number, roleId: number): Promise<RoleMembershipResult>
+   ```
+
+3. **Add Role Management Endpoints to UsersController** (`angular/backend/src/modules/users/users.controller.ts`):
+   ```typescript
+   @Post(':id/roles/:roleId')
+   addToRole(@Param('id') userId: number, @Param('roleId') roleId: number): Promise<RoleMembershipResult>
+   
+   @Delete(':id/roles/:roleId') 
+   removeFromRole(@Param('id') userId: number, @Param('roleId') roleId: number): Promise<RoleMembershipResult>
+   ```
+
+**Phase 2: Frontend Integration**
+4. **Create Frontend Interface** (`angular/frontend/src/app/models/role-membership-result.interface.ts`):
+   - Match backend DTO structure for type safety
+
+5. **Update UserService** (`angular/frontend/src/app/services/user.service.ts`):
+   ```typescript
+   addUserToRole(userId: number, roleId: number): Observable<RoleMembershipResult>
+   removeUserFromRole(userId: number, roleId: number): Observable<RoleMembershipResult>
+   ```
+
+6. **Update UsersComponent** (`angular/frontend/src/app/features/users/users.component.ts`):
+   - Replace `addToRole()` and `removeFromRole()` methods to use new dedicated endpoints
+   - Use `result.message` for user feedback instead of hardcoded messages
+   - Handle both success and failure response paths properly
+
+**Phase 3: Testing & Validation**
+7. **Test Role Assignment Operations**:
+   - Add user to role (success case)
+   - Add user to role they already have (graceful failure)
+   - Remove user from role (success case)
+   - Remove user from role they don't have (graceful failure)
+   - Invalid user/role IDs (error handling)
+
+8. **Verify Response Consistency**:
+   - Ensure all responses follow `RoleMembershipResult` format
+   - Validate meaningful error messages
+   - Check operation logging and debugging info
+
+#### **BENEFITS OF THIS APPROACH** ✅
+- **Eliminates null reference errors** during role operations
+- **Better user feedback** with meaningful messages from backend
+- **Operation transparency** - users know exactly what happened
+- **Enhanced debugging** with comprehensive logging
+- **Graceful failure handling** - duplicate operations inform rather than crash
+- **API consistency** with group management approach
+- **Simplified frontend logic** - no complex state management needed
+- **Better error context** - role-specific error messages
+
+#### **FILES TO MODIFY** 📁
+**Backend:**
+- `angular/backend/src/modules/users/dto/role-membership-result.dto.ts` (create)
+- `angular/backend/src/modules/users/users.service.ts` (add methods)
+- `angular/backend/src/modules/users/users.controller.ts` (add endpoints)
+
+**Frontend:**
+- `angular/frontend/src/app/models/role-membership-result.interface.ts` (create)
+- `angular/frontend/src/app/services/user.service.ts` (add methods)
+- `angular/frontend/src/app/features/users/users.component.ts` (update methods)
+
+#### **TESTING CHECKLIST** ✅
+- [ ] Backend endpoints return proper `RoleMembershipResult` objects
+- [ ] Frontend receives and handles responses correctly
+- [ ] Duplicate role assignments handled gracefully
+- [ ] Role removal from non-member handled gracefully
+- [ ] Error messages are meaningful and user-friendly
+- [ ] Operation logging provides debugging information
+- [ ] No null reference errors during operations
+- [ ] User interface updates correctly after operations
+
+#### **IMPLEMENTATION NOTES**
+- **Follow the exact pattern used for group management** - it's proven to work
+- **Ensure proper TypeScript typing** throughout the chain
+- **Test both success and failure scenarios** thoroughly
+- **Maintain backward compatibility** with existing role update functionality
+- **Use incremental operations** rather than bulk replacements
+- **Provide meaningful error messages** for all failure cases
+
 ### BUG-065: Role Management Not Working - Backend UsersService Update Method Missing Role Assignment Logic
 - **Status**: Complete
 - **Testing**: Passed
@@ -2902,4 +3029,131 @@ if (updateUserDto.roleIds) {
 - Validate error handling for invalid role IDs
 - Confirm database `user_roles` table updates correctly
 
-### FEAT-064: Add to Role Functionality for Users Page
+### BUG-078: Implement Role Management with Dedicated API Endpoints (Like Groups)
+- **Status**: Not Started
+- **Priority**: High
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-28
+- **Description**: Role management currently uses generic user update endpoints and lacks meaningful API responses, causing poor user experience and potential null reference errors. Need to implement dedicated role management endpoints similar to the working group management system.
+
+#### **CURRENT ARCHITECTURE PROBLEMS** 🚨
+
+**Role Management (Problematic):**
+- **Generic endpoint**: Uses `/api/users/:id` (PATCH) for all user updates
+- **No dedicated methods**: No specific role assignment/removal endpoints
+- **Bulk operations**: Frontend sends complete `roleIds` array, backend replaces all roles
+- **No meaningful responses**: Returns updated User object, no operation feedback
+- **Complex frontend logic**: Frontend must fetch fresh data, calculate differences, handle validation
+- **Poor error handling**: Generic user update errors, no role-specific context
+- **No operation tracking**: No way to know what actually changed
+
+**Group Management (Working):**
+- **Dedicated endpoints**: `/api/groups/:id/members/:userId` (POST/DELETE)
+- **Specific service methods**: `GroupsService.addMember()` and `removeMember()`
+- **Incremental operations**: Add/remove individual memberships
+- **Meaningful responses**: Returns `GroupMembershipResult` with operation details
+- **Simple frontend logic**: Direct API calls with clear success/failure handling
+- **Excellent error handling**: Specific error messages with context
+- **Operation tracking**: Detailed logs of what changed and when
+
+#### **IMPLEMENTATION PLAN** 📋
+
+**Phase 1: Backend API Endpoints**
+1. **Create RoleMembershipResult DTO** (`angular/backend/src/modules/users/dto/role-membership-result.dto.ts`):
+   ```typescript
+   export interface RoleMembershipResult {
+     success: boolean;
+     operation: 'added' | 'removed';
+     user: { id: number; email: string; firstName?: string; lastName?: string; };
+     role: { id: number; name: string; description?: string; };
+     timestamp: Date;
+     message: string;
+     previousState?: { wasAlreadyMember: boolean; memberSince?: Date; };
+     currentState: { isMember: boolean; memberSince?: Date; totalRoleMembers: number; };
+   }
+   ```
+
+2. **Add Role Management Methods to UsersService** (`angular/backend/src/modules/users/users.service.ts`):
+   ```typescript
+   async addUserToRole(userId: number, roleId: number): Promise<RoleMembershipResult>
+   async removeUserFromRole(userId: number, roleId: number): Promise<RoleMembershipResult>
+   ```
+
+3. **Add Role Management Endpoints to UsersController** (`angular/backend/src/modules/users/users.controller.ts`):
+   ```typescript
+   @Post(':id/roles/:roleId')
+   addToRole(@Param('id') userId: number, @Param('roleId') roleId: number): Promise<RoleMembershipResult>
+   
+   @Delete(':id/roles/:roleId') 
+   removeFromRole(@Param('id') userId: number, @Param('roleId') roleId: number): Promise<RoleMembershipResult>
+   ```
+
+**Phase 2: Frontend Integration**
+4. **Create Frontend Interface** (`angular/frontend/src/app/models/role-membership-result.interface.ts`):
+   - Match backend DTO structure for type safety
+
+5. **Update UserService** (`angular/frontend/src/app/services/user.service.ts`):
+   ```typescript
+   addUserToRole(userId: number, roleId: number): Observable<RoleMembershipResult>
+   removeUserFromRole(userId: number, roleId: number): Observable<RoleMembershipResult>
+   ```
+
+6. **Update UsersComponent** (`angular/frontend/src/app/features/users/users.component.ts`):
+   - Replace `addToRole()` and `removeFromRole()` methods to use new dedicated endpoints
+   - Use `result.message` for user feedback instead of hardcoded messages
+   - Handle both success and failure response paths properly
+
+**Phase 3: Testing & Validation**
+7. **Test Role Assignment Operations**:
+   - Add user to role (success case)
+   - Add user to role they already have (graceful failure)
+   - Remove user from role (success case)
+   - Remove user from role they don't have (graceful failure)
+   - Invalid user/role IDs (error handling)
+
+8. **Verify Response Consistency**:
+   - Ensure all responses follow `RoleMembershipResult` format
+   - Validate meaningful error messages
+   - Check operation logging and debugging info
+
+#### **BENEFITS OF THIS APPROACH** ✅
+- **Eliminates null reference errors** during role operations
+- **Better user feedback** with meaningful messages from backend
+- **Operation transparency** - users know exactly what happened
+- **Enhanced debugging** with comprehensive logging
+- **Graceful failure handling** - duplicate operations inform rather than crash
+- **API consistency** with group management approach
+- **Simplified frontend logic** - no complex state management needed
+- **Better error context** - role-specific error messages
+
+#### **FILES TO MODIFY** 📁
+**Backend:**
+- `angular/backend/src/modules/users/dto/role-membership-result.dto.ts` (create)
+- `angular/backend/src/modules/users/users.service.ts` (add methods)
+- `angular/backend/src/modules/users/users.controller.ts` (add endpoints)
+
+**Frontend:**
+- `angular/frontend/src/app/models/role-membership-result.interface.ts` (create)
+- `angular/frontend/src/app/services/user.service.ts` (add methods)
+- `angular/frontend/src/app/features/users/users.component.ts` (update methods)
+
+#### **TESTING CHECKLIST** ✅
+- [ ] Backend endpoints return proper `RoleMembershipResult` objects
+- [ ] Frontend receives and handles responses correctly
+- [ ] Duplicate role assignments handled gracefully
+- [ ] Role removal from non-member handled gracefully
+- [ ] Error messages are meaningful and user-friendly
+- [ ] Operation logging provides debugging information
+- [ ] No null reference errors during operations
+- [ ] User interface updates correctly after operations
+
+#### **IMPLEMENTATION NOTES**
+- **Follow the exact pattern used for group management** - it's proven to work
+- **Ensure proper TypeScript typing** throughout the chain
+- **Test both success and failure scenarios** thoroughly
+- **Maintain backward compatibility** with existing role update functionality
+- **Use incremental operations** rather than bulk replacements
+- **Provide meaningful error messages** for all failure cases
+
+// ... existing code ...

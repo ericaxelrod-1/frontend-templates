@@ -682,60 +682,35 @@ export class UsersComponent implements OnInit {
   addToRole(user: User, role: Role): void {
     if (!role.id) return;
     
-    // First, fetch fresh user data to ensure we have accurate role assignments
-    this.userService.getUser(user.id).subscribe({
-      next: (freshUser) => {
-        // Check if user already has this role
-        const hasRole = freshUser.roles?.some(r => r.id === role.id);
-        if (hasRole) {
-          this.logger.warn('User already has this role', {
-            userId: user.id,
-            roleId: role.id,
-            roleName: role.name
+    this.userService.addUserToRole(user.id, role.id).subscribe({
+      next: (result) => {
+        if (result.success) {
+          // Update the user in the local array with fresh data
+          this.userService.getUser(user.id).subscribe({
+            next: (updatedUser) => {
+              const index = this.users.findIndex(u => u.id === user.id);
+              if (index !== -1) {
+                this.users[index] = updatedUser;
+                // Force change detection by creating a new array reference
+                this.users = [...this.users];
+              }
+              this.cdr.detectChanges();
+            }
           });
-          this.snackBar.open(`${freshUser.firstName || freshUser.email} already has role "${role.name}"`, 'Close', {
+          
+          this.snackBar.open(result.message, 'Close', {
             duration: 3000
           });
-          return;
+        } else {
+          // Graceful failure - user already has role
+          this.snackBar.open(result.message, 'Close', {
+            duration: 3000
+          });
         }
-
-        const currentRoleIds = freshUser.roles?.map(r => r.id).filter((id): id is number => id !== undefined) || [];
-        const updateData: UpdateUserRequest = {
-          roleIds: [...currentRoleIds, role.id!]
-        };
-
-        this.logger.debug('Adding user to role:', {
-          userId: user.id,
-          roleId: role.id,
-          currentRoleIds,
-          newRoleIds: updateData.roleIds
-        });
-
-        this.userService.updateUser(user.id, updateData).subscribe({
-          next: (updatedUser) => {
-            // Update the user in the local array
-            const index = this.users.findIndex(u => u.id === user.id);
-            if (index !== -1) {
-              this.users[index] = updatedUser;
-              // Force change detection by creating a new array reference
-              this.users = [...this.users];
-            }
-            this.snackBar.open(`User added to role "${role.name}" successfully`, 'Close', {
-              duration: 3000
-            });
-            this.cdr.detectChanges();
-          },
-          error: (error) => {
-            this.logger.error('Error adding user to role:', error);
-            this.snackBar.open(error.error?.message || error.message || 'Error adding user to role', 'Close', {
-              duration: 5000
-            });
-          }
-        });
       },
       error: (error) => {
-        this.logger.error('Error fetching fresh user data for role assignment:', error);
-        this.snackBar.open('Error loading user data. Please refresh and try again.', 'Close', {
+        this.logger.error('Error adding user to role:', error);
+        this.snackBar.open(error.message || 'Error adding user to role', 'Close', {
           duration: 5000
         });
       }
@@ -745,75 +720,35 @@ export class UsersComponent implements OnInit {
   removeFromRole(user: User, role: Role): void {
     if (!role.id) return;
     
-    // First, fetch fresh user data to ensure we have accurate role assignments
-    this.userService.getUser(user.id).subscribe({
-      next: (freshUser) => {
-        if (!freshUser.roles || freshUser.roles.length === 0) {
-          this.logger.warn('User has no roles to remove', { 
-            userId: user.id
-          });
-          this.snackBar.open(`${freshUser.firstName || freshUser.email} has no roles assigned`, 'Close', {
-            duration: 3000
-          });
-          return;
-        }
-
-        // Check if user actually has this role
-        const hasRole = freshUser.roles.some(r => r.id === role.id);
-        if (!hasRole) {
-          this.logger.warn('User does not have this role', {
-            userId: user.id,
-            roleId: role.id,
-            roleName: role.name,
-            userRoles: freshUser.roles.map(r => ({ id: r.id, name: r.name })).filter(r => r.id !== undefined)
-          });
-          this.snackBar.open(`${freshUser.firstName || freshUser.email} does not have role "${role.name}"`, 'Close', {
-            duration: 3000
-          });
-          return;
-        }
-        
-        const updatedRoleIds = freshUser.roles
-          .filter(r => r.id !== role.id)
-          .map(r => r.id)
-          .filter((id): id is number => id !== undefined);
-        
-        const updateData: UpdateUserRequest = {
-          roleIds: updatedRoleIds
-        };
-
-        this.logger.debug('Removing user from role:', {
-          userId: user.id,
-          roleId: role.id,
-          originalRoleIds: freshUser.roles.map(r => r.id).filter((id): id is number => id !== undefined),
-          updatedRoleIds
-        });
-
-        this.userService.updateUser(user.id, updateData).subscribe({
-          next: (updatedUser) => {
-            // Update the user in the local array
-            const index = this.users.findIndex(u => u.id === user.id);
-            if (index !== -1) {
-              this.users[index] = updatedUser;
-              // Force change detection by creating a new array reference
-              this.users = [...this.users];
+    this.userService.removeUserFromRole(user.id, role.id).subscribe({
+      next: (result) => {
+        if (result.success) {
+          // Update the user in the local array with fresh data
+          this.userService.getUser(user.id).subscribe({
+            next: (updatedUser) => {
+              const index = this.users.findIndex(u => u.id === user.id);
+              if (index !== -1) {
+                this.users[index] = updatedUser;
+                // Force change detection by creating a new array reference
+                this.users = [...this.users];
+              }
+              this.cdr.detectChanges();
             }
-            this.snackBar.open(`Removed role "${role.name}" from user successfully`, 'Close', {
-              duration: 3000
-            });
-            this.cdr.detectChanges();
-          },
-          error: (error) => {
-            this.logger.error('Error removing user from role:', error);
-            this.snackBar.open(error.error?.message || error.message || 'Error removing user from role', 'Close', {
-              duration: 5000
-            });
-          }
-        });
+          });
+          
+          this.snackBar.open(result.message, 'Close', {
+            duration: 3000
+          });
+        } else {
+          // Graceful failure - user doesn't have role
+          this.snackBar.open(result.message, 'Close', {
+            duration: 3000
+          });
+        }
       },
       error: (error) => {
-        this.logger.error('Error fetching fresh user data for role removal:', error);
-        this.snackBar.open('Error loading user data. Please refresh and try again.', 'Close', {
+        this.logger.error('Error removing user from role:', error);
+        this.snackBar.open(error.message || 'Error removing user from role', 'Close', {
           duration: 5000
         });
       }
@@ -830,43 +765,43 @@ export class UsersComponent implements OnInit {
     this.selectedUserForRole = null;
   }
 
-  onRoleSelectionChange(roleIds: number[]): void {
-    if (!this.selectedUserForRole || roleIds.length === 0) return;
+  onRoleSelectionChange(selectedRoleIds: number[]): void {
+    if (!this.selectedUserForRole) return;
 
     const user = this.selectedUserForRole;
     const currentRoleIds = user.roles?.map(r => r.id).filter((id): id is number => id !== undefined) || [];
-    const newRoleIds = [...currentRoleIds, ...roleIds];
+    
+    // Calculate which roles to add and which to remove
+    const addedRoleIds = selectedRoleIds.filter(roleId => !currentRoleIds.includes(roleId));
+    const removedRoleIds = currentRoleIds.filter(roleId => !selectedRoleIds.includes(roleId));
 
-    const updateData: UpdateUserRequest = {
-      roleIds: newRoleIds
-    };
-
-    this.userService.updateUser(user.id, updateData).subscribe({
-      next: (updatedUser) => {
-        // Update the user in the local array
-        const index = this.users.findIndex(u => u.id === user.id);
-        if (index !== -1) {
-          this.users[index] = updatedUser;
-          // Force change detection by creating a new array reference
-          this.users = [...this.users];
+    // Process additions using dedicated endpoints
+    if (addedRoleIds.length > 0) {
+      addedRoleIds.forEach(roleId => {
+        const role = this.availableRoles.find(r => r.id === roleId);
+        if (role) {
+          this.addToRole(this.selectedUserForRole!, role);
         }
-        
-        const addedRoles = this.availableRoles.filter(role => roleIds.includes(role.id!));
-        const roleNames = addedRoles.map(role => role.name).join(', ');
-        
-        this.snackBar.open(`User added to role(s): ${roleNames}`, 'Close', {
-          duration: 3000
-        });
-        this.closeRoleSelector();
-        this.cdr.detectChanges();
-      },
-      error: (error) => {
-        this.logger.error('Error adding user to roles:', error);
-        this.snackBar.open(error.message || 'Error adding user to roles', 'Close', {
-          duration: 5000
-        });
-      }
-    });
+      });
+    }
+
+    // Process removals using dedicated endpoints
+    if (removedRoleIds.length > 0) {
+      removedRoleIds.forEach(roleId => {
+        const role = this.availableRoles.find(r => r.id === roleId);
+        if (role) {
+          this.removeFromRole(this.selectedUserForRole!, role);
+        }
+      });
+    }
+
+    // If no changes were made, inform the user
+    if (addedRoleIds.length === 0 && removedRoleIds.length === 0) {
+      this.snackBar.open('No changes made to role memberships', 'Close', { duration: 3000 });
+    }
+
+    // Close the selector after processing
+    this.closeRoleSelector();
   }
 
   getSelectedGroupIds(): number[] {
