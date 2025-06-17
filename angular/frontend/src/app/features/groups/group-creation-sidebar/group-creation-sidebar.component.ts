@@ -64,34 +64,34 @@ import { Group } from '../../../models/group.model';
               </textarea>
               <mat-icon matSuffix>description</mat-icon>
             </mat-form-field>
+            
+            <!-- Form Validation -->
+            <div class="form-validation" *ngIf="!groupForm.form.valid && groupForm.form.touched">
+              <mat-icon class="warning-icon">warning</mat-icon>
+              <span>Group name is required</span>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+              <button mat-button (click)="onCloseSidebar()" class="cancel-button">
+                <mat-icon>cancel</mat-icon>
+                Cancel
+              </button>
+              <button 
+                mat-raised-button 
+                color="primary" 
+                (click)="onSave()" 
+                [disabled]="!groupForm.form.valid"
+                class="save-button">
+                <mat-icon>{{ editMode ? 'save' : 'add' }}</mat-icon>
+                {{ editMode ? 'Save Changes' : 'Create Group' }}
+              </button>
+            </div>
           </form>
         </div>
 
-        <mat-divider></mat-divider>
-
-        <!-- Actions Section -->
-        <div class="actions-section">
-          <div class="form-validation" *ngIf="!groupForm.form.valid && groupForm.form.touched">
-            <mat-icon class="warning-icon">warning</mat-icon>
-            <span>Group name is required</span>
-          </div>
-          
-          <div class="action-buttons">
-            <button mat-button (click)="onCloseSidebar()" class="cancel-button">
-              <mat-icon>cancel</mat-icon>
-              Cancel
-            </button>
-            <button 
-              mat-raised-button 
-              color="primary" 
-              (click)="onSave()" 
-              [disabled]="!groupForm.form.valid"
-              class="save-button">
-              <mat-icon>{{ editMode ? 'save' : 'add' }}</mat-icon>
-              {{ editMode ? 'Save Changes' : 'Create Group' }}
-            </button>
-          </div>
-        </div>
+        <!-- Spacer for better scrolling -->
+        <div class="bottom-spacer"></div>
       </div>
     </div>
     
@@ -199,48 +199,49 @@ import { Group } from '../../../models/group.model';
           resize: vertical;
           min-height: 80px;
         }
+        
+        .form-validation {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 16px 0;
+          padding: 8px 12px;
+          background-color: rgba(244, 67, 54, 0.1);
+          border-radius: 4px;
+          color: #d32f2f;
+          font-size: 0.9rem;
+          
+          .warning-icon {
+            font-size: 1.2rem;
+            width: 1.2rem;
+            height: 1.2rem;
+          }
+        }
+        
+        .action-buttons {
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+          align-items: center;
+          margin-top: 24px;
+          padding-top: 16px;
+          border-top: 1px solid #e0e0e0;
+          
+          .cancel-button {
+            color: #666;
+          }
+          
+          .save-button {
+            min-width: 140px;
+            height: 40px;
+          }
+        }
       }
     }
     
-    .actions-section {
-      padding: 20px 24px;
-      border-top: 1px solid #e0e0e0;
-      background-color: #f5f5f5;
-      flex-shrink: 0; /* Prevent shrinking */
-      
-      .form-validation {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 16px;
-        padding: 8px 12px;
-        background-color: rgba(244, 67, 54, 0.1);
-        border-radius: 4px;
-        color: #d32f2f;
-        font-size: 0.9rem;
-        
-        .warning-icon {
-          font-size: 1.2rem;
-          width: 1.2rem;
-          height: 1.2rem;
-        }
-      }
-      
-      .action-buttons {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-        align-items: center;
-        
-        .cancel-button {
-          color: #666;
-        }
-        
-        .save-button {
-          min-width: 140px;
-          height: 40px;
-        }
-      }
+    .bottom-spacer {
+      height: 40px;
+      flex-shrink: 0;
     }
     
     @media (max-width: 768px) {

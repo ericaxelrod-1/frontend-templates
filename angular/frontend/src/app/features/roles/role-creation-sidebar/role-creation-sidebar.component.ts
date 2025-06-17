@@ -138,33 +138,33 @@ interface PermissionGroup {
                 </mat-accordion>
               </div>
             </div>
+            
+            <!-- Form Validation -->
+            <div class="form-validation" *ngIf="!formData.name?.trim()">
+              <mat-icon class="warning-icon">warning</mat-icon>
+              <span>Role name is required</span>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+              <button mat-button 
+                      class="cancel-button"
+                      (click)="onCloseSidebar()">
+                Cancel
+              </button>
+              <button mat-raised-button 
+                      color="primary"
+                      class="save-button"
+                      [disabled]="!formData.name?.trim()"
+                      (click)="onSave()">
+                {{ editMode ? 'Update Role' : 'Create Role' }}
+              </button>
+            </div>
           </form>
         </div>
         
-        <!-- Actions Section -->
-        <div class="actions-section">
-          <!-- Form Validation -->
-          <div class="form-validation" *ngIf="!formData.name?.trim()">
-            <mat-icon class="warning-icon">warning</mat-icon>
-            <span>Role name is required</span>
-          </div>
-          
-          <!-- Action Buttons -->
-          <div class="action-buttons">
-            <button mat-button 
-                    class="cancel-button"
-                    (click)="onCloseSidebar()">
-              Cancel
-            </button>
-            <button mat-raised-button 
-                    color="primary"
-                    class="save-button"
-                    [disabled]="!formData.name?.trim()"
-                    (click)="onSave()">
-              {{ editMode ? 'Update Role' : 'Create Role' }}
-            </button>
-          </div>
-        </div>
+        <!-- Spacer for better scrolling -->
+        <div class="bottom-spacer"></div>
       </div>
     </div>
   `,
@@ -318,49 +318,50 @@ interface PermissionGroup {
           .permissions-accordion {
             margin-top: 16px;
           }
+          
+          .form-validation {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 24px 0 16px 0;
+            padding: 8px 12px;
+            background-color: rgba(244, 67, 54, 0.1);
+            border-radius: 4px;
+            color: #d32f2f;
+            font-size: 0.9rem;
+            
+            .warning-icon {
+              font-size: 1.2rem;
+              width: 1.2rem;
+              height: 1.2rem;
+            }
+          }
+          
+          .action-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #e0e0e0;
+            
+            .cancel-button {
+              color: #666;
+            }
+            
+            .save-button {
+              min-width: 140px;
+              height: 40px;
+            }
+          }
         }
       }
     }
     
-    .actions-section {
-      padding: 20px 24px;
-      border-top: 1px solid #e0e0e0;
-      background-color: #f5f5f5;
+    .bottom-spacer {
+      height: 40px;
       flex-shrink: 0;
-      
-      .form-validation {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 16px;
-        padding: 8px 12px;
-        background-color: rgba(244, 67, 54, 0.1);
-        border-radius: 4px;
-        color: #d32f2f;
-        font-size: 0.9rem;
-        
-        .warning-icon {
-          font-size: 1.2rem;
-          width: 1.2rem;
-          height: 1.2rem;
-        }
-      }
-      
-      .action-buttons {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-        align-items: center;
-        
-        .cancel-button {
-          color: #666;
-        }
-        
-        .save-button {
-          min-width: 140px;
-          height: 40px;
-        }
-      }
     }
     
     @media (max-width: 768px) {
@@ -591,14 +592,15 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
   
   onSave(): void {
     if (this.formData.name && this.formData.name.trim()) {
-      // Convert selected permission IDs back to Permission array
-      const selectedPermissionObjects = this.availablePermissions
-        .filter(p => this.selectedPermissions.has(p.id));
+      // Convert selected permission IDs to permission strings (name field)
+      const selectedPermissionStrings = this.availablePermissions
+        .filter(p => this.selectedPermissions.has(p.id))
+        .map(p => p.name); // Use permission.name for backend compatibility
       
-      const roleToSave: Partial<Role> = {
+      const roleToSave: any = {
         name: this.formData.name.trim(),
         description: this.formData.description?.trim() || '',
-        permissions: selectedPermissionObjects
+        permissions: selectedPermissionStrings // Send as string array
       };
       
       // Include ID if editing

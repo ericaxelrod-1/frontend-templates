@@ -4,6 +4,34 @@ Last Updated: 2025-05-28
 
 ## High Priority
 
+### BUG-055: Role Creation Data Format Error
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-01-26
+- **Completed**: 2025-01-26
+- **Description**: Frontend role creation was failing with "Bad Request - each value in permissions must be a string" error because the component was sending full Permission objects instead of permission strings to the backend.
+
+#### Implementation Notes
+- **Root Cause Analysis Completed**: 2025-01-26
+- **Data Format Mismatch**: Frontend sending `permissions: Permission[]` objects, backend expecting `permissions: string[]` strings
+- **Backend Architecture Discovery**: Two RolesControllers exist but only UsersModule version active in app.module.ts
+  - `angular/backend/src/modules/roles/roles.controller.ts`: Expects `permissionIds: number[]` (NOT imported)
+  - `angular/backend/src/modules/users/roles.controller.ts`: Expects `permissions: string[]` (IS imported and handles requests)
+- **Class Validator Error**: `@IsString({ each: true })` validation in CreateRoleDto from UsersModule was failing
+
+**Solution Implemented**:
+- Updated `RoleCreationSidebarComponent.onSave()` method to extract permission.name strings from selected Permission objects
+- Data transformation: `Permission[] → string[]` (e.g., `[{id: 1, name: "users:create"}, ...]` → `["users:create", ...]`)
+
+**Files Modified**:
+- `angular/frontend/src/app/features/roles/role-creation-sidebar/role-creation-sidebar.component.ts`: Fixed data format in onSave() method
+
+**Testing Results**:
+- ✅ Frontend build compiles successfully
+- ✅ Data format matches backend validation requirements
+- ✅ Role creation functionality restored
+
 ### BUG-052: Duplicate Roles in Database - Data Cleanup Required
 - **Status**: Complete
 - **Testing**: Not Started

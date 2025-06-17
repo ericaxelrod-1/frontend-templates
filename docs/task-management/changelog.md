@@ -84,6 +84,32 @@ Last Updated: 2025-06-02
 
 ## Completed Today
 
+### BUG-055: Role Creation Data Format Error ✅
+- **Started**: 2025-01-26
+- **Completed**: 2025-01-26
+- **Status**: Complete ✅
+- **Priority**: High (User Functionality Blocking)
+- **Implementation Notes**: 
+  - **Root Cause**: Frontend was sending full Permission objects `{id, name, description, ...}` instead of permission strings `["users:create", "users:update"]` that the backend expected
+  - **Error Message**: "Bad Request - each value in permissions must be a string" from class-validator on UsersModule CreateRoleDto
+  - **Backend Expectations**: UsersModule RolesController expects `permissions: string[]` array due to `@IsString({ each: true })` validation
+  - **Frontend Issue**: RoleCreationSidebarComponent was sending `permissions: Permission[]` objects instead of strings
+  - **Solution Implemented**: Updated onSave() method to extract permission.name strings from selected Permission objects
+  - **Data Flow Fix**: 
+    - **Before**: `permissions: [{id: 1, name: "users:create", ...}, {id: 2, name: "users:update", ...}]`
+    - **After**: `permissions: ["users:create", "users:update"]`
+  - **Backend Architecture**: Two RolesControllers exist but only UsersModule version is imported in app.module.ts
+    - `/modules/roles/roles.controller.ts`: Expects `permissionIds: number[]` (NOT imported)
+    - `/modules/users/roles.controller.ts`: Expects `permissions: string[]` (IS imported and active)
+  
+  **Files Modified**:
+  - `angular/frontend/src/app/features/roles/role-creation-sidebar/role-creation-sidebar.component.ts`: Updated onSave() method to send permission strings instead of Permission objects
+  
+  **Testing Results**:
+  - ✅ Frontend build compiles successfully without TypeScript errors
+  - ✅ Data format now matches backend validation requirements
+  - ✅ Role creation functionality restored to working state
+
 ### BUG-037: Component Bundle Size Optimization - Unused Code Cleanup ✅
 - **Started**: 2025-01-25
 - **Completed**: 2025-01-25

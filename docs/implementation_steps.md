@@ -279,9 +279,27 @@ Add additional analytics features to the role monitoring tools.
 - Add permission impact analysis
 - Implement dashboard with visualizations
 
+### 17. Role Creation Data Format Error (ID: BUG-055)
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Last Updated**: 2025-01-26
+
+Fix role creation functionality failing due to data format mismatch between frontend and backend.
+
+**Sub-tasks:**
+- ✓ Investigate "each value in permissions must be a string" error in role creation
+- ✓ Analyze backend CreateRoleDto validation requirements in UsersModule
+- ✓ Identify data format mismatch: Permission objects vs permission strings
+- ✓ Update RoleCreationSidebarComponent onSave() method to send correct format
+- ✓ Transform Permission[] to string[] in frontend component
+- ✓ Test role creation functionality after fix
+- ✓ Verify frontend build compiles successfully
+- ✓ Document backend architecture: two RolesControllers, only UsersModule active
+
 ## Phase 3: Integration and Deployment
 
-### 17. Continuous Integration Setup (ID: TECH-004.1)
+### 18. Continuous Integration Setup (ID: TECH-004.1)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: TECH-001.2, TECH-001.3
@@ -295,7 +313,7 @@ Set up automated testing and continuous integration for the project.
 - Implement linting checks
 - Create automated documentation generation
 
-### 18. Deployment Pipeline (ID: TECH-004.2)
+### 19. Deployment Pipeline (ID: TECH-004.2)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: TECH-004.1
@@ -311,7 +329,7 @@ Create a deployment pipeline for the tools and applications.
 
 ## Phase 4: Feature Implementation
 
-### 19. Role Hierarchy Management (ID: FEAT-001)
+### 20. Role Hierarchy Management (ID: FEAT-001)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: TECH-001.3
@@ -325,7 +343,7 @@ Implement a role hierarchy management system.
 - Implement permission propagation
 - Add validation for circular dependencies
 
-### 20. Permission Auditing (ID: FEAT-002)
+### 21. Permission Auditing (ID: FEAT-002)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: TECH-001.3, FEAT-001
@@ -385,7 +403,7 @@ Add permission auditing capabilities to track changes to permissions.
     - cache_endpoints
   - Should follow established patterns for column names and constraints 
 
-### 21. Create API Status/Health Endpoint (ID: FEAT-007)
+### 22. Create API Status/Health Endpoint (ID: FEAT-007)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: None
@@ -402,7 +420,7 @@ Create a comprehensive API status/health endpoint for system monitoring and debu
 - Add different detail levels (basic vs detailed)
 - Test endpoint functionality
 
-### 22. Fix Critical TypeScript Compilation Errors (ID: BUG-033)
+### 23. Fix Critical TypeScript Compilation Errors (ID: BUG-033)
 - **Status**: Complete
 - **Testing**: Passed
 - **Dependencies**: None
@@ -421,7 +439,7 @@ Fix critical TypeScript compilation errors in cache-sync.service.ts related to '
 - ✓ Test that build compiles successfully
 - ✓ Update documentation to reflect resolution
 
-### 23. Database Schema Alignment Investigation (ID: TECH-004)
+### 24. Database Schema Alignment Investigation (ID: TECH-004)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: None

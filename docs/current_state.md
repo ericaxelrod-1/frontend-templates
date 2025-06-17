@@ -226,6 +226,15 @@ Database contains 8 duplicate roles created by conflicting seed scripts, causing
   - Build now compiles successfully without errors
 - **Code Quality**: Improved codebase by removing dead/abandoned code
 - **Architecture**: Clarified cache service architecture by removing conflicting implementations
+- **BUG-055 COMPLETE**: Role Creation Data Format Error ✅
+  - **Achievement**: Resolved frontend data format mismatch causing role creation failures
+  - **Root Cause**: Frontend sending Permission objects instead of permission strings to backend
+  - **Backend Discovery**: Two RolesControllers exist, only UsersModule version is active and expects string arrays
+  - **Solution**: Updated RoleCreationSidebarComponent to extract permission.name strings from selected Permission objects
+  - **Data Flow Fix**: `Permission[] → string[]` transformation in onSave() method
+  - **Testing**: Frontend build successful, data format matches backend validation requirements
+  - **Result**: Role creation functionality fully restored and working
+- **BUG-037 COMPLETE**: Component Bundle Size Optimization - Unused Code Cleanup ✅
 
 ### **2025-05-23: Comprehensive Schema Audit Completed**
 - Conducted thorough database schema audit using schema_alignment_audit.py tool
