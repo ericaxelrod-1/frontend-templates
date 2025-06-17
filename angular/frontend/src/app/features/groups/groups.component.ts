@@ -4,17 +4,15 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { GroupService } from '../../services/group.service';
 import { UserService } from '../../services/user.service';
 import { Group, Member, Permission, GROUP_PERMISSION_SETS } from '../../models/group.model';
 import { User } from '../../models/user.model';
-import { GroupDialogComponent } from './group-dialog/group-dialog.component';
 import { UserSelectorSidebarComponent } from './user-selector-sidebar/user-selector-sidebar.component';
 import { MemberActionsSidebarComponent, MemberAction } from './member-actions-sidebar/member-actions-sidebar.component';
+import { GroupCreationSidebarComponent } from './group-creation-sidebar/group-creation-sidebar.component';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
@@ -28,10 +26,10 @@ import { PermissionService } from '../../core/services/permission.service';
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatDialogModule,
     MatListModule,
     UserSelectorSidebarComponent,
-    MemberActionsSidebarComponent
+    MemberActionsSidebarComponent,
+    GroupCreationSidebarComponent
   ],
   template: `
     <div class="groups-container">
@@ -113,6 +111,14 @@ import { PermissionService } from '../../core/services/permission.service';
         (closeSidebar)="closeMemberActions()"
         (actionSelected)="onMemberActionSelected($event)">
       </app-member-actions-sidebar>
+      
+      <!-- Group Creation Sidebar -->
+      <app-group-creation-sidebar
+        [isOpen]="isGroupCreationOpen"
+        [groupData]="selectedGroupForEdit"
+        (closeSidebar)="closeGroupCreation()"
+        (groupSaved)="onGroupSaved($event)">
+      </app-group-creation-sidebar>
     </div>
   `,
   styles: [`
@@ -194,10 +200,13 @@ export class GroupsComponent implements OnInit {
   selectedMember: Member | null = null;
   selectedGroupForMember: Group | null = null;
   
+  // Group creation sidebar state
+  isGroupCreationOpen = false;
+  selectedGroupForEdit: Group | null = null;
+  
   constructor(
     private groupService: GroupService,
     private userService: UserService,
-    private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private authService: AuthService,
     private router: Router,
@@ -246,48 +255,51 @@ export class GroupsComponent implements OnInit {
   }
 
   createGroup(): void {
-    const dialogRef = this.dialog.open(GroupDialogComponent, {
-      data: { group: null }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.groupService.createGroup(result).subscribe({
-          next: (group) => {
-            if (!group.members) {
-              group.members = [];
-            }
-            this.groups.push(group);
-            this.snackBar.open('Group created successfully', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            console.error('Error creating group:', error);
-            this.snackBar.open('Error creating group', 'Close', { duration: 3000 });
-          }
-        });
-      }
-    });
+    this.selectedGroupForEdit = null; // Create mode
+    this.isGroupCreationOpen = true;
   }
 
   editGroup(group: Group): void {
-    const dialogRef = this.dialog.open(GroupDialogComponent, {
-      data: { group }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.groupService.updateGroup(group.id, result).subscribe({
-          next: () => {
-            Object.assign(group, result);
-            this.snackBar.open('Group updated successfully', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            console.error('Error updating group:', error);
-            this.snackBar.open('Error updating group', 'Close', { duration: 3000 });
+    this.selectedGroupForEdit = group; // Edit mode
+    this.isGroupCreationOpen = true;
+  }
+  
+  closeGroupCreation(): void {
+    this.isGroupCreationOpen = false;
+    this.selectedGroupForEdit = null;
+  }
+  
+  onGroupSaved(groupData: Partial<Group>): void {
+    if (this.selectedGroupForEdit) {
+      // Edit mode
+      this.groupService.updateGroup(this.selectedGroupForEdit.id, groupData).subscribe({
+        next: () => {
+          Object.assign(this.selectedGroupForEdit!, groupData);
+          this.snackBar.open('Group updated successfully', 'Close', { duration: 3000 });
+          this.closeGroupCreation();
+        },
+        error: (error) => {
+          console.error('Error updating group:', error);
+          this.snackBar.open('Error updating group', 'Close', { duration: 3000 });
+        }
+      });
+    } else {
+      // Create mode
+      this.groupService.createGroup(groupData).subscribe({
+        next: (group) => {
+          if (!group.members) {
+            group.members = [];
           }
-        });
-      }
-    });
+          this.groups.push(group);
+          this.snackBar.open('Group created successfully', 'Close', { duration: 3000 });
+          this.closeGroupCreation();
+        },
+        error: (error) => {
+          console.error('Error creating group:', error);
+          this.snackBar.open('Error creating group', 'Close', { duration: 3000 });
+        }
+      });
+    }
   }
 
   deleteGroup(group: Group): void {

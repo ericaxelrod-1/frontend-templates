@@ -5,10 +5,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RoleService, Role } from '../../services/role.service';
-import { RoleDialogComponent } from './role-dialog/role-dialog.component';
+import { RoleCreationSidebarComponent } from './role-creation-sidebar/role-creation-sidebar.component';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
@@ -23,7 +22,7 @@ import { PermissionService } from '../../core/services/permission.service';
     MatIconModule,
     MatTableModule,
     MatChipsModule,
-    MatDialogModule
+    RoleCreationSidebarComponent
   ],
   template: `
     <div class="roles-container">
@@ -104,6 +103,14 @@ import { PermissionService } from '../../core/services/permission.service';
           <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
         </table>
       </ng-container>
+      
+      <!-- Role Creation Sidebar -->
+      <app-role-creation-sidebar
+        [isOpen]="isRoleCreationOpen"
+        [roleData]="selectedRoleForEdit"
+        (closeSidebar)="closeRoleCreation()"
+        (roleSaved)="onRoleSaved($event)">
+      </app-role-creation-sidebar>
     </div>
   `,
   styles: [`
@@ -143,6 +150,10 @@ export class RolesComponent implements OnInit {
   hasPermission = false;
   loading = true;
   
+  // Role creation sidebar state
+  isRoleCreationOpen = false;
+  selectedRoleForEdit: Role | null = null;
+  
   // Make Array available in the template
   protected Array = Array;
   
@@ -151,7 +162,6 @@ export class RolesComponent implements OnInit {
     private authService: AuthService,
     private snackBar: MatSnackBar,
     private router: Router,
-    private dialog: MatDialog,
     private permissionService: PermissionService
   ) {}
 
@@ -195,24 +205,8 @@ export class RolesComponent implements OnInit {
   }
 
   createRole(): void {
-    const dialogRef = this.dialog.open(RoleDialogComponent, {
-      data: { role: null }
-    });
-
-    dialogRef.afterClosed().subscribe((result: Role | undefined) => {
-      if (result) {
-        this.roleService.createRole(result).subscribe({
-          next: (role) => {
-            this.roles.push(role);
-            this.snackBar.open('Role created successfully', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            console.error('Error creating role:', error);
-            this.snackBar.open('Error creating role', 'Close', { duration: 3000 });
-          }
-        });
-      }
-    });
+    this.selectedRoleForEdit = null;
+    this.isRoleCreationOpen = true;
   }
 
   editRole(role: Role): void {
@@ -220,25 +214,44 @@ export class RolesComponent implements OnInit {
       this.snackBar.open('Cannot edit role without an ID', 'Close', { duration: 3000 });
       return;
     }
-
-    const dialogRef = this.dialog.open(RoleDialogComponent, {
-      data: { role }
-    });
-
-    dialogRef.afterClosed().subscribe((result: Role | undefined) => {
-      if (result) {
-        this.roleService.updateRole(role.id!, result).subscribe({
-          next: () => {
-            Object.assign(role, result);
-            this.snackBar.open('Role updated successfully', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            console.error('Error updating role:', error);
-            this.snackBar.open('Error updating role', 'Close', { duration: 3000 });
-          }
-        });
-      }
-    });
+    
+    this.selectedRoleForEdit = role;
+    this.isRoleCreationOpen = true;
+  }
+  
+  closeRoleCreation(): void {
+    this.isRoleCreationOpen = false;
+    this.selectedRoleForEdit = null;
+  }
+  
+  onRoleSaved(roleData: Partial<Role>): void {
+    if (this.selectedRoleForEdit?.id) {
+      // Edit mode - update existing role
+      this.roleService.updateRole(this.selectedRoleForEdit.id, roleData).subscribe({
+        next: () => {
+          Object.assign(this.selectedRoleForEdit!, roleData);
+          this.snackBar.open('Role updated successfully', 'Close', { duration: 3000 });
+          this.closeRoleCreation();
+        },
+        error: (error) => {
+          console.error('Error updating role:', error);
+          this.snackBar.open('Error updating role', 'Close', { duration: 3000 });
+        }
+      });
+    } else {
+      // Create mode - create new role
+      this.roleService.createRole(roleData).subscribe({
+        next: (role) => {
+          this.roles.push(role);
+          this.snackBar.open('Role created successfully', 'Close', { duration: 3000 });
+          this.closeRoleCreation();
+        },
+        error: (error) => {
+          console.error('Error creating role:', error);
+          this.snackBar.open('Error creating role', 'Close', { duration: 3000 });
+        }
+      });
+    }
   }
 
   deleteRole(role: Role): void {
