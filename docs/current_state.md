@@ -232,8 +232,10 @@ Database contains 8 duplicate roles created by conflicting seed scripts, causing
   - **Backend Discovery**: Two RolesControllers exist, only UsersModule version is active and expects string arrays
   - **Solution**: Updated RoleCreationSidebarComponent to extract permission.name strings from selected Permission objects
   - **Data Flow Fix**: `Permission[] → string[]` transformation in onSave() method
-  - **Testing**: Frontend build successful, data format matches backend validation requirements
-  - **Result**: Role creation functionality fully restored and working
+  - **Additional Fix**: Resolved AJAX refresh issue where newly created roles weren't appearing without page refresh
+  - **Backend Transformation**: Added data transformation in RolesService to convert `rolePermissions` to `permissions` array for frontend compatibility
+  - **Testing**: Both frontend and backend build successful, data format matches validation requirements, AJAX behavior working
+  - **Result**: Role creation functionality fully restored with immediate list updates
 - **BUG-037 COMPLETE**: Component Bundle Size Optimization - Unused Code Cleanup ✅
 
 ### **2025-05-23: Comprehensive Schema Audit Completed**

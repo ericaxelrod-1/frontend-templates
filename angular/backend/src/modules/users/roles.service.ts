@@ -225,19 +225,54 @@ export class RolesService {
       }
     }
 
-    return savedRole;
+    // Return the complete role with permissions populated
+    const completeRole = await this.rolesRepository.findOne({
+      where: { id: savedRole.id },
+      relations: ['rolePermissions', 'rolePermissions.permission'],
+    });
+
+    return completeRole ? this.transformRoleForFrontend(completeRole) : savedRole;
+  }
+
+  /**
+   * Transform role data to match frontend expectations
+   * Converts rolePermissions to permissions array
+   */
+  private transformRoleForFrontend(role: Role): Role {
+    if (role.rolePermissions) {
+      // Transform rolePermissions to permissions array
+      const permissions = role.rolePermissions
+        .filter(rp => rp.isGranted && rp.permission) // Only include granted permissions
+        .map(rp => rp.permission);
+      
+      // Create a new role object with permissions instead of rolePermissions
+      return {
+        ...role,
+        permissions: permissions,
+        rolePermissions: undefined, // Remove rolePermissions to avoid confusion
+      } as any;
+    }
+    return role;
   }
 
   async findAll(): Promise<Role[]> {
-    return this.rolesRepository.find();
+    const roles = await this.rolesRepository.find({
+      relations: ['rolePermissions', 'rolePermissions.permission'],
+    });
+    
+    // Transform roles to match frontend expectations
+    return roles.map(role => this.transformRoleForFrontend(role));
   }
 
   async findOne(id: number): Promise<Role> {
-    const role = await this.rolesRepository.findOne({ where: { id } });
+    const role = await this.rolesRepository.findOne({ 
+      where: { id },
+      relations: ['rolePermissions', 'rolePermissions.permission'],
+    });
     if (!role) {
       throw new NotFoundException(`Role with ID ${id} not found`);
     }
-    return role;
+    return this.transformRoleForFrontend(role);
   }
 
   async findByName(name: string): Promise<Role> {

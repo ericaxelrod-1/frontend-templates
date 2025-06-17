@@ -102,13 +102,26 @@ Last Updated: 2025-06-02
     - `/modules/roles/roles.controller.ts`: Expects `permissionIds: number[]` (NOT imported)
     - `/modules/users/roles.controller.ts`: Expects `permissions: string[]` (IS imported and active)
   
+  **Additional Issue Discovered**: AJAX refresh problem - newly created roles not appearing without page refresh
+  - **Root Cause**: Backend was returning `rolePermissions: RolePermission[]` but frontend expected `permissions: Permission[]`
+  - **Backend Data Structure Mismatch**: Role entity has `rolePermissions` relationship, but frontend expects direct `permissions` array
+  - **Solution**: Added data transformation in backend RolesService:
+    - Created `transformRoleForFrontend()` method to convert `rolePermissions` to `permissions` array
+    - Updated `findAll()`, `findOne()`, and `create()` methods to include nested permission relations
+    - Filtered only granted permissions (`isGranted: true`) for frontend display
+    - Ensured consistent data structure between initial load and newly created roles
+  
   **Files Modified**:
   - `angular/frontend/src/app/features/roles/role-creation-sidebar/role-creation-sidebar.component.ts`: Updated onSave() method to send permission strings instead of Permission objects
+  - `angular/backend/src/modules/users/roles.service.ts`: Added data transformation to match frontend expectations and include nested permission relations
   
   **Testing Results**:
   - ✅ Frontend build compiles successfully without TypeScript errors
+  - ✅ Backend build compiles successfully without TypeScript errors
   - ✅ Data format now matches backend validation requirements
   - ✅ Role creation functionality restored to working state
+  - ✅ Newly created roles now appear immediately in the list (AJAX behavior working)
+  - ✅ Data structure consistency between initial load and new role creation
 
 ### BUG-037: Component Bundle Size Optimization - Unused Code Cleanup ✅
 - **Started**: 2025-01-25

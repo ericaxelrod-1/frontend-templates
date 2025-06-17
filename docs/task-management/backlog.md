@@ -20,17 +20,25 @@ Last Updated: 2025-05-28
   - `angular/backend/src/modules/users/roles.controller.ts`: Expects `permissions: string[]` (IS imported and handles requests)
 - **Class Validator Error**: `@IsString({ each: true })` validation in CreateRoleDto from UsersModule was failing
 
+**Additional Issue Discovered**: AJAX refresh problem - newly created roles not appearing without page refresh
+- **Backend Data Structure Mismatch**: Role entity has `rolePermissions` relationship, but frontend expected direct `permissions` array
+- **Solution**: Added data transformation in backend RolesService to convert `rolePermissions` to `permissions` array
+
 **Solution Implemented**:
 - Updated `RoleCreationSidebarComponent.onSave()` method to extract permission.name strings from selected Permission objects
 - Data transformation: `Permission[] → string[]` (e.g., `[{id: 1, name: "users:create"}, ...]` → `["users:create", ...]`)
+- Added backend data transformation to ensure consistent data structure between initial load and new role creation
 
 **Files Modified**:
 - `angular/frontend/src/app/features/roles/role-creation-sidebar/role-creation-sidebar.component.ts`: Fixed data format in onSave() method
+- `angular/backend/src/modules/users/roles.service.ts`: Added data transformation to match frontend expectations
 
 **Testing Results**:
 - ✅ Frontend build compiles successfully
+- ✅ Backend build compiles successfully  
 - ✅ Data format matches backend validation requirements
 - ✅ Role creation functionality restored
+- ✅ Newly created roles appear immediately in the list (AJAX behavior working)
 
 ### BUG-052: Duplicate Roles in Database - Data Cleanup Required
 - **Status**: Complete
