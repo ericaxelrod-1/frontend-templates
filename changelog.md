@@ -101,106 +101,43 @@ The null reference error "Cannot read properties of null (reading 'success')" ha
 - **Started**: 2025-01-28
 - **Completed**: 2025-01-28
 - **Status**: Complete ✅
-- **Implementation Notes**: Successfully implemented dedicated role management endpoints following the exact same pattern as group management, providing meaningful API responses and eliminating null reference errors.
+- **Implementation Notes**: Successfully implemented role management using the same pattern as the working group management system
+- **Files Modified**: 
+  - `angular/backend/src/modules/users/dto/role-membership-result.dto.ts` (Created)
+  - `angular/frontend/src/app/models/role-membership-result.interface.ts` (Created)
+  - `angular/backend/src/modules/users/users.service.ts` (Added addUserToRole, removeUserFromRole methods)
+  - `angular/backend/src/modules/users/users.controller.ts` (Added POST/DELETE role endpoints)
+  - `angular/frontend/src/app/services/user.service.ts` (Added addUserToRole, removeUserFromRole methods)
+  - `angular/frontend/src/app/features/users/users.component.ts` (Updated addToRole, removeFromRole, onRoleSelectionChange methods)
+- **Testing Results**: 
+  - ✅ Backend compilation: Passed
+  - ✅ Frontend compilation: Passed
+  - ✅ API endpoints: POST /users/:id/roles/:roleId, DELETE /users/:id/roles/:roleId
+  - ✅ Role assignment/unassignment: Working correctly
+  - ✅ onRoleSelectionChange method: Fixed to use dedicated endpoints
 
-#### **IMPLEMENTATION COMPLETED** 🎯
+### CRITICAL FIX: onRoleSelectionChange Method ✅
+- **Issue**: Method was using old updateUser API instead of dedicated role endpoints
+- **Root Cause**: Incorrect logic combining existing and new role IDs, causing invalid role ID errors
+- **Solution**: Implemented proper change detection logic using dedicated addUserToRole/removeUserFromRole endpoints
+- **Result**: Role assignment from Users page now works correctly using the same pattern as group management
 
-**Phase 1: Backend API Endpoints** ✅
-1. **Created RoleMembershipResult DTO** (`angular/backend/src/modules/users/dto/role-membership-result.dto.ts`):
-   - Matches GroupMembershipResult structure for consistency
-   - Includes success/failure status, operation details, user/role info
-   - Provides meaningful messages and state information
-   - Both class (for Swagger) and interface (for TypeScript) exports
+### BUG-080: Groups Page Shows No Members Despite Correct Backend Data ✅
+- **Completed**: 2025-01-28
+- **Implementation Notes**: Fixed property mapping issue in frontend GroupService where it was looking for non-existent `userGroups` instead of `users` property
+- **Files Modified**: 
+  - `angular/frontend/src/app/services/group.service.ts` (Fixed mapping from group.userGroups to group.users)
+- **Testing Results**: 
+  - ✅ Frontend compilation: Passed
+  - ✅ Property mapping: Fixed to use correct backend response structure
+  - ✅ Groups page: Now correctly displays group members
+  - ✅ Data consistency: Groups page and Users page now show consistent membership data
 
-2. **Added Role Management Methods to UsersService** (`angular/backend/src/modules/users/users.service.ts`):
-   - `addUserToRole(userId: number, roleId: number): Promise<RoleMembershipResult>`
-   - `removeUserFromRole(userId: number, roleId: number): Promise<RoleMembershipResult>`
-   - Graceful handling of duplicate operations (returns success: false with explanation)
-   - Comprehensive error handling and validation
-   - Detailed operation logging for debugging
-
-3. **Added Role Management Endpoints to UsersController** (`angular/backend/src/modules/users/users.controller.ts`):
-   - `POST /users/:id/roles/:roleId` - Add user to role
-   - `DELETE /users/:id/roles/:roleId` - Remove user from role
-   - Proper permission guards: `['roles:assign', 'users:update']`
-   - Swagger documentation with response examples
-   - Returns `RoleMembershipResult` objects
-
-**Phase 2: Frontend Integration** ✅
-4. **Created Frontend Interface** (`angular/frontend/src/app/models/role-membership-result.interface.ts`):
-   - Matches backend DTO structure exactly
-   - Type-safe interface for frontend consumption
-
-5. **Updated UserService** (`angular/frontend/src/app/services/user.service.ts`):
-   - `addUserToRole(userId: number, roleId: number): Observable<RoleMembershipResult>`
-   - `removeUserFromRole(userId: number, roleId: number): Observable<RoleMembershipResult>`
-   - Comprehensive logging of operations and results
-   - Proper error handling with meaningful error messages
-
-6. **Updated UsersComponent** (`angular/frontend/src/app/features/users/users.component.ts`):
-   - Replaced complex `addToRole()` and `removeFromRole()` methods
-   - Now uses dedicated endpoints instead of generic user update
-   - Uses `result.message` for user feedback (no more hardcoded messages)
-   - Handles both success and graceful failure scenarios
-   - Simplified logic - no more manual role array manipulation
-
-#### **BENEFITS ACHIEVED** ✅
-
-**Technical Improvements**:
-- **Eliminated null reference errors** during role operations
-- **API consistency** with group management approach
-- **Meaningful error messages** with proper context
-- **Operation transparency** - users know exactly what happened
-- **Enhanced debugging** with comprehensive logging
-- **Type safety** throughout the entire chain
-
-**User Experience Improvements**:
-- **Better feedback** with backend-generated messages
-- **Graceful failure handling** - duplicate operations inform rather than crash
-- **Faster operations** - no need to fetch fresh user data before operations
-- **Consistent behavior** with group management
-
-**Developer Experience Improvements**:
-- **Simplified frontend logic** - no complex state management needed
-- **Better error context** - role-specific error messages
-- **Easier debugging** with detailed operation logs
-- **Maintainable code** following established patterns
-
-#### **FILES MODIFIED** 📁
-
-**Backend Files**:
-- `angular/backend/src/modules/users/dto/role-membership-result.dto.ts` (created)
-- `angular/backend/src/modules/users/users.service.ts` (added methods)
-- `angular/backend/src/modules/users/users.controller.ts` (added endpoints)
-
-**Frontend Files**:
-- `angular/frontend/src/app/models/role-membership-result.interface.ts` (created)
-- `angular/frontend/src/app/services/user.service.ts` (added methods)
-- `angular/frontend/src/app/features/users/users.component.ts` (updated methods)
-
-#### **TESTING STATUS** ✅
-- [x] Backend endpoints compile without errors
-- [x] Frontend code compiles without errors
-- [x] TypeScript interfaces properly typed and imported
-- [x] API endpoints follow RESTful conventions
-- [x] Error handling implemented for all scenarios
-- [x] Logging provides debugging information
-- [x] Follows exact same pattern as working group management
-
-#### **ARCHITECTURAL CONSISTENCY** 🏗️
-
-Role management now follows the **exact same pattern** as group management:
-
-| Feature | Groups | Roles |
-|---------|--------|-------|
-| **Endpoints** | `/groups/:id/members/:userId` | `/users/:id/roles/:roleId` |
-| **Operations** | POST/DELETE | POST/DELETE |
-| **Response Type** | `GroupMembershipResult` | `RoleMembershipResult` |
-| **Error Handling** | Graceful failures | Graceful failures |
-| **User Feedback** | Backend messages | Backend messages |
-| **Logging** | Comprehensive | Comprehensive |
-
-This ensures consistent behavior and maintainability across the application.
+### CRITICAL FIX: Groups Page Member Display ✅
+- **Issue**: Groups page displayed "No members in this group" for all groups despite correct backend data
+- **Root Cause**: Frontend GroupService mapped `group.userGroups` (non-existent) instead of `group.users` (actual backend property)
+- **Solution**: Updated mapping to use `group.users` to match backend Group entity structure
+- **Result**: Groups page now correctly renders group membership information
 
 ## Completed Today
 

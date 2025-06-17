@@ -18,10 +18,10 @@ export class GroupService {
       map(groups => groups.map(group => ({
         ...group,
         permissions: group.permissions || [],
-        // Transform backend userGroups to frontend members format
-        members: group.userGroups ? group.userGroups.map((userGroup: any) => ({
-          id: userGroup.user.id,
-          name: `${userGroup.user.firstName || ''} ${userGroup.user.lastName || ''}`.trim() || userGroup.user.email,
+        // Transform backend users to frontend members format
+        members: group.users ? group.users.map((user: any) => ({
+          id: user.id,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
           role: 'Member', // Default role, could be enhanced later
           permissions: [] // Default permissions, could be enhanced later
         })) : []
