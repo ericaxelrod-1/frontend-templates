@@ -5,6 +5,7 @@ import {
   Param,
   Put,
   Patch,
+  Delete,
   Body,
   UseGuards,
   Logger,
@@ -197,5 +198,25 @@ export class RolesController {
       assignRoleDto.roleId,
       currentUser,
     );
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a role' })
+  @ApiResponse({
+    status: 200,
+    description: 'Role deleted successfully',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions',
+  })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:delete')
+  remove(
+    @Param('id') id: number,
+    @CurrentUser() currentUser: User,
+  ): Promise<void> {
+    return this.rolesService.remove(id, currentUser);
   }
 }

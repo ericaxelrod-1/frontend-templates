@@ -477,6 +477,35 @@ export class RolesService {
       );
     }
 
-    await this.rolesRepository.remove(role);
+    // Start transaction to ensure atomicity
+    const queryRunner = this.rolesRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // First, delete all role permissions (cascade deletion)
+      await queryRunner.manager.query(
+        'DELETE FROM role_permissions WHERE role_id = ?',
+        [id]
+      );
+
+      // Then delete the role itself using SQL query
+      await queryRunner.manager.query(
+        'DELETE FROM roles WHERE id = ?',
+        [id]
+      );
+
+      // Commit the transaction
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      // Rollback the transaction on error
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(
+        `Failed to delete role: ${error.message}`
+      );
+    } finally {
+      // Release the query runner
+      await queryRunner.release();
+    }
   }
 }

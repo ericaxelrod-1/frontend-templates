@@ -8,6 +8,26 @@ This repository contains tools for managing and validating database schemas and 
 
 ## Current Focus Areas
 
+- **COMPLETED: BUG-060 Role Deletion Foreign Key Constraint (✅ COMPLETE - PRODUCTION READY)**
+  - **FINAL STATUS**: Role deletion functionality fully restored - roles with permission assignments can now be deleted successfully
+  - **Root Cause**: `RolesService.remove()` method didn't handle cascade deletion of role permissions before deleting the role
+  - **Database Issue**: `role_permissions` table foreign key constraint with `ON DELETE NO ACTION` prevented role deletion
+  - **Impact**: Users got "FOREIGN KEY constraint failed" error when trying to delete roles with permission assignments
+  - **Solution**: Implemented transaction-based two-phase deletion process (delete permissions first, then role)
+  - **Transaction Safety**: Uses QueryRunner for atomic operations with proper rollback on errors
+  - **Architecture**: Cascade deletion properly integrated with existing security validation and error handling
+  - **Testing**: Both backend and frontend build successfully, transaction logic ensures data integrity
+
+- **COMPLETED: BUG-059 Role Delete Endpoint Missing (✅ COMPLETE - PRODUCTION READY)**
+  - **FINAL STATUS**: Role deletion functionality fully restored - users can now delete roles successfully
+  - **Root Cause**: Active `RolesController` (in UsersModule) was missing DELETE endpoint while frontend called `DELETE /api/roles/:id`
+  - **Backend Architecture Issue**: Two RolesControllers exist - one has DELETE endpoint but isn't imported, the other is imported but missing DELETE endpoint
+  - **Impact**: Users got 404 error when trying to delete roles, completely blocking role management functionality
+  - **Solution**: Added `@Delete(':id')` endpoint to active RolesController that calls existing `RolesService.remove()` method
+  - **Security Features**: Includes permission checking (`roles:delete`), system role protection, and user assignment validation
+  - **Architecture**: DELETE endpoint properly integrated with existing security infrastructure and validation logic
+  - **Testing**: Both backend and frontend build successfully, endpoint validates permissions correctly
+
 - **COMPLETED: BUG-058 Role Edit Mode Not Connected (✅ COMPLETE - PRODUCTION READY)**
   - **FINAL STATUS**: Role editing functionality fully restored - permissions now populate correctly in edit mode
   - **Root Cause**: The `ngOnChanges` method in role-creation-sidebar component was missing `this.editMode = !!this.roleData;` line

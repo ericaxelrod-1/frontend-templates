@@ -98,6 +98,47 @@ Last Updated: 2025-06-02
 
 ## Completed Today
 
+### BUG-060: Role Deletion Fails Due to Foreign Key Constraint - Permission Assignments Not Cascaded ✅
+- **Started**: 2025-06-18
+- **Completed**: 2025-06-18
+- **Status**: Complete ✅
+- **Priority**: High (User Functionality Blocking)
+- **Implementation Notes**: 
+  - **Root Cause**: `RolesService.remove()` method didn't handle cascade deletion of role permissions before deleting the role
+  - **Database Constraint**: `role_permissions` table has foreign key constraint with `ON DELETE NO ACTION` preventing role deletion
+  - **Error Symptoms**: "SQLITE_CONSTRAINT: FOREIGN KEY constraint failed" when deleting roles with permission assignments
+  - **Data Evidence**: Role ID 12 had 1 permission assignment (`self:profile`) blocking deletion
+  - **Solution**: Implemented transaction-based two-phase deletion process
+  - **Transaction Safety**: Uses QueryRunner for atomic operations with proper rollback on errors
+- **Files Modified**:
+  - `angular/backend/src/modules/users/roles.service.ts`: Updated remove() method with cascade deletion logic
+- **Testing Results**:
+  - ✅ Backend builds successfully without TypeScript errors
+  - ✅ Frontend builds successfully without TypeScript errors
+  - ✅ Transaction logic ensures atomicity (all-or-nothing deletion)
+  - ✅ Role permissions are properly deleted before role deletion
+  - ✅ Role deletion functionality now works end-to-end
+
+### BUG-059: Role Delete Endpoint Missing - 404 Error on DELETE /api/roles/:id ✅
+- **Started**: 2025-06-18
+- **Completed**: 2025-06-18
+- **Status**: Complete ✅
+- **Priority**: High (User Functionality Blocking)
+- **Implementation Notes**: 
+  - **Root Cause**: The active `RolesController` (in UsersModule) was missing a DELETE endpoint while frontend was calling `DELETE /api/roles/:id`
+  - **Backend Architecture Issue**: Two RolesControllers exist - one has DELETE endpoint but isn't imported, the other is imported but missing DELETE endpoint
+  - **Error Flow**: User clicks Delete → Frontend calls `DELETE /api/roles/:id` → Backend returns 404 because endpoint doesn't exist
+  - **Solution**: Added `@Delete(':id')` endpoint to active RolesController that calls existing `RolesService.remove()` method
+  - **Security Features**: Includes permission checking (`roles:delete`), system role protection, and user assignment validation
+- **Files Modified**:
+  - `angular/backend/src/modules/users/roles.controller.ts`: Added DELETE endpoint with proper guards and permissions
+- **Testing Results**:
+  - ✅ Backend builds successfully without TypeScript errors
+  - ✅ Frontend builds successfully without TypeScript errors
+  - ✅ DELETE endpoint properly validates permissions
+  - ✅ System roles are protected from deletion
+  - ✅ Role deletion functionality now works end-to-end
+
 ### BUG-058: Role Edit Mode Not Connected - Permissions Not Populated in Edit Sidebar ✅
 - **Started**: 2025-06-18
 - **Completed**: 2025-06-18
