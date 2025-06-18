@@ -275,6 +275,70 @@ export class RolesService {
     return this.transformRoleForFrontend(role);
   }
 
+  async update(id: number, updateRoleDto: any, currentUser: User): Promise<Role> {
+    // Check if current user has permission to update roles
+    const hasPermission = await this.hasPermission(
+      currentUser.id,
+      'roles',
+      'update',
+    );
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to update roles',
+      );
+    }
+
+    const role = await this.rolesRepository.findOne({ where: { id } });
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${id} not found`);
+    }
+
+    // Prevent modifying system-defined roles
+    if (role.isSystemRole) {
+      throw new ForbiddenException('System-defined roles cannot be modified');
+    }
+
+    // Check if role with same name already exists (if name is being updated)
+    if (updateRoleDto.name && updateRoleDto.name !== role.name) {
+      const existingRole = await this.rolesRepository.findOne({
+        where: { name: updateRoleDto.name },
+      });
+      if (existingRole) {
+        throw new ForbiddenException(
+          `Role with name ${updateRoleDto.name} already exists`,
+        );
+      }
+    }
+
+    // Update basic role information
+    if (updateRoleDto.name) {
+      role.name = updateRoleDto.name;
+    }
+    if (updateRoleDto.description !== undefined) {
+      role.description = updateRoleDto.description;
+    }
+
+    const updatedRole = await this.rolesRepository.save(role);
+
+    // Update permissions if provided
+    if (updateRoleDto.permissions && Array.isArray(updateRoleDto.permissions)) {
+      try {
+        await this.permissionsService.assignPermissionsToRole(
+          updatedRole.id,
+          updateRoleDto.permissions,
+        );
+      } catch (error) {
+        console.error(
+          `Error updating permissions for role:`,
+          error.message,
+        );
+      }
+    }
+
+    // Return the complete role with permissions populated
+    return this.findOne(updatedRole.id);
+  }
+
   async findByName(name: string): Promise<Role> {
     const role = await this.rolesRepository.findOne({ where: { name } });
     if (!role) {

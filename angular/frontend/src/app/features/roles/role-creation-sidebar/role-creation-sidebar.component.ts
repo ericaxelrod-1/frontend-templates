@@ -208,166 +208,132 @@ interface PermissionGroup {
     }
     
     .sidebar-content {
+      flex: 1;
       display: flex;
       flex-direction: column;
-      height: 100%;
     }
     
     .sidebar-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      padding: 24px;
-      background-color: #1976d2;
-      color: white;
-      
-      .header-content {
-        flex: 1;
-        
-        h2 {
-          margin: 0 0 8px 0;
-          font-size: 1.5rem;
-          font-weight: 500;
-        }
-        
-        p {
-          margin: 0;
-          opacity: 0.9;
-          font-size: 0.9rem;
-        }
-      }
-      
-      .close-button {
-        color: white;
-        margin-left: 16px;
-      }
+      padding: 20px;
+      border-bottom: 1px solid #e0e0e0;
+      background-color: #fafafa;
+    }
+    
+    .header-content h2 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      font-weight: 500;
+    }
+    
+    .header-content p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .close-button {
+      margin-top: -8px;
+      margin-right: -8px;
     }
     
     .form-section {
       flex: 1;
-      overflow-y: auto;
-      
-      .role-form {
-        display: flex;
-        flex-direction: column;
-        
-        .basic-info-section {
-          padding: 24px;
-          
-          h3 {
-            margin: 0 0 16px 0;
-            color: #333;
-            font-size: 1.1rem;
-          }
-          
-          .full-width {
-            width: 100%;
-            margin-bottom: 16px;
-          }
-          
-          textarea {
-            resize: vertical;
-            min-height: 80px;
-          }
-        }
-        
-        .permissions-section {
-          padding: 24px;
-          
-          h3 {
-            margin: 0 0 16px 0;
-            color: #333;
-            font-size: 1.1rem;
-          }
-          
-          .select-all {
-            margin-bottom: 16px;
-            padding: 12px;
-            background-color: #f5f5f5;
-            border-radius: 4px;
-          }
-          
-          .resource-select-all {
-            margin-bottom: 12px;
-            padding: 8px;
-            background-color: #e3f2fd;
-            border-radius: 4px;
-          }
-          
-          .permissions-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-            margin-bottom: 16px;
-          }
-          
-          .permission-item {
-            padding: 12px;
-            border-radius: 4px;
-            background-color: #fafafa;
-            border: 1px solid #e0e0e0;
-            
-            .permission-description {
-              margin-top: 4px;
-              font-size: 12px;
-              color: rgba(0, 0, 0, 0.6);
-              line-height: 1.3;
-            }
-          }
-          
-          .permissions-accordion {
-            margin-top: 16px;
-          }
-          
-          .form-validation {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 24px 0 16px 0;
-            padding: 8px 12px;
-            background-color: rgba(244, 67, 54, 0.1);
-            border-radius: 4px;
-            color: #d32f2f;
-            font-size: 0.9rem;
-            
-            .warning-icon {
-              font-size: 1.2rem;
-              width: 1.2rem;
-              height: 1.2rem;
-            }
-          }
-          
-          .action-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-            align-items: center;
-            margin-top: 24px;
-            padding-top: 16px;
-            border-top: 1px solid #e0e0e0;
-            
-            .cancel-button {
-              color: #666;
-            }
-            
-            .save-button {
-              min-width: 140px;
-              height: 40px;
-            }
-          }
-        }
-      }
+      padding: 20px;
+    }
+    
+    .basic-info-section {
+      margin-bottom: 24px;
+    }
+    
+    .basic-info-section h3 {
+      margin: 0 0 16px 0;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    
+    .full-width {
+      width: 100%;
+      margin-bottom: 16px;
+    }
+    
+    .permissions-section {
+      margin-top: 24px;
+    }
+    
+    .permissions-section h3 {
+      margin: 0 0 16px 0;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    
+    .select-all {
+      margin-bottom: 16px;
+      padding: 12px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+    }
+    
+    .permissions-accordion {
+      margin-bottom: 24px;
+    }
+    
+    .resource-select-all {
+      margin-bottom: 16px;
+      padding: 8px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .permissions-grid {
+      display: grid;
+      gap: 12px;
+    }
+    
+    .permission-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .permission-description {
+      font-size: 12px;
+      color: #666;
+      margin-left: 32px;
+    }
+    
+    .form-validation {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #f44336;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    
+    .warning-icon {
+      font-size: 18px;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+    }
+    
+    .cancel-button {
+      min-width: 100px;
+    }
+    
+    .save-button {
+      min-width: 120px;
     }
     
     .bottom-spacer {
-      height: 40px;
-      flex-shrink: 0;
-    }
-    
-    @media (max-width: 768px) {
-      .role-creation-sidebar {
-        width: 100vw;
-      }
+      height: 20px;
     }
   `]
 })
@@ -387,15 +353,14 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
   
   availablePermissions: Permission[] = [];
   permissionGroups: PermissionGroup[] = [];
-  selectedPermissions: Set<string | number> = new Set();
+  selectedPermissions: Set<number> = new Set();
   
   constructor(private roleService: RoleService) {}
-  
+
   ngOnInit(): void {
     this.loadPermissions();
-    this.resetForm();
   }
-  
+
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['roleData'] || changes['isOpen']) {
       this.editMode = !!this.roleData;
@@ -447,7 +412,7 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
     const groupMap = new Map<string, Permission[]>();
     
     this.availablePermissions.forEach(permission => {
-      // Extract resource from permission id (format: 'resource:action')
+      // Extract resource from permission name (format: 'resource:action')
       const resource = this.getResourceFromPermission(permission);
       
       if (!groupMap.has(resource)) {
@@ -467,10 +432,13 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
    * Extract resource part from permission
    */
   getResourceFromPermission(permission: Permission): string {
-    // Handle both id format (resource:action) and name format
-    const id = permission.id || permission.name;
-    if (typeof id === 'string' && id.includes(':')) {
-      return id.split(':')[0];
+    // Use permission.name which is in format 'resource:action'
+    if (permission.name && permission.name.includes(':')) {
+      return permission.name.split(':')[0];
+    }
+    // Fallback to resourceName if available
+    if (permission.resourceName) {
+      return permission.resourceName;
     }
     return 'other';
   }
@@ -479,12 +447,8 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
    * Format permission name for display
    */
   formatPermissionName(permission: Permission): string {
-    // If permission.id is in resource:action format, use that
-    if (typeof permission.id === 'string' && permission.id.includes(':')) {
-      return permission.id;
-    }
-    // Otherwise use name
-    return permission.name;
+    // Use permission.name which is the formatted permission string
+    return permission.name || `${permission.resourceName}:${permission.actionName}`;
   }
   
   /**
@@ -592,15 +556,21 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
   
   onSave(): void {
     if (this.formData.name && this.formData.name.trim()) {
-      // Convert selected permission IDs to permission strings (name field)
-      const selectedPermissionStrings = this.availablePermissions
-        .filter(p => this.selectedPermissions.has(p.id))
-        .map(p => p.name); // Use permission.name for backend compatibility
+      // Convert selected permission IDs to permission names for backend compatibility
+      const selectedPermissionNames: string[] = [];
+      
+      // Look up each selected permission ID in availablePermissions and get the name
+      Array.from(this.selectedPermissions).forEach(permissionId => {
+        const permission = this.availablePermissions.find(p => p.id === permissionId);
+        if (permission && permission.name) {
+          selectedPermissionNames.push(permission.name);
+        }
+      });
       
       const roleToSave: any = {
         name: this.formData.name.trim(),
         description: this.formData.description?.trim() || '',
-        permissions: selectedPermissionStrings // Send as string array
+        permissions: selectedPermissionNames // Send as permission names array to match backend DTO
       };
       
       // Include ID if editing

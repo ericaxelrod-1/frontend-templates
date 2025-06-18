@@ -1,12 +1,33 @@
 # Current Project State
 
-Last Updated: 2025-05-29
+Last Updated: 2025-06-02
 
 ## Project Overview
 
 This repository contains tools for managing and validating database schemas and role-based access control for an Angular/NestJS application. The project provides utilities for monitoring roles, permissions, and validating database schemas.
 
 ## Current Focus Areas
+
+- **COMPLETED: BUG-058 Role Edit Mode Not Connected (✅ COMPLETE - PRODUCTION READY)**
+  - **FINAL STATUS**: Role editing functionality fully restored - permissions now populate correctly in edit mode
+  - **Root Cause**: The `ngOnChanges` method in role-creation-sidebar component was missing `this.editMode = !!this.roleData;` line
+  - **UI Symptoms**: Sidebar showed "Create Role" instead of "Edit Role", form was empty, no permissions pre-selected
+  - **Impact**: Users couldn't see or modify existing role permissions when editing roles
+  - **Solution**: Added missing editMode detection line following the same pattern as group-creation-sidebar component
+  - **Architecture**: Fixed form population logic to properly detect edit mode and initialize selectedPermissions Set
+  - **Testing**: Both backend and frontend build successfully, edit mode properly detected, permissions pre-selected
+  - **Files Modified**: role-creation-sidebar.component.ts (added editMode detection in ngOnChanges method)
+  - **OUTCOME**: Role permission editing now works correctly - users can see and modify existing role permissions
+
+- **COMPLETED: BUG-056 Role Update Endpoint Missing (✅ COMPLETE - PRODUCTION READY)**
+  - **FINAL STATUS**: Role editing functionality fully restored and working
+  - **Root Cause**: Frontend `RoleService.updateRole()` called `PATCH /api/roles/:id` but backend RolesController was missing this endpoint
+  - **Error**: "Cannot PATCH /api/roles/12" - 404 error when trying to update role basic information (name, description)
+  - **Solution**: Added complete PATCH endpoint support with UpdateRoleDto, validation, and security features
+  - **Architecture**: Added proper validation, permission checking (`roles:update`), system role protection, and duplicate name validation
+  - **Testing**: Both backend and frontend build successfully, role editing works end-to-end
+  - **Files Modified**: roles.controller.ts (added PATCH endpoint), roles.service.ts (added update method), role.dto.ts (added UpdateRoleDto)
+  - **OUTCOME**: Role editing functionality now works properly without 404 errors
 
 - **COMPLETED: BUG-037 Sidebar Responsive Width Issue - Angular Best Practices Implementation (✅ COMPLETE - PRODUCTION READY)**
   - **FINAL STATUS**: Sidebar maintains fixed 280px width across all screen sizes with proper responsive behavior

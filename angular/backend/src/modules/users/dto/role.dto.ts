@@ -20,6 +20,44 @@ export class UpdateRolePermissionsDto {
   permissions: string[];
 }
 
+export class UpdateRoleDto {
+  @ApiProperty({
+    description: 'Name of the role',
+    example: 'Content Manager',
+    required: false,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  name?: string;
+
+  @ApiProperty({
+    description: 'Description of the role',
+    example: 'User who can manage content but not users or system settings',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiProperty({
+    description: 'List of permission strings to replace current permissions',
+    example: [
+      'content:create',
+      'content:edit',
+      'content:delete',
+      'content:view',
+      'users:view',
+    ],
+    type: [String],
+    required: false,
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  permissions?: string[];
+}
+
 export class AssignRoleDto {
   @ApiProperty({
     description: 'Role ID to assign to the user',

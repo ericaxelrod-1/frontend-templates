@@ -229,9 +229,10 @@ export class RolesComponent implements OnInit {
       // Edit mode - update existing role
       this.roleService.updateRole(this.selectedRoleForEdit.id, roleData).subscribe({
         next: () => {
-          Object.assign(this.selectedRoleForEdit!, roleData);
           this.snackBar.open('Role updated successfully', 'Close', { duration: 3000 });
           this.closeRoleCreation();
+          // Reload the entire roles list to ensure data consistency
+          this.loadRoles();
         },
         error: (error) => {
           console.error('Error updating role:', error);
@@ -242,9 +243,10 @@ export class RolesComponent implements OnInit {
       // Create mode - create new role
       this.roleService.createRole(roleData).subscribe({
         next: (role) => {
-          this.roles.push(role);
           this.snackBar.open('Role created successfully', 'Close', { duration: 3000 });
           this.closeRoleCreation();
+          // Reload the entire roles list to ensure the new role appears with all data
+          this.loadRoles();
         },
         error: (error) => {
           console.error('Error creating role:', error);

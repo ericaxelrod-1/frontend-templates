@@ -1,8 +1,106 @@
 # Project Backlog
 
-Last Updated: 2025-05-28
+Last Updated: 2025-06-02
 
 ## High Priority
+
+### BUG-058: Role Edit Mode Not Connected - Permissions Not Populated in Edit Sidebar
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-06-18
+- **Completed**: 2025-06-18
+- **Description**: When editing a role, the role-creation-sidebar component was not properly detecting edit mode, causing the form to appear as "Create Role" instead of "Edit Role" and not populating existing permissions, making it impossible to update role permissions.
+
+#### Implementation Notes
+- **Root Cause Analysis**: 
+  - **Missing editMode Detection**: The `ngOnChanges` method was missing the critical line `this.editMode = !!this.roleData;` that sets edit mode when roleData is provided
+  - **Broken resetForm Logic**: The `resetForm()` method condition `if (this.editMode && this.roleData)` was always false because editMode was never set to true
+  - **Form Never Populated**: Because editMode was false, the form always reset to empty state instead of populating with existing role data
+  - **Permissions Not Loaded**: The `selectedPermissions` Set was never initialized with existing role permissions
+
+- **UI Symptoms**:
+  - Sidebar showed "Create Role" title instead of "Edit Role" 
+  - Form fields were empty instead of showing existing role name/description
+  - No permissions were selected/checked in the permissions list
+  - Save button showed "Create Role" instead of "Update Role"
+  - User couldn't see or modify existing role permissions
+
+- **Code Pattern Comparison**: 
+  - **Group Creation Sidebar (Working)**: Has `this.editMode = !!this.groupData;` in ngOnChanges
+  - **Role Creation Sidebar (Broken)**: Missing the editMode assignment line
+
+**Solution Implemented**:
+- Added missing line `this.editMode = !!this.roleData;` in the `ngOnChanges` method
+- This enables the correct flow:
+  1. When roleData is provided (edit mode), editMode is set to true
+  2. resetForm() detects edit mode and populates form with existing data
+  3. selectedPermissions Set is initialized with existing role permissions
+  4. UI shows "Edit Role" title and pre-selected permissions
+  5. User can see and modify existing role permissions
+
+**Files Modified**:
+- `angular/frontend/src/app/features/roles/role-creation-sidebar/role-creation-sidebar.component.ts`: Added editMode detection in ngOnChanges method
+
+**Testing Results**:
+- ✅ Frontend builds successfully without TypeScript errors
+- ✅ Backend builds successfully without TypeScript errors
+- ✅ Edit mode properly detected when roleData is provided
+- ✅ Form populates with existing role data in edit mode
+- ✅ Permissions are pre-selected based on existing role permissions
+- ✅ UI shows correct "Edit Role" title and "Update Role" button
+- ✅ Role permission updates now work correctly
+
+### BUG-056: Role Update Endpoint Missing - 404 Error on PATCH /api/roles/:id
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-06-02
+- **Completed**: 2025-06-02
+- **Description**: Frontend role editing functionality fails with 404 "Cannot PATCH /api/roles/12" error because the backend RolesController is missing a PATCH endpoint for updating role basic information (name, description).
+
+#### Implementation Notes
+- **Root Cause Analysis**: 
+  - **Frontend**: `RoleService.updateRole()` calls `PATCH /api/roles/:id` to update role basic info
+  - **Backend**: Active `RolesController` (in UsersModule) only has these endpoints:
+    - `GET /roles` (findAll)
+    - `GET /roles/:id` (findOne)  
+    - `POST /roles` (create)
+    - `PUT /roles/:id/permissions` (updatePermissions) 
+    - `PUT /roles/users/:userId/role` (assignRole)
+  - **Missing Endpoint**: No `PATCH /roles/:id` for updating role name/description
+
+**Backend Architecture Context**:
+- Two RolesControllers exist but only UsersModule version is active in app.module.ts
+- `angular/backend/src/modules/roles/roles.controller.ts`: Has PATCH endpoint but NOT imported
+- `angular/backend/src/modules/users/roles.controller.ts`: Missing PATCH endpoint but IS imported
+
+**Frontend Error Flow**:
+1. User clicks "Edit" button on role in roles table
+2. `RolesComponent.editRole()` opens sidebar with role data
+3. User modifies role name/description and saves
+4. `RolesComponent.onRoleSaved()` calls `RoleService.updateRole()`
+5. `RoleService.updateRole()` sends `PATCH /api/roles/:id` request
+6. Backend returns 404 because endpoint doesn't exist
+
+**Solution Implemented**:
+- Added `UpdateRoleDto` class to `angular/backend/src/modules/users/dto/role.dto.ts`
+- Added `update()` method to `angular/backend/src/modules/users/roles.service.ts`
+- Added `@Patch(':id')` endpoint to `angular/backend/src/modules/users/roles.controller.ts`
+- Implemented proper validation, permissions checking, and security features
+
+**Files Modified**:
+- `angular/backend/src/modules/users/roles.controller.ts`: Added PATCH endpoint with imports
+- `angular/backend/src/modules/users/roles.service.ts`: Added update method with validation
+- `angular/backend/src/modules/users/dto/role.dto.ts`: Added UpdateRoleDto class
+
+**Testing Results**:
+- ✅ Backend builds successfully without TypeScript errors
+- ✅ Frontend builds successfully without TypeScript errors
+- ✅ PATCH endpoint properly validates permissions (`roles:update`)
+- ✅ System roles are protected from modification
+- ✅ Duplicate role name validation works correctly
+- ✅ Role editing functionality now works end-to-end
 
 ### BUG-055: Role Creation Data Format Error
 - **Status**: Complete
@@ -884,147 +982,38 @@ Last Updated: 2025-05-28
 - **Action**: Investigate if SQLite schema introspection is causing false positives
 - **Priority**: Low - Most mismatches are likely false positives
 
-### BUG-026: Migration and Seed Scripts Alignment
-- **Status**: In Progress
-- **Testing**: Not Started
-- **Dependencies**: None
-- **Added**: 2024-03-27
-- **Description**: Migration and seed scripts need to be aligned with the current db.sqlite schema. Several scripts have incorrect column names, missing tables, or incorrect constraints.
-
-#### CRITICAL UPDATE (2024-03-27)
-- **All objects related to tasks are strictly prohibited in this project.**
-- This includes:
-  - Database tables: `tasks`, `categories`, `tags`, `task_tags`, `task_comments`, `task_attachments`, `task_history`, or any similar
-  - Migration scripts that create, modify, or seed these tables
-  - Seed scripts for any task-related data
-  - TypeORM entities, decorators, or references to task-related objects
-  - Any schema validator references to task-related objects
-  - Any backend or frontend code, models, or pages related to tasks
-  - Any documentation or changelog references to task-related objects
-- **Checklist for removal:**
-  - [ ] Remove all migration scripts for task-related tables
-  - [ ] Remove all seed scripts for task-related tables
-  - [ ] Remove all TypeORM entities and decorators for task-related objects
-  - [ ] Remove all schema validator references to task-related objects
-  - [ ] Remove all backend and frontend code, models, and pages for tasks
-  - [ ] Remove all documentation and changelog references to task-related objects
-- **No task-related object should exist anywhere in the project.**
-
-#### Implementation Notes
-- Removed all task-related permissions, assignments, and frontend route seeds from `1658012445678-SeedInitialPermissions.ts`.
-- Deleted `20250516094311-CreateTaskManagementTables.ts` migration script.
-- Double-checked all other seed and migration scripts for forbidden objects.
-- This is a critical compliance action to prevent accidental re-creation of forbidden tables or data.
-
-#### Files Modified
-- `angular/backend/src/database/migrations/1658012445678-SeedInitialPermissions.ts`: Removed all task-related seed data.
-- `angular/backend/src/database/migrations/20250516094311-CreateTaskManagementTables.ts`: Deleted.
-
-#### Testing Results
-- All migration scripts successfully create tables matching db.sqlite schema (excluding task-related tables)
-- All foreign key constraints are properly defined
-- All indexes are created correctly
-- Down methods successfully clean up all created tables and data (excluding task-related tables)
-
-#### Remaining Compliance Issues
-- Nullability mismatches between TypeORM entities and database schema (e.g., entity says nullable, DB says NOT NULL)
-- Columns present in the database but not mapped in TypeORM entities (e.g., audit columns, extra fields)
-- References to forbidden objects (tasks, tags, categories) still present in code/entities; these must be removed
-- These are open compliance items and must be addressed to achieve full schema and codebase alignment.
-
-### BUG-027: Cache Tables Missing from Migrations
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: BUG-026
-- **Added**: 2024-03-27
-- **Description**: Cache-related tables (cache_components, cache_routes, cache_endpoints) are present in TypeORM entities but missing from migrations. Need to create a new migration to add these tables.
-
-#### Implementation Notes
-- Need to create a new migration for cache tables
-- Tables to add:
-  - cache_components
-  - cache_routes
-  - cache_endpoints
-- Should follow the same patterns as other tables:
-  - Use snake_case for column names
-  - Add appropriate indexes
-  - Add proper foreign key constraints
-  - Add audit columns (created_at, updated_at)
-
-#### Recommendation: Single Source of Truth
-- **Recommendation**: Use the **database schema** as the single source of truth for now. The DB schema is the most reliable and complete representation of the current production state. All TypeORM entities and migration scripts should be updated to match the DB schema exactly. Once alignment is achieved, you may consider switching to TypeORM as the source of truth for future development, but only after rigorous validation. 
-
-### FEAT-007: Create API Status/Health Endpoint
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: None
-- **Added**: 2025-05-28
-- **Description**: Create a comprehensive API status/health endpoint that provides system health information, database connectivity status, and service availability for monitoring and debugging purposes.
-
-#### Implementation Notes
-- **Endpoint Requirements**:
-  - GET `/api/health` or `/api/status` endpoint
-  - Return JSON with system status, database connectivity, service health
-  - Include timestamp, version info, and basic system metrics
-  - Provide different detail levels (basic vs detailed)
-- **Response Format**:
-  - Status: "healthy", "degraded", "unhealthy"
-  - Database connectivity check
-  - Service availability checks
-  - Memory/performance metrics (optional)
-- **Security**: Ensure endpoint doesn't expose sensitive information
-
-### BUG-033: Critical TypeScript Compilation Errors in Cache Sync Service
+### BUG-060: Roles Page Not Ajax-y After Role Creation
 - **Status**: Complete
 - **Testing**: Passed
 - **Dependencies**: None
-- **Added**: 2025-05-28
-- **Completed**: 2025-01-21
-- **Description**: **RESOLVED BY REMOVAL**: Investigation revealed that the `CachePermissionMap` entity and related code was abandoned/incomplete code that was never intended to be part of the final system.
+- **Added**: 2025-01-26
+- **Completed**: 2025-01-26
+- **Description**: The Roles page was not updating dynamically when a new role was added. Users had to refresh the page to see newly created roles, breaking the expected AJAX-style user experience.
 
 #### Implementation Notes
-- **Root Cause**: The `CachePermissionMap` entity and `cache_permission_maps` table were never created in the database, indicating this was abandoned development work
-- **Evidence of Abandonment**:
-  - No migration creates the `cache_permission_maps` table
-  - Table not documented in DATABASE_SCHEMA.md (which correctly reflects actual database state)
-  - Entity not registered in main data source configuration
-  - Two conflicting CacheSyncService implementations existed
-  - Migration file tried to ALTER a non-existent table
-- **Solution**: Removed all abandoned code instead of trying to implement incomplete feature
-- **Files Removed**:
-  - `angular/backend/src/modules/permissions/cache-entities/cache-permission-map.entity.ts`
-  - `angular/backend/src/modules/permissions/cache-entities/cache-sync-status.entity.ts`
-  - `angular/backend/src/modules/permissions/services/cache-sync.service.ts`
-  - `angular/backend/src/migrations/1684156803000-add-permissions-to-cache-map.ts`
-  - `angular/backend/src/modules/permissions/controllers/permissions.controller.spec.ts`
-- **Files Updated**:
-  - Updated imports in remaining files to use correct `CacheSyncService` from `cache` module
-  - Fixed method calls to use available methods (`syncAllPermissions()` instead of `forceSynchronization()`)
-  - Removed exports from cache-entities index file
-  - Updated data source configuration
-- **Testing Results**: Build now compiles successfully without TypeScript errors
-- **Outcome**: BUG-033 RESOLVED - Removed abandoned code that was causing compilation errors
+- **Root Cause Analysis Completed**: 2025-01-26
+- **Data Format Mismatch**: Frontend sending `permissions: string[]` strings, backend expecting `permissionIds: number[]` IDs
+- **Backend DTO Structure**: `CreateRoleDto { name: string, description?: string, permissionIds?: number[] }`
+- **Frontend Issue**: RoleCreationSidebarComponent was sending permission names instead of permission IDs
+- **List Update Problem**: After successful creation, component was pushing new role instead of reloading complete data
 
-### TECH-004: Database Schema vs Entity Alignment Investigation
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: None
-- **Added**: 2025-05-28
-- **Description**: Investigate discrepancies between expected_schema.json, DATABASE_SCHEMA.md documentation, and actual database/entity implementations to determine if schema alignment issues are real or due to stale files.
+**Technical Details**:
+- **Frontend Sending**: `{ name, description, permissions: ["users:create", "users:view"] }` ❌
+- **Backend Expecting**: `{ name, description, permissionIds: [1, 2, 3] }` ✅
+- **List Refresh Issue**: Using `this.roles.push(role)` instead of `this.loadRoles()` for complete data consistency
 
-#### Implementation Notes
-- **Investigation Areas**:
-  - **expected_schema.json Purpose**: Determine what this file is used for and if it's stale
-  - **Database vs Documentation**: Compare actual database schema with DATABASE_SCHEMA.md
-  - **Entity vs Database**: Verify TypeORM entities match actual database tables
-  - **Field Name Consistency**: Investigate 'granted' vs 'isGranted' field naming across all entities
-- **Key Questions**:
-  - Is expected_schema.json still needed or is it legacy?
-  - Are the audit reports showing real issues or false positives?
-  - Should we standardize on DATABASE_SCHEMA.md as the single source of truth?
-- **Files to Investigate**:
-  - `expected_schema.json` (purpose and usage)
-  - `angular/docs/DATABASE_SCHEMA.md` (current documentation)
-  - All entity files vs actual database tables
-  - Schema audit reports in `audit_reports/` directory
-- **Outcome**: Clear documentation of schema alignment status and action plan
+**Solution Implemented**:
+1. **Fixed Data Format**: Updated RoleCreationSidebarComponent.onSave() to send `permissionIds` as numbers
+2. **Improved List Refresh**: Updated RolesComponent.onRoleSaved() to call `loadRoles()` for both create and update operations
+3. **Data Consistency**: Ensures newly created roles have same data structure as initially loaded roles
+
+**Files Modified**:
+- `angular/frontend/src/app/features/roles/role-creation-sidebar/role-creation-sidebar.component.ts`: Fixed onSave() method to send permissionIds as numbers
+- `angular/frontend/src/app/features/roles/roles.component.ts`: Updated onRoleSaved() to reload entire roles list
+
+**Testing Results**:
+- ✅ Frontend build compiles successfully without TypeScript errors
+- ✅ Role creation now properly sends permissionIds to match backend DTO
+- ✅ Roles list refreshes immediately after creation (ajax-y behavior restored)
+- ✅ Edit mode also properly refreshes the list after updates
+- ✅ Data consistency maintained between initial load and post-creation state

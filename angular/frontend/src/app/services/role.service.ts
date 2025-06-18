@@ -4,11 +4,11 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface Permission {
-  id: string | number;
+  id: number;
   name: string;
   description: string;
-  resource: string;
-  action: string;
+  resourceName: string;
+  actionName: string;
 }
 
 export interface Role {

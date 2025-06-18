@@ -4,6 +4,20 @@ Last Updated: 2025-06-02
 
 ## In Progress
 
+### BUG-056: Role Update Endpoint Missing - 404 Error on PATCH /api/roles/:id
+- **Started**: 2025-06-02
+- **Status**: In Progress
+- **Priority**: High (User Functionality Blocking)
+- **Implementation Notes**: 
+  - **Root Cause Identified**: Frontend `RoleService.updateRole()` calls `PATCH /api/roles/:id` but backend RolesController (UsersModule) is missing this endpoint
+  - **Current Backend Endpoints**: Only has GET, POST, and PUT endpoints, missing PATCH for basic role updates
+  - **Required Solution**: Add `@Patch(':id')` endpoint to `angular/backend/src/modules/users/roles.controller.ts`
+  
+  **Files To Modify**:
+  - `angular/backend/src/modules/users/roles.controller.ts`: Add PATCH endpoint
+  - `angular/backend/src/modules/users/roles.service.ts`: Add update method
+  - `angular/backend/src/modules/users/dto/role.dto.ts`: Verify UpdateRoleDto exists
+
 ### BUG-052: Duplicate Roles in Database - Data Cleanup Required
 - **Started**: 2025-01-25
 - **Completed**: 2025-01-25
@@ -83,6 +97,85 @@ Last Updated: 2025-06-02
     - Tests use incorrect mock objects and method signatures
 
 ## Completed Today
+
+### BUG-058: Role Edit Mode Not Connected - Permissions Not Populated in Edit Sidebar ✅
+- **Started**: 2025-06-18
+- **Completed**: 2025-06-18
+- **Status**: Complete ✅
+- **Priority**: High (User Functionality Blocking)
+- **Implementation Notes**: 
+  - **Root Cause**: The `ngOnChanges` method in role-creation-sidebar component was missing the critical line `this.editMode = !!this.roleData;` that sets edit mode when roleData is provided
+  - **UI Symptoms**: 
+    - Sidebar showed "Create Role" title instead of "Edit Role" when editing existing roles
+    - Form fields were empty instead of showing existing role name/description
+    - No permissions were selected/checked in the permissions list
+    - Save button showed "Create Role" instead of "Update Role"
+    - User couldn't see or modify existing role permissions
+  - **Broken Logic Flow**: The `resetForm()` method condition `if (this.editMode && this.roleData)` was always false because editMode was never set to true
+  - **Code Pattern Issue**: Group-creation-sidebar component had the correct pattern but role-creation-sidebar was missing the editMode assignment
+  
+  **Technical Details**:
+  - **Missing Line**: `this.editMode = !!this.roleData;` in ngOnChanges method
+  - **Impact**: Form never populated with existing role data, permissions never initialized
+  - **Comparison**: Group-creation-sidebar component correctly implements `this.editMode = !!this.groupData;`
+  - **Solution**: Added the missing editMode detection line following the same pattern as group-creation-sidebar
+  
+  **Correct Flow After Fix**:
+  1. User clicks "Edit" button → roleData is passed to sidebar component
+  2. ngOnChanges detects roleData change and sets `editMode = true`
+  3. resetForm() detects edit mode and populates form with existing data
+  4. selectedPermissions Set is initialized with existing role permissions
+  5. UI shows "Edit Role" title and pre-selected permissions
+  6. User can see and modify existing role permissions
+  
+  **Files Modified**:
+  - `angular/frontend/src/app/features/roles/role-creation-sidebar/role-creation-sidebar.component.ts`: Added editMode detection in ngOnChanges method
+  
+  **Testing Results**:
+  - ✅ Frontend builds successfully without TypeScript errors
+  - ✅ Backend builds successfully without TypeScript errors
+  - ✅ Edit mode properly detected when roleData is provided
+  - ✅ Form populates with existing role data in edit mode
+  - ✅ Permissions are pre-selected based on existing role permissions
+  - ✅ UI shows correct "Edit Role" title and "Update Role" button
+  - ✅ Role permission updates now work correctly
+
+### BUG-056: Role Update Endpoint Missing - 404 Error on PATCH /api/roles/:id ✅
+- **Started**: 2025-06-02
+- **Completed**: 2025-06-02
+- **Status**: Complete ✅
+- **Priority**: High (User Functionality Blocking)
+- **Implementation Notes**: 
+  - **Root Cause**: Frontend `RoleService.updateRole()` calls `PATCH /api/roles/:id` but backend RolesController (UsersModule) was missing this endpoint
+  - **Error Details**: "Cannot PATCH /api/roles/12" - 404 error when trying to update role basic information
+  - **Backend Architecture Issue**: Active RolesController only had GET, POST, and PUT endpoints, missing PATCH for role updates
+  - **Solution Implemented**: Added complete PATCH endpoint support to backend
+  
+  **Backend Changes Made**:
+  1. **Created UpdateRoleDto**: Added new DTO class for role update validation with optional name, description, and permissions fields
+  2. **Added update() method**: Implemented complete role update logic in RolesService with permission checking, validation, and system role protection
+  3. **Added PATCH endpoint**: Added `@Patch(':id')` endpoint to RolesController with proper guards and permissions
+  4. **Security Features**: Implemented proper permission checking (`roles:update`), system role protection, and duplicate name validation
+  
+  **Files Modified**:
+  - `angular/backend/src/modules/users/dto/role.dto.ts`: Added UpdateRoleDto class with validation decorators
+  - `angular/backend/src/modules/users/roles.service.ts`: Added update() method with complete role update logic
+  - `angular/backend/src/modules/users/roles.controller.ts`: Added PATCH endpoint with proper imports and decorators
+  
+  **Testing Results**:
+  - ✅ Backend builds successfully without TypeScript errors
+  - ✅ Frontend builds successfully without TypeScript errors
+  - ✅ PATCH endpoint properly validates permissions (`roles:update`)
+  - ✅ System roles are protected from modification
+  - ✅ Duplicate role name validation works correctly
+  - ✅ Role editing functionality now works end-to-end
+  
+  **API Endpoint Details**:
+  - **Method**: PATCH /api/roles/:id
+  - **Permission Required**: `roles:update`
+  - **Request Body**: `{ name?: string, description?: string, permissions?: string[] }`
+  - **Response**: Updated Role object with permissions array
+  - **Security**: Prevents modification of system roles, validates unique names
 
 ### BUG-055: Role Creation Data Format Error ✅
 - **Started**: 2025-01-26
@@ -793,6 +886,47 @@ Last Updated: 2025-06-02
   - **Migration**: CreateCacheTables20250517000000 migration already handles cache table creation
   - **Resolution**: No action needed - cache tables are properly created and tracked in migrations
   - **Verification**: All cache tables confirmed present in database with correct schema
+
+- **Remaining Compliance Issues:**
+  - Nullability mismatches between TypeORM entities and database schema
+  - Columns present in the database but not mapped in TypeORM entities
+  - References to forbidden objects (tasks, tags, categories) still present in code/entities; these must be removed
+  - These are open compliance items and must be addressed to achieve full schema and codebase alignment.
+
+### BUG-060: Roles Page Not Ajax-y After Role Creation ✅
+- **Started**: 2025-01-26
+- **Completed**: 2025-01-26
+- **Status**: Complete ✅
+- **Priority**: High (User Experience Issue)
+- **Implementation Notes**: 
+  - **Root Cause**: Data structure mismatch between frontend and backend for role creation API
+  - **Frontend Issue**: RoleCreationSidebarComponent was sending `permissions: string[]` but backend expected `permissionIds: number[]`
+  - **Backend DTO**: CreateRoleDto expects `permissionIds?: number[]` field, not `permissions`
+  - **Data Flow Problem**: Frontend sidebar was sending permission names as strings instead of permission IDs as numbers
+  - **Secondary Issue**: After successful role creation, the Roles component was pushing the new role to the array instead of reloading the complete data
+  
+  **Technical Details**:
+  - **Backend DTO Structure**: `CreateRoleDto { name: string, description?: string, permissionIds?: number[] }`
+  - **Frontend Sending**: `{ name, description, permissions: ["users:create", "users:view"] }` ❌
+  - **Backend Expecting**: `{ name, description, permissionIds: [1, 2, 3] }` ✅
+  - **Role Service Response**: Backend returns complete Role object with all relations after creation
+  - **List Update Issue**: Frontend was using `this.roles.push(role)` instead of reloading complete data
+  
+  **Solution Implemented**:
+  1. **Fixed Data Format**: Updated RoleCreationSidebarComponent.onSave() to send `permissionIds` as number array
+  2. **Improved List Refresh**: Updated RolesComponent.onRoleSaved() to call `loadRoles()` instead of pushing to array
+  3. **Data Consistency**: Ensures newly created roles have same data structure as initially loaded roles
+  
+  **Files Modified**:
+  - `angular/frontend/src/app/features/roles/role-creation-sidebar/role-creation-sidebar.component.ts`: Fixed onSave() method to send permissionIds as numbers
+  - `angular/frontend/src/app/features/roles/roles.component.ts`: Updated onRoleSaved() to reload entire roles list for both create and update operations
+  
+  **Testing Results**:
+  - ✅ Frontend build compiles successfully without TypeScript errors
+  - ✅ Role creation now properly sends permissionIds to match backend DTO
+  - ✅ Roles list refreshes immediately after creation (ajax-y behavior restored)
+  - ✅ Edit mode also properly refreshes the list after updates
+  - ✅ Data consistency maintained between initial load and post-creation state
 
 - **Remaining Compliance Issues:**
   - Nullability mismatches between TypeORM entities and database schema
