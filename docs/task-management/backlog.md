@@ -1,8 +1,155 @@
 # Project Backlog
 
-Last Updated: 2025-06-02
+Last Updated: 2025-06-18
 
 ## High Priority
+
+### BUG-082: Login Monitoring Dashboard Shows Incorrect Data - Backend Controller Returns Placeholder Text
+- **Status**: Complete
+- **Priority**: High
+- **Testing**: Passed
+- **Dependencies**: None
+- **Added**: 2025-01-08
+- **Started**: 2025-06-18
+- **Completed**: 2025-06-18
+
+#### Implementation Notes
+- **Root Cause**: Multiple issues causing Recent Login Attempts table to show "No login attempts found"
+  1. Backend controller returned placeholder text instead of calling service
+  2. Service query logic used LessThan (old attempts) instead of MoreThan (recent attempts)  
+  3. Frontend expected {items: [], total: 0} format but backend returned raw array
+  4. Backend only supported email filter but frontend sent ipAddress, status, dateFrom, dateTo
+  5. Database had only success attempts, no failed/blocked examples for testing
+
+- **Files Modified**:
+  - `angular/backend/src/modules/auth/controllers/login-monitoring.controller.ts`: Fixed data format and filter support
+  - `angular/backend/src/modules/auth/services/login-attempt.service.ts`: Added pagination support and comprehensive filtering
+
+- **Testing Results**:
+  - ✅ Backend compiles successfully
+  - ✅ API returns correct format: {items: LoginAttempt[], total: number}
+  - ✅ All filters supported: email, ipAddress, status, dateFrom, dateTo
+  - ✅ Database contains diverse test data (91 total: 84 success, 3 failed, 2 blocked, 1 captcha_required, 1 captcha_failed)
+  - ✅ Pagination working with limit/offset parameters
+
+### BUG-081: Permissions Management Page is Redundant - Duplicate Functionality with Users/Groups/Roles
+- **Status**: Not Started
+- **Priority**: Medium
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-08
+- **Description**: The Permissions Management page (/admin/permissions) provides duplicate functionality that already exists in the main Users, Groups, and Roles pages, creating confusion and maintenance overhead.
+
+#### **DETAILED ANALYSIS** 🔍
+
+**Redundancy Evidence**:
+
+**1. Users Component** (`/app/users`) **vs** Permissions Management:
+- ✅ Users page: Full user management with roles and groups assignment
+- ❌ Permissions Management: Duplicates user-role and user-group assignments
+- **Verdict**: Users page is more comprehensive and user-friendly
+
+**2. Groups Component** (`/app/groups`) **vs** Permissions Management:
+- ✅ Groups page: Complete group management with member management
+- ❌ Permissions Management: Duplicates group membership functionality
+- **Verdict**: Groups page provides better UX for group administration
+
+**3. Roles Component** (`/app/roles`) **vs** Permissions Management:
+- ✅ Roles page: Full role management with permission assignment
+- ❌ Permissions Management: Duplicates role permission functionality
+- **Verdict**: Roles page is more intuitive for role administration
+
+**Navigation Analysis**:
+- **Main App Routes** (`app.routes.ts`): Users, Groups, Roles accessible at `/app/*`
+- **Admin Routes** (`admin.module.ts`): Permissions Management at `/admin/permissions`
+- **User Confusion**: Two different paths to same functionality
+
+**Code Architecture Issues**:
+- **Duplicate Components**: Permissions Management has separate components for same operations
+- **Maintenance Overhead**: Changes must be made in multiple places
+- **Inconsistent UX**: Different UI patterns for same functionality
+- **Code Bloat**: Unnecessary duplication increases bundle size
+
+**Permissions Management Module Structure**:
+```
+/features/admin/permissions-management/
+├── component-permissions/
+├── route-permissions/
+├── endpoint-permissions/
+├── permissions-dashboard/
+├── assign-permissions/
+├── role-permissions/
+├── group-permissions/
+└── permissions-management.module.ts (93 lines)
+```
+
+**Functionality Overlap**:
+- **Role Permissions**: Already handled by Roles page
+- **Group Permissions**: Already handled by Groups page  
+- **User Assignments**: Already handled by Users page
+- **Component/Route/Endpoint Permissions**: Technical implementation details, not user-facing
+
+#### **PROPOSED SOLUTION**
+
+**Phase 1: Remove Redundant Module**
+1. **Delete Permissions Management Directory**:
+   ```
+   angular/frontend/src/app/features/admin/permissions-management/
+   ```
+
+2. **Remove Route from Admin Module**:
+   File: `angular/frontend/src/app/modules/admin/admin.module.ts`
+   ```typescript
+   // REMOVE THIS ROUTE:
+   {
+     path: 'permissions',
+     loadChildren: () => import('../../features/admin/permissions-management/permissions-management.module').then(m => m.PermissionsManagementModule),
+     canActivate: [PermissionGuard],
+     data: { permissions: 'permissions:admin' }
+   }
+   ```
+
+3. **Update Navigation Components**:
+   - Remove "Permissions Management" links from admin navigation
+   - Ensure Users, Groups, Roles are accessible from main navigation
+
+**Phase 2: Consolidate Navigation**
+1. **Verify Main Routes** (`app.routes.ts`):
+   ```typescript
+   // ENSURE THESE EXIST:
+   { path: 'users', loadChildren: () => import('./features/users/users.routes').then(m => m.routes) },
+   { path: 'groups', loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent) },
+   { path: 'roles', loadComponent: () => import('./features/roles/roles.component').then(c => c.RolesComponent) }
+   ```
+
+2. **Update Admin Layout**:
+   - Remove permissions management navigation items
+   - Add clear links to Users, Groups, Roles if needed
+
+**Phase 3: Cleanup and Validation**
+1. **Remove Unused Imports**: Clean up any remaining references
+2. **Update Documentation**: Remove permissions management references
+3. **Test Navigation**: Ensure all functionality accessible via main routes
+
+#### **EXPECTED OUTCOMES**
+- ✅ Eliminates code duplication (reduces codebase by ~1000+ lines)
+- ✅ Simplifies user experience (single path to each function)
+- ✅ Reduces maintenance overhead (changes in one place only)
+- ✅ Improves performance (smaller bundle size)
+- ✅ Cleaner navigation structure
+
+#### **FILES TO REMOVE**
+- `angular/frontend/src/app/features/admin/permissions-management/` (entire directory)
+
+#### **FILES TO MODIFY**
+- `angular/frontend/src/app/modules/admin/admin.module.ts` (remove route)
+- Navigation components (remove permissions management links)
+- Documentation files (remove references)
+
+#### **RISK ASSESSMENT**
+- **Low Risk**: Functionality preserved in main Users/Groups/Roles pages
+- **No Data Loss**: Only removing duplicate UI components
+- **Reversible**: Can be restored from git history if needed
 
 ### BUG-060: Role Deletion Fails Due to Foreign Key Constraint - Permission Assignments Not Cascaded
 - **Status**: Complete

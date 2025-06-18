@@ -1,8 +1,37 @@
 # Project Changelog
 
-Last Updated: 2025-06-02
+Last Updated: 2025-06-18
 
 ## In Progress
+
+### BUG-081: Permissions Management Page is Redundant - Duplicate Functionality with Users/Groups/Roles
+- **Started**: 2025-01-08
+- **Status**: In Progress
+- **Priority**: Medium (Code Quality & User Experience)
+- **Implementation Notes**: 
+  - **Root Cause Identified**: Permissions Management page (/admin/permissions) provides duplicate functionality that already exists in main Users, Groups, and Roles pages
+  - **Redundancy Analysis**:
+    - Users page (/app/users): Full user management with roles and groups assignment ✅
+    - Groups page (/app/groups): Complete group management with member management ✅  
+    - Roles page (/app/roles): Full role management with permission assignment ✅
+    - Permissions Management (/admin/permissions): Duplicates all above functionality ❌
+  - **Impact**: Code duplication, maintenance overhead, user confusion, larger bundle size
+  - **Solution Strategy**: 3-phase removal of redundant module while preserving all functionality in main pages
+  
+  **Phase 1: Remove Redundant Module**
+  - Delete permissions-management directory (93+ component files)
+  - Remove route from admin.module.ts
+  - Update navigation components
+  
+  **Phase 2: Consolidate Navigation**  
+  - Verify main routes for Users/Groups/Roles are accessible
+  - Remove permissions management navigation links
+  - Update admin layout if needed
+  
+  **Phase 3: Cleanup & Validation**
+  - Remove unused imports and references
+  - Update documentation
+  - Test all functionality via main routes
 
 ### BUG-056: Role Update Endpoint Missing - 404 Error on PATCH /api/roles/:id
 - **Started**: 2025-06-02
@@ -97,6 +126,64 @@ Last Updated: 2025-06-02
     - Tests use incorrect mock objects and method signatures
 
 ## Completed Today
+
+### BUG-082: Login Monitoring Dashboard Shows Incorrect Data - Backend Controller Returns Placeholder Text ✅
+- **Started**: 2025-06-18
+- **Completed**: 2025-06-18
+- **Status**: Complete ✅
+- **Priority**: High (User Functionality Blocking)
+- **Implementation Notes**: 
+  - **Root Cause Identified**: Login monitoring dashboard showed 29 total attempts but 0 rows in the "recent attempts" table, and all test scenarios (failed, blocked, captcha required) showed zero counts. Backend controller was returning placeholder text instead of actual database data.
+  
+  **Issues Fixed**:
+  1. **Backend Controller Bug**: `login-monitoring.controller.ts` line 42-48 returned placeholder text instead of calling service
+  2. **Service Query Logic Error**: `login-attempt.service.ts` used `LessThan(cutoff)` which returned OLD attempts, not recent ones
+  3. **Frontend Data Format Mismatch**: Backend returned raw array but frontend expected `{items: [], total: 0}` format
+  4. **Missing Filter Support**: Backend only handled email filter, but frontend sent ipAddress, status, dateFrom, dateTo
+  5. **Field Mapping Issue**: Frontend expected `email` and `createdAt` fields, but backend entity used `emailAttempted` and `attemptedAt`
+  6. **Missing Sorting Functionality**: Table columns were not sortable, needed default timestamp descending sort
+  7. **Missing Test Data**: Database had 83 login attempts, ALL with status 'success' - no failed/blocked examples
+  
+  **Files Modified**:
+  - `angular/backend/src/modules/auth/controllers/login-monitoring.controller.ts`: Fixed getRecentAttempts to return proper format, support all filters, and added sorting parameters (sortBy, sortDirection)
+  - `angular/backend/src/modules/auth/services/login-attempt.service.ts`: Added getTotalAttemptsCount method, updated getRecentAttemptsForDashboard to support comprehensive filtering and sorting with field mapping
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added MatSort functionality with default timestamp descending sort and onSortChange method
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Added mat-sort-header directives to all sortable columns
+  - `angular/frontend/src/app/modules/admin/admin.module.ts`: Added MatSortModule import
+  - **Database**: Added 7 test login attempts with various failure scenarios (failed, blocked, captcha_required, captcha_failed)
+  
+  **Testing Results**:
+  - ✅ Backend builds successfully with TypeScript compilation
+  - ✅ Frontend builds successfully with Angular compilation  
+  - ✅ Database contains diverse test data (91 total attempts: 84 success, 3 failed, 2 blocked, 1 captcha_required, 1 captcha_failed)
+  - ✅ API endpoint now returns correct format: `{items: LoginAttempt[], total: number}`
+  - ✅ All filter parameters supported: email, ipAddress, status, dateFrom, dateTo
+  - ✅ Pagination support with limit/offset parameters
+  - ✅ Field mapping resolved: `emailAttempted` → `email`, `attemptedAt` → `createdAt`
+  - ✅ Sorting functionality: All columns sortable with default timestamp descending
+  
+  **Expected Result**: Login monitoring dashboard should now show recent login attempts in the table with proper email and timestamp columns displayed, plus working filtering, pagination, and sorting support. Default sort is timestamp descending (most recent first).
+
+### BUG-061: Login-Monitoring Routes Return 401 Unauthorized - Permission Mismatch ✅
+- **Started**: 2025-01-08
+- **Completed**: 2025-01-08
+- **Status**: Complete ✅
+- **Priority**: High (User Functionality Blocking)
+- **Implementation Notes**: 
+  - **Root Cause**: Backend login-monitoring controller expected `login-monitoring:view` permission but database only contained `login-monitoring:read` permission
+  - **Error Symptoms**: User could navigate to `/admin/login-monitoring` route but all API calls failed with 401 Unauthorized errors
+  - **Permission Mismatch**: 
+    - Database permissions: `login-monitoring:read` and `login-monitoring:manage` (✅ assigned to superadmin)
+    - Backend controller expected: `login-monitoring:view` and `login-monitoring:manage` (❌ view permission not found)
+  - **Investigation Process**: Used @999-bugfinder methodology to systematically compare working routes vs failing routes
+  - **Solution**: Updated backend controller to use `login-monitoring:read` instead of `login-monitoring:view` to align with database
+- **Files Modified**:
+  - `angular/backend/src/modules/auth/controllers/login-monitoring.controller.ts`: Changed all `@RequirePermission('login-monitoring:view')` to `@RequirePermission('login-monitoring:read')`
+- **Testing Results**:
+  - ✅ Permission requirements now match database permissions
+  - ✅ Superadmin user has required `login-monitoring:read` and `login-monitoring:manage` permissions
+  - ✅ Login-monitoring API endpoints should now work correctly
+  - ✅ 401 Unauthorized errors should be resolved
 
 ### BUG-060: Role Deletion Fails Due to Foreign Key Constraint - Permission Assignments Not Cascaded ✅
 - **Started**: 2025-06-18
@@ -602,332 +689,6 @@ Last Updated: 2025-06-02
   - **Resolution**: No action needed - cache tables are properly created and tracked in migrations
   - **Verification**: All cache tables confirmed present in database with correct schema
 
-## Recent Completions
-
-### BUG-031: Fix Login Circular Dependency with Permissions
-- **Started**: 2025-05-28
-- **Completed**: 2025-05-28
-- **Status**: Complete ✅
-- **Implementation Notes**: 
-  - **Root Cause**: User login was failing due to circular dependency - user-permissions endpoint required `permissions:read` permission, but users need to login first to get their permissions
-  - **Impact**: Users could authenticate but immediately get redirected back to login page due to failed permission checks
-  - **Console Errors**: 
-    - `Failed to load resource: the server responded with a status of 400 (Bad Request)` for `/api/permissions/user-permissions`
-    - `Failed to load resource: the server responded with a status of 401 (Unauthorized)` for `/api/roles`
-    - `POST http://localhost:3000/api/auth/logout 400 (Bad Request)` for logout endpoint
-    - `AuthInterceptor: Token refresh failed: undefined No refresh token available for refreshAccessToken call`
-  - **Solution**: 
-    - **Permissions Controller**: Removed `@RequirePermissions('permissions:read')` decorator from `getUserPermissions()` method to eliminate circular dependency
-    - **Permissions Controller**: Fixed method call from `getCurrentUserPermissions(userId)` to `getUserPermissions(userId)` to match actual service method
-    - **Roles Controller**: Removed deprecated `RoleGuard` that was causing 401 errors, keeping only `JwtAuthGuard` for authentication
-    - **Auth Service**: Fixed logout method to send `{ token: refreshToken }` instead of `{ refreshToken }` to match backend `RefreshTokenDto` expectations
-- **Files Modified**:
-  - `angular/backend/src/modules/permissions/controllers/permissions.controller.ts`: Removed permission requirement and fixed service method call
-  - `angular/backend/src/modules/roles/roles.controller.ts`: Removed deprecated RoleGuard
-  - `angular/frontend/src/app/core/services/auth.service.ts`: Fixed logout request body property name
-- **Testing Results**:
-  - ✅ Backend server running successfully on port 3000
-  - ✅ `/api/permissions/user-permissions` returns 401 Unauthorized (expected without auth token)
-  - ✅ `/api/roles` returns 401 Unauthorized (expected without auth token)  
-  - ✅ `/api/auth/logout` accepts proper JSON with `token` property
-  - ✅ No more 400 Bad Request errors from circular dependencies
-  - ✅ Login flow should now work without permission check failures
-
-### BUG-030: Fix QueryBuilder Column Mapping Issues in PatternDetectionService
-- **Started**: 2025-05-27
-- **Completed**: 2025-05-27
-- **Status**: Complete ✅
-- **Implementation Notes**: 
-  - **Root Cause**: PatternDetectionService and LoginAttemptService were using `createdAt` in QueryBuilder queries, but the LoginAttempt entity maps this to the `attempted_at` database column
-  - **Impact**: Caused runtime database errors: "Property 'createdAt' was not found in 'LoginAttempt'"
-  - **Solution**: Replaced all instances of `createdAt` with `attemptedAt` in QueryBuilder and repository queries
-  
-  **Files Fixed**:
-  - `src/modules/auth/services/pattern-detection.service.ts`: Fixed all QueryBuilder queries and MoreThan/Between clauses
-  - `src/modules/auth/services/login-attempt.service.ts`: Fixed all repository find queries and order clauses
-  - `src/scripts/create-test-login-attempt.ts`: Fixed order clause in test script
-  
-  **Technical Details**:
-  - The LoginAttempt entity has `@CreateDateColumn({ name: 'attempted_at' })` but provides `createdAt` getter/setter for backward compatibility
-  - TypeORM QueryBuilder uses actual database column names, not entity property names
-  - Repository.find() queries work with entity property names through the getter/setter mapping
-  
-  **Testing**: Application builds successfully and no more database schema errors
-
-### BUG-020: Align Migration Scripts to Current db.sqlite Schema
-- **Started**: 2025-05-16
-- **Completed**: 2025-05-16
-- **Implementation Notes**: 
-  - Updated migration scripts to use consistent snake_case naming conventions 
-  - Fixed `1658012345678-CreatePermissionEntities.ts` to use snake_case column names:   
-    - `resourceName` → `resource_name`   
-    - `actionName` → `action_name`    
-    - `createdAt` → `created_at`   
-    - `updatedAt` → `updated_at`   
-    - `ownerId` → `owner_id`   
-    - `filePath` → `file_path`   
-    - `overridePermissions` → `override_permissions`   
-    - `lastSynced` → `last_synced`   
-    - `controllerName` → `controller_name`   
-    - `handlerName` → `handler_name`   
-    - `isAdmin` → `is_admin` 
-  - Updated `20250516094310-CreateAndSeedActionsTable.ts` to use `action_code` instead of `action_name` 
-  - Recreated `1658012445678-SeedInitialPermissions.ts` with proper snake_case column names 
-  - Added `CREATE TABLE IF NOT EXISTS` to prevent conflicts with existing tables 
-  - Verified that the current database schema already uses snake_case consistently 
-  - The database schema uses `action_id` (foreign key) instead of `action_name` (text field) for permissions table
-- **Files Modified**: 
-  - `angular/backend/src/database/migrations/1658012345678-CreatePermissionEntities.ts`: Updated all column names to snake_case 
-  - `angular/backend/src/database/migrations/20250516094310-CreateAndSeedActionsTable.ts`: Updated to use action_code 
-  - `angular/backend/src/database/migrations/1658012445678-SeedInitialPermissions.ts`: Recreated with snake_case columns
-- **Testing Results**: 
-  - Database schema audit confirmed all tables use snake_case naming conventions 
-  - Migration scripts now match the current database structure 
-  - TypeORM naming strategy translator will work correctly with consistent snake_case
-
-### TASK-004: Align Database Schema, Documentation, and Migrations
-- **Started**: 2025-05-07
-- **Completed**: 2025-05-13
-- **Implementation Notes**:
-  - All schema alignment and table naming issues resolved by TASK-004.
-  - Database schema, migration scripts, and seed scripts are now fully aligned with TypeORM entity definitions.
-  - All tables are managed by a single, up-to-date migration script.
-  - All seed scripts are compatible and have been successfully run.
-  - Foreign key constraints have been corrected, and the application starts successfully.
-  - Legacy/backup tables have been dropped.
-  - Documentation and changelogs updated to reflect all changes.
-- **Files Modified**:
-  - All migration scripts affecting permissions, roles, users, and related tables
-  - All seed scripts for permissions, roles, users
-  - Documentation: backlog.md, changelog.md, implementation_steps.md, current_state.md
-
-### TECH-003: Full Schema Alignment Audit
-- **Started**: 2025-05-07
-- **Completed**: 2025-05-13
-- **Implementation Notes**:
-  - All schema alignment and table naming issues resolved by TASK-004. See TASK-004 for details.
-
-### TECH-003.1: Schema Alignment Mismatch Analysis
-- **Started**: 2025-05-07
-- **Completed**: 2025-05-13
-- **Implementation Notes**:
-  - All schema alignment and table naming issues resolved by TASK-004. See TASK-004 for details.
-
-### TECH-003.2: Schema Alignment Critical Fixes
-- **Started**: 2025-05-09
-- **Completed**: 2025-05-13
-- **Implementation Notes**:
-  - All schema alignment and table naming issues resolved by TASK-004. See TASK-004 for details.
-
-### BUG-015: Table Name Inconsistency Between user_permission and user_permissions
-- **Started**: 2025-05-06
-- **Completed**: 2025-05-13
-- **Implementation Notes**:
-  - All schema alignment and table naming issues resolved by TASK-004. See TASK-004 for details.
-
-### TECH-002.5: Database Tools Enhancement
-- **Started**: 2025-05-06
-- **Completed**: 2025-05-06
-- **Implementation Notes**: 
-  - Enhanced database validation and management tools with better error handling and logging
-  - Updated fix-database.js to create all required tables in the schema based on expected_schema.json
-  - Improved check-db.js with better column information display, index checks, and row counts
-  - Added comprehensive logging to both tools with timestamps
-  - Created a config.json file to control tool behavior
-  - Added support for foreign key constraints in all tables
-  - Created default data for actions and resources tables
-  - Added proper documentation with README file
-  - Created backup directory for database backups
-  - Files modified:
-    - fix-database.js: Enhanced to create complete database schema with all tables
-    - check-db.js: Improved to provide detailed database structure information
-    - config.json: Added to control debug mode and other settings
-    - DATABASE_TOOLS_README.md: Added comprehensive documentation
-  - Testing results:
-    - Successfully creates all required tables from scratch
-    - Properly handles existing tables with missing columns
-    - Generates detailed logs with timestamps
-    - Successfully validates database structure
-
-### BUG-014: Circular Dependency Issues in UsersModule
-- **Started**: 2025-05-03
-- **Completed**: 2025-05-03
-- **Implementation Notes**: 
-  - Fixed circular dependency issues between UsersModule and PermissionsModule
-  - Root cause: PERMISSION_CHECKER token was not properly provided and exported in PermissionsSharedModule
-  - Updates implemented:
-    - Added provider in PermissionsSharedModule for PERMISSION_CHECKER token
-    - Made PermissionCheckerService more robust with fallback implementation
-    - Added missing repository dependencies to PermissionsSharedModule 
-    - Updated UsersModule to import PermissionsSharedModule
-    - Fixed CacheSyncService import path in PermissionsController
-    - Used forwardRef for all module imports that could be part of circular dependencies
-    - Added missing entity imports in PermissionsModule
-  - Files modified:
-    - angular/backend/src/modules/permissions/shared/permissions-shared.module.ts
-    - angular/backend/src/modules/permissions/services/permission-checker.service.ts
-    - angular/backend/src/modules/users/users.module.ts
-    - angular/backend/src/modules/permissions/controllers/permissions.controller.ts
-    - angular/backend/src/modules/permissions/permissions.module.ts
-  - Testing results:
-    - Application starts successfully without dependency errors
-    - All modules properly initialize
-
-### BUG-013: Incomplete Scanner Service Implementations
-- **Started**: 2025-05-02
-- **Completed**: 2025-05-03
-- **Implementation Notes**: 
-  - Identified dependency injection issues with scanner services in the permissions module
-  - Root cause: Placeholder implementations of scanner services missing required dependencies
-  - EndpointScannerService requires DiscoveryService, MetadataScanner, and Reflector dependencies
-  - Scanners module doesn't import DiscoveryModule needed for these dependencies
-  - All scanner services have incomplete implementations that don't match angular/backend versions
-  - Created detailed documentation of required changes in backlog and implementation steps
-  - Updates implemented:
-    - Added DiscoveryModule import to both src and angular/backend ScannersModule
-    - Updated EndpointScannerService constructor to include DiscoveryService, MetadataScanner, and Reflector
-    - Implemented basic error handling and logging in all scanner services
-    - Updated interface definitions to match angular/backend versions
-    - Added implementation for basic manifest saving functionality
-    - Fixed CacheSyncService import path from '../services/cache-sync.service' to '../../cache/cache-sync.service'
-    - Fixed method names in ManifestService (clearPermissionsCache → clearAllPermissions)
-    - Fixed syncPermissions method call by providing required parameters ('permissions', 0)
-    - Fixed missing CachePermissionMap reference in PermissionsModule
-  - **Investigation Findings**:
-    - Error in backend server startup: "UnknownDependenciesException: Nest can't resolve dependencies of the EndpointScannerService"
-    - The application fails due to missing DiscoveryService at index [2] in the constructor
-    - After fixing EndpointScannerService, encountered issue with CacheSyncService in ManifestService
-    - Found incorrect import paths and method calls in ManifestService
-    - Successfully resolved scanner service dependencies, but found other unrelated dependency issues in UsersModule
-  - **Outcome**:
-    - Scanner services now have correct dependencies injected
-    - DiscoveryModule properly imported in both src and angular/backend
-    - Basic implementation completed with proper error handling
-    - Application now progresses past the scanner service initialization
-    - Note: Other dependency issues exist in the application, but they're not related to BUG-013 and should be tracked separately
-
-### BUG-012: Missing ManifestService Dependency in PermissionsModule
-- **Completed**: 2025-05-02
-- **Implementation Notes**: 
-  - Fixed the ManifestService dependency injection issue in PermissionsController by:
-    - Creating a new ScannersModule to properly export all scanner services
-    - Removing the duplicate ManifestService implementation in /services directory
-    - Updating the PermissionsModule to import the ScannersModule
-    - Updating import statements in PermissionsService to point to the correct ManifestService
-  - Root cause: Two different ManifestService implementations existed in the codebase
-  - Additional fixes:
-    - Added missing entity files in the src/modules/permissions/entities directory
-    - Updated ScannersModule to include ConfigModule and all required entity repositories
-    - Updated scanner services to have proper constructor injections
-    - Synchronized the implementations between angular/backend and src directories
-  - Files modified:
-    - angular/backend/src/modules/permissions/scanners/scanners.module.ts
-    - angular/backend/src/modules/permissions/permissions.module.ts
-    - src/modules/permissions/scanners/scanners.module.ts
-    - src/modules/permissions/scanners/component-scanner.service.ts
-    - src/modules/permissions/scanners/route-scanner.service.ts 
-    - src/modules/permissions/scanners/endpoint-scanner.service.ts
-    - src/modules/permissions/scanners/manifest.service.ts
-  - New files created:
-    - src/modules/permissions/entities/permission.entity.ts
-    - src/modules/permissions/entities/ui-component.entity.ts
-    - src/modules/permissions/entities/frontend-route.entity.ts
-    - src/modules/permissions/entities/api-endpoint.entity.ts
-
-### TECH-002.4: TypeORM Migration Fix
-- **Completed**: 2025-04-30
-- **Implementation Notes**: 
-  - Fixed TypeORM migration class names that were causing database connection errors
-  - Updated class names to include valid JavaScript timestamps instead of numeric IDs
-  - Renamed migration files to match their class names
-  - Fixed issue: "Migration name is wrong. Migration class name should have a JavaScript timestamp appended"
-- **Files Modified**:
-  - angular/backend/src/migrations/1700000001-add-action-permissions.ts → 1684156801000-add-action-permissions.ts
-  - angular/backend/src/migrations/1700000002-fix-role-permissions.ts → 1684156802000-fix-role-permissions.ts
-  - angular/backend/src/migrations/1700000003-add-permissions-to-cache-map.ts → 1684156803000-add-permissions-to-cache-map.ts
-
-### TECH-002.3: SQLite Database Schema Fix
-- **Completed**: 2025-04-30
-- **Implementation Notes**: 
-  - Created a migration to fix SQLite composite primary key issues
-  - Modified join tables to use single primary key with auto-increment
-  - Added unique constraints for relationship columns
-  - Created improved database configuration with SQLite-specific settings
-  - Added a script to run the SQLite-specific migrations
-- **Files Modified**:
-  - angular/backend/src/migrations/1742536989657-FixSQLiteCompositePrimaryKeys.ts (new)
-  - angular/backend/src/config/database.config.ts (new)
-  - angular/backend/src/scripts/run-migrations.ts (new)
-  - angular/backend/src/app.module.ts (updated)
-  - angular/backend/package.json (updated with new scripts)
-
-### BUG-001: Login Functionality Fixed
-- **Completed**: 2025-04-30
-- **Implementation Notes**: 
-  - Fixed User entity repository injection in the Auth module
-  - Updated the UsersSharedModule to provide the User entity via TypeOrmModule
-  - Corrected module imports in the App module (UsersModule instead of UserModule)
-  - Resolved the "Unable to resolve dependency: UserRepository" error
-- **Files Modified**:
-  - angular/backend/src/modules/auth/auth.module.ts
-  - angular/backend/src/modules/users/shared/users-shared.module.ts
-  - angular/backend/src/app.module.ts
-
-### TECH-001.2: Test Suite Enhancement
-- **Completed**: 2025-04-30
-- **Implementation Notes**: Added comprehensive tests for the schema validation utilities.
-- **Files Modified**:
-  - angular/backend/test/schema-validation.spec.ts
-  - angular/backend/test/role-monitor.spec.ts
-  - angular/backend/src/utils/test-helpers.ts
-
-### TECH-001.1: Code Documentation Update
-- **Completed**: 2025-04-30
-- **Implementation Notes**: Updated all docstrings to follow consistent format.
-- **Files Modified**:
-  - All source code files in src/
-  - Readme.md updated with documentation guidelines
-
-### FEAT-005: Role Monitoring Dashboard
-- **Completed**: 2025-04-29
-- **Implementation Notes**: Created a dashboard for monitoring role changes.
-- **Files Modified**:
-  - angular/frontend/src/app/admin/role-dashboard.component.ts
-  - angular/frontend/src/app/admin/role-dashboard.component.html
-  - angular/backend/src/controllers/roles.controller.ts
-
-### FEAT-004: Schema Validation API
-- **Completed**: 2025-04-28
-- **Implementation Notes**: Created REST API for schema validation.
-- **Files Modified**:
-  - angular/backend/src/controllers/schema.controller.ts
-  - angular/backend/src/services/schema.service.ts
-
-### BUG-026: Migration and Seed Scripts Alignment
-- **Started**: 2025-05-23
-- **Completed**: 2025-05-23
-- **Status**: Complete ✅
-- **Implementation Notes**: 
-  - **Root Cause**: Database tables existed but migrations table was empty, causing conflicts
-  - **Solution**: Marked all existing migrations as executed by inserting records into migrations table
-  - **Fixed Migration Conflicts**:
-    - Removed duplicate actions table creation from CreatePermissionEntities migration
-    - Aligned migration timestamps with execution order
-    - All 13 migrations now properly tracked in migrations table
-  - **Testing**: Migration run now completes successfully with "No migrations are pending"
-  - **Files Modified**: 
-    - `src/database/migrations/1658012345678-CreatePermissionEntities.ts`: Removed duplicate actions table creation
-
-### BUG-027: Cache Tables Missing from Migrations
-- **Started**: 2025-05-23
-- **Completed**: 2025-05-23
-- **Status**: Complete ✅ (Not Needed)
-- **Implementation Notes**: 
-  - **Analysis**: Cache tables (cache_components, cache_routes, cache_endpoints) already exist in database
-  - **Migration**: CreateCacheTables20250517000000 migration already handles cache table creation
-  - **Resolution**: No action needed - cache tables are properly created and tracked in migrations
-  - **Verification**: All cache tables confirmed present in database with correct schema
-
 - **Remaining Compliance Issues:**
   - Nullability mismatches between TypeORM entities and database schema
   - Columns present in the database but not mapped in TypeORM entities
@@ -944,7 +705,6 @@ Last Updated: 2025-06-02
   - **Frontend Issue**: RoleCreationSidebarComponent was sending `permissions: string[]` but backend expected `permissionIds: number[]`
   - **Backend DTO**: CreateRoleDto expects `permissionIds?: number[]` field, not `permissions`
   - **Data Flow Problem**: Frontend sidebar was sending permission names as strings instead of permission IDs as numbers
-  - **Secondary Issue**: After successful role creation, the Roles component was pushing the new role to the array instead of reloading the complete data
   
   **Technical Details**:
   - **Backend DTO Structure**: `CreateRoleDto { name: string, description?: string, permissionIds?: number[] }`

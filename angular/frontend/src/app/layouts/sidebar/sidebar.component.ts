@@ -60,12 +60,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
       icon: 'security', 
       route: '/admin/login-monitoring', 
       permission: 'system:admin'
-    },
-    { 
-      label: 'Permissions', 
-      icon: 'shield', 
-      route: '/admin/permissions', 
-      permission: 'permissions:admin'
     }
   ];
   

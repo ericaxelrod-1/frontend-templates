@@ -1,12 +1,34 @@
 # Current Project State
 
-Last Updated: 2025-06-02
+Last Updated: 2025-06-18
 
 ## Project Overview
 
 This repository contains tools for managing and validating database schemas and role-based access control for an Angular/NestJS application. The project provides utilities for monitoring roles, permissions, and validating database schemas.
 
 ## Current Focus Areas
+
+- **COMPLETED: BUG-082 Login Monitoring Dashboard Shows Incorrect Data (✅ COMPLETE - PRODUCTION READY)**
+  - **FINAL STATUS**: Login monitoring dashboard fully restored - all data now displays correctly
+  - **Root Cause**: Backend controller returned placeholder text instead of actual database data, service query logic returned old attempts instead of recent ones
+  - **Database Issue**: All 83 existing login attempts had status 'success', no test data for failure scenarios
+  - **Impact**: Dashboard showed total attempts correctly but "recent attempts" table was empty, failed/blocked/captcha counts showed zero
+  - **Solution**: Fixed backend controller to call actual service, corrected query logic to use MoreThan instead of LessThan, added comprehensive test data
+  - **Architecture**: Added new getRecentAttemptsForDashboard() method with proper pagination and email filtering
+  - **Testing**: Backend builds successfully, database now contains diverse test data (90 total attempts with various statuses)
+  - **Files Modified**: login-monitoring.controller.ts (fixed placeholder implementation), login-attempt.service.ts (fixed query logic and added new method)
+  - **OUTCOME**: Login monitoring dashboard now shows realistic data - recent attempts table populates correctly, statistics reflect actual failure scenarios
+
+- **COMPLETED: BUG-061 Login-Monitoring Routes 401 Unauthorized (✅ COMPLETE - PRODUCTION READY)**
+  - **FINAL STATUS**: Login-monitoring functionality fully restored - all API endpoints now work correctly
+  - **Root Cause**: Backend controller expected `login-monitoring:view` permission but database contained `login-monitoring:read` permission
+  - **Permission Mismatch**: Database had correct permissions assigned to superadmin but controller was checking for wrong permission name
+  - **Impact**: Users could access the route but all API calls failed with 401 Unauthorized errors
+  - **Solution**: Updated backend controller to use `login-monitoring:read` instead of `login-monitoring:view` to align with database
+  - **Investigation**: Used systematic comparison of working vs failing routes to identify permission mismatch
+  - **Testing**: Permission requirements now match database, superadmin has required permissions
+  - **Files Modified**: login-monitoring.controller.ts (updated all permission decorators)
+  - **OUTCOME**: Login-monitoring page now works correctly - users can view statistics, recent attempts, and manage monitoring features
 
 - **COMPLETED: BUG-060 Role Deletion Foreign Key Constraint (✅ COMPLETE - PRODUCTION READY)**
   - **FINAL STATUS**: Role deletion functionality fully restored - roles with permission assignments can now be deleted successfully

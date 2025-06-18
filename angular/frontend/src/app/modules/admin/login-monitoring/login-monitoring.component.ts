@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSort, Sort } from '@angular/material/sort';
+import { MatTableDataSource } from '@angular/material/table';
 import { environment } from '../../../../environments/environment';
 import { PermissionService } from '../../../core/services/permission.service';
 import { Router } from '@angular/router';
@@ -54,7 +56,7 @@ interface IPReputation {
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
 })
-export class LoginMonitoringComponent implements OnInit {
+export class LoginMonitoringComponent implements OnInit, AfterViewInit {
   apiUrl = `${environment.apiUrl}/login-monitoring`;
   
   // Data
@@ -75,6 +77,12 @@ export class LoginMonitoringComponent implements OnInit {
   pageSize = 10;
   currentPage = 0;
   
+  // Sorting
+  currentSort: Sort = {
+    active: 'createdAt',
+    direction: 'desc'
+  };
+  
   // Permission state
   hasPermission = false;
   
@@ -85,6 +93,8 @@ export class LoginMonitoringComponent implements OnInit {
     patterns: false,
     ipReputation: false
   };
+
+  @ViewChild(MatSort) sort!: MatSort;
 
   constructor(
     private http: HttpClient,
@@ -118,6 +128,23 @@ export class LoginMonitoringComponent implements OnInit {
     });
   }
 
+  ngAfterViewInit(): void {
+    // Set default sort to timestamp descending
+    this.sort.active = 'createdAt';
+    this.sort.direction = 'desc';
+    
+    this.sort.sortChange.subscribe(() => {
+      this.currentPage = 0;
+      this.loadRecentAttempts();
+    });
+  }
+
+  onSortChange(sort: Sort): void {
+    this.currentSort = sort;
+    this.currentPage = 0;
+    this.loadRecentAttempts();
+  }
+
   loadRecentAttempts(): void {
     if (!this.hasPermission) return;
     
@@ -125,6 +152,11 @@ export class LoginMonitoringComponent implements OnInit {
     
     const filters = this.filterForm.value;
     let url = `${this.apiUrl}/attempts/recent?limit=${this.pageSize}&offset=${this.currentPage * this.pageSize}`;
+    
+    // Add sorting parameters
+    if (this.currentSort.active && this.currentSort.direction) {
+      url += `&sortBy=${this.currentSort.active}&sortDirection=${this.currentSort.direction}`;
+    }
     
     if (filters.email) {
       url += `&email=${encodeURIComponent(filters.email)}`;

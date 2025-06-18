@@ -251,28 +251,29 @@
         </div>
         
         <!-- Attempts Table -->
-        <mat-table [dataSource]="recentAttempts" *ngIf="!loading.attempts && recentAttempts.length > 0">
+        <mat-table [dataSource]="recentAttempts" matSort (matSortChange)="onSortChange($event)" 
+                   *ngIf="!loading.attempts && recentAttempts.length > 0">
           <!-- ID Column -->
           <ng-container matColumnDef="id">
-            <mat-header-cell *matHeaderCellDef>ID</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header>ID</mat-header-cell>
             <mat-cell *matCellDef="let attempt">{{ attempt.id }}</mat-cell>
           </ng-container>
           
           <!-- Timestamp Column -->
           <ng-container matColumnDef="timestamp">
-            <mat-header-cell *matHeaderCellDef>Timestamp</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header="createdAt">Timestamp</mat-header-cell>
             <mat-cell *matCellDef="let attempt">{{ attempt.createdAt | date:'medium' }}</mat-cell>
           </ng-container>
           
           <!-- Email Column -->
           <ng-container matColumnDef="email">
-            <mat-header-cell *matHeaderCellDef>Email</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header>Email</mat-header-cell>
             <mat-cell *matCellDef="let attempt">{{ attempt.email }}</mat-cell>
           </ng-container>
           
           <!-- IP Address Column -->
           <ng-container matColumnDef="ipAddress">
-            <mat-header-cell *matHeaderCellDef>IP Address</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header>IP Address</mat-header-cell>
             <mat-cell *matCellDef="let attempt">
               <a (click)="getIPReputation(attempt.ipAddress)" class="ip-link">
                 {{ attempt.ipAddress }}
@@ -282,7 +283,7 @@
           
           <!-- Status Column -->
           <ng-container matColumnDef="status">
-            <mat-header-cell *matHeaderCellDef>Status</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header>Status</mat-header-cell>
             <mat-cell *matCellDef="let attempt">
               <span class="status-badge" [ngClass]="'status-' + attempt.status">
                 {{ attempt.status | titlecase }}
@@ -292,7 +293,7 @@
           
           <!-- Details Column -->
           <ng-container matColumnDef="details">
-            <mat-header-cell *matHeaderCellDef>Details</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header="failureReason">Details</mat-header-cell>
             <mat-cell *matCellDef="let attempt">
               {{ attempt.failureReason || '-' }}
             </mat-cell>

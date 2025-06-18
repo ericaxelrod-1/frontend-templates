@@ -6,7 +6,6 @@
 3. [Users](#users)
 4. [Groups](#groups)
 5. [Roles](#roles)
-6. [Tasks](#tasks)
 7. [Error Handling](#error-handling)
 8. [Pagination](#pagination)
 9. [Data Transfer Objects (DTOs)](#data-transfer-objects-dtos)
@@ -69,6 +68,9 @@ After interceptor transformation (available in frontend code):
 When documenting API requests and responses in this document, we use the actual backend format (snake_case) for clarity and consistency with the actual API contract.
 
 ## Authentication
+### Cascading Dependencies
+
+When deleting resources, it is important to consider cascading dependencies to avoid foreign key violations. For example, deleting a user may require deleting all of their associated data, such as their tasks, comments, and group memberships. The backend should handle these dependencies gracefully to ensure data integrity.
 
 Authentication is handled using JSON Web Tokens (JWT). 
 
@@ -624,209 +626,6 @@ Authorization: Bearer <token>
 }
 ```
 
-## Tasks
-
-### Get All Tasks
-
-**Endpoint:** `GET /tasks`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Query Parameters:**
-- `page`: Page number (default: 1)
-- `limit`: Number of items per page (default: 10)
-- `sort`: Sort field (default: "createdAt")
-- `order`: Sort order ("asc" or "desc", default: "desc")
-- `status`: Filter by status ("pending", "in-progress", "completed")
-
-**Response:** (200 OK)
-```json
-{
-  "items": [
-    {
-      "id": "uuid",
-      "title": "Complete project documentation",
-      "description": "Write detailed documentation for the project",
-      "status": "in-progress",
-      "dueDate": "2023-02-01T00:00:00Z",
-      "assignedTo": {
-        "id": "uuid",
-        "firstName": "John",
-        "lastName": "Doe"
-      },
-      "createdAt": "2023-01-01T00:00:00Z"
-    }
-  ],
-  "meta": {
-    "totalItems": 50,
-    "itemCount": 10,
-    "itemsPerPage": 10,
-    "totalPages": 5,
-    "currentPage": 1
-  }
-}
-```
-
-### Create Task
-
-**Endpoint:** `POST /tasks`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "title": "Review pull request",
-  "description": "Review the latest pull request for the frontend",
-  "status": "pending",
-  "dueDate": "2023-01-15T00:00:00Z",
-  "assignedToId": "uuid"
-}
-```
-
-**Response:** (201 Created)
-```json
-{
-  "id": "uuid",
-  "title": "Review pull request",
-  "description": "Review the latest pull request for the frontend",
-  "status": "pending",
-  "dueDate": "2023-01-15T00:00:00Z",
-  "assignedTo": {
-    "id": "uuid",
-    "firstName": "John",
-    "lastName": "Doe"
-  },
-  "createdBy": {
-    "id": "uuid",
-    "firstName": "Jane",
-    "lastName": "Smith"
-  },
-  "createdAt": "2023-01-10T00:00:00Z"
-}
-```
-
-### Get Task by ID
-
-**Endpoint:** `GET /tasks/:id`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response:** (200 OK)
-```json
-{
-  "id": "uuid",
-  "title": "Review pull request",
-  "description": "Review the latest pull request for the frontend",
-  "status": "pending",
-  "dueDate": "2023-01-15T00:00:00Z",
-  "assignedTo": {
-    "id": "uuid",
-    "firstName": "John",
-    "lastName": "Doe"
-  },
-  "createdBy": {
-    "id": "uuid",
-    "firstName": "Jane",
-    "lastName": "Smith"
-  },
-  "createdAt": "2023-01-10T00:00:00Z",
-  "comments": [
-    {
-      "id": "uuid",
-      "content": "I'll start working on this today",
-      "createdBy": {
-        "id": "uuid",
-        "firstName": "John",
-        "lastName": "Doe"
-      },
-      "createdAt": "2023-01-11T00:00:00Z"
-    }
-  ]
-}
-```
-
-### Update Task
-
-**Endpoint:** `PUT /tasks/:id`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "title": "Review pull request #123",
-  "description": "Review the latest pull request for the frontend",
-  "status": "in-progress",
-  "dueDate": "2023-01-15T00:00:00Z"
-}
-```
-
-**Response:** (200 OK)
-```json
-{
-  "id": "uuid",
-  "title": "Review pull request #123",
-  "description": "Review the latest pull request for the frontend",
-  "status": "in-progress",
-  "dueDate": "2023-01-15T00:00:00Z",
-  "updatedAt": "2023-01-11T00:00:00Z"
-}
-```
-
-### Delete Task
-
-**Endpoint:** `DELETE /tasks/:id`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response:** (204 No Content)
-
-### Add Task Comment
-
-**Endpoint:** `POST /tasks/:id/comments`
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "content": "I've completed the review"
-}
-```
-
-**Response:** (201 Created)
-```json
-{
-  "id": "uuid",
-  "content": "I've completed the review",
-  "taskId": "uuid",
-  "createdBy": {
-    "id": "uuid",
-    "firstName": "John",
-    "lastName": "Doe"
-  },
-  "createdAt": "2023-01-12T00:00:00Z"
-}
-```
 
 ## Error Handling
 
