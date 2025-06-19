@@ -38,8 +38,8 @@ export class LoginMonitoringController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('login-monitoring:read')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get recent login attempts' })
-  @ApiResponse({ status: 200, description: 'List of recent login attempts' })
+  @ApiOperation({ summary: 'Get recent login attempts with server-side sorting' })
+  @ApiResponse({ status: 200, description: 'List of recent login attempts sorted by SQL ORDER BY' })
   async getRecentAttempts(
     @Query('limit') limit: number = 50,
     @Query('offset') offset: number = 0,
@@ -51,18 +51,20 @@ export class LoginMonitoringController {
     @Query('sortBy') sortBy?: string,
     @Query('sortDirection') sortDirection?: 'asc' | 'desc',
   ) {
+    const filters = {
+      email,
+      ipAddress,
+      status,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+      sortBy: sortBy || 'attemptedAt',
+      sortDirection: sortDirection || 'desc',
+    };
+    
     const attempts = await this.loginAttemptService.getRecentAttemptsForDashboard(
       limit, 
       offset, 
-      {
-        email,
-        ipAddress,
-        status,
-        dateFrom: dateFrom ? new Date(dateFrom) : undefined,
-        dateTo: dateTo ? new Date(dateTo) : undefined,
-        sortBy: sortBy || 'attemptedAt',
-        sortDirection: sortDirection || 'desc',
-      }
+      filters
     );
     
     // Get total count for pagination

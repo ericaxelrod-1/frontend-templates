@@ -148,7 +148,6 @@ export class LoginAttemptService {
     },
   ): Promise<any[]> {
     const query = this.loginAttemptRepository.createQueryBuilder('attempt')
-      .leftJoinAndSelect('attempt.user', 'user')
       .limit(limit)
       .offset(offset);
 
@@ -172,40 +171,50 @@ export class LoginAttemptService {
       query.andWhere('attempt.attemptedAt <= :dateTo', { dateTo: filters.dateTo });
     }
 
-    // Handle sorting
+    // Handle sorting - Enhanced server-side sorting with comprehensive field mapping
     const sortBy = filters?.sortBy || 'attemptedAt';
     const sortDirection = filters?.sortDirection || 'desc';
     
-    // Map frontend field names to database field names
+    // Comprehensive mapping from frontend field names to database field names
     const fieldMapping: { [key: string]: string } = {
       'id': 'attempt.id',
       'createdAt': 'attempt.attemptedAt',
+      'timestamp': 'attempt.attemptedAt', // Alternative name for timestamp column
+      'attemptedAt': 'attempt.attemptedAt',
       'email': 'attempt.emailAttempted',
+      'emailAttempted': 'attempt.emailAttempted',
       'ipAddress': 'attempt.ipAddress',
       'status': 'attempt.status',
       'failureReason': 'attempt.failureReason',
+      'userAgent': 'attempt.userAgent',
     };
     
+    // Validate sort field and use safe default
     const dbField = fieldMapping[sortBy] || 'attempt.attemptedAt';
-    query.orderBy(dbField, sortDirection.toUpperCase() as 'ASC' | 'DESC');
+    
+    // Validate sort direction
+    const validDirection = (sortDirection?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+    
+    // Apply ORDER BY clause - this generates SQL like: ORDER BY attempt.attemptedAt DESC
+    query.orderBy(dbField, validDirection);
 
     const attempts = await query.getMany();
     
     // Transform the data to include the fields the frontend expects
-    return attempts.map(attempt => ({
+    const transformed = attempts.map(attempt => ({
       id: attempt.id,
       ipAddress: attempt.ipAddress,
       userAgent: attempt.userAgent,
-      email: attempt.emailAttempted, // Map emailAttempted to email
+      email: attempt.emailAttempted || '', // Map emailAttempted to email, handle null values
       status: attempt.status,
-      failureReason: attempt.failureReason,
+      failureReason: attempt.failureReason || '',
       createdAt: attempt.attemptedAt, // Map attemptedAt to createdAt
-      user: attempt.user,
-      metadata: attempt.metadata,
       // Include original fields as well for compatibility
       emailAttempted: attempt.emailAttempted,
       attemptedAt: attempt.attemptedAt,
     }));
+    
+    return transformed;
   }
 
   async getTotalAttemptsCount(filters?: {
