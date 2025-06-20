@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet, RouterModule } from '@angular/router';
+import { RouterOutlet, RouterModule, Router, NavigationEnd } from '@angular/router';
 import { HeaderComponent } from '../header/header.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { FooterComponent } from '../footer/footer.component';
@@ -8,8 +8,10 @@ import { UserSidebarComponent } from '../user-sidebar/user-sidebar.component';
 import { Subject, takeUntil, Observable } from 'rxjs';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
+import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/services/auth.service';
 import { User } from '../../models';
+import { filter } from 'rxjs/operators';
 
 /**
  * Custom Layout Component - CSS Grid Layout Implementation
@@ -26,6 +28,7 @@ import { User } from '../../models';
  * - Proper navigation menu scrolling
  * - Responsive breakpoint detection
  * - Modern layout architecture
+ * - Admin context detection for nested navigation
  */
 @Component({
   selector: 'app-custom-layout',
@@ -38,15 +41,17 @@ import { User } from '../../models';
     SidebarComponent,
     FooterComponent,
     UserSidebarComponent,
-    MatSidenavModule
+    MatSidenavModule,
+    MatIconModule
   ],
   template: `
     <!-- CSS Grid Layout Container -->
-    <div class="app-layout">
+    <div class="app-layout" [class.admin-context]="isAdminContext">
       <!-- Header: Fixed at top, full viewport width -->
       <app-header
         class="layout-header"
         [sidebarOpened]="!isCollapsed"
+        [isAdminContext]="isAdminContext"
         (sidebarToggle)="toggleMenu()"
         (userMenuToggle)="openUserSidebar()">
       </app-header>
@@ -55,19 +60,54 @@ import { User } from '../../models';
       <div class="layout-main">
         <!-- Material Sidenav Container with proper height constraints -->
         <mat-sidenav-container class="sidenav-container">
-          <!-- Material Sidenav with proper responsive behavior -->
+          <!-- Single Dynamic Sidenav with context-based content -->
           <mat-sidenav
             #sidenav
             [mode]="isMobile ? 'over' : 'side'"
             [opened]="isMobile ? false : true"
             [ngClass]="!isCollapsed ? 'expanded' : ''"
-            class="sidenav">
-            <app-sidebar [isCollapsed]="isCollapsed"></app-sidebar>
+            class="sidenav"
+            position="start">
+            
+            <!-- Dynamic content based on context -->
+            <ng-container *ngIf="!isAdminContext">
+              <!-- Main navigation content -->
+              <app-sidebar 
+                [isCollapsed]="isCollapsed"
+                [isAdminContext]="isAdminContext">
+              </app-sidebar>
+            </ng-container>
+            
+            <ng-container *ngIf="isAdminContext">
+              <!-- Admin navigation content -->
+              <div class="admin-sidebar-content">
+                <div class="admin-sidebar-header">
+                  <h3>Admin Panel</h3>
+                </div>
+                <nav class="admin-nav">
+                  <a routerLink="/app/admin/login-monitoring" 
+                     routerLinkActive="active"
+                     class="admin-nav-item">
+                    <mat-icon>security</mat-icon>
+                    <span>Login Monitoring</span>
+                  </a>
+                  <!-- Future admin navigation items can be added here -->
+                </nav>
+              </div>
+            </ng-container>
           </mat-sidenav>
 
           <!-- Sidenav Content - Main content area -->
           <mat-sidenav-content class="sidenav-content">
             <main class="main-content">
+              <!-- Admin breadcrumb when in admin context -->
+              <div *ngIf="isAdminContext" class="admin-breadcrumb">
+                <mat-icon>admin_panel_settings</mat-icon>
+                <span>Administration</span>
+                <mat-icon>chevron_right</mat-icon>
+                <span>{{ getAdminPageTitle() }}</span>
+              </div>
+              
               <!-- Content wrapper for proper centering -->
               <div class="content-wrapper">
                 <router-outlet></router-outlet>
@@ -102,6 +142,11 @@ export class CustomLayoutComponent implements OnInit, OnDestroy {
   isCollapsed = false;
   
   /**
+   * Admin context detection
+   */
+  isAdminContext = false;
+  
+  /**
    * User sidebar state management
    */
   isUserSidebarOpen = false;
@@ -109,12 +154,28 @@ export class CustomLayoutComponent implements OnInit, OnDestroy {
 
   constructor(
     private breakpointObserver: BreakpointObserver,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router
   ) {
     this.currentUser$ = this.authService.currentUser$;
   }
 
   ngOnInit(): void {
+    // Monitor route changes for admin context detection
+    // Use setTimeout to defer state change to next tick to prevent NG0100 error
+    this.router.events
+      .pipe(
+        filter(event => event instanceof NavigationEnd),
+        takeUntil(this.destroy$)
+      )
+      .subscribe((event) => {
+        const navEnd = event as NavigationEnd;
+        // Defer admin context detection to next tick to prevent change detection violations
+        setTimeout(() => {
+          this.isAdminContext = navEnd.url.includes('/app/admin');
+        }, 0);
+      });
+    
     // Monitor mobile breakpoint
     this.breakpointObserver
       .observe([Breakpoints.Handset])
@@ -147,6 +208,17 @@ export class CustomLayoutComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  /**
+   * Get admin page title based on current route
+   */
+  getAdminPageTitle(): string {
+    const url = this.router.url;
+    if (url.includes('login-monitoring')) {
+      return 'Login Monitoring';
+    }
+    return 'Admin Panel';
   }
 
   /**

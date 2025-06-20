@@ -20,6 +20,11 @@ import { LoggerService } from '../../services/logging/logger.service';
  * Updated to work with the new custom layout system that doesn't require
  * complex responsive state management. The header now simply receives
  * sidebar state as input and emits toggle events.
+ * 
+ * Features:
+ * - Admin context awareness for consistent theming
+ * - User menu integration
+ * - Responsive sidebar toggle
  */
 @Component({
   selector: 'app-header',
@@ -39,6 +44,7 @@ import { LoggerService } from '../../services/logging/logger.service';
 export class HeaderComponent implements OnInit, OnDestroy {
   @Input() isFixedHeader = false;
   @Input() sidebarOpened = true;
+  @Input() isAdminContext = false;
   @Output() sidebarToggle = new EventEmitter<void>();
   @Output() userMenuToggle = new EventEmitter<void>();
   

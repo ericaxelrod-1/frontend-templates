@@ -99,11 +99,100 @@ export class TableComponent implements OnInit, AfterViewInit {
 }
 ```
 
+## CRITICAL NG0100 ERROR PREVENTION
+
+⚠️ **STOP**: Default sort initialization MUST be handled carefully to avoid NG0100 errors.
+
+### 1. The aria-sort NG0100 Problem
+
+**Root Cause**: Setting `sort.active` and `sort.direction` in `ngAfterViewInit()` changes the `aria-sort` attribute during change detection, causing NG0100 error.
+
+**PROHIBITED Pattern**:
+```typescript
+ngAfterViewInit(): void {
+  // ❌ CAUSES NG0100 ERROR - changes aria-sort during change detection
+  this.sort.active = 'createdAt';
+  this.sort.direction = 'desc';
+}
+```
+
+**REQUIRED Solution - Use sort() method with setTimeout**:
+```typescript
+ngAfterViewInit(): void {
+  if (this.sort && this.hasPermission) {
+    // ✅ CORRECT - Use setTimeout to defer to next tick
+    setTimeout(() => {
+      this.sort.sort({
+        id: 'createdAt',        // Column ID from mat-sort-header
+        start: 'desc',          // Initial direction
+        disableClear: false
+      } as MatSortable);
+    }, 0);
+    
+    // Set up sort change handler
+    this.sort.sortChange.subscribe(() => {
+      this.currentPage = 0;
+      this.loadData();
+    });
+  }
+}
+```
+
+### 2. Alternative Solution - Template-Based Default Sort
+
+**Use matSortStart and matSortDirection in template**:
+```html
+<mat-table [dataSource]="dataSource" matSort 
+           matSortActive="createdAt" 
+           matSortDirection="desc">
+  <ng-container matColumnDef="timestamp">
+    <mat-header-cell *matHeaderCellDef mat-sort-header="createdAt">
+      Timestamp
+    </mat-header-cell>
+    <mat-cell *matCellDef="let item">{{ item.createdAt | date:'medium' }}</mat-cell>
+  </ng-container>
+</mat-table>
+```
+
 ## REACTIVE PATTERN IMPLEMENTATION
 
-### 1. Industry-Standard RxJS Pattern
+### 1. Simple Loading Pattern (Recommended)
 
-**ALWAYS use the proven RxJS merge() pattern**:
+**Use simple loading pattern like Groups/Users components**:
+
+```typescript
+loadData(): void {
+  this.loading = true;
+  
+  const params = this.buildQueryParams();
+  
+  this.dataService.getData(params).subscribe({
+    next: (data) => {
+      this.dataSource = data.items;
+      this.totalCount = data.total;
+      this.loading = false;
+    },
+    error: (error) => {
+      console.error('Data loading error:', error);
+      this.loading = false;
+    }
+  });
+}
+
+private buildQueryParams(): any {
+  return {
+    sortBy: this.sort?.active || 'createdAt',
+    sortDirection: this.sort?.direction || 'desc',
+    page: this.currentPage,
+    pageSize: this.pageSize,
+    ...this.getFilterParams()
+  };
+}
+```
+
+### 2. Alternative: Industry-Standard RxJS Pattern
+
+**Only use if you need advanced reactive behavior**:
 
 ```typescript
 import { merge } from 'rxjs';
@@ -162,11 +251,14 @@ interface ServerResponse<T> {
 ```typescript
 private getSortField(sortHeaderId: string): string {
   const fieldMapping: { [key: string]: string } = {
-    'timestamp': 'createdAt',
+    'timestamp': 'createdAt',        // Frontend column -> Backend field
+    'createdAt': 'attemptedAt',      // Handle both naming conventions
     'details': 'failureReason',
-    'email': 'email',
+    'email': 'emailAttempted',       // Backend uses emailAttempted
     'ipAddress': 'ipAddress',
-    'status': 'status'
+    'status': 'status',
+    'userAgent': 'userAgent',
+    'id': 'id'
   };
   
   return fieldMapping[sortHeaderId] || sortHeaderId;
@@ -183,6 +275,31 @@ private loadDataFromServer(): Observable<ServerResponse<any>> {
   
   return this.dataService.getData(params);
 }
+```
+
+### 4. Complete Column Requirements
+
+**ALWAYS ensure all entity fields are represented in the table**:
+
+For LoginAttempt entity, these columns are REQUIRED:
+- `id` - Primary key
+- `timestamp` (createdAt/attemptedAt) - When attempt occurred
+- `email` (emailAttempted) - Email used in attempt
+- `ipAddress` - IP address of attempt
+- `status` - Success/failure status
+- `details` (failureReason) - Why attempt failed
+- `userAgent` - Browser/client information ⚠️ MISSING in most implementations
+- `metadata` - Additional JSON data ⚠️ MISSING in most implementations
+- `actions` - Administrative actions
+
+**Template Column Definition**:
+```html
+<!-- All columns must be defined -->
+attemptColumns: string[] = [
+  'id', 'timestamp', 'email', 'ipAddress', 
+  'userAgent', 'status', 'details', 'metadata', 'actions'
+];
+```
 ```
 
 ## TEMPLATE IMPLEMENTATION
@@ -395,4 +512,7 @@ private initializeReactivePattern(): void {
 - **Impact**: Reliable, maintainable, and performant data loading
 
 **Remember**: Server-side sorting is about moving computation from client to server for better performance with large datasets. Every click should trigger a new SQL query with different ORDER BY clauses.
+
+
+
 

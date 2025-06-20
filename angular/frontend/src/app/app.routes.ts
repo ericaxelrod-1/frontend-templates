@@ -4,7 +4,6 @@ import { PermissionGuard } from './core/guards/permission.guard';
 
 // Layout components
 import { CustomLayoutComponent } from './layouts/custom-layout/custom-layout.component';
-import { AdminLayoutComponent } from './layouts/admin/admin.component';
 
 /**
  * Main application routes
@@ -67,17 +66,30 @@ export const routes: Routes = [
         data: { 
           permissions: 'roles:view'
         }
+      },
+      {
+        path: 'admin',
+        canActivate: [PasswordChangeGuard, PermissionGuard],
+        data: { 
+          permissions: 'system:admin'
+        },
+        children: [
+          {
+            path: '',
+            redirectTo: 'login-monitoring',
+            pathMatch: 'full'
+          },
+          {
+            path: 'login-monitoring',
+            loadComponent: () => import('./modules/admin/login-monitoring/login-monitoring.component').then(c => c.LoginMonitoringComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'system:admin'
+            }
+          }
+        ]
       }
     ]
-  },
-  {
-    path: 'admin',
-    component: AdminLayoutComponent,
-    canActivate: [AuthGuard, PasswordChangeGuard, PermissionGuard],
-    data: { 
-      permissions: 'system:admin'
-    },
-    loadChildren: () => import('./modules/admin/admin.module').then(m => m.AdminModule)
   },
   {
     path: '',

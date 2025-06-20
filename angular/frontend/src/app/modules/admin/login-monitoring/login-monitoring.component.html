@@ -276,6 +276,16 @@
             </mat-cell>
           </ng-container>
           
+          <!-- User Agent Column -->
+          <ng-container matColumnDef="userAgent">
+            <mat-header-cell *matHeaderCellDef mat-sort-header>User Agent</mat-header-cell>
+            <mat-cell *matCellDef="let attempt" class="user-agent-cell">
+              <span [matTooltip]="attempt.userAgent" class="user-agent-text">
+                {{ attempt.userAgent | slice:0:50 }}{{ attempt.userAgent && attempt.userAgent.length > 50 ? '...' : '' }}
+              </span>
+            </mat-cell>
+          </ng-container>
+          
           <!-- Status Column -->
           <ng-container matColumnDef="status">
             <mat-header-cell *matHeaderCellDef mat-sort-header>Status</mat-header-cell>
@@ -291,6 +301,17 @@
             <mat-header-cell *matHeaderCellDef mat-sort-header="failureReason">Details</mat-header-cell>
             <mat-cell *matCellDef="let attempt">
               {{ attempt.failureReason || '-' }}
+            </mat-cell>
+          </ng-container>
+          
+          <!-- Metadata Column -->
+          <ng-container matColumnDef="metadata">
+            <mat-header-cell *matHeaderCellDef mat-sort-header>Metadata</mat-header-cell>
+            <mat-cell *matCellDef="let attempt" class="metadata-cell">
+              <span *ngIf="attempt.metadata" [matTooltip]="attempt.metadata" class="metadata-text">
+                {{ attempt.metadata | slice:0:30 }}{{ attempt.metadata && attempt.metadata.length > 30 ? '...' : '' }}
+              </span>
+              <span *ngIf="!attempt.metadata" class="no-metadata">-</span>
             </mat-cell>
           </ng-container>
           

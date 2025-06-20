@@ -1,13 +1,32 @@
 import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ReactiveFormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatSort, Sort } from '@angular/material/sort';
+import { MatSort, Sort, MatSortable } from '@angular/material/sort';
+import { Router } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { PermissionService } from '../../../core/services/permission.service';
-import { Router } from '@angular/router';
 import { catchError, startWith, switchMap, debounceTime } from 'rxjs/operators';
 import { of, throwError, merge } from 'rxjs';
+
+// Material Modules
+import { MatCardModule } from '@angular/material/card';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTableModule } from '@angular/material/table';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatSortModule } from '@angular/material/sort';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTabsModule } from '@angular/material/tabs';
 
 interface LoginAttempt {
   id: number;
@@ -16,6 +35,7 @@ interface LoginAttempt {
   email: string;
   status: string;
   failureReason?: string;
+  metadata?: string;
   createdAt: Date;
 }
 
@@ -52,6 +72,26 @@ interface IPReputation {
 
 @Component({
   selector: 'app-login-monitoring',
+  standalone: true,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatCardModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTableModule,
+    MatPaginatorModule,
+    MatSortModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    MatProgressSpinnerModule,
+    MatSnackBarModule,
+    MatTooltipModule,
+    MatTabsModule
+  ],
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
 })
@@ -68,7 +108,7 @@ export class LoginMonitoringComponent implements OnInit, AfterViewInit {
   filterForm: FormGroup;
   
   // Display columns
-  attemptColumns: string[] = ['id', 'timestamp', 'email', 'ipAddress', 'status', 'details', 'actions'];
+  attemptColumns: string[] = ['id', 'timestamp', 'email', 'ipAddress', 'userAgent', 'status', 'details', 'metadata', 'actions'];
   patternColumns: string[] = ['type', 'severity', 'details', 'timestamp', 'actions'];
   
   // Pagination
@@ -119,12 +159,8 @@ export class LoginMonitoringComponent implements OnInit, AfterViewInit {
       if (hasPermission) {
         this.loadStats();
         this.detectPatterns();
-        // Set flag to initialize reactive pattern after ViewChild is available
-        this.shouldInitializeReactivePattern = true;
-        // If ViewChild is already available, initialize immediately
-        if (this.sort) {
-          this.initializeReactivePattern();
-        }
+        // Load initial data
+        this.loadRecentAttempts();
       } else {
         this.snackBar.open('You do not have permission to view this page.', 'Close', { duration: 5000 });
         this.router.navigate(['/app/dashboard']);
@@ -133,62 +169,21 @@ export class LoginMonitoringComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    // If permission check completed and we should initialize, do it now
-    if (this.shouldInitializeReactivePattern && this.hasPermission) {
-      this.initializeReactivePattern();
-    }
-  }
-
-  private shouldInitializeReactivePattern = false;
-
-  /**
-   * Initialize the reactive pattern after both permission check and ViewChild are available
-   * This prevents the race condition and infinite retry loop
-   */
-  private initializeReactivePattern(): void {
-    console.log('[DEBUG] initializeReactivePattern called', {
-      hasPermission: this.hasPermission,
-      sortAvailable: !!this.sort,
-      alreadyInitialized: this.reactivePatternInitialized
-    });
-    
-    // Prevent multiple initializations
-    if (this.reactivePatternInitialized) {
-      console.log('[DEBUG] Already initialized, skipping');
-      return;
-    }
-    
-    // Ensure both permission and ViewChild are available
-    if (!this.hasPermission || !this.sort) {
-      console.log('[DEBUG] Prerequisites not met', {
-        hasPermission: this.hasPermission,
-        sortAvailable: !!this.sort
-      });
-      return;
-    }
-    
-    console.log('[DEBUG] Initializing reactive pattern...');
-    this.reactivePatternInitialized = true;
-    
-    // Set initial sort state to match our default
-    this.sort.active = this.currentSort.active;
-    this.sort.direction = this.currentSort.direction;
-    
-    // Reset pagination when sorting changes (industry best practice)
-    this.sort.sortChange.subscribe(() => {
-      this.currentPage = 0;
-    });
-    
-    // Complete reactive pattern: merge all user interaction events
-    // This is the industry-standard approach for server-side operations
-    merge(
-      this.sort.sortChange,
-      this.filterForm.valueChanges.pipe(debounceTime(300)) // Debounce filter changes
-    )
-    .pipe(
-      startWith({}), // Trigger initial load - now safe because permissions are confirmed
-      switchMap(() => {
-        console.log('[DEBUG] Reactive pattern triggered, loading data...');
+    // Set up sort change handler after ViewChild is available
+    if (this.sort && this.hasPermission) {
+      // ✅ FIX NG0100 ERROR: Use setTimeout to defer sort initialization to next tick
+      // This prevents aria-sort attribute changes during change detection cycle
+      setTimeout(() => {
+        this.sort.sort({
+          id: this.currentSort.active,           // 'createdAt' - maps to timestamp column
+          start: this.currentSort.direction,     // 'desc' - descending order
+          disableClear: false
+        } as MatSortable);
+      }, 0);
+      
+      // Reset pagination when sorting changes and reload data
+      this.sort.sortChange.subscribe(() => {
+        this.currentPage = 0;
         // Update current sort state from MatSort
         if (this.sort.active && this.sort.direction) {
           this.currentSort = {
@@ -196,52 +191,17 @@ export class LoginMonitoringComponent implements OnInit, AfterViewInit {
             direction: this.sort.direction
           };
         }
-        
-        // Trigger server-side sorted query
-        return this.loadAttemptsReactive();
-      })
-    )
-    .subscribe({
-      next: (data) => {
-        console.log('[DEBUG] Data received from API:', data);
-        // Pure server-side approach - use the sorted data directly from API
-        this.recentAttempts = data.items || [];
-        this.totalAttempts = data.total || 0;
-        this.loading.attempts = false;
-        console.log('[DEBUG] Updated component state:', {
-          attemptsCount: this.recentAttempts.length,
-          totalAttempts: this.totalAttempts,
-          loading: this.loading.attempts
-        });
-      },
-      error: (error) => {
-        console.error('[DEBUG] Error in reactive pattern:', error);
-        this.handleApiError('login attempts', error);
-        this.loading.attempts = false;
-      }
-    });
-    
-    console.log('[DEBUG] Reactive pattern initialization complete');
+        this.loadRecentAttempts();
+      });
+    }
   }
 
-  private reactivePatternInitialized = false;
-
   /**
-   * Reactive data loading method that returns Observable
-   * This follows the industry-standard pattern for server-side operations
+   * Load recent login attempts using simple loading pattern
+   * This replaces the complex reactive pattern to eliminate NG0100 errors
    */
-  private loadAttemptsReactive() {
-    console.log('[DEBUG] loadAttemptsReactive called', {
-      hasPermission: this.hasPermission,
-      currentSort: this.currentSort,
-      currentPage: this.currentPage,
-      pageSize: this.pageSize
-    });
-    
-    if (!this.hasPermission) {
-      console.log('[DEBUG] No permission, returning empty data');
-      return of({ items: [], total: 0 });
-    }
+  loadRecentAttempts(): void {
+    if (!this.hasPermission) return;
     
     this.loading.attempts = true;
     
@@ -275,25 +235,32 @@ export class LoginMonitoringComponent implements OnInit, AfterViewInit {
       url += `&dateTo=${dateTo.toISOString()}`;
     }
     
-    console.log('[DEBUG] Making API call to:', url);
-    
-    return this.http.get<any>(url)
+    this.http.get<any>(url)
       .pipe(
         catchError((error: HttpErrorResponse) => {
-          console.error('[DEBUG] API call failed:', error);
           this.handleApiError('login attempts', error);
           return of({ items: [], total: 0 });
         })
-      );
+      )
+      .subscribe({
+        next: (data) => {
+          this.recentAttempts = data.items || [];
+          this.totalAttempts = data.total || 0;
+          this.loading.attempts = false;
+        },
+        error: (error) => {
+          this.handleApiError('login attempts', error);
+          this.loading.attempts = false;
+        }
+      });
   }
 
   /**
-   * Trigger method to manually refresh data using the reactive pattern
-   * This replaces the old loadRecentAttempts method
+   * Trigger method to manually refresh data
+   * Simplified to directly call loadRecentAttempts
    */
   triggerDataRefresh(): void {
-    // Manually trigger the filter form to emit, which will trigger the reactive pattern
-    this.filterForm.updateValueAndValidity({ emitEvent: true });
+    this.loadRecentAttempts();
   }
 
   loadStats(): void {
@@ -311,6 +278,10 @@ export class LoginMonitoringComponent implements OnInit, AfterViewInit {
       .subscribe({
         next: (data) => {
           this.statistics = data;
+          this.loading.stats = false;
+        },
+        error: (error) => {
+          this.handleApiError('statistics', error);
           this.loading.stats = false;
         }
       });
@@ -331,6 +302,10 @@ export class LoginMonitoringComponent implements OnInit, AfterViewInit {
       .subscribe({
         next: (data) => {
           this.detectedPatterns = data || [];
+          this.loading.patterns = false;
+        },
+        error: (error) => {
+          this.handleApiError('patterns', error);
           this.loading.patterns = false;
         }
       });

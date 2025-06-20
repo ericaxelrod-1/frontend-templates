@@ -22,6 +22,7 @@ import { User } from '../../models/user.model';
 })
 export class SidebarComponent implements OnInit, OnDestroy {
   @Input() isCollapsed = false; // Controls whether sidebar shows only icons or full text
+  @Input() isAdminContext = false; // Indicates if we're in admin context
   
   currentUser: User | null = null;
   private destroy$ = new Subject<void>();
@@ -56,9 +57,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
   // Admin section items (only for users with admin access)
   adminItems = [
     { 
-      label: 'Activity Monitor', 
+      label: 'Administration', 
       icon: 'security', 
-      route: '/admin/login-monitoring', 
+      route: '/app/admin/login-monitoring', 
       permission: 'system:admin'
     }
   ];
