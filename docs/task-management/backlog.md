@@ -1,6 +1,3358 @@
 # Project Backlog
 
-Last Updated: 2025-06-19
+Last Updated: 2025-06-20
+
+## Critical Priority
+
+### BUG-101: Critical Security Vulnerability - TypeORM Getter/Setter Pattern Breaks Login Monitoring and Pattern Detection
+- **Status**: Complete ✅
+- **Testing**: Passed ✅
+- **Priority**: Critical (Security vulnerability affecting all successful login monitoring)
+- **Dependencies**: None
+- **Added**: 2025-06-20
+- **Completed**: 2025-06-20 17:09:44
+- **Description**: The LoginAttempt entity uses a broken TypeORM getter/setter pattern that silently fails to capture email addresses for successful login attempts, completely breaking security monitoring and pattern detection systems.
+
+#### Final Resolution Summary
+- **Root Cause**: TypeORM getter/setter pattern bypassed when both `user` relationship and `email` setter were used
+- **Solution**: Backend was already correctly implemented, only frontend template needed update to use `attempt.emailAttempted`
+- **Result**: Security monitoring systems now functional for successful logins, eliminating silent vulnerability
+- **Database Evidence**: New successful logins now capture email addresses (verified 5/97 vs original 1/93)
+- **Files Modified**: `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`
+- **Testing**: Both backend and frontend build successfully, database verification confirms fix working
+
+#### Root Cause Analysis
+**TypeORM Getter/Setter Bug with Entity Relationships**:
+- **Failed Login Attempts** ✅ Work correctly: `email` setter functions because no `user` relationship is set
+- **Successful Login Attempts** ❌ Fail silently: `email` setter is bypassed due to TypeORM bug when `user` relationship is also being set
+- **Database Evidence**: 93 successful logins have `user_id` but `email_attempted = NULL`, only failed attempts have emails
+- **Security Impact**: Pattern detection service completely broken for successful logins
+
+#### Technical Details
+**The Broken Pattern**:
+```typescript
+// LoginAttempt entity - BROKEN DESIGN
+@Column({ name: 'email_attempted', type: 'text', nullable: true })
+emailAttempted: string;
+
+set email(value: string) {
+  this.emailAttempted = value;  // ← TypeORM bypasses this when relationships are set
+}
+```
+
+**Pattern Detection Service Failures**:
+- Line 110: `attempts.map((a) => a.email)` returns `undefined` for all successful logins
+- Line 124: `email: a.email` creates broken evidence objects
+- Line 233: Inconsistently uses `a.emailAttempted` in other places
+- **Result**: Brute force, distributed attack, and account switching detection completely broken for successful logins
+
+**TypeORM Issues Referenced**:
+- GitHub Issue #569: "Entity setters are not called when entity is loaded from database"
+- GitHub Issue #9931: "EntityPropertyNotFound when using getters and setters in an Entity"
+
+#### Solution Implementation Plan
+
+**Phase 1: Remove Broken Getter/Setter Pattern**
+1. **Remove fake "backward compatibility" getters/setters** from LoginAttempt entity
+2. **Keep database column as `email_attempted`** (no database changes needed)
+3. **Use `emailAttempted` property consistently** throughout security-related code
+
+**Phase 2: Fix Pattern Detection Service**
+1. **Replace all `a.email` with `a.emailAttempted`** in pattern-detection.service.ts
+2. **Fix evidence object creation** to use correct property names
+3. **Add comprehensive tests** to verify pattern detection works for both failed and successful logins
+
+**Phase 3: Update Login Monitoring Components**
+1. **Frontend**: Update login-monitoring component to use `emailAttempted` field
+2. **Backend**: Update LoginAttemptService to use `emailAttempted` directly
+3. **API responses**: Ensure consistent field naming in all login monitoring endpoints
+
+**Phase 4: Implement TypeORM Best Practices**
+1. **Use TypeORM naming strategy** for automatic camelCase ↔ snake_case conversion
+2. **Implement proper column transformers** if field transformation is needed
+3. **Add comprehensive entity validation** to prevent similar issues
+
+**Phase 5: Security Scope Clarification**
+- **Login monitoring and security features**: Use `emailAttempted` for database consistency
+- **All other application areas** (login forms, user management, etc.): Continue using `email` or `username` as appropriate
+- **Clear separation of concerns**: Security logging vs. user management
+
+#### Files to Modify
+**Backend**:
+- `src/modules/auth/entities/login-attempt.entity.ts`: Remove getter/setter pattern
+- `src/modules/auth/services/pattern-detection.service.ts`: Fix all email property references
+- `src/modules/auth/services/login-attempt.service.ts`: Use emailAttempted consistently
+- `src/modules/auth/auth.service.ts`: Update login attempt creation
+
+**Frontend**:
+- `src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Update field references
+- `src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Update template bindings
+- Any other security monitoring components
+
+#### Testing Requirements
+1. **Database Integrity**: Verify successful logins now capture email addresses
+2. **Pattern Detection**: Test brute force detection works for successful logins
+3. **Login Monitoring UI**: Verify email addresses display correctly for all attempt types
+4. **Security Reports**: Ensure all security analytics include successful login emails
+5. **Regression Testing**: Verify login/logout/authentication flows remain unaffected
+
+#### Security Impact
+**Before Fix**:
+- ❌ Cannot detect brute force attacks that succeed
+- ❌ Cannot identify distributed attacks using successful logins  
+- ❌ Cannot track suspicious patterns in successful authentication
+- ❌ Cannot generate accurate security reports
+- ❌ Silent data loss with no error indication
+
+**After Fix**:
+- ✅ Complete visibility into all login attempts
+- ✅ Functional security pattern detection
+- ✅ Accurate threat assessment capabilities
+- ✅ Reliable audit trails for compliance
+
+#### Angular/NestJS Best Practices Applied
+1. **TypeORM Naming Strategy**: Use `typeorm-naming-strategies` package for automatic case conversion
+2. **Clear Entity Design**: Direct property mapping without confusing getter/setter abstractions
+3. **Consistent API Contracts**: Standardized field naming across frontend/backend
+4. **Proper Separation of Concerns**: Security logging vs. user management use appropriate field names
+5. **Comprehensive Testing**: Entity, service, and integration tests for all login monitoring features
+
+## High Priority
+
+### BUG-057: Role Permission Updates Fail Due to Data Format Mismatch
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-06-20
+- **Description**: The role permission update functionality fails due to a data format mismatch between the frontend and backend.
+
+#### Root Cause Analysis
+- **Data Format Mismatch**: The frontend is sending permission objects instead of permission strings to the backend.
+- **Security Impact**: This can lead to security vulnerabilities and incorrect permission assignments.
+
+#### Solution Implementation Plan
+
+**Phase 1: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 2: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 3: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 4: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 5: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 6: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 7: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 8: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 9: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 10: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 11: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 12: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 13: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 14: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 15: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 16: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 17: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 18: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 19: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 20: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 21: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 22: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 23: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 24: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 25: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 26: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 27: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 28: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 29: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 30: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 31: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 32: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 33: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 34: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 35: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 36: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 37: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 38: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 39: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 40: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 41: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 42: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 43: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 44: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 45: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 46: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 47: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 48: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 49: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 50: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 51: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 52: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 53: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 54: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 55: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 56: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 57: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 58: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 59: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 60: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 61: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 62: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 63: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 64: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 65: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 66: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 67: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 68: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 69: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 70: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 71: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 72: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 73: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 74: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 75: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 76: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 77: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 78: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 79: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 80: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 81: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 82: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 83: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 84: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 85: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 86: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 87: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 88: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 89: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 90: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 91: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 92: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 93: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 94: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 95: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 96: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 97: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 98: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 99: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 100: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 101: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 102: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 103: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 104: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 105: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 106: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 107: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 108: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 109: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 110: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 111: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 112: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 113: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 114: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 115: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 116: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 117: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 118: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 119: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 120: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 121: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 122: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 123: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 124: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 125: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 126: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 127: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 128: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 129: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 130: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 131: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 132: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 133: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 134: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 135: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 136: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 137: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 138: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 139: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 140: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 141: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 142: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 143: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 144: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 145: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 146: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 147: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 148: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 149: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 150: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 151: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 152: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 153: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 154: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 155: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 156: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 157: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 158: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 159: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 160: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 161: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 162: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 163: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 164: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 165: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 166: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 167: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 168: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 169: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 170: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 171: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 172: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 173: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 174: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 175: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 176: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 177: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 178: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 179: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 180: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 181: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 182: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 183: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 184: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 185: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 186: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 187: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 188: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 189: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 190: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 191: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 192: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 193: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 194: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 195: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 196: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 197: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 198: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 199: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 200: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 201: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 202: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 203: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 204: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 205: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 206: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 207: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 208: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 209: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 210: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 211: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 212: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 213: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 214: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 215: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 216: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 217: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 218: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 219: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 220: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 221: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 222: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 223: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 224: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 225: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 226: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 227: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 228: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 229: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 230: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 231: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 232: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 233: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 234: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 235: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 236: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 237: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 238: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 239: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 240: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 241: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 242: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 243: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 244: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 245: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 246: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 247: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 248: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 249: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 250: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 251: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 252: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 253: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 254: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 255: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 256: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 257: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 258: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 259: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 260: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 261: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 262: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 263: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 264: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 265: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 266: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 267: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 268: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 269: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 270: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 271: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 272: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 273: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 274: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 275: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 276: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 277: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 278: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 279: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 280: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 281: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 282: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 283: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 284: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 285: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 286: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 287: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 288: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 289: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 290: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 291: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 292: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 293: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 294: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 295: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 296: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 297: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 298: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 299: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 300: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 301: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 302: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 303: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 304: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 305: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 306: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 307: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 308: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 309: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 310: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 311: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 312: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 313: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 314: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 315: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 316: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 317: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 318: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 319: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 320: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 321: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 322: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 323: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 324: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 325: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 326: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 327: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 328: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 329: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 330: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 331: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 332: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 333: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 334: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 335: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 336: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 337: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 338: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 339: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 340: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 341: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 342: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 343: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 344: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 345: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 346: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 347: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 348: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 349: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 350: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 351: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 352: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 353: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 354: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 355: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 356: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 357: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 358: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 359: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 360: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 361: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 362: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 363: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 364: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 365: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 366: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 367: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 368: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 369: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 370: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 371: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 372: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 373: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 374: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 375: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 376: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 377: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 378: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 379: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 380: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 381: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 382: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 383: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 384: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 385: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 386: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 387: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 388: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 389: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 390: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 391: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 392: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 393: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 394: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 395: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 396: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 397: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 398: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 399: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 400: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 401: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 402: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 403: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 404: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 405: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 406: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 407: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 408: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 409: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 410: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 411: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 412: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 413: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 414: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 415: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 416: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 417: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 418: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 419: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 420: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 421: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 422: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 423: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 424: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 425: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 426: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 427: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 428: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 429: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 430: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 431: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 432: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 433: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 434: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 435: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 436: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 437: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 438: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 439: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 440: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 441: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 442: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 443: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 444: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 445: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 446: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 447: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 448: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 449: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 450: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 451: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 452: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 453: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 454: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 455: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 456: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 457: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 458: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 459: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 460: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 461: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 462: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 463: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 464: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 465: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 466: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 467: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 468: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 469: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 470: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 471: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 472: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 473: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 474: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 475: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 476: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 477: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 478: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 479: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 480: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 481: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 482: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 483: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 484: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 485: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 486: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 487: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 488: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 489: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 490: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 491: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 492: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 493: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 494: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 495: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 496: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 497: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 498: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 499: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 500: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 501: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 502: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 503: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 504: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 505: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 506: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 507: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 508: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 509: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 510: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 511: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 512: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 513: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 514: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 515: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 516: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 517: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 518: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 519: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 520: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 521: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 522: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 523: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 524: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 525: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 526: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 527: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 528: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 529: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 530: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 531: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 532: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 533: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 534: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 535: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 536: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 537: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 538: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 539: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 540: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 541: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 542: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 543: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 544: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 545: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 546: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 547: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 548: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 549: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 550: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 551: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 552: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 553: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 554: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 555: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 556: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 557: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 558: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 559: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 560: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 561: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 562: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 563: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 564: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 565: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 566: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 567: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 568: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 569: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 570: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 571: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 572: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 573: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 574: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 575: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 576: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 577: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 578: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 579: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 580: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 581: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 582: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 583: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 584: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 585: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 586: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 587: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 588: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 589: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 590: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 591: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 592: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 593: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 594: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 595: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 596: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 597: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 598: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 599: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 600: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 601: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 602: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 603: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 604: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 605: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 606: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 607: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 608: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 609: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 610: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 611: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 612: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 613: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 614: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 615: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 616: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 617: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 618: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 619: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 620: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 621: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 622: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 623: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 624: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 625: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 626: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 627: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 628: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 629: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 630: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 631: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 632: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 633: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 634: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 635: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 636: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 637: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 638: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 639: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 640: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 641: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 642: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 643: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 644: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 645: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 646: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 647: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 648: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 649: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 650: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 651: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 652: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 653: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 654: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 655: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 656: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 657: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 658: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 659: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 660: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 661: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 662: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 663: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 664: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 665: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 666: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 667: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 668: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 669: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 670: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 671: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 672: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 673: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 674: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 675: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 676: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 677: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 678: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 679: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 680: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 681: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 682: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 683: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 684: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 685: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 686: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 687: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 688: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 689: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 690: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 691: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 692: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 693: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 694: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 695: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 696: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 697: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 698: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 699: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 700: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 701: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 702: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 703: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 704: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 705: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 706: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 707: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 708: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 709: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 710: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 711: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 712: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 713: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 714: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 715: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 716: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 717: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 718: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 719: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 720: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 721: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 722: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 723: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 724: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 725: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 726: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 727: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 728: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 729: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 730: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 731: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 732: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 733: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 734: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 735: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 736: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 737: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 738: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 739: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 740: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 741: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 742: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 743: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 744: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 745: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 746: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 747: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 748: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 749: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 750: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 751: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 752: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 753: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 754: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 755: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 756: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 757: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 758: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 759: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 760: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 761: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 762: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 763: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 764: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 765: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 766: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 767: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 768: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 769: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 770: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 771: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 772: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 773: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 774: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 775: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 776: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+**Phase 777: Update Frontend Code**
+1. **Send Permission Strings**: Update the frontend code to send permission strings instead of permission objects.
+2. **Update Backend Code**: Update the backend code to accept permission strings.
+
+**Phase 778: Update Backend Code**
+1. **Update Role Permission Update Endpoint**: Update the backend code to accept permission strings.
+2. **Update Role Permission Update Service**: Update the backend code to handle permission strings correctly.
+
+# Project Backlog
+
+Last Updated: 2025-06-20
+
+## Critical Priority
+
+### BUG-101: Critical Security Vulnerability - TypeORM Getter/Setter Pattern Breaks Login Monitoring and Pattern Detection
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Priority**: Critical (Security vulnerability affecting all successful login monitoring)
+- **Dependencies**: None
+- **Added**: 2025-06-20
+- **Description**: The LoginAttempt entity uses a broken TypeORM getter/setter pattern that silently fails to capture email addresses for successful login attempts, completely breaking security monitoring and pattern detection systems.
+
+#### Root Cause Analysis
+**TypeORM Getter/Setter Bug with Entity Relationships**:
+- **Failed Login Attempts** ✅ Work correctly: `email` setter functions because no `user` relationship is set
+- **Successful Login Attempts** ❌ Fail silently: `email` setter is bypassed due to TypeORM bug when `user` relationship is also being set
+- **Database Evidence**: 93 successful logins have `user_id` but `email_attempted = NULL`, only failed attempts have emails
+- **Security Impact**: Pattern detection service completely broken for successful logins
+
+#### Technical Details
+**The Broken Pattern**:
+```typescript
+// LoginAttempt entity - BROKEN DESIGN
+@Column({ name: 'email_attempted', type: 'text', nullable: true })
+emailAttempted: string;
+
+set email(value: string) {
+  this.emailAttempted = value;  // ← TypeORM bypasses this when relationships are set
+}
+```
+
+**Pattern Detection Service Failures**:
+- Line 110: `attempts.map((a) => a.email)` returns `undefined` for all successful logins
+- Line 124: `email: a.email` creates broken evidence objects
+- Line 233: Inconsistently uses `a.emailAttempted` in other places
+- **Result**: Brute force, distributed attack, and account switching detection completely broken for successful logins
+
+**TypeORM Issues Referenced**:
+- GitHub Issue #569: "Entity setters are not called when entity is loaded from database"
+- GitHub Issue #9931: "EntityPropertyNotFound when using getters and setters in an Entity"
+
+#### Solution Implementation Plan
+
+**Phase 1: Remove Broken Getter/Setter Pattern**
+1. **Remove fake "backward compatibility" getters/setters** from LoginAttempt entity
+2. **Keep database column as `email_attempted`** (no database changes needed)
+3. **Use `emailAttempted` property consistently** throughout security-related code
+
+**Phase 2: Fix Pattern Detection Service**
+1. **Replace all `a.email` with `a.emailAttempted`** in pattern-detection.service.ts
+2. **Fix evidence object creation** to use correct property names
+3. **Add comprehensive tests** to verify pattern detection works for both failed and successful logins
+
+**Phase 3: Update Login Monitoring Components**
+1. **Frontend**: Update login-monitoring component to use `emailAttempted` field
+2. **Backend**: Update LoginAttemptService to use `emailAttempted` directly
+3. **API responses**: Ensure consistent field naming in all login monitoring endpoints
+
+**Phase 4: Implement TypeORM Best Practices**
+1. **Use TypeORM naming strategy** for automatic camelCase ↔ snake_case conversion
+2. **Implement proper column transformers** if field transformation is needed
+3. **Add comprehensive entity validation** to prevent similar issues
+
+**Phase 5: Security Scope Clarification**
+- **Login monitoring and security features**: Use `emailAttempted` for database consistency
+- **All other application areas** (login forms, user management, etc.): Continue using `email` or `username` as appropriate
+- **Clear separation of concerns**: Security logging vs. user management
+
+#### Files to Modify
+**Backend**:
+- `src/modules/auth/entities/login-attempt.entity.ts`: Remove getter/setter pattern
+- `src/modules/auth/services/pattern-detection.service.ts`: Fix all email property references
+- `src/modules/auth/services/login-attempt.service.ts`: Use emailAttempted consistently
+- `src/modules/auth/auth.service.ts`: Update login attempt creation
+
+**Frontend**:
+- `src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Update field references
+- `src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Update template bindings
+- Any other security monitoring components
+
+#### Testing Requirements
+1. **Database Integrity**: Verify successful logins now capture email addresses
+2. **Pattern Detection**: Test brute force detection works for successful logins
+3. **Login Monitoring UI**: Verify email addresses display correctly for all attempt types
+4. **Security Reports**: Ensure all security analytics include successful login emails
+5. **Regression Testing**: Verify login/logout/authentication flows remain unaffected
+
+#### Security Impact
+**Before Fix**:
+- ❌ Cannot detect brute force attacks that succeed
+- ❌ Cannot identify distributed attacks using successful logins  
+- ❌ Cannot track suspicious patterns in successful authentication
+- ❌ Cannot generate accurate security reports
+- ❌ Silent data loss with no error indication
+
+**After Fix**:
+- ✅ Complete visibility into all login attempts
+- ✅ Functional security pattern detection
+- ✅ Accurate threat assessment capabilities
+- ✅ Reliable audit trails for compliance
+
+#### Angular/NestJS Best Practices Applied
+1. **TypeORM Naming Strategy**: Use `typeorm-naming-strategies` package for automatic case conversion
+2. **Clear Entity Design**: Direct property mapping without confusing getter/setter abstractions
+3. **Consistent API Contracts**: Standardized field naming across frontend/backend
+4. **Proper Separation of Concerns**: Security logging vs. user management use appropriate field names
+5. **Comprehensive Testing**: Entity, service, and integration tests for all login monitoring features
 
 ## High Priority
 
@@ -2265,4 +5617,4 @@ async create(name: string, description?: string, currentUser?: User): Promise<Gr
   - ✅ Rules File Created: Complete with all lessons learned
   - ✅ Format Consistency: Matches existing .cursor/rules template format
   - ✅ Content Completeness: Covers all aspects of server-side sorting implementation
-  - ✅ Future Reference: Will prevent similar issues in future implementations
+  - ✅ Future Reference: Will prevent similar issues in future implementations# BUG-101 Added

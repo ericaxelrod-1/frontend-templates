@@ -24,7 +24,7 @@ export class LoginAttemptService {
   async create(data: {
     ipAddress: string;
     userAgent: string;
-    email?: string;
+    emailAttempted?: string;
     status: LoginStatus;
     user?: User;
     failureReason?: string;
@@ -33,7 +33,7 @@ export class LoginAttemptService {
     const loginAttempt = this.loginAttemptRepository.create({
       ipAddress: data.ipAddress,
       userAgent: data.userAgent,
-      email: data.email,
+      emailAttempted: data.emailAttempted,
       status: data.status,
       user: data.user,
       failureReason: data.failureReason,
@@ -92,7 +92,7 @@ export class LoginAttemptService {
     const cutoffTime = new Date(Date.now() - minutes * 60 * 1000);
     return this.loginAttemptRepository.find({
       where: {
-        email,
+        emailAttempted: email,
         attemptedAt: Between(cutoffTime, new Date()),
       },
       order: {

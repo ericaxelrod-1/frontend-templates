@@ -138,7 +138,7 @@ export class AuthService {
         await this.loginAttemptService.create({
           ipAddress,
           userAgent,
-          email,
+          emailAttempted: email,
           status: 'blocked',
           failureReason: 'IP address is blocked',
         });
@@ -171,7 +171,7 @@ export class AuthService {
           await this.loginAttemptService.create({
             ipAddress,
             userAgent,
-            email,
+            emailAttempted: email,
             status: 'captcha_required',
           });
           throw new BadRequestException({
@@ -192,7 +192,7 @@ export class AuthService {
           await this.loginAttemptService.create({
             ipAddress,
             userAgent,
-            email,
+            emailAttempted: email,
             status: 'failed',
             failureReason: 'Invalid CAPTCHA',
           });
@@ -206,7 +206,7 @@ export class AuthService {
         await this.loginAttemptService.create({
           ipAddress,
           userAgent,
-          email,
+          emailAttempted: email,
           status: 'failed',
           failureReason: 'Invalid credentials',
         });
@@ -218,7 +218,7 @@ export class AuthService {
       await this.loginAttemptService.create({
         ipAddress,
         userAgent,
-        email,
+        emailAttempted: email,
         status: 'success',
         user,
       });
