@@ -4,8 +4,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatDividerModule } from '@angular/material/divider';
-import { Member } from '../../../models/group.model';
 import { Group } from '../../../models/group.model';
+import { User } from '../../../models/user.model';
 
 export interface MemberAction {
   id: string;
@@ -33,7 +33,7 @@ export interface MemberAction {
         <div class="sidebar-header">
           <div class="header-content">
             <h2>Member Actions</h2>
-            <p *ngIf="member">{{ member.name }}</p>
+            <p *ngIf="member">{{ (member.firstName || '') + ' ' + (member.lastName || '') || member.email }}</p>
             <p *ngIf="group" class="group-name">{{ group.name }}</p>
           </div>
           <button mat-icon-button (click)="onCloseSidebar()" class="close-button">
@@ -48,8 +48,8 @@ export interface MemberAction {
           <div class="member-details">
             <mat-icon class="member-icon">person</mat-icon>
             <div class="member-text">
-              <div class="member-name">{{ member.name }}</div>
-              <div class="member-role">{{ member.role || 'Member' }}</div>
+              <div class="member-name">{{ (member.firstName || '') + ' ' + (member.lastName || '') || member.email }}</div>
+              <div class="member-role">{{ member.roles?.[0]?.name || 'Member' }}</div>
             </div>
           </div>
         </div>
@@ -235,11 +235,11 @@ export interface MemberAction {
 })
 export class MemberActionsSidebarComponent implements OnInit, OnChanges {
   @Input() isOpen = false;
-  @Input() member: Member | null = null;
+  @Input() member: User | null = null;
   @Input() group: Group | null = null;
   
   @Output() closeSidebar = new EventEmitter<void>();
-  @Output() actionSelected = new EventEmitter<{ action: MemberAction; member: Member; group: Group }>();
+  @Output() actionSelected = new EventEmitter<{ action: MemberAction; member: User; group: Group }>();
   
   availableActions: MemberAction[] = [];
   

@@ -41,7 +41,13 @@ export class GroupsService {
       ownerId: currentUser?.id
     });
 
-    return this.groupRepository.save(group);
+    const savedGroup = await this.groupRepository.save(group);
+    
+    // Load relations for consistency with other endpoints (findAll, findOne)
+    return this.groupRepository.findOne({
+      where: { id: savedGroup.id },
+      relations: ['users', 'owner']
+    });
   }
 
   async update(id: number, name?: string, description?: string, currentUser?: User): Promise<Group> {

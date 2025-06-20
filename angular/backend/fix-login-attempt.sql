@@ -1,1 +1,0 @@
-DROP TABLE IF EXISTS login_attempt; CREATE TABLE login_attempt (id INTEGER PRIMARY KEY AUTOINCREMENT, ipAddress TEXT NOT NULL, userAgent TEXT NOT NULL, email TEXT, status TEXT NOT NULL DEFAULT 'failed', metadata TEXT, failureReason TEXT, createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP, userId INTEGER NULL);

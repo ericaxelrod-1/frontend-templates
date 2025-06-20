@@ -18,7 +18,7 @@ export interface Group {
   name: string;
   description: string;
   owner: string;
-  members: Member[];
+  users: any[];  // Use any[] to avoid circular dependency, will be typed as User[] in components
   permissions: Permission[];
 }
 

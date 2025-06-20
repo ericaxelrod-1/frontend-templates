@@ -16,7 +16,7 @@
       
       <mat-card-content>
         <p>{{ group.description }}</p>
-        <mat-chip color="primary">{{ group.members }} members</mat-chip>
+        <mat-chip color="primary">{{ group.users?.length || 0 }} members</mat-chip>
       </mat-card-content>
       
       <mat-card-actions>

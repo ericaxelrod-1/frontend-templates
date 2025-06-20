@@ -8,7 +8,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { GroupService } from '../../services/group.service';
 import { UserService } from '../../services/user.service';
-import { Group, Member, Permission, GROUP_PERMISSION_SETS } from '../../models/group.model';
+import { Group, Permission, GROUP_PERMISSION_SETS } from '../../models/group.model';
 import { User } from '../../models/user.model';
 import { UserSelectorSidebarComponent } from './user-selector-sidebar/user-selector-sidebar.component';
 import { MemberActionsSidebarComponent, MemberAction } from './member-actions-sidebar/member-actions-sidebar.component';
@@ -62,17 +62,17 @@ import { PermissionService } from '../../core/services/permission.service';
               <p>{{ group.description }}</p>
               
               <div class="members-section">
-                <h3>Members ({{ group.members ? group.members.length : 0 }})</h3>
-                <mat-list *ngIf="group.members && group.members.length > 0">
-                  <mat-list-item *ngFor="let member of group.members">
-                    <span matListItemTitle>{{ member.name }}</span>
-                    <span matListItemLine>{{ member.role || 'Member' }}</span>
-                    <button mat-icon-button (click)="openMemberActions(group, member)" matListItemMeta class="member-actions-button">
+                <h3>Members ({{ group.users ? group.users.length : 0 }})</h3>
+                <mat-list *ngIf="group.users && group.users.length > 0">
+                  <mat-list-item *ngFor="let user of group.users">
+                    <span matListItemTitle>{{ (user.firstName || '') + ' ' + (user.lastName || '') || user.email }}</span>
+                    <span matListItemLine>{{ user.roles?.[0]?.name || 'Member' }}</span>
+                    <button mat-icon-button (click)="openMemberActions(group, user)" matListItemMeta class="member-actions-button">
                       <mat-icon>more_vert</mat-icon>
                     </button>
                   </mat-list-item>
                 </mat-list>
-                <div *ngIf="!group.members || group.members.length === 0" class="no-members">
+                <div *ngIf="!group.users || group.users.length === 0" class="no-members">
                   No members in this group.
                 </div>
                 
@@ -197,7 +197,7 @@ export class GroupsComponent implements OnInit {
   
   // Member actions sidebar state
   isMemberActionsOpen = false;
-  selectedMember: Member | null = null;
+  selectedMember: User | null = null;
   selectedGroupForMember: Group | null = null;
   
   // Group creation sidebar state
@@ -233,9 +233,9 @@ export class GroupsComponent implements OnInit {
     this.groupService.getGroups().subscribe({
       next: (groups) => {
         this.groups = groups.map(group => {
-          // Ensure members is an array
-          if (!group.members) {
-            group.members = [];
+          // Ensure users is an array
+          if (!group.users) {
+            group.users = [];
           }
           return group;
         });
@@ -287,8 +287,8 @@ export class GroupsComponent implements OnInit {
       // Create mode
       this.groupService.createGroup(groupData).subscribe({
         next: (group) => {
-          if (!group.members) {
-            group.members = [];
+          if (!group.users) {
+            group.users = [];
           }
           this.groups.push(group);
           this.snackBar.open('Group created successfully', 'Close', { duration: 3000 });
@@ -331,7 +331,7 @@ export class GroupsComponent implements OnInit {
     this.userService.getUsers().subscribe({
       next: (users) => {
         // Filter out users who are already members of the group
-        const memberIds = group.members?.map(member => member.id) || [];
+        const memberIds = group.users?.map(user => user.id) || [];
         this.availableUsers = users.filter(user => !memberIds.includes(user.id));
       },
       error: (error) => {
@@ -366,12 +366,12 @@ export class GroupsComponent implements OnInit {
     });
   }
 
-  removeMember(group: Group, member: Member): void {
-    if (confirm(`Are you sure you want to remove ${member.name} from the group?`)) {
+  removeMember(group: Group, member: User): void {
+    if (confirm(`Are you sure you want to remove ${(member.firstName || '') + ' ' + (member.lastName || '') || member.email} from the group?`)) {
       this.groupService.removeMember(group.id, member.id).subscribe({
         next: () => {
-          if (group.members) {
-            group.members = group.members.filter(m => m.id !== member.id);
+          if (group.users) {
+            group.users = group.users.filter(u => u.id !== member.id);
           }
           this.snackBar.open('Member removed successfully', 'Close', { duration: 3000 });
         },
@@ -383,12 +383,15 @@ export class GroupsComponent implements OnInit {
     }
   }
 
-  makeAdmin(group: Group, member: Member): void {
+  makeAdmin(group: Group, member: User): void {
     // Use non-deprecated method with admin permissions
     const adminPermissions: Permission[] = GROUP_PERMISSION_SETS['ADMIN'];
     this.groupService.updateMemberPermissions(group.id, member.id, adminPermissions).subscribe({
       next: () => {
-        member.role = 'Admin';
+        // Update the user's role in the local data
+        if (member.roles && member.roles.length > 0) {
+          member.roles[0].name = 'Admin';
+        }
         this.snackBar.open('Member role updated successfully', 'Close', { duration: 3000 });
       },
       error: (error) => {
@@ -398,8 +401,8 @@ export class GroupsComponent implements OnInit {
     });
   }
 
-  openMemberActions(group: Group, member: Member): void {
-    console.log('[GroupsComponent] Opening member actions for:', member.name, 'in group:', group.name);
+  openMemberActions(group: Group, member: User): void {
+    console.log('[GroupsComponent] Opening member actions for:', (member.firstName || '') + ' ' + (member.lastName || '') || member.email, 'in group:', group.name);
     this.selectedMember = member;
     this.selectedGroupForMember = group;
     this.isMemberActionsOpen = true;
@@ -412,8 +415,8 @@ export class GroupsComponent implements OnInit {
     this.selectedGroupForMember = null;
   }
   
-  onMemberActionSelected(event: { action: MemberAction; member: Member; group: Group }): void {
-    console.log('[GroupsComponent] Member action selected:', event.action.id, 'for member:', event.member.name);
+  onMemberActionSelected(event: { action: MemberAction; member: User; group: Group }): void {
+    console.log('[GroupsComponent] Member action selected:', event.action.id, 'for member:', (event.member.firstName || '') + ' ' + (event.member.lastName || '') || event.member.email);
     
     switch (event.action.id) {
       case 'make-admin':

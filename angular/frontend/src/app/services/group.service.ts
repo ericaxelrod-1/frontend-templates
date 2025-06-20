@@ -2,8 +2,8 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, map, catchError, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { User } from '../models/user.model';
 import { Group, Member, Permission, GROUP_PERMISSION_SETS } from '../models/group.model';
+import { User } from '../models/user.model';
 
 @Injectable({
   providedIn: 'root'
@@ -14,18 +14,7 @@ export class GroupService {
   constructor(private http: HttpClient) {}
 
   getGroups(): Observable<Group[]> {
-    return this.http.get<any[]>(this.apiUrl).pipe(
-      map(groups => groups.map(group => ({
-        ...group,
-        permissions: group.permissions || [],
-        // Transform backend users to frontend members format
-        members: group.users ? group.users.map((user: any) => ({
-          id: user.id,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
-          role: 'Member', // Default role, could be enhanced later
-          permissions: [] // Default permissions, could be enhanced later
-        })) : []
-      }))),
+    return this.http.get<Group[]>(this.apiUrl).pipe(
       catchError(error => {
         console.error('Error getting groups:', error);
         return throwError(() => error);
@@ -35,7 +24,6 @@ export class GroupService {
 
   getGroup(id: number): Observable<Group> {
     return this.http.get<Group>(`${this.apiUrl}/${id}`).pipe(
-      map(group => this.convertToNewFormat([group])[0]),
       catchError(error => {
         console.error(`Error getting group ${id}:`, error);
         return throwError(() => error);
@@ -45,7 +33,6 @@ export class GroupService {
 
   createGroup(group: Partial<Group>): Observable<Group> {
     return this.http.post<Group>(this.apiUrl, group).pipe(
-      map(group => this.convertToNewFormat([group])[0]),
       catchError(error => {
         console.error('Error creating group:', error);
         return throwError(() => error);
@@ -55,7 +42,6 @@ export class GroupService {
 
   updateGroup(id: number, group: Partial<Group>): Observable<Group> {
     return this.http.put<Group>(`${this.apiUrl}/${id}`, group).pipe(
-      map(group => this.convertToNewFormat([group])[0]),
       catchError(error => {
         console.error(`Error updating group ${id}:`, error);
         return throwError(() => error);
@@ -72,42 +58,15 @@ export class GroupService {
     );
   }
 
-  getGroupMembers(groupId: number): Observable<Member[]> {
+  getGroupMembers(groupId: number): Observable<User[]> {
     return this.http.get<User[]>(`${this.apiUrl}/${groupId}/users`).pipe(
-      map(users => users.map(user => ({
-        id: user.id,
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
-        permissions: user.permissions?.map(p => ({
-          id: p.id,
-          name: p.name,
-          resourceName: p.resourceName,
-          actionName: p.actionName,
-          isGranted: true
-        })) || [],
-        role: user.roles?.[0]?.name // For legacy support
-      }))),
       catchError(() => {
-        return this.http.get<Member[]>(`${this.apiUrl}/${groupId}/members`).pipe(
-          map(members => members.map(member => ({
-            ...member,
-            permissions: member.permissions || []
-          }))),
+        // Fallback to getting group and extracting users
+        return this.getGroup(groupId).pipe(
+          map(group => group.users || []),
           catchError(() => {
-            return this.getGroup(groupId).pipe(
-              map(group => {
-                if (group.members && group.members.length > 0) {
-                  return group.members.map(member => ({
-                    ...member,
-                    permissions: member.permissions || []
-                  }));
-                }
-                return [];
-              }),
-              catchError(() => {
-                console.error(`Could not get members for group ${groupId} from any endpoint`);
-                return of([]);
-              })
-            );
+            console.error(`Could not get members for group ${groupId} from any endpoint`);
+            return of([]);
           })
         );
       })
@@ -163,15 +122,5 @@ export class GroupService {
     );
   }
 
-  private convertToNewFormat(groups: Group[]): Group[] {
-    return groups.map(group => ({
-      ...group,
-      members: group.members.map(member => ({
-        ...member,
-        permissions: member.role ? 
-          GROUP_PERMISSION_SETS[member.role] || GROUP_PERMISSION_SETS['MEMBER'] :
-          member.permissions || []
-      }))
-    }));
-  }
+
 } 

@@ -1,155 +1,195 @@
 # Project Backlog
 
-Last Updated: 2025-06-18
+Last Updated: 2025-06-19
 
 ## High Priority
 
-### BUG-089: Fix Race Condition in RxJS Reactive Pattern - Permission Check Timing Issue
-- **Status**: Complete
-- **Priority**: High
-- **Testing**: Passed
-- **Dependencies**: BUG-088 (Complete Reactive Pattern Implementation)
-- **Added**: 2025-06-19
-- **Started**: 2025-06-19
-- **Completed**: 2025-06-19
-
-#### Implementation Notes
-- **User Report**: "Now the table is empty again" after RxJS merge implementation
-- **Root Cause**: Race condition between async permission check and reactive pattern initialization
-- **Technical Details**: 
-  - `ngOnInit()` starts async permission check via `permissionService.hasPermission()`
-  - `ngAfterViewInit()` runs immediately with reactive pattern using `startWith({})`
-  - `startWith({})` triggers `loadAttemptsReactive()` before permission check completes
-  - `loadAttemptsReactive()` checks `!this.hasPermission` (still false) and returns empty data
-  - Permission check completes later but reactive pattern already loaded empty data
-- **Solution Applied**: Solution 1 - Wait for permission check before initializing reactive pattern
-- **Architecture Change**: Moved reactive pattern initialization to `initializeReactivePattern()` method called after permission check completes
-
-#### Files Modified
-- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Fixed race condition by coordinating permission check timing with reactive pattern initialization
-
-#### Testing Results
-- ✅ Frontend Build: Successful
-- ✅ Backend Build: Successful  
-- ✅ Race Condition: Resolved - reactive pattern now waits for permission check
-- ✅ Architecture: Maintains industry-standard RxJS merge() pattern with proper initialization timing
-
-### BUG-088: Implement Complete Reactive Pattern for Server-Side Sorting Using RxJS merge() - Industry Best Practices
-- **Status**: Complete
-- **Priority**: High
-- **Testing**: Passed
-- **Dependencies**: BUG-087 (Pure Server-Side Sorting Implementation)
-- **Added**: 2025-06-18
-- **Started**: 2025-06-18
-- **Completed**: 2025-06-18
-
-#### Implementation Notes
-- **User Request**: "Implement the complete reactive pattern using RxJS merge() based on your research"
-- **Research Foundation**: Conducted comprehensive web research on Angular Material server-side sorting best practices from multiple authoritative sources
-- **Root Cause**: Previous implementation had all architectural components (ViewChild, template directive, API) but was missing the reactive subscription layer
-- **Industry Standard Solution**: Applied the proven RxJS merge() pattern used by thousands of Angular applications
-
-#### Technical Implementation
-- **Reactive Pattern**: Implemented complete RxJS merge() pattern in ngAfterViewInit()
-- **Event Streams**: Combined sort.sortChange and filterForm.valueChanges using merge()
-- **Optimization**: Added startWith({}) for initial load, switchMap() for request cancellation, debounceTime(300) for filter optimization
-- **Architecture**: Complete reactive flow - UI interactions → RxJS streams → API calls → SQL ORDER BY → Updated UI
-
-#### Files Modified
-- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: 
-  - Added industry-standard reactive pattern
-  - Replaced imperative methods with reactive streams
-  - Updated all method references to use reactive pattern
-- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`:
-  - Updated template references to use new trigger method
-
-#### Testing Results
-- ✅ Frontend Build: Successful compilation with no errors
-- ✅ Backend Build: Successful compilation, API unchanged  
-- ✅ TypeScript: All type checking passed
-- ✅ Linting: All errors resolved
-- ✅ Architecture: Follows Angular Material best practices
-
-### BUG-087: Implement Pure Server-Side Sorting for Login Monitoring Table - Remove Client-Side Sorting Conflicts
-- **Status**: Complete
-- **Priority**: High
-- **Testing**: Passed
-- **Dependencies**: BUG-083 (Login Monitoring Table Sorting Issues)
-- **Added**: 2025-06-18
-- **Started**: 2025-06-18
-- **Completed**: 2025-06-18
-
-#### Implementation Notes
-- **User Request**: "We should be relying on server-side sorting. It's expected this list will get quite large, and we need to do this exclusively in SQL. Each sort icon should trigger a new SQL query with a different ORDER BY clause"
-- **Root Cause**: Mixed approach using both MatTableDataSource (client-side) and server-side sorting caused architectural conflicts and confusion
-- **Previous Issue**: MatTableDataSource.sort expects to sort local data, but we were getting sorted data from server, creating conflicting paradigms
-- **Solution**: Implemented pure server-side sorting by removing MatTableDataSource and using plain array with manual sort state management
-
-**Pure Server-Side Architecture**:
-- **Frontend**: Plain array (`recentAttempts: LoginAttempt[]`) instead of MatTableDataSource
-- **Sort Events**: Manual sort state management triggers API calls with sortBy/sortDirection parameters  
-- **Backend**: Comprehensive field mapping generates SQL ORDER BY clauses for all sortable columns
-- **SQL Generation**: Maps frontend fields (createdAt) to database fields (attempt.attemptedAt)
-- **Debug Logging**: Shows actual SQL ORDER BY clauses: "Generated SQL ORDER BY: attempt.attemptedAt DESC"
-
-**Files Modified**:
-- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Removed MatTableDataSource, implemented pure server-side sorting
-- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Updated template to use plain array
-- `angular/backend/src/modules/auth/controllers/login-monitoring.controller.ts`: Enhanced logging for server-side sorting
-- `angular/backend/src/modules/auth/services/login-attempt.service.ts`: Comprehensive field mapping and SQL ORDER BY generation
-
-**Testing Results**:
-- ✅ Backend builds successfully with TypeScript compilation
-- ✅ Frontend builds successfully with TypeScript compilation
-- ✅ Each column header click triggers new API call with different sort parameters
-- ✅ SQL ORDER BY clauses generated for all sortable columns (id, timestamp, email, ipAddress, status, details)
-- ✅ Sorting affects entire dataset across all pages, not just current page
-- ✅ Debug logging confirms server-side SQL sorting on each click
-
-**Performance Benefits**:
-- Database-level sorting for large datasets (thousands of login attempts)
-- Proper pagination with server-side sorted results
-- No client-side memory overhead for sorting large datasets
-- Efficient SQL indexing can be used for sorting performance
-
-### BUG-083: Login Monitoring Table Sorting Issues - Toggle and Server-Side Sorting Not Working
-- **Status**: Complete
-- **Priority**: High
-- **Testing**: Passed
-- **Dependencies**: BUG-082 (Login Monitoring Data Display)
-- **Added**: 2025-06-18
-- **Started**: 2025-06-18
-- **Completed**: 2025-06-18
-
-#### Implementation Notes
-- **Root Cause**: Two critical sorting issues:
-  1. Sort toggle didn't work due to conflicting event handlers between onSortChange() method and MatSort directive
-  2. Sorting only affected current page (client-side) instead of entire dataset (server-side)
-- **Solution**: Removed duplicate event handlers, implemented proper server-side sorting with API parameters
-- **Files Modified**:
-  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Fixed sort state management and timing
-- **Testing Results**:
-  - ✅ Sort toggle works correctly (asc/desc cycling)
-  - ✅ Server-side sorting affects entire dataset
-  - ✅ Default timestamp descending sort on page load
-  - ✅ Pagination resets when sorting changes
-
-### BUG-082: Login Monitoring Dashboard Shows Incorrect Data - Backend Controller Returns Placeholder Text
+### BUG-094: Simplify Group Service - Remove Problematic convertToNewFormat() Function
 - **Status**: Complete
 - **Priority**: High
 - **Testing**: Passed
 - **Dependencies**: None
-- **Added**: 2025-01-08
-- **Started**: 2025-06-18
-- **Completed**: 2025-06-18
+- **Added**: 2025-06-19
+- **Completed**: 2025-06-19
+- **Description**: The Create Group function still fails despite backend fix because the frontend `convertToNewFormat()` function expects `group.members` but backend returns `group.users`. Instead of complex data transformation, follow the simpler role service pattern that directly uses backend response format.
 
-#### Implementation Notes
-- **Root Cause**: Multiple issues causing Recent Login Attempts table to show "No login attempts found"
-  1. Backend controller returned placeholder text instead of calling service
-  2. Service query logic used LessThan (old attempts) instead of MoreThan (recent attempts)  
-  3. Frontend expected {items: [], total: 0} format but backend returned raw array
-  4. Backend only supported email filter but frontend sent ipAddress, status, dateFrom, dateTo
-  5. Database had only success attempts, no failed/blocked examples for testing
+#### **DETAILED ANALYSIS** 🔍
+
+**Root Cause**: 
+- Backend returns groups with `users` property (TypeORM relation name)
+- Frontend `convertToNewFormat()` expects `members` property, causing `TypeError: Cannot read properties of undefined (reading 'map')`
+- Unnecessary complexity - role service works fine without data transformation
+
+**Current Problematic Flow**:
+1. Backend returns: `{ id: 1, name: "Test", users: [] }`
+2. Frontend expects: `{ id: 1, name: "Test", members: [] }`
+3. convertToNewFormat() tries to map undefined `members` → Error
+
+**Proposed Solution Pattern** (Following Role Service):
+- Remove `convertToNewFormat()` function entirely
+- Update frontend to work with backend's `users` property directly
+- Simplify group service to match role service pattern
+- Update group components to use `group.users` instead of `group.members`
+
+#### Implementation Strategy
+1. **Remove convertToNewFormat()**: Delete the problematic transformation function
+2. **Update Group Interface**: Change `members` to `users` to match backend
+3. **Update Components**: Change all references from `group.members` to `group.users`
+4. **Simplify Service**: Remove transformation calls, use direct backend responses
+5. **Test Create Group**: Verify functionality works without transformation layer
+
+### BUG-093: Create Group Function Returns Undefined Members - Backend Relations Not Loaded  
+- **Status**: Complete (Backend Fixed, Frontend Issue Remains)
+- **Priority**: High
+- **Testing**: Failed (Error persists)
+- **Dependencies**: None
+- **Added**: 2025-06-19
+- **Completed**: 2025-06-19 (Backend only)
+- **Description**: The "Create Group" function fails with `TypeError: Cannot read properties of undefined (reading 'map')` at group.service.ts:169:30 because the backend create() method doesn't load entity relations after saving, returning a group object with `users: undefined`.
+
+#### **DETAILED ANALYSIS** 🔍
+
+**Root Cause Identified**:
+Backend `GroupsService.create()` method saves a new group but doesn't load relations, unlike other methods (`findAll()`, `findOne()`) that properly load the `users` relation.
+
+**Error Flow**:
+1. User clicks "Create Group" button
+2. Frontend calls `GroupService.createGroup()`
+3. Backend `create()` method saves group **without loading relations**
+4. Backend returns group with `users: undefined`
+5. Frontend calls `convertToNewFormat([group])[0]`
+6. `convertToNewFormat()` tries to access `group.members.map()` (where `members` maps from `users`)
+7. Since `group.members` is `undefined`, `.map()` throws TypeError
+
+**Code Location**: 
+- **Frontend Error**: `angular/frontend/src/app/services/group.service.ts:169` in `convertToNewFormat()` method
+- **Backend Issue**: `angular/backend/src/modules/users/groups.service.ts:39` in `create()` method
+
+**Pattern Inconsistency**:
+- ✅ `findAll()`: Uses `relations: ['users']`
+- ✅ `findOne()`: Uses `relations: ['users', 'owner']`
+- ❌ `create()`: No relations loaded after save
+
+**Frontend Error Code**:
+```typescript
+private convertToNewFormat(groups: Group[]): Group[] {
+  return groups.map(group => ({
+    ...group,
+    members: group.members.map(member => ({ // ← LINE 169: ERROR HERE
+      ...member,
+      permissions: member.role ? 
+        GROUP_PERMISSION_SETS[member.role] || GROUP_PERMISSION_SETS['MEMBER'] :
+        member.permissions || []
+    }))
+  }));
+}
+```
+
+**Backend Current Implementation**:
+```typescript
+async create(name: string, description?: string, currentUser?: User): Promise<Group> {
+  const group = this.groupRepository.create({
+    name,
+    description,
+    ownerId: currentUser?.id
+  });
+
+  return this.groupRepository.save(group); // ← Returns group WITHOUT loading relations
+}
+```
+
+#### **SOLUTION REQUIRED**
+Update backend `create()` method to follow the same pattern as other methods by loading relations after saving:
+
+```typescript
+async create(name: string, description?: string, currentUser?: User): Promise<Group> {
+  const group = this.groupRepository.create({
+    name,
+    description,
+    ownerId: currentUser?.id
+  });
+
+  const savedGroup = await this.groupRepository.save(group);
+  
+  // Load relations for consistency with other endpoints
+  return this.groupRepository.findOne({
+    where: { id: savedGroup.id },
+    relations: ['users', 'owner']
+  });
+}
+```
+
+#### **FILES TO MODIFY**
+- `angular/backend/src/modules/users/groups.service.ts`: Update create() method to load relations
+
+#### **EXPECTED OUTCOMES**
+- ✅ Create Group function works without errors
+- ✅ Consistent data structure across all group endpoints
+- ✅ Frontend convertToNewFormat() receives proper group with members array
+- ✅ Group creation returns newly created group with empty members array (not undefined)
+
+#### **RISK ASSESSMENT**
+- **Low Risk**: Simple consistency fix following established patterns
+- **No Breaking Changes**: Frontend expects the same data structure
+- **Performance**: Minimal impact - single additional database query per group creation
+
+### BUG-079: Consolidate Conflicting Database Migration Scripts
+- **Status**: Not Started
+- **Priority**: High
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-28
+- **Description**: Multiple migration scripts are creating conflicting role data, causing role validation failures. Need to consolidate and fix migration conflicts to ensure consistent database state.
+
+#### **DETAILED ANALYSIS**
+
+**Conflicting Migration Files**:
+1. **`migrations/1742536989663-FixRolesTableStructure.ts`** (Most Recent)
+   - Creates: 'admin', 'user' (lowercase)
+   - Location: `/migrations/` (root level)
+
+2. **`angular/backend/src/migrations/1690000000001-SeedPermissionsData.ts`**
+   - Creates: 'Super Admin', 'Admin', 'User', 'Guest' (title case)
+   - Location: `angular/backend/src/migrations/`
+
+3. **`angular/backend/src/migrations/1720000000004-CreateRolesTable.ts`**
+   - Creates: 'SUPER_ADMIN', 'ADMIN', 'USER' (uppercase)
+   - Location: `angular/backend/src/migrations/`
+
+**Current Database State** (from investigation):
+- ID 1: "user"
+- ID 3: "superuser" 
+- ID 6: "Administrator"
+- ID 8: "Super Administrator"
+
+**Issues Identified**:
+- Multiple migrations creating different role naming conventions
+- No proper migration ordering or conflict resolution
+- Database state is unpredictable depending on migration execution order
+- Frontend loads roles from one source while backend validates against potentially different data
+
+**Impact**:
+- Role validation failures in user management
+- "One or more role IDs are invalid" errors
+- Inconsistent role data between frontend and backend
+- Affects both old and new role management implementations
+
+#### **SOLUTION REQUIRED**
+1. **Audit all migration files** that create or modify roles
+2. **Create single authoritative migration** that ensures consistent role data
+3. **Remove or update conflicting migrations** to prevent future conflicts
+4. **Establish migration naming and ordering standards**
+5. **Verify role data consistency** between all modules and endpoints
+
+
+
+
+
+
+
+
+
+
 
 - **Files Modified**:
   - `angular/backend/src/modules/auth/controllers/login-monitoring.controller.ts`: Fixed data format and filter support
