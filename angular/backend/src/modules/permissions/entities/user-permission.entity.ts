@@ -1,12 +1,11 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  Unique
+  PrimaryColumn
 } from 'typeorm';
 import { Permission } from './permission.entity';
 import { User } from '../../users/entities/user.entity';
@@ -16,24 +15,11 @@ import { User } from '../../users/entities/user.entity';
  * Aligned with database schema as of 2025-05-16
  */
 @Entity('user_permissions')
-@Unique(['userId', 'permissionId'])
 export class UserPermission {
-  /**
-   * Primary key
-   */
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  /**
-   * Foreign key to the user
-   */
-  @Column({ name: 'user_id' })
+  @PrimaryColumn({ name: 'user_id' })
   userId: number;
 
-  /**
-   * Foreign key to the permission
-   */
-  @Column({ name: 'permission_id' })
+  @PrimaryColumn({ name: 'permission_id' })
   permissionId: number;
 
   /**

@@ -55,7 +55,7 @@ export class ResourcesController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
   @Get()
-  @RequirePermission('resources:read')
+  @RequirePermission('resources:view')
   @ApiOperation({ summary: 'Get all resources' })
   @ApiResponse({
     status: 200,
@@ -67,7 +67,7 @@ export class ResourcesController {
   }
 
   @Get(':id')
-  @RequirePermission('resources:read')
+  @RequirePermission('resources:view')
   @ApiOperation({ summary: 'Get resource by ID' })
   @ApiParam({ name: 'id', description: 'Resource ID' })
   @ApiResponse({

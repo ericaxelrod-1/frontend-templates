@@ -1,22 +1,77 @@
+// Angular Material Theme Variables
+// Import Angular Material theming functions
 @use '@angular/material' as mat;
 
-// Color Variables using both CSS variables and Material theme
-$primary: var(--primary-color);
-$primary-light: var(--primary-light);
-$primary-dark: var(--primary-dark);
-$accent: var(--accent-color);
-$text-on-primary: var(--text-on-primary);
-$text-primary: var(--text-primary);
-$text-secondary: var(--text-secondary);
-$background-dark: var(--background-dark);
-$background-card: var(--background-card);
-$surface: var(--surface);
-$error: var(--error);
-$success: var(--success);
-$warning: var(--warning);
-$info: var(--info);
+// Define the palettes (these should match styles.scss)
+$primary-palette: mat.define-palette(mat.$indigo-palette);
+$accent-palette: mat.define-palette(mat.$pink-palette, A200, A100, A400);
+$warn-palette: mat.define-palette(mat.$red-palette);
 
-// Typography
+// Create the theme (this should match styles.scss)
+$light-theme: mat.define-light-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  )
+));
+
+// Extract colors from the theme
+$primary-color: mat.get-color-from-palette($primary-palette, 500);
+$primary-light: mat.get-color-from-palette($primary-palette, 100);
+$primary-dark: mat.get-color-from-palette($primary-palette, 700);
+$accent-color: mat.get-color-from-palette($accent-palette, A200);
+$warn-color: mat.get-color-from-palette($warn-palette, 500);
+
+// Background colors from theme
+$background-color: mat.get-color-from-palette(mat.$grey-palette, 50);
+$background-card: #ffffff;
+$background-hover: mat.get-color-from-palette(mat.$grey-palette, 100);
+
+// Text colors from theme
+$text-primary: rgba(0, 0, 0, 0.87);
+$text-secondary: rgba(0, 0, 0, 0.6);
+$text-disabled: rgba(0, 0, 0, 0.38);
+$text-hint: rgba(0, 0, 0, 0.38);
+
+// Border and divider colors
+$border-color: rgba(0, 0, 0, 0.12);
+$divider-color: rgba(0, 0, 0, 0.12);
+
+// Semantic colors
+$success-color: #4caf50;
+$warning-color: #ff9800;
+$info-color: #2196f3;
+$error-color: $warn-color;
+
+// Material Design spacing system (8dp grid)
+$spacing-xs: 4px;   // 0.5 * 8dp
+$spacing-sm: 8px;   // 1 * 8dp
+$spacing-md: 16px;  // 2 * 8dp
+$spacing-lg: 24px;  // 3 * 8dp
+$spacing-xl: 32px;  // 4 * 8dp
+$spacing-xxl: 48px; // 6 * 8dp
+
+// Material Design elevation shadows
+$elevation-0: none;
+$elevation-1: 0 2px 1px -1px rgba(0, 0, 0, 0.2), 0 1px 1px 0 rgba(0, 0, 0, 0.14), 0 1px 3px 0 rgba(0, 0, 0, 0.12);
+$elevation-2: 0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12);
+$elevation-3: 0 3px 3px -2px rgba(0, 0, 0, 0.2), 0 3px 4px 0 rgba(0, 0, 0, 0.14), 0 1px 8px 0 rgba(0, 0, 0, 0.12);
+$elevation-4: 0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12);
+$elevation-6: 0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12);
+$elevation-8: 0 5px 5px -3px rgba(0, 0, 0, 0.2), 0 8px 10px 1px rgba(0, 0, 0, 0.14), 0 3px 14px 2px rgba(0, 0, 0, 0.12);
+
+// Border radius values
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+
+// Transition durations
+$transition-fast: 150ms;
+$transition-normal: 300ms;
+$transition-slow: 500ms;
+
+// Typography variables
 $font-family-base: 'Roboto', 'Helvetica Neue', sans-serif;
 $font-size-base: 1rem;
 $font-size-sm: 0.875rem;
@@ -27,28 +82,111 @@ $font-weight-medium: 500;
 $font-weight-bold: 700;
 $line-height-base: 1.5;
 
-// Spacing
-$spacing-xs: 0.25rem; // 4px
-$spacing-sm: 0.5rem;  // 8px
-$spacing-md: 1rem;    // 16px
-$spacing-lg: 1.5rem;  // 24px
-$spacing-xl: 2rem;    // 32px
+// Breakpoint variables
+$breakpoint-xs: 0;
+$breakpoint-sm: 600px;
+$breakpoint-md: 960px;
+$breakpoint-lg: 1280px;
+$breakpoint-xl: 1920px;
 
-// Border Radius
-$border-radius-sm: 4px;
-$border-radius-md: 8px;
-$border-radius-lg: 16px;
+// Z-index layers
+$z-index-dropdown: 1000;
+$z-index-sticky: 1020;
+$z-index-fixed: 1030;
+$z-index-modal-backdrop: 1040;
+$z-index-modal: 1050;
+$z-index-popover: 1060;
+$z-index-tooltip: 1070;
 
-// Transitions
-$transition-base: all 0.3s ease;
+// Material Design Typography Scale
+// These classes can be used directly in HTML or extended in SCSS
 
-// Shadows
-$shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
-$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-$shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+.mat-headline-1 { 
+  font-size: 6rem; 
+  line-height: 6rem; 
+  font-weight: 300; 
+  letter-spacing: -0.015625em;
+}
 
-// Breakpoints
-$breakpoint-sm: 576px;
-$breakpoint-md: 768px;
-$breakpoint-lg: 992px;
-$breakpoint-xl: 1200px; 
+.mat-headline-2 { 
+  font-size: 3.75rem; 
+  line-height: 3.75rem; 
+  font-weight: 300; 
+  letter-spacing: -0.0083333333em;
+}
+
+.mat-headline-3 { 
+  font-size: 3rem; 
+  line-height: 3.125rem; 
+  font-weight: 400; 
+  letter-spacing: normal;
+}
+
+.mat-headline-4 { 
+  font-size: 2.125rem; 
+  line-height: 2.5rem; 
+  font-weight: 400; 
+  letter-spacing: 0.0073529412em;
+}
+
+.mat-headline-5 { 
+  font-size: 1.5rem; 
+  line-height: 2rem; 
+  font-weight: 400; 
+  letter-spacing: normal;
+}
+
+.mat-headline-6 { 
+  font-size: 1.25rem; 
+  line-height: 2rem; 
+  font-weight: 500; 
+  letter-spacing: 0.0125em;
+}
+
+.mat-subtitle-1 {
+  font-size: 1rem;
+  line-height: 1.75rem;
+  font-weight: 400;
+  letter-spacing: 0.009375em;
+}
+
+.mat-subtitle-2 {
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  font-weight: 500;
+  letter-spacing: 0.0071428571em;
+}
+
+.mat-body-1 {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.03125em;
+}
+
+.mat-body-2 {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+  letter-spacing: 0.0178571429em;
+}
+
+.mat-caption {
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+  letter-spacing: 0.0333333333em;
+}
+
+.mat-button-text {
+  font-size: 0.875rem;
+  line-height: 2.25rem;
+  font-weight: 500;
+  letter-spacing: 0.0892857143em;
+  text-transform: uppercase;
+}
+
+// Shadow variables for backward compatibility
+$shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+$shadow-md: 0 4px 8px rgba(0, 0, 0, 0.15);
+$shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.2); 

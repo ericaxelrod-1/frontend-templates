@@ -1,381 +1,312 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
-import { Group } from '../permissions/entities/group.entity';
+import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
-import { UserGroup } from './entities/user-group.entity';
-import { IPermissionChecker } from '../permissions/shared/interfaces/permission-checker.interface';
-import { PERMISSION_CHECKER } from '../permissions/shared/permissions-shared.module';
-
-// Since the Group entity already has userGroups, we don't need the ExtendedGroup interface
-// If we need additional properties, we can define them here
-type ExtendedGroup = Group;
+import { Group } from '../permissions/entities/group.entity';
+import { GroupMembershipResult } from './dto/group-membership-result.dto';
 
 @Injectable()
 export class GroupsService {
+  private readonly logger = new Logger(GroupsService.name);
+
   constructor(
-    @InjectRepository(Group)
-    private groupsRepository: Repository<Group>,
-    @InjectRepository(UserGroup)
-    private userGroupsRepository: Repository<UserGroup>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-    @Inject(PERMISSION_CHECKER)
-    private readonly permissionChecker: IPermissionChecker,
+    @InjectRepository(User) private userRepository: Repository<User>,
+    @InjectRepository(Group) private groupRepository: Repository<Group>
   ) {}
 
-  /**
-   * Create a new group
-   * @param name - The name of the group
-   * @param description - The description of the group
-   * @param currentUser - The user creating the group
-   * @returns The created group
-   */
-  async create(
-    name: string,
-    description: string,
-    currentUser: User,
-  ): Promise<Group> {
-    // Check if user has permission to create groups
-    const hasPermission = await this.permissionChecker.checkUserPermission(
-      currentUser.id,
-      'groups',
-      'create',
-    );
-    
-    if (!hasPermission) {
-      throw new ForbiddenException(
-        'You do not have permission to create groups',
-      );
-    }
-    
-    // Check if group already exists
-    const existingGroup = await this.groupsRepository.findOne({
-      where: { name } as FindOptionsWhere<Group>,
+  async findAll(): Promise<Group[]> {
+    return this.groupRepository.find({
+      relations: ['users'],
+      order: { name: 'ASC' }
     });
-    
-    if (existingGroup) {
-      throw new BadRequestException(`Group with name ${name} already exists`);
-    }
-    
-    // Create new group
-    const group = this.groupsRepository.create({
-      name,
-      description,
-      settings: JSON.stringify({}),
-    });
-    
-    return this.groupsRepository.save(group);
   }
 
-  /**
-   * Find all groups
-   * @param currentUser - The user requesting the groups
-   * @returns An array of groups
-   */
-  async findAll(currentUser: User): Promise<Group[]> {
-    // Check if user has permission to view groups
-    const hasPermission = await this.permissionChecker.checkUserPermission(
-      currentUser.id,
-      'groups',
-      'read',
-    );
-    
-    // If global permission, return all groups
-    if (hasPermission) {
-      return this.groupsRepository.find();
-    }
-    
-    // Otherwise, return only groups the user is a member of
-    const userWithGroups = await this.userRepository.findOne({
-      where: { id: currentUser.id },
-      relations: ['groups'],
+  async findOne(id: number): Promise<Group> {
+    const group = await this.groupRepository.findOne({
+      where: { id },
+      relations: ['users', 'owner']
     });
-    
-    if (!userWithGroups || !userWithGroups.groups) {
-      return [];
-    }
-    
-    return userWithGroups.groups;
-  }
 
-  /**
-   * Find a group by ID
-   * @param id - The ID of the group to find
-   * @param currentUser - The user requesting the group
-   * @returns The found group
-   */
-  async findOne(id: number, currentUser: User): Promise<Group> {
-    // Check if user has permission to view groups
-    const hasPermission = await this.permissionChecker.checkUserPermission(
-      currentUser.id,
-      'groups',
-      'read',
-    );
-    
-    // If no global permission, check if they're a member
-    if (!hasPermission) {
-      const membership = await this.userGroupsRepository.findOne({
-        where: {
-          group: { id },
-          user: { id: currentUser.id },
-        } as FindOptionsWhere<UserGroup>,
-      });
-      
-      if (!membership) {
-        throw new ForbiddenException(
-          'You do not have permission to view this group',
-        );
-      }
-    }
-    
-    const group = await this.groupsRepository.findOne({
-      where: { id } as FindOptionsWhere<Group>,
-      relations: ['userGroups', 'userGroups.user'],
-    });
-    
     if (!group) {
       throw new NotFoundException(`Group with ID ${id} not found`);
     }
-    
+
     return group;
   }
 
-  /**
-   * Add a user to a group
-   * @param groupId - The ID of the group
-   * @param userId - The ID of the user to add
-   * @param currentUser - The user performing the action
-   * @returns The created user-group relationship
-   */
-  async addMember(
-    groupId: number,
-    userId: number,
-    currentUser: User,
-  ): Promise<UserGroup> {
-    // Check if current user has permission to manage group members
-    const hasPermission = await this.permissionChecker.checkUserPermission(
-      currentUser.id,
-      'member',
-      'manage',
-    );
-    if (!hasPermission) {
-      throw new ForbiddenException(
-        'You do not have permission to manage group members',
-      );
-    }
-
-    // Check if group exists
-    const group = await this.findOne(groupId, currentUser);
-    
-    // Check if user exists
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-    
-    if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
-    }
-    
-    // Check if user is already a member
-    const existingMembership = await this.userGroupsRepository.findOne({
-      where: {
-        group: { id: groupId },
-        user: { id: userId },
-      } as FindOptionsWhere<UserGroup>,
-    });
-    
-    if (existingMembership) {
-      throw new BadRequestException(
-        `User with ID ${userId} is already a member of group with ID ${groupId}`,
-      );
-    }
-    
-    // Create membership
-    const userGroup = this.userGroupsRepository.create({
-      group,
-      user,
-    });
-    
-    return this.userGroupsRepository.save(userGroup);
-  }
-
-  /**
-   * Remove a user from a group
-   * @param groupId - The ID of the group
-   * @param userId - The ID of the user to remove
-   * @param currentUser - The user performing the action
-   */
-  async removeMember(
-    groupId: number,
-    userId: number,
-    currentUser: User,
-  ): Promise<void> {
-    // Check if current user has permission to manage group members
-    const hasPermission = await this.permissionChecker.checkUserPermission(
-      currentUser.id,
-      'member',
-      'manage',
-    );
-    if (!hasPermission) {
-      throw new ForbiddenException(
-        'You do not have permission to manage group members',
-      );
-    }
-
-    // Check if group exists
-    await this.findOne(groupId, currentUser);
-    
-    // Check if membership exists
-    const membership = await this.userGroupsRepository.findOne({
-      where: {
-        group: { id: groupId },
-        user: { id: userId },
-      } as FindOptionsWhere<UserGroup>,
-      relations: ['group', 'user'],
-    });
-    
-    if (!membership) {
-      throw new NotFoundException(
-        `User with ID ${userId} is not a member of group with ID ${groupId}`,
-      );
-    }
-    
-    // Remove membership
-    await this.userGroupsRepository.remove(membership);
-  }
-
-  /**
-   * Delete a group
-   * @param id - The ID of the group to delete
-   * @param currentUser - The user performing the action
-   */
-  async delete(id: number, currentUser: User): Promise<void> {
-    // Check if user has permission to delete groups
-    const hasPermission = await this.permissionChecker.checkUserPermission(
-      currentUser.id,
-      'groups',
-      'delete',
-    );
-    if (!hasPermission) {
-      throw new ForbiddenException(
-        'You do not have permission to delete groups',
-      );
-    }
-
-    // Check if group exists
-    const group = await this.findOne(id, currentUser);
-    
-    // Delete group
-    await this.groupsRepository.remove(group);
-  }
-
-  /**
-   * Update group settings
-   * @param id - The ID of the group
-   * @param settings - The new settings for the group
-   * @param currentUser - The user performing the action
-   * @returns The updated group
-   */
-  async updateSettings(
-    id: number,
-    settings: Record<string, any>,
-    currentUser: User,
-  ): Promise<Group> {
-    // Check if user has permission to update group settings
-    const hasPermission = await this.permissionChecker.checkUserPermission(
-      currentUser.id,
-      'groups',
-      'update',
-    );
-    if (!hasPermission) {
-      throw new ForbiddenException(
-        'You do not have permission to update group settings',
-      );
-    }
-
-    // Check if group exists
-    const group = await this.findOne(id, currentUser);
-    
-    // Update settings
-    group.settings = JSON.stringify(settings);
-    
-    return this.groupsRepository.save(group);
-  }
-
-  /**
-   * Update member permissions
-   * @param groupId - The ID of the group
-   * @param userId - The ID of the user
-   * @param permissions - The new permissions for the user
-   * @param currentUser - The user performing the action
-   * @returns The updated user-group relationship
-   */
-  async updateMemberPermissions(
-    groupId: number,
-    userId: number,
-    permissions: string[],
-    currentUser: User,
-  ): Promise<UserGroup> {
-    // Check if current user has permission to manage group members
-    const hasPermission = await this.permissionChecker.checkUserPermission(
-      currentUser.id,
-      'member',
-      'manage',
-    );
-    if (!hasPermission) {
-      throw new ForbiddenException(
-        'You do not have permission to manage group members',
-      );
-    }
-
-    const group = await this.findOne(groupId, currentUser);
-    const userGroup = group.userGroups.find((ug) => ug.user.id === userId);
-
-    if (!userGroup) {
-      throw new NotFoundException('User is not a member of this group');
-    }
-
-    // Validate permission format
-    const validPermissions = permissions.filter(perm => {
-      const parts = perm.split(':');
-      return parts.length === 2 && parts[0] && parts[1];
+  async create(name: string, description?: string, currentUser?: User): Promise<Group> {
+    const group = this.groupRepository.create({
+      name,
+      description,
+      ownerId: currentUser?.id
     });
 
-    // Note: UserGroup entity doesn't have permissions property
-    // This would need to be handled through GroupPermission entities instead
+    const savedGroup = await this.groupRepository.save(group);
     
-    return this.userGroupsRepository.save(userGroup);
+    // Load relations for consistency with other endpoints (findAll, findOne)
+    return this.groupRepository.findOne({
+      where: { id: savedGroup.id },
+      relations: ['users', 'owner']
+    });
   }
 
-  /**
-   * Get members of a group
-   * @param groupId - The ID of the group
-   * @param currentUser - The user performing the action
-   * @returns The members of the group
-   */
-  async getMembers(groupId: number, currentUser: User): Promise<UserGroup[]> {
-    const group = await this.findOne(groupId, currentUser);
-    return group.userGroups;
+  async update(id: number, name?: string, description?: string, currentUser?: User): Promise<Group> {
+    const group = await this.findOne(id);
+    
+    // Basic permission check - only owner or system admin can update
+    if (currentUser && group.ownerId !== currentUser.id) {
+      const isAdmin = currentUser.roles?.some(role => role.name === 'admin');
+      if (!isAdmin) {
+        throw new NotFoundException('Only the group owner or admin can update this group');
+      }
+    }
+
+    if (name !== undefined) group.name = name;
+    if (description !== undefined) group.description = description;
+
+    return this.groupRepository.save(group);
   }
 
-  // Implementation of the findGroupWithUserGroups method to fix the error
-  private async findGroupWithUserGroups(id: number): Promise<ExtendedGroup> {
-    const group = await this.groupsRepository.findOne({
-      where: { id } as FindOptionsWhere<Group>,
-      relations: ['userGroups', 'userGroups.user'],
+  async delete(id: number, currentUser?: User): Promise<void> {
+    const group = await this.findOne(id);
+    
+    // Basic permission check - only owner or system admin can delete
+    if (currentUser && group.ownerId !== currentUser.id) {
+      const isAdmin = currentUser.roles?.some(role => role.name === 'admin');
+      if (!isAdmin) {
+        throw new NotFoundException('Only the group owner or admin can delete this group');
+      }
+    }
+
+    // Prevent deletion of system groups
+    if (group.isSystemGroup) {
+      throw new NotFoundException('System groups cannot be deleted');
+    }
+
+    await this.groupRepository.remove(group);
+  }
+
+  async getMembers(groupId: number): Promise<User[]> {
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+      relations: ['users']
     });
 
     if (!group) {
-      throw new NotFoundException(`Group with ID ${id} not found`);
+      throw new NotFoundException(`Group with ID ${groupId} not found`);
     }
 
-    return group as ExtendedGroup;
+    return group.users || [];
+  }
+
+  async addMember(groupId: number, userId: number): Promise<GroupMembershipResult> {
+    this.logger.debug(`Adding user ${userId} to group ${groupId}`);
+    
+    // Fetch user with current groups
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['groups']
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Fetch group
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+      relations: ['users']
+    });
+
+    if (!group) {
+      throw new NotFoundException(`Group with ID ${groupId} not found`);
+    }
+
+    // Check if user is already a member
+    const wasAlreadyMember = user.groups?.some(g => g.id === groupId) || false;
+    
+    if (wasAlreadyMember) {
+      this.logger.warn(`User ${userId} is already a member of group ${groupId}`);
+      return {
+        success: false,
+        operation: 'added',
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        },
+        group: {
+          id: group.id,
+          name: group.name,
+          description: group.description
+        },
+        timestamp: new Date(),
+        message: `User is already a member of group ${group.name}`,
+        previousState: {
+          wasAlreadyMember: true,
+          memberSince: undefined // Could be enhanced to track join dates
+        },
+        currentState: {
+          isMember: true,
+          memberSince: undefined,
+          totalGroupMembers: group.users?.length || 0
+        }
+      };
+    }
+
+    // Add user to group
+    if (!user.groups) {
+      user.groups = [];
+    }
+    user.groups.push(group);
+
+    // Save the updated user
+    await this.userRepository.save(user);
+
+    // Get updated group member count
+    const updatedGroup = await this.groupRepository.findOne({
+      where: { id: groupId },
+      relations: ['users']
+    });
+
+    this.logger.log(`Successfully added user ${userId} to group ${groupId}`);
+
+    return {
+      success: true,
+      operation: 'added',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      },
+      group: {
+        id: group.id,
+        name: group.name,
+        description: group.description
+      },
+      timestamp: new Date(),
+      message: `User successfully added to group ${group.name}`,
+      previousState: {
+        wasAlreadyMember: false
+      },
+      currentState: {
+        isMember: true,
+        memberSince: new Date(),
+        totalGroupMembers: updatedGroup?.users?.length || 0
+      }
+    };
+  }
+
+  async removeMember(groupId: number, userId: number): Promise<GroupMembershipResult> {
+    this.logger.debug(`Removing user ${userId} from group ${groupId}`);
+    
+    // Fetch user with current groups
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['groups']
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Fetch group
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+      relations: ['users']
+    });
+
+    if (!group) {
+      throw new NotFoundException(`Group with ID ${groupId} not found`);
+    }
+
+    // Check if user is a member
+    const wasAlreadyMember = user.groups?.some(g => g.id === groupId) || false;
+    
+    if (!wasAlreadyMember) {
+      this.logger.warn(`User ${userId} is not a member of group ${groupId}`);
+      return {
+        success: false,
+        operation: 'removed',
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        },
+        group: {
+          id: group.id,
+          name: group.name,
+          description: group.description
+        },
+        timestamp: new Date(),
+        message: `User is not a member of group ${group.name}`,
+        previousState: {
+          wasAlreadyMember: false
+        },
+        currentState: {
+          isMember: false,
+          memberSince: undefined,
+          totalGroupMembers: group.users?.length || 0
+        }
+      };
+    }
+
+    // Remove user from group
+    user.groups = user.groups?.filter(g => g.id !== groupId) || [];
+
+    // Save the updated user
+    await this.userRepository.save(user);
+
+    // Get updated group member count
+    const updatedGroup = await this.groupRepository.findOne({
+      where: { id: groupId },
+      relations: ['users']
+    });
+
+    this.logger.log(`Successfully removed user ${userId} from group ${groupId}`);
+
+    return {
+      success: true,
+      operation: 'removed',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      },
+      group: {
+        id: group.id,
+        name: group.name,
+        description: group.description
+      },
+      timestamp: new Date(),
+      message: `User successfully removed from group ${group.name}`,
+      previousState: {
+        wasAlreadyMember: true
+      },
+      currentState: {
+        isMember: false,
+        memberSince: undefined,
+        totalGroupMembers: updatedGroup?.users?.length || 0
+      }
+    };
+  }
+
+  async updateSettings(id: number, settings: any, currentUser?: User): Promise<Group> {
+    const group = await this.findOne(id);
+    
+    // Basic permission check - only owner or system admin can update settings
+    if (currentUser && group.ownerId !== currentUser.id) {
+      const isAdmin = currentUser.roles?.some(role => role.name === 'admin');
+      if (!isAdmin) {
+        throw new NotFoundException('Only the group owner or admin can update group settings');
+      }
+    }
+
+    group.settings = JSON.stringify(settings);
+    return this.groupRepository.save(group);
   }
 }

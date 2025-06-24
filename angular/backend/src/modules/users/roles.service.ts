@@ -44,7 +44,8 @@ export class RolesService {
   }
 
   async ensureSystemRoles() {
-    // Define standard system roles
+    // Define standard system roles using preferred (numerically lowest ID) role names
+    // Only the 4 roles we want to keep in the database
     const standardRoles = [
       {
         name: 'user',
@@ -52,17 +53,17 @@ export class RolesService {
         isDefault: true,
       },
       {
-        name: 'admin',
-        description: 'Administrator with elevated permissions',
-        isDefault: false,
-      },
-      {
         name: 'superuser',
         description: 'Super user with advanced permissions',
         isDefault: false,
       },
       {
-        name: 'superadmin',
+        name: 'Administrator',
+        description: 'Administrator with elevated permissions',
+        isDefault: false,
+      },
+      {
+        name: 'Super Administrator',
         description: 'Super administrator with all permissions',
         isDefault: false,
       },
@@ -95,53 +96,53 @@ export class RolesService {
     // Define permission mappings for standard roles
     const permissionMappings = {
       user: ['self:profile:read', 'self:profile:update'],
-      admin: [
+      Administrator: [
         'users:create',
-        'users:read',
+        'users:view',
         'users:update',
         'users:delete',
         'groups:create',
-        'groups:read',
+        'groups:view',
         'groups:update',
         'groups:delete',
         'groups:manage',
       ],
       superuser: [
         'users:create',
-        'users:read',
+        'users:view',
         'users:update',
         'users:delete',
         'users:manage',
         'groups:create',
-        'groups:read',
+        'groups:view',
         'groups:update',
         'groups:delete',
         'groups:manage',
-        'roles:read',
+        'roles:view',
         'roles:create',
       ],
-      superadmin: [
+      'Super Administrator': [
         'users:create',
-        'users:read',
+        'users:view',
         'users:update',
         'users:delete',
         'users:admin',
         'users:manage',
         'users:emulate',
         'groups:create',
-        'groups:read',
+        'groups:view',
         'groups:update',
         'groups:delete',
         'groups:admin',
         'groups:manage',
         'roles:create',
-        'roles:read',
+        'roles:view',
         'roles:update',
         'roles:delete',
         'roles:admin',
         'roles:manage',
         'roles:assign',
-        'permissions:read',
+        'permissions:view',
         'permissions:update',
         'permissions:admin',
         'permissions:refresh',
@@ -224,19 +225,118 @@ export class RolesService {
       }
     }
 
-    return savedRole;
+    // Return the complete role with permissions populated
+    const completeRole = await this.rolesRepository.findOne({
+      where: { id: savedRole.id },
+      relations: ['rolePermissions', 'rolePermissions.permission'],
+    });
+
+    return completeRole ? this.transformRoleForFrontend(completeRole) : savedRole;
+  }
+
+  /**
+   * Transform role data to match frontend expectations
+   * Converts rolePermissions to permissions array
+   */
+  private transformRoleForFrontend(role: Role): Role {
+    if (role.rolePermissions) {
+      // Transform rolePermissions to permissions array
+      const permissions = role.rolePermissions
+        .filter(rp => rp.isGranted && rp.permission) // Only include granted permissions
+        .map(rp => rp.permission);
+      
+      // Create a new role object with permissions instead of rolePermissions
+      return {
+        ...role,
+        permissions: permissions,
+        rolePermissions: undefined, // Remove rolePermissions to avoid confusion
+      } as any;
+    }
+    return role;
   }
 
   async findAll(): Promise<Role[]> {
-    return this.rolesRepository.find();
+    const roles = await this.rolesRepository.find({
+      relations: ['rolePermissions', 'rolePermissions.permission'],
+    });
+    
+    // Transform roles to match frontend expectations
+    return roles.map(role => this.transformRoleForFrontend(role));
   }
 
   async findOne(id: number): Promise<Role> {
+    const role = await this.rolesRepository.findOne({ 
+      where: { id },
+      relations: ['rolePermissions', 'rolePermissions.permission'],
+    });
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${id} not found`);
+    }
+    return this.transformRoleForFrontend(role);
+  }
+
+  async update(id: number, updateRoleDto: any, currentUser: User): Promise<Role> {
+    // Check if current user has permission to update roles
+    const hasPermission = await this.hasPermission(
+      currentUser.id,
+      'roles',
+      'update',
+    );
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to update roles',
+      );
+    }
+
     const role = await this.rolesRepository.findOne({ where: { id } });
     if (!role) {
       throw new NotFoundException(`Role with ID ${id} not found`);
     }
-    return role;
+
+    // Prevent modifying system-defined roles
+    if (role.isSystemRole) {
+      throw new ForbiddenException('System-defined roles cannot be modified');
+    }
+
+    // Check if role with same name already exists (if name is being updated)
+    if (updateRoleDto.name && updateRoleDto.name !== role.name) {
+      const existingRole = await this.rolesRepository.findOne({
+        where: { name: updateRoleDto.name },
+      });
+      if (existingRole) {
+        throw new ForbiddenException(
+          `Role with name ${updateRoleDto.name} already exists`,
+        );
+      }
+    }
+
+    // Update basic role information
+    if (updateRoleDto.name) {
+      role.name = updateRoleDto.name;
+    }
+    if (updateRoleDto.description !== undefined) {
+      role.description = updateRoleDto.description;
+    }
+
+    const updatedRole = await this.rolesRepository.save(role);
+
+    // Update permissions if provided
+    if (updateRoleDto.permissions && Array.isArray(updateRoleDto.permissions)) {
+      try {
+        await this.permissionsService.assignPermissionsToRole(
+          updatedRole.id,
+          updateRoleDto.permissions,
+        );
+      } catch (error) {
+        console.error(
+          `Error updating permissions for role:`,
+          error.message,
+        );
+      }
+    }
+
+    // Return the complete role with permissions populated
+    return this.findOne(updatedRole.id);
   }
 
   async findByName(name: string): Promise<Role> {
@@ -377,6 +477,35 @@ export class RolesService {
       );
     }
 
-    await this.rolesRepository.remove(role);
+    // Start transaction to ensure atomicity
+    const queryRunner = this.rolesRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // First, delete all role permissions (cascade deletion)
+      await queryRunner.manager.query(
+        'DELETE FROM role_permissions WHERE role_id = ?',
+        [id]
+      );
+
+      // Then delete the role itself using SQL query
+      await queryRunner.manager.query(
+        'DELETE FROM roles WHERE id = ?',
+        [id]
+      );
+
+      // Commit the transaction
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      // Rollback the transaction on error
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(
+        `Failed to delete role: ${error.message}`
+      );
+    } finally {
+      // Release the query runner
+      await queryRunner.release();
+    }
   }
 }

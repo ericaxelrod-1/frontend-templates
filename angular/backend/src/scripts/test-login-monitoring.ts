@@ -47,7 +47,7 @@ async function testLoginMonitoring() {
       ipAddress: '192.168.1.100',
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/98.0.4758.102',
-      email: 'test@example.com',
+      emailAttempted: 'test@example.com',
       status: 'success',
     });
     logger.log(
@@ -58,7 +58,7 @@ async function testLoginMonitoring() {
     const failedAttempt = await loginAttemptService.create({
       ipAddress: '192.168.1.101',
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/97.0',
-      email: 'test@example.com',
+      emailAttempted: 'test@example.com',
       status: 'failed',
       failureReason: 'Invalid password',
     });
@@ -131,7 +131,7 @@ async function testLoginMonitoring() {
         ipAddress: '192.168.1.200',
         userAgent:
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/98.0.4758.102',
-        email: 'victim@example.com',
+        emailAttempted: 'victim@example.com',
         status: 'failed',
         failureReason: 'Invalid password',
       });
@@ -143,7 +143,7 @@ async function testLoginMonitoring() {
         ipAddress: `192.168.1.${210 + i}`,
         userAgent:
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/98.0.4758.102',
-        email: 'victim@example.com',
+        emailAttempted: 'victim@example.com',
         status: 'failed',
         failureReason: 'Invalid password',
       });

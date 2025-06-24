@@ -110,10 +110,9 @@ async function createLoginAttemptForUser(connection: any, user: User) {
   const loginAttempt = loginAttemptRepository.create({
     ipAddress: '127.0.0.1',
     userAgent: 'Mozilla/5.0 Test Browser',
-    email: user.email,
+    emailAttempted: user.email,
     status: 'success',
     user: user,
-    userId: user.id,
     metadata: JSON.stringify({
       browser: 'Test Browser',
       os: 'Test OS',

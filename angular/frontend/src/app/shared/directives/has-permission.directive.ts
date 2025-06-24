@@ -6,7 +6,7 @@ import { PermissionService } from '../../core/services/permission.service';
  * Directive for conditionally rendering a template based on user permissions.
  * 
  * Usage:
- * <div *hasPermission="'users:read'">Only shown to users with 'users:read' permission</div>
+ * <div *hasPermission="'users:view'">Only shown to users with 'users:view' permission</div>
  * <div *hasPermission="['users:create', 'users:update']">Shown if user has any of these permissions</div>
  * <div *hasPermission="'users:delete'; else unauthorized">Shown to users with delete permission</div>
  * <ng-template #unauthorized>Access denied message</ng-template>

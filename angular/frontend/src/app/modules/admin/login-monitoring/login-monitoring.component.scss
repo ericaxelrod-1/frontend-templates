@@ -1,17 +1,19 @@
+@use '../../../../styles/abstracts' as *;
+
 .login-monitoring-container {
-  padding: 20px;
+  padding: $spacing-lg;
   max-width: 1600px;
   margin: 0 auto;
   
   h1 {
-    margin-bottom: 24px;
-    color: var(--primary-color);
+    margin-bottom: $spacing-xl;
+    color: var(--mdc-theme-on-surface);
   }
 }
 
 // Permission error message
 .permission-error {
-  margin: 20px 0;
+  margin: $spacing-lg 0;
   text-align: center;
 
   mat-card {
@@ -19,12 +21,12 @@
     margin: 0 auto;
     
     h2 {
-      color: #f44336;
-      margin-bottom: 16px;
+      color: var(--mdc-theme-error);
+      margin-bottom: $spacing-md;
     }
     
     p {
-      margin-bottom: 20px;
+      margin-bottom: $spacing-lg;
     }
   }
 }
@@ -33,35 +35,39 @@
 .stats-container {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: $spacing-lg;
+  margin-bottom: $spacing-lg;
   position: relative;
 }
 
 .stats-card {
   height: 100%;
-  border-radius: 8px;
+  border-radius: $border-radius-md;
   transition: transform 0.2s, box-shadow 0.2s;
   
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    box-shadow: $elevation-4;
   }
   
   &.success {
-    border-top: 4px solid #4caf50;
+    border-top: 4px solid var(--mdc-theme-success);
   }
   
   &.warning {
-    border-top: 4px solid #ff9800;
+    border-top: 4px solid var(--mdc-theme-warning);
   }
   
   &.danger {
-    border-top: 4px solid #f44336;
+    border-top: 4px solid var(--mdc-theme-error);
+  }
+  
+  &.info {
+    border-top: 4px solid var(--mdc-theme-info);
   }
   
   mat-card-header {
-    padding: 16px 16px 0;
+    padding: $spacing-md $spacing-md 0;
   }
   
   .stats-content {
@@ -69,32 +75,34 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 16px;
+    padding: $spacing-md;
   }
   
   .stats-number {
     font-size: 2.5rem;
     font-weight: 500;
-    margin-bottom: 8px;
+    margin-bottom: $spacing-xs;
+    color: var(--mdc-theme-on-surface);
   }
   
   .stats-percent {
     font-size: 1.2rem;
     opacity: 0.7;
+    color: var(--mdc-theme-text-secondary);
   }
 }
 
 // Section cards
 .section-card {
-  margin-bottom: 20px;
+  margin-bottom: $spacing-lg;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: $border-radius-md;
   
   mat-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 16px 0;
+    padding: $spacing-md $spacing-md 0;
     
     .mat-card-title {
       display: flex;
@@ -107,14 +115,14 @@
         min-width: 24px;
         height: 24px;
         border-radius: 12px;
-        padding: 0 8px;
-        margin-left: 8px;
+        padding: 0 $spacing-xs;
+        margin-left: $spacing-xs;
         font-size: 12px;
         font-weight: 500;
         
         &.danger {
-          background-color: #f44336;
-          color: white;
+          background-color: var(--mdc-theme-error);
+          color: var(--mdc-theme-on-error);
         }
       }
     }
@@ -122,7 +130,7 @@
     .header-actions {
       margin-left: auto;
       display: flex;
-      gap: 8px;
+      gap: $spacing-xs;
       
       button {
         display: flex;
@@ -136,7 +144,7 @@
   }
   
   mat-card-content {
-    padding: 16px;
+    padding: $spacing-md;
   }
 }
 
@@ -144,7 +152,7 @@
 .table-container {
   position: relative;
   min-height: 200px;
-  margin-top: 16px;
+  margin-top: $spacing-md;
 }
 
 table {
@@ -157,7 +165,7 @@ table {
 
 .user-agent {
   font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--mdc-theme-text-secondary);
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -167,55 +175,92 @@ table {
 // Badges
 .severity-badge, .status-badge {
   display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 4px $spacing-xs;
+  border-radius: $border-radius-sm;
   font-size: 12px;
   font-weight: 500;
 }
 
 .severity-high {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: rgba(var(--mdc-theme-error-rgb), 0.1);
+  color: var(--mdc-theme-error);
 }
 
 .severity-medium {
-  background-color: #fff8e1;
-  color: #ff8f00;
+  background-color: rgba(var(--mdc-theme-warning-rgb), 0.1);
+  color: var(--mdc-theme-warning);
 }
 
 .severity-low {
-  background-color: #e8f5e9;
-  color: #2e7d32;
+  background-color: rgba(var(--mdc-theme-success-rgb), 0.1);
+  color: var(--mdc-theme-success);
 }
 
 .status-success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
+  background-color: rgba(var(--mdc-theme-success-rgb), 0.1);
+  color: var(--mdc-theme-success);
 }
 
 .status-failed {
-  background-color: #fff8e1;
-  color: #ff8f00;
+  background-color: rgba(var(--mdc-theme-warning-rgb), 0.1);
+  color: var(--mdc-theme-warning);
 }
 
 .status-blocked {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: rgba(var(--mdc-theme-error-rgb), 0.1);
+  color: var(--mdc-theme-error);
 }
 
 .status-captcha_required, .status-captcha_failed {
-  background-color: #e3f2fd;
-  color: #1565c0;
+  background-color: rgba(var(--mdc-theme-info-rgb), 0.1);
+  color: var(--mdc-theme-info);
 }
 
 // IP link
 .ip-link {
-  color: var(--primary-color);
+  color: var(--mdc-theme-primary);
   text-decoration: underline;
   cursor: pointer;
   
   &:hover {
     text-decoration: none;
+  }
+}
+
+// User Agent column styling
+.user-agent-cell {
+  max-width: 200px;
+  
+  .user-agent-text {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--mdc-theme-text-secondary);
+    cursor: help;
+  }
+}
+
+// Metadata column styling
+.metadata-cell {
+  max-width: 150px;
+  
+  .metadata-text {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--mdc-theme-text-secondary);
+    cursor: help;
+  }
+  
+  .no-metadata {
+    color: var(--mdc-theme-text-disabled);
+    font-style: italic;
   }
 }
 
@@ -225,11 +270,11 @@ table {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  padding: $spacing-xxl;
   
   span {
-    margin-top: 16px;
-    color: rgba(0, 0, 0, 0.6);
+    margin-top: $spacing-md;
+    color: var(--mdc-theme-text-secondary);
   }
 }
 
@@ -239,14 +284,35 @@ table {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 0;
-  color: rgba(0, 0, 0, 0.5);
+  padding: $spacing-xxl 0;
+  color: var(--mdc-theme-text-secondary);
   
   .empty-icon {
     font-size: 48px;
     height: 48px;
     width: 48px;
-    margin-bottom: 16px;
+    margin-bottom: $spacing-md;
+    opacity: 0.5;
+  }
+  
+  p {
+    font-size: 16px;
+  }
+}
+
+.empty-state-in-table {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-xxl;
+  color: var(--mdc-theme-text-secondary);
+  
+  .empty-icon {
+    font-size: 48px;
+    height: 48px;
+    width: 48px;
+    margin-bottom: $spacing-md;
     opacity: 0.5;
   }
   
@@ -257,23 +323,23 @@ table {
 
 // Filters
 .filters-form {
-  padding: 16px 0;
+  padding: $spacing-md 0;
 }
 
 .filters-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: $spacing-md;
+  margin-bottom: $spacing-md;
   
   mat-form-field {
     flex: 1;
     min-width: 200px;
   }
   
-  .filter-buttons {
+  .filter-actions {
     display: flex;
-    gap: 8px;
+    gap: $spacing-xs;
     align-items: flex-start;
     margin-top: 4px;
   }
@@ -298,56 +364,60 @@ table {
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: $elevation-8;
   
   mat-card-header {
     position: relative;
     
     .close-button {
       position: absolute;
-      top: 8px;
-      right: 8px;
+      top: $spacing-xs;
+      right: $spacing-xs;
     }
   }
   
   .reputation-stats {
-    margin: 16px 0;
+    margin: $spacing-md 0;
     
     .reputation-item {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 8px;
-      padding: 8px;
-      background-color: rgba(0, 0, 0, 0.03);
-      border-radius: 4px;
+      margin-bottom: $spacing-xs;
+      padding: $spacing-xs;
+      background-color: var(--mdc-theme-surface);
+      border: 1px solid var(--mdc-theme-outline);
+      border-radius: $border-radius-sm;
       
       .reputation-label {
         font-weight: 500;
+        color: var(--mdc-theme-on-surface);
       }
       
       .reputation-value {
+        color: var(--mdc-theme-on-surface);
+        
         &.status-blocked {
-          color: #c62828;
+          color: var(--mdc-theme-error);
           font-weight: 500;
         }
         
         &.status-allowed {
-          color: #2e7d32;
+          color: var(--mdc-theme-success);
           font-weight: 500;
         }
         
         &.score-good {
-          color: #2e7d32;
+          color: var(--mdc-theme-success);
           font-weight: 500;
         }
         
         &.score-medium {
-          color: #ff8f00;
+          color: var(--mdc-theme-warning);
           font-weight: 500;
         }
         
         &.score-bad {
-          color: #c62828;
+          color: var(--mdc-theme-error);
           font-weight: 500;
         }
       }
@@ -357,8 +427,8 @@ table {
   .action-buttons {
     display: flex;
     justify-content: center;
-    gap: 16px;
-    margin-top: 24px;
+    gap: $spacing-md;
+    margin-top: $spacing-xl;
     
     button {
       min-width: 120px;
@@ -368,10 +438,10 @@ table {
 
 // Pattern table
 .pattern-ip-list {
-  margin-top: 8px;
+  margin-top: $spacing-xs;
   
   a {
-    color: #2196f3;
+    color: var(--mdc-theme-primary);
     text-decoration: underline;
     cursor: pointer;
     
@@ -387,11 +457,11 @@ table {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: $spacing-xxl;
   
   p {
-    margin-top: 16px;
-    color: rgba(0, 0, 0, 0.54);
+    margin-top: $spacing-md;
+    color: var(--mdc-theme-text-secondary);
   }
 }
 
@@ -401,7 +471,7 @@ table {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: rgba(var(--mdc-theme-surface-rgb), 0.7);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -410,19 +480,20 @@ table {
 
 .no-data-message {
   text-align: center;
-  padding: 40px;
-  color: rgba(0, 0, 0, 0.54);
+  padding: $spacing-xxl;
+  color: var(--mdc-theme-text-secondary);
 }
 
 // Error messages
 .error-message {
-  margin: 20px 0;
+  margin: $spacing-lg 0;
   
   mat-card {
     text-align: center;
     
     p {
-      margin-bottom: 16px;
+      margin-bottom: $spacing-md;
+      color: var(--mdc-theme-on-surface);
     }
   }
 } 

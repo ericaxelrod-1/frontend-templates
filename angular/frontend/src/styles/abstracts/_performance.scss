@@ -1,0 +1,281 @@
+// Performance Optimization Utilities
+// Day 5: Enhanced performance optimizations for production readiness
+
+// CSS Containment for better rendering performance
+@mixin contain($types: layout style paint) {
+  contain: $types;
+}
+
+// GPU acceleration for smooth animations
+@mixin gpu-accelerate {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+// Optimized transitions
+@mixin optimized-transition($property: all, $duration: 0.2s, $timing: ease) {
+  transition: $property $duration $timing;
+  will-change: $property;
+  
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    will-change: auto;
+  }
+}
+
+// Lazy loading optimization
+@mixin lazy-load-placeholder {
+  background: linear-gradient(90deg, 
+    rgba(var(--mdc-theme-on-surface-rgb), 0.1) 25%, 
+    rgba(var(--mdc-theme-on-surface-rgb), 0.05) 50%, 
+    rgba(var(--mdc-theme-on-surface-rgb), 0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s infinite;
+  
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background: rgba(var(--mdc-theme-on-surface-rgb), 0.1);
+  }
+}
+
+@keyframes loading-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+// Critical CSS inlining helper
+@mixin critical-styles {
+  // Above-the-fold styles that should be inlined
+  font-display: swap;
+  contain: layout style;
+}
+
+// Bundle size optimization
+@mixin tree-shake-safe {
+  // Ensure styles can be tree-shaken when not used
+  @supports (contain: layout) {
+    contain: layout;
+  }
+}
+
+// Memory-efficient patterns
+@mixin memory-efficient {
+  // Reduce memory usage for large lists
+  contain: strict;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 200px;
+}
+
+// Performance utility classes
+.perf-contain-layout { @include contain(layout); }
+.perf-contain-style { @include contain(style); }
+.perf-contain-paint { @include contain(paint); }
+.perf-contain-strict { @include contain(strict); }
+
+.perf-gpu-accelerate { @include gpu-accelerate; }
+
+.perf-lazy-placeholder { @include lazy-load-placeholder; }
+
+.perf-memory-efficient { @include memory-efficient; }
+
+// Optimized scroll performance
+.perf-smooth-scroll {
+  scroll-behavior: smooth;
+  
+  @media (prefers-reduced-motion: reduce) {
+    scroll-behavior: auto;
+  }
+}
+
+.perf-scroll-snap {
+  scroll-snap-type: y mandatory;
+  
+  > * {
+    scroll-snap-align: start;
+  }
+}
+
+// Image optimization helpers
+.perf-image-optimize {
+  object-fit: cover;
+  object-position: center;
+  loading: lazy;
+  decoding: async;
+}
+
+// Font loading optimization
+.perf-font-display {
+  font-display: swap;
+}
+
+// Critical resource hints
+.perf-preload-font {
+  // Use with link rel="preload" for critical fonts
+  font-display: swap;
+}
+
+// Layout shift prevention
+.perf-prevent-cls {
+  // Prevent Cumulative Layout Shift
+  aspect-ratio: 16 / 9; // Adjust as needed
+  width: 100%;
+  height: auto;
+}
+
+// Efficient animations
+.perf-efficient-animation {
+  // Only animate transform and opacity for best performance
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  will-change: transform, opacity;
+  
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    will-change: auto;
+  }
+}
+
+// Virtual scrolling support
+.perf-virtual-scroll {
+  overflow-y: auto;
+  contain: strict;
+  height: 400px; // Set appropriate height
+  
+  .virtual-item {
+    contain: layout style paint;
+    will-change: transform;
+  }
+}
+
+// Bundle splitting helpers
+.perf-lazy-component {
+  // For lazy-loaded components
+  min-height: 200px;
+  @include lazy-load-placeholder;
+}
+
+// Critical path optimization
+.perf-critical-path {
+  // For above-the-fold content
+  @include critical-styles;
+  priority: high;
+}
+
+// Resource loading optimization
+.perf-resource-hints {
+  // Use with appropriate resource hints
+  &[data-preload] {
+    // Preload critical resources
+    loading: eager;
+  }
+  
+  &[data-prefetch] {
+    // Prefetch next-page resources
+    loading: lazy;
+  }
+}
+
+// Performance monitoring helpers
+.perf-measure {
+  // For performance measurement
+  &::before {
+    content: '';
+    display: block;
+    // Add performance marks here if needed
+  }
+}
+
+// Efficient grid layouts
+.perf-grid-efficient {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  contain: layout;
+  
+  > * {
+    contain: layout style;
+  }
+}
+
+// Optimized flexbox
+.perf-flex-efficient {
+  display: flex;
+  contain: layout;
+  
+  > * {
+    contain: layout style;
+  }
+}
+
+// Service Worker cache optimization
+.perf-cache-optimize {
+  // For content that should be cached efficiently
+  // Note: Cache control should be set via HTTP headers, not CSS
+}
+
+// Progressive enhancement
+.perf-progressive-enhance {
+  // Base styles for progressive enhancement
+  @supports (contain: layout) {
+    contain: layout;
+  }
+  
+  @supports (content-visibility: auto) {
+    content-visibility: auto;
+  }
+}
+
+// Bundle analysis helpers
+.perf-bundle-analyze {
+  // Mark components for bundle analysis
+  &[data-chunk] {
+    // Chunk boundary marker
+    contain: layout;
+  }
+}
+
+// Memory leak prevention
+.perf-cleanup {
+  // Ensure proper cleanup
+  &.destroyed {
+    will-change: auto;
+    transform: none;
+    transition: none;
+  }
+}
+
+// Efficient state management
+.perf-state-efficient {
+  // For components with frequent state changes
+  contain: layout style;
+  will-change: contents;
+}
+
+// Network optimization
+.perf-network-optimize {
+  // For network-dependent content
+  &[data-offline] {
+    // Offline fallback styles
+    opacity: 0.7;
+    filter: grayscale(0.3);
+  }
+}
+
+// Performance budget helpers
+.perf-budget-critical {
+  // Critical path budget: < 14KB
+  max-width: 100%;
+  contain: layout;
+}
+
+.perf-budget-important {
+  // Important content budget: < 50KB
+  contain: layout style;
+}
+
+.perf-budget-deferred {
+  // Deferred content: can be larger
+  content-visibility: auto;
+  contain-intrinsic-size: 0 300px;
+} 

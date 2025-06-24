@@ -77,10 +77,10 @@ const permissionsToSeed = [
     actionCode: 'create',
   },
   {
-    name: 'user:read',
+    name: 'user:view',
     description: 'View user details',
     resourceName: 'user',
-    actionCode: 'read',
+    actionCode: 'view',
   },
   {
     name: 'user:update',
@@ -109,10 +109,10 @@ const permissionsToSeed = [
     actionCode: 'create',
   },
   {
-    name: 'permission:read',
+    name: 'permission:view',
     description: 'View permission details',
     resourceName: 'permission',
-    actionCode: 'read',
+    actionCode: 'view',
   },
   {
     name: 'permission:update',
@@ -147,10 +147,10 @@ const permissionsToSeed = [
     actionCode: 'create',
   },
   {
-    name: 'report:read',
+    name: 'report:view',
     description: 'View report details',
     resourceName: 'report',
-    actionCode: 'read',
+    actionCode: 'view',
   },
   {
     name: 'report:update',
@@ -200,7 +200,7 @@ const permissionsToSeed = [
 
 const rolesToSeed = [
   {
-    name: 'ADMIN',
+    name: 'Administrator',
     description: 'System Administrator',
     isSystemRole: true,
     isDefault: false,
@@ -208,40 +208,48 @@ const rolesToSeed = [
     parentRole: null,
   },
   {
-    name: 'USER',
+    name: 'user',
     description: 'Regular User',
     isSystemRole: true,
     isDefault: true,
-    permissions: ['user:read', 'user:update', 'report:read', 'report:list'],
+    permissions: ['user:view', 'user:update', 'report:view', 'report:list'],
     parentRole: null,
   },
   {
-    name: 'MANAGER',
-    description: 'Team Manager',
+    name: 'Super User',
+    description: 'Team Manager with Super User permissions',
     isSystemRole: true,
     isDefault: false,
     permissions: [
-      'user:read',
+      'user:view',
       'user:list',
       'report:create',
-      'report:read',
+      'report:view',
       'report:update',
       'report:list',
       'report:export',
     ],
-    parentRole: 'USER',
+    parentRole: 'user',
   },
   {
-    name: 'AUDITOR',
-    description: 'System Auditor',
+    name: 'superuser',
+    description: 'Superuser with advanced permissions',
     isSystemRole: true,
     isDefault: false,
     permissions: [
       'system:audit',
-      'report:read',
+      'report:view',
       'report:list',
       'report:export',
     ],
+    parentRole: null,
+  },
+  {
+    name: 'Super Administrator',
+    description: 'Super Administrator with full system access',
+    isSystemRole: true,
+    isDefault: false,
+    permissions: ['*'], // All permissions
     parentRole: null,
   },
 ];

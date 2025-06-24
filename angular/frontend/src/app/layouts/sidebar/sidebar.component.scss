@@ -1,104 +1,204 @@
-@use '@angular/material' as material;
+@use '../../../styles/abstracts' as *;
 
-// Use our CSS variables for consistent theming
-.mat-sidenav {
-  width: 250px;
-}
-
-.active-link {
-  font-weight: 500;
-  border-left: 3px solid var(--primary-color);
-  background-color: rgba(0, 0, 0, 0.04);
-  color: var(--primary-color);
-}
-
-.sidenav-content {
-  color: var(--primary-color);
-  display: flex;
-  flex-direction: column;
+// Responsive Sidebar Component - Following dev.to Guide
+.sidebar {
   height: 100%;
-}
-
-.sidenav-header {
-  padding: 16px;
+  background: var(--mdc-theme-surface);
+  border-right: 1px solid rgba(var(--mdc-theme-on-surface-rgb), 0.12);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.3s ease;
 }
 
-.logo-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8px;
+.sidebar-header {
+  padding: $spacing-lg;
+  border-bottom: 1px solid rgba(var(--mdc-theme-on-surface-rgb), 0.08);
+  
+  .logo-container {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+    
+    .logo {
+      width: 32px;
+      height: 32px;
+      margin-right: $spacing-sm;
+      border-radius: 8px;
+    }
+    
+    .app-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--mdc-theme-on-surface);
+      margin: 0;
+    }
+  }
+  
+  .user-info {
+    margin-top: $spacing-md;
+    
+    .user-name {
+      font-weight: 500;
+      color: var(--mdc-theme-on-surface);
+      margin-bottom: 2px;
+    }
+    
+    .user-email {
+      color: rgba(var(--mdc-theme-on-surface-rgb), 0.6);
+      font-size: 0.875rem;
+    }
+  }
 }
 
-.user-info {
-  text-align: center;
-  margin-top: 16px;
-}
-
-.user-name {
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.user-email {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.mat-divider {
-  margin: 8px 0;
-}
-
-.menu-items {
-  display: flex;
-  flex-direction: column;
+.sidebar-content {
   flex: 1;
+  padding: $spacing-md 0;
 }
 
-.menu-item {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  text-decoration: none;
-  color: var(--text-primary);
+.nav-section {
+  margin-bottom: $spacing-lg;
   
-  mat-icon {
-    margin-right: 16px;
+  &:last-child { margin-bottom: 0; }
+  
+  .section-title {
+    padding: 0 $spacing-lg $spacing-sm $spacing-lg;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(var(--mdc-theme-on-surface-rgb), 0.6);
+    margin: 0;
   }
   
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.04);
+  .nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
-}
-
-.sidenav-footer {
-  padding: 16px;
-  margin-top: auto;
-}
-
-// Section divider and account section styles
-.section-divider {
-  margin: 16px 0;
-}
-
-.sidebar-section {
-  padding: 8px 16px;
   
-  h3 {
-    font-size: 14px;
-    margin: 8px 0;
-    color: rgba(0, 0, 0, 0.6);
-    font-weight: 500;
+  .nav-link {
+    display: flex;
+    align-items: center;
+    padding: $spacing-sm $spacing-lg;
+    text-decoration: none;
+    color: rgba(var(--mdc-theme-on-surface-rgb), 0.87);
+    transition: background-color 0.2s ease, color 0.2s ease;
+    position: relative;
+    min-height: 48px;
+    
+    &:hover { background: rgba(var(--mdc-theme-on-surface-rgb), 0.04); }
+    &:focus {
+      outline: 2px solid var(--mdc-theme-primary);
+      outline-offset: -2px;
+    }
+    
+    &.active {
+      background: rgba(var(--mdc-theme-primary-rgb), 0.08);
+      color: var(--mdc-theme-primary);
+      
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--mdc-theme-primary);
+      }
+      
+      .nav-icon { color: var(--mdc-theme-primary); }
+    }
+    
+    .nav-icon {
+      width: 24px;
+      height: 24px;
+      margin-right: $spacing-md;
+      color: rgba(var(--mdc-theme-on-surface-rgb), 0.6);
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Material Icons';
+      flex-shrink: 0; // Prevent icon from shrinking
+    }
+    
+    .nav-text {
+      flex: 1;
+      font-size: 0.875rem;
+      font-weight: 500;
+      white-space: nowrap; // Prevent text wrapping
+      overflow: hidden; // Hide overflow when collapsed
+    }
+    
+    .nav-badge {
+      background: var(--mdc-theme-error);
+      color: var(--mdc-theme-on-error);
+      border-radius: 10px;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      min-width: 16px;
+      text-align: center;
+      line-height: 1.2;
+    }
+  }
+  
+  .has-submenu {
+    .nav-link {
+      .expand-icon {
+        margin-left: auto;
+        transition: transform 0.2s ease;
+        color: rgba(var(--mdc-theme-on-surface-rgb), 0.6);
+      }
+      
+      &.expanded .expand-icon { transform: rotate(180deg); }
+    }
+    
+    .submenu {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+      background: rgba(var(--mdc-theme-on-surface-rgb), 0.02);
+      
+      &.expanded { max-height: 300px; }
+      
+      .submenu-link {
+        display: flex;
+        align-items: center;
+        padding: $spacing-sm $spacing-lg $spacing-sm calc(#{$spacing-lg} + 24px + #{$spacing-md});
+        text-decoration: none;
+        color: rgba(var(--mdc-theme-on-surface-rgb), 0.7);
+        font-size: 0.875rem;
+        min-height: 40px;
+        transition: background-color 0.2s ease, color 0.2s ease;
+        
+        &:hover {
+          background: rgba(var(--mdc-theme-on-surface-rgb), 0.04);
+          color: rgba(var(--mdc-theme-on-surface-rgb), 0.87);
+        }
+        
+        &:focus {
+          outline: 2px solid var(--mdc-theme-primary);
+          outline-offset: -2px;
+        }
+        
+        &.active {
+          background: rgba(var(--mdc-theme-primary-rgb), 0.08);
+          color: var(--mdc-theme-primary);
+          font-weight: 500;
+        }
+      }
+    }
   }
 }
 
-.delete-account-link {
-  color: #d32f2f;
-  
-  mat-icon {
-    color: #d32f2f;
-  }
+.sidebar-footer {
+  border-top: 1px solid rgba(var(--mdc-theme-on-surface-rgb), 0.08);
+  padding: $spacing-md 0;
 }
+
+/* REMOVED ALL RESPONSIVE OVERLAY BEHAVIOR */
+/* Sidebar is now fixed at all screen sizes with no overlay functionality */

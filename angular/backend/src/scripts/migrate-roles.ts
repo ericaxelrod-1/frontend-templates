@@ -15,7 +15,7 @@ import { UiComponent } from '../modules/permissions/entities/ui-component.entity
 import { FrontendRoute } from '../modules/permissions/entities/frontend-route.entity';
 import { ApiEndpoint } from '../modules/permissions/entities/api-endpoint.entity';
 import { User } from '../modules/users/entities/user.entity';
-import { UserGroup } from '../modules/users/entities/user-group.entity';
+// import { UserGroup } from '../modules/users/entities/user-group.entity'; // Temporarily disabled
 import { Injectable } from '@nestjs/common';
 import environmentConfig from '../config/environment.config';
 import { DataSource } from 'typeorm';
@@ -96,49 +96,49 @@ const rolesToPermissions: RolePermissionMapping[] = [
     role: 'ADMIN',
     permissions: [
       'user:create',
-      'user:read',
+      'user:view',
       'user:update',
       'user:delete',
       'role:create',
-      'role:read',
+      'role:view',
       'role:update',
       'role:delete',
       'permission:create',
-      'permission:read',
+      'permission:view',
       'permission:update',
       'permission:delete',
       'report:create',
-      'report:read',
+      'report:view',
       'report:update',
       'report:delete',
-      'system:settings:read',
+      'system:settings:view',
       'system:settings:update',
     ],
   },
   {
     role: 'USER',
-    permissions: ['user:read', 'role:read', 'permission:read', 'report:read'],
+    permissions: ['user:view', 'role:view', 'permission:view', 'report:view'],
   },
   {
     role: 'MANAGER',
     permissions: [
-      'user:read',
+      'user:view',
       'user:update',
-      'role:read',
-      'permission:read',
+      'role:view',
+      'permission:view',
       'report:create',
-      'report:read',
+      'report:view',
       'report:update',
     ],
   },
   {
     role: 'AUDITOR',
     permissions: [
-      'user:read',
-      'role:read',
-      'permission:read',
-      'report:read',
-      'system:audit:read',
+      'user:view',
+      'role:view',
+      'permission:view',
+      'report:view',
+      'system:audit:view',
     ],
   },
 ];
@@ -264,7 +264,7 @@ class RoleMigrationSeed {
           FrontendRoute,
           ApiEndpoint,
           User,
-          UserGroup,
+          // UserGroup, // Temporarily disabled
         ],
         synchronize: false,
         logging: configService.get('NODE_ENV') === 'development',

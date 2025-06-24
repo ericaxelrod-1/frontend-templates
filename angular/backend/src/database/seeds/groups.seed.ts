@@ -1,12 +1,10 @@
 import { DataSource } from 'typeorm';
-import { Group } from '../../modules/users/entities/group.entity';
+import { Group } from '../../modules/permissions/entities/group.entity';
 import { User } from '../../modules/users/entities/user.entity';
-import { UserGroup } from '../../modules/users/entities/user-group.entity';
 
 export async function seedGroups(dataSource: DataSource) {
   const groupRepository = dataSource.getRepository(Group);
   const userRepository = dataSource.getRepository(User);
-  const userGroupRepository = dataSource.getRepository(UserGroup);
 
   // Get existing users
   const admin = await userRepository.findOne({
@@ -74,69 +72,50 @@ export async function seedGroups(dataSource: DataSource) {
       console.log(`Group already exists: ${groupData.name}`);
     }
 
-    // Create user-group relationships
+    // Create user-group relationships using many-to-many
     if (groupData.name === 'Administrators') {
       // Add admin to Administrators group
-      await createUserGroupIfNotExists(userGroupRepository, admin, group, true);
+      await addUserToGroupIfNotExists(userRepository, admin, group);
 
-      // Add manager to Administrators group (not as admin)
-      await createUserGroupIfNotExists(
-        userGroupRepository,
-        manager,
-        group,
-        false,
-      );
+      // Add manager to Administrators group
+      await addUserToGroupIfNotExists(userRepository, manager, group);
     } else if (groupData.name === 'Project Managers') {
-      // Add manager to Project Managers group as admin
-      await createUserGroupIfNotExists(
-        userGroupRepository,
-        manager,
-        group,
-        true,
-      );
+      // Add manager to Project Managers group
+      await addUserToGroupIfNotExists(userRepository, manager, group);
 
       // Add regular user to Project Managers group
-      await createUserGroupIfNotExists(
-        userGroupRepository,
-        regularUser,
-        group,
-        false,
-      );
+      await addUserToGroupIfNotExists(userRepository, regularUser, group);
     } else if (groupData.name === 'Regular Users') {
       // Add regular user to Regular Users group
-      await createUserGroupIfNotExists(
-        userGroupRepository,
-        regularUser,
-        group,
-        false,
-      );
+      await addUserToGroupIfNotExists(userRepository, regularUser, group);
     }
   }
 }
 
-async function createUserGroupIfNotExists(
-  repository: any,
+async function addUserToGroupIfNotExists(
+  userRepository: any,
   user: User,
   group: Group,
-  isAdmin: boolean,
 ) {
-  const existingUserGroup = await repository.findOne({
-    where: {
-      user: { id: user.id },
-      group: { id: group.id },
-    },
+  // Load user with groups to check if already a member
+  const userWithGroups = await userRepository.findOne({
+    where: { id: user.id },
+    relations: ['groups'],
   });
 
-  if (!existingUserGroup) {
-    const userGroup = repository.create({
-      user,
-      group,
-      isAdmin,
-    });
-    await repository.save(userGroup);
-    console.log(
-      `Added user ${user.email} to group ${group.name} (${isAdmin ? 'admin' : 'member'})`,
-    );
+  if (!userWithGroups) {
+    console.error(`User ${user.email} not found`);
+    return;
+  }
+
+  // Check if user is already in the group
+  const isAlreadyMember = userWithGroups.groups.some(g => g.id === group.id);
+
+  if (!isAlreadyMember) {
+    // Add group to user's groups
+    userWithGroups.groups.push(group);
+    await userRepository.save(userWithGroups);
+    console.log(`Added user ${user.email} to group ${group.name}`);
   } else {
     console.log(`User ${user.email} already in group ${group.name}`);
   }

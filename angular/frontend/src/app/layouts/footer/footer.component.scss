@@ -1,50 +1,116 @@
+@use '@angular/material' as mat;
+@use '../../../styles/abstracts' as abstracts;
+
+// Component host element - ensure full viewport control
+:host {
+  display: block;
+  width: 100%;
+}
+
 footer {
-  background-color: #f5f5f5;
-  padding: 16px 0;
-  font-size: 14px;
-  color: #666;
-  border-top: 1px solid #e0e0e0;
+  background-color: var(--mdc-theme-surface);
+  color: var(--mdc-theme-on-surface);
+  padding: abstracts.$spacing-md 0;
+  font-size: 0.875rem;
+  border-top: 1px solid var(--mdc-theme-outline);
   margin-top: auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .footer-content {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  padding: 0 abstracts.$spacing-lg;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  justify-content: space-between;
+  box-sizing: border-box;
 }
 
 .footer-logo {
-  margin-right: 20px;
+  margin-right: abstracts.$spacing-md;
+  flex-shrink: 0;
   
   img {
     height: 30px;
     width: auto;
+    object-fit: contain;
   }
 }
 
 .footer-text {
   flex-grow: 1;
   text-align: right;
+  color: var(--mdc-theme-text-secondary);
 }
 
 p {
   margin: 0;
+  line-height: 1.5;
 }
 
-@media (max-width: 768px) {
+/* Material Design Responsive Breakpoints */
+@include abstracts.respond-to(md) {
+  .footer-content {
+    padding: 0 abstracts.$spacing-lg;
+  }
+}
+
+@include abstracts.respond-to(sm) {
+  footer {
+    padding: abstracts.$spacing-sm 0;
+  }
+  
+  .footer-content {
+    padding: 0 abstracts.$spacing-sm;
+  }
+  
+  .footer-logo {
+    margin-right: abstracts.$spacing-sm;
+    
+    img {
+      height: 28px;
+    }
+  }
+}
+
+@include abstracts.respond-to(xs) {
   .footer-content {
     flex-direction: column;
     text-align: center;
+    gap: abstracts.$spacing-sm;
+    padding: 0 abstracts.$spacing-xs;
   }
   
   .footer-logo {
     margin-right: 0;
-    margin-bottom: 10px;
+    
+    img {
+      height: 24px;
+    }
   }
   
   .footer-text {
     text-align: center;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  footer {
+    border-top: 2px solid var(--mdc-theme-on-surface);
+  }
+}
+
+/* Dark theme support */
+.dark-theme {
+  footer {
+    background-color: var(--mdc-theme-surface);
+    color: var(--mdc-theme-on-surface);
+    border-top-color: var(--mdc-theme-outline);
+  }
+  
+  .footer-text {
+    color: var(--mdc-theme-text-secondary);
   }
 }

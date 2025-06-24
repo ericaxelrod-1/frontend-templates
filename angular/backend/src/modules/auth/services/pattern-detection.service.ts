@@ -108,7 +108,7 @@ export class PatternDetectionService {
       });
 
       const uniqueEmails = [
-        ...new Set(attempts.map((a) => a.email).filter(Boolean)),
+        ...new Set(attempts.map((a) => a.emailAttempted).filter(Boolean)),
       ];
 
       patterns.push({
@@ -122,8 +122,8 @@ export class PatternDetectionService {
           uniqueEmailCount: uniqueEmails.length,
           attempts: attempts.map((a) => ({
             timestamp: a.attemptedAt,
-            email: a.email,
-            userId: a.userId,
+            email: a.emailAttempted,
+            userId: a.user?.id || null,
             status: a.status,
           })),
         },
@@ -183,7 +183,7 @@ export class PatternDetectionService {
           })),
         },
         timestamp: new Date(),
-        userId: attempts[0]?.userId,
+        userId: attempts[0]?.user?.id || null,
       });
     }
 

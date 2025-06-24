@@ -181,7 +181,7 @@
       <mat-card-header>
         <mat-card-title>Recent Login Attempts</mat-card-title>
         <div class="header-actions">
-          <button mat-stroked-button color="primary" (click)="loadRecentAttempts()" [disabled]="loading.attempts">
+          <button mat-stroked-button color="primary" (click)="triggerDataRefresh()" [disabled]="loading.attempts">
             <mat-icon>refresh</mat-icon> Refresh
           </button>
         </div>
@@ -245,34 +245,30 @@
           <span>Loading login attempts...</span>
         </div>
         
-        <div *ngIf="!loading.attempts && recentAttempts.length === 0" class="empty-state">
-          <mat-icon class="empty-icon">history</mat-icon>
-          <p>No login attempts found</p>
-        </div>
-        
-        <!-- Attempts Table -->
-        <mat-table [dataSource]="recentAttempts" *ngIf="!loading.attempts && recentAttempts.length > 0">
+        <!-- Attempts Table - Pure Server-Side Sorting -->
+        <!-- Always render table structure so ViewChild is available -->
+        <mat-table [dataSource]="recentAttempts" matSort>
           <!-- ID Column -->
           <ng-container matColumnDef="id">
-            <mat-header-cell *matHeaderCellDef>ID</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header>ID</mat-header-cell>
             <mat-cell *matCellDef="let attempt">{{ attempt.id }}</mat-cell>
           </ng-container>
           
           <!-- Timestamp Column -->
           <ng-container matColumnDef="timestamp">
-            <mat-header-cell *matHeaderCellDef>Timestamp</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header="createdAt">Timestamp</mat-header-cell>
             <mat-cell *matCellDef="let attempt">{{ attempt.createdAt | date:'medium' }}</mat-cell>
           </ng-container>
           
           <!-- Email Column -->
           <ng-container matColumnDef="email">
-            <mat-header-cell *matHeaderCellDef>Email</mat-header-cell>
-            <mat-cell *matCellDef="let attempt">{{ attempt.email }}</mat-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header>Email</mat-header-cell>
+            <mat-cell *matCellDef="let attempt">{{ attempt.emailAttempted }}</mat-cell>
           </ng-container>
           
           <!-- IP Address Column -->
           <ng-container matColumnDef="ipAddress">
-            <mat-header-cell *matHeaderCellDef>IP Address</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header>IP Address</mat-header-cell>
             <mat-cell *matCellDef="let attempt">
               <a (click)="getIPReputation(attempt.ipAddress)" class="ip-link">
                 {{ attempt.ipAddress }}
@@ -280,9 +276,19 @@
             </mat-cell>
           </ng-container>
           
+          <!-- User Agent Column -->
+          <ng-container matColumnDef="userAgent">
+            <mat-header-cell *matHeaderCellDef mat-sort-header>User Agent</mat-header-cell>
+            <mat-cell *matCellDef="let attempt" class="user-agent-cell">
+              <span [matTooltip]="attempt.userAgent" class="user-agent-text">
+                {{ attempt.userAgent | slice:0:50 }}{{ attempt.userAgent && attempt.userAgent.length > 50 ? '...' : '' }}
+              </span>
+            </mat-cell>
+          </ng-container>
+          
           <!-- Status Column -->
           <ng-container matColumnDef="status">
-            <mat-header-cell *matHeaderCellDef>Status</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header>Status</mat-header-cell>
             <mat-cell *matCellDef="let attempt">
               <span class="status-badge" [ngClass]="'status-' + attempt.status">
                 {{ attempt.status | titlecase }}
@@ -292,9 +298,20 @@
           
           <!-- Details Column -->
           <ng-container matColumnDef="details">
-            <mat-header-cell *matHeaderCellDef>Details</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef mat-sort-header="failureReason">Details</mat-header-cell>
             <mat-cell *matCellDef="let attempt">
               {{ attempt.failureReason || '-' }}
+            </mat-cell>
+          </ng-container>
+          
+          <!-- Metadata Column -->
+          <ng-container matColumnDef="metadata">
+            <mat-header-cell *matHeaderCellDef mat-sort-header>Metadata</mat-header-cell>
+            <mat-cell *matCellDef="let attempt" class="metadata-cell">
+              <span *ngIf="attempt.metadata" [matTooltip]="attempt.metadata" class="metadata-text">
+                {{ attempt.metadata | slice:0:30 }}{{ attempt.metadata && attempt.metadata.length > 30 ? '...' : '' }}
+              </span>
+              <span *ngIf="!attempt.metadata" class="no-metadata">-</span>
             </mat-cell>
           </ng-container>
           
@@ -313,6 +330,12 @@
           
           <mat-header-row *matHeaderRowDef="attemptColumns"></mat-header-row>
           <mat-row *matRowDef="let row; columns: attemptColumns;"></mat-row>
+          
+          <!-- Empty state row when no data -->
+          <div *ngIf="!loading.attempts && recentAttempts.length === 0" class="empty-state-in-table">
+            <mat-icon class="empty-icon">history</mat-icon>
+            <p>No login attempts found</p>
+          </div>
         </mat-table>
         
         <!-- Pagination -->

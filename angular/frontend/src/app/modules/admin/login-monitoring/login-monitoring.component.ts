@@ -1,12 +1,32 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ReactiveFormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSort, Sort, MatSortable } from '@angular/material/sort';
+import { Router } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { PermissionService } from '../../../core/services/permission.service';
-import { Router } from '@angular/router';
-import { catchError } from 'rxjs/operators';
-import { of, throwError } from 'rxjs';
+import { catchError, startWith, switchMap, debounceTime } from 'rxjs/operators';
+import { of, throwError, merge } from 'rxjs';
+
+// Material Modules
+import { MatCardModule } from '@angular/material/card';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTableModule } from '@angular/material/table';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatSortModule } from '@angular/material/sort';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTabsModule } from '@angular/material/tabs';
 
 interface LoginAttempt {
   id: number;
@@ -15,6 +35,7 @@ interface LoginAttempt {
   email: string;
   status: string;
   failureReason?: string;
+  metadata?: string;
   createdAt: Date;
 }
 
@@ -51,13 +72,33 @@ interface IPReputation {
 
 @Component({
   selector: 'app-login-monitoring',
+  standalone: true,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatCardModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTableModule,
+    MatPaginatorModule,
+    MatSortModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    MatProgressSpinnerModule,
+    MatSnackBarModule,
+    MatTooltipModule,
+    MatTabsModule
+  ],
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
 })
-export class LoginMonitoringComponent implements OnInit {
+export class LoginMonitoringComponent implements OnInit, AfterViewInit {
   apiUrl = `${environment.apiUrl}/login-monitoring`;
   
-  // Data
+  // Data - using plain array for pure server-side sorting
   recentAttempts: LoginAttempt[] = [];
   statistics: Statistics | null = null;
   detectedPatterns: Pattern[] = [];
@@ -67,13 +108,19 @@ export class LoginMonitoringComponent implements OnInit {
   filterForm: FormGroup;
   
   // Display columns
-  attemptColumns: string[] = ['id', 'timestamp', 'email', 'ipAddress', 'status', 'details', 'actions'];
+  attemptColumns: string[] = ['id', 'timestamp', 'email', 'ipAddress', 'userAgent', 'status', 'details', 'metadata', 'actions'];
   patternColumns: string[] = ['type', 'severity', 'details', 'timestamp', 'actions'];
   
   // Pagination
   totalAttempts = 0;
   pageSize = 10;
   currentPage = 0;
+  
+  // Sorting - pure server-side approach
+  currentSort: Sort = {
+    active: 'createdAt',
+    direction: 'desc'
+  };
   
   // Permission state
   hasPermission = false;
@@ -85,6 +132,8 @@ export class LoginMonitoringComponent implements OnInit {
     patterns: false,
     ipReputation: false
   };
+
+  @ViewChild(MatSort) sort!: MatSort;
 
   constructor(
     private http: HttpClient,
@@ -103,14 +152,15 @@ export class LoginMonitoringComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Check permission using resource:action format
-    this.permissionService.hasPermission('system:admin').subscribe(hasPermission => {
+    // Check permission using resource:action format - match backend requirement
+    this.permissionService.hasPermission('login-monitoring:read').subscribe(hasPermission => {
       this.hasPermission = hasPermission;
       
       if (hasPermission) {
         this.loadStats();
-        this.loadRecentAttempts();
         this.detectPatterns();
+        // Load initial data
+        this.loadRecentAttempts();
       } else {
         this.snackBar.open('You do not have permission to view this page.', 'Close', { duration: 5000 });
         this.router.navigate(['/app/dashboard']);
@@ -118,6 +168,38 @@ export class LoginMonitoringComponent implements OnInit {
     });
   }
 
+  ngAfterViewInit(): void {
+    // Set up sort change handler after ViewChild is available
+    if (this.sort && this.hasPermission) {
+      // ✅ FIX NG0100 ERROR: Use setTimeout to defer sort initialization to next tick
+      // This prevents aria-sort attribute changes during change detection cycle
+      setTimeout(() => {
+        this.sort.sort({
+          id: this.currentSort.active,           // 'createdAt' - maps to timestamp column
+          start: this.currentSort.direction,     // 'desc' - descending order
+          disableClear: false
+        } as MatSortable);
+      }, 0);
+      
+      // Reset pagination when sorting changes and reload data
+      this.sort.sortChange.subscribe(() => {
+        this.currentPage = 0;
+        // Update current sort state from MatSort
+        if (this.sort.active && this.sort.direction) {
+          this.currentSort = {
+            active: this.sort.active,
+            direction: this.sort.direction
+          };
+        }
+        this.loadRecentAttempts();
+      });
+    }
+  }
+
+  /**
+   * Load recent login attempts using simple loading pattern
+   * This replaces the complex reactive pattern to eliminate NG0100 errors
+   */
   loadRecentAttempts(): void {
     if (!this.hasPermission) return;
     
@@ -125,6 +207,11 @@ export class LoginMonitoringComponent implements OnInit {
     
     const filters = this.filterForm.value;
     let url = `${this.apiUrl}/attempts/recent?limit=${this.pageSize}&offset=${this.currentPage * this.pageSize}`;
+    
+    // Add sorting parameters - pure server-side sorting with SQL ORDER BY
+    if (this.currentSort.active && this.currentSort.direction) {
+      url += `&sortBy=${this.currentSort.active}&sortDirection=${this.currentSort.direction}`;
+    }
     
     if (filters.email) {
       url += `&email=${encodeURIComponent(filters.email)}`;
@@ -160,8 +247,20 @@ export class LoginMonitoringComponent implements OnInit {
           this.recentAttempts = data.items || [];
           this.totalAttempts = data.total || 0;
           this.loading.attempts = false;
+        },
+        error: (error) => {
+          this.handleApiError('login attempts', error);
+          this.loading.attempts = false;
         }
       });
+  }
+
+  /**
+   * Trigger method to manually refresh data
+   * Simplified to directly call loadRecentAttempts
+   */
+  triggerDataRefresh(): void {
+    this.loadRecentAttempts();
   }
 
   loadStats(): void {
@@ -179,6 +278,10 @@ export class LoginMonitoringComponent implements OnInit {
       .subscribe({
         next: (data) => {
           this.statistics = data;
+          this.loading.stats = false;
+        },
+        error: (error) => {
+          this.handleApiError('statistics', error);
           this.loading.stats = false;
         }
       });
@@ -199,6 +302,10 @@ export class LoginMonitoringComponent implements OnInit {
       .subscribe({
         next: (data) => {
           this.detectedPatterns = data || [];
+          this.loading.patterns = false;
+        },
+        error: (error) => {
+          this.handleApiError('patterns', error);
           this.loading.patterns = false;
         }
       });
@@ -264,18 +371,18 @@ export class LoginMonitoringComponent implements OnInit {
 
   resetFilters(): void {
     this.filterForm.reset();
-    this.loadRecentAttempts();
+    this.triggerDataRefresh();
   }
 
   applyFilters(): void {
     this.currentPage = 0;
-    this.loadRecentAttempts();
+    this.triggerDataRefresh();
   }
 
   pageChange(event: any): void {
     this.currentPage = event.pageIndex;
     this.pageSize = event.pageSize;
-    this.loadRecentAttempts();
+    this.triggerDataRefresh();
   }
 
   sendTestAlert(): void {

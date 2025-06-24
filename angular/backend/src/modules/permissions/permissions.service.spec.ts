@@ -139,7 +139,7 @@ describe('PermissionsService', () => {
     it('should return cached permissions if available', async () => {
       // Arrange
       const userId = 1;
-      const cachedPermissions = ['users:read', 'users:write'];
+      const cachedPermissions = ['users:view', 'users:write'];
       (cacheService.getUserPermissions as jest.Mock).mockResolvedValue(
         cachedPermissions,
       );
@@ -164,7 +164,7 @@ describe('PermissionsService', () => {
             id: 'role1',
             rolePermissions: [
               {
-                permission: { resourceName: 'users', actionName: 'read' },
+                permission: { resourceName: 'users', actionName: 'view' },
                 granted: true,
               },
             ],
@@ -209,7 +209,7 @@ describe('PermissionsService', () => {
         ],
       });
 
-      expect(result).toContain('users:read');
+      expect(result).toContain('users:view');
       expect(result).toContain('tasks:write');
       expect(result).toContain('projects:delete');
       expect(cacheService.cacheUserPermissions).toHaveBeenCalledWith(

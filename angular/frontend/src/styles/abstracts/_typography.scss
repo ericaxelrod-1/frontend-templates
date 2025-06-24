@@ -1,0 +1,231 @@
+@use '@angular/material' as mat;
+
+// Material Design Typography Scale
+// Based on Material Design 3 typography system
+
+// Display Typography (Large, prominent text)
+.mat-display-large {
+  font-size: 3.5rem;    // 56px
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.25px;
+}
+
+.mat-display-medium {
+  font-size: 2.8125rem; // 45px
+  font-weight: 400;
+  line-height: 1.16;
+  letter-spacing: 0;
+}
+
+.mat-display-small {
+  font-size: 2.25rem;   // 36px
+  font-weight: 400;
+  line-height: 1.22;
+  letter-spacing: 0;
+}
+
+// Headline Typography (High-emphasis text)
+.mat-headline-large {
+  font-size: 2rem;      // 32px
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.mat-headline-medium {
+  font-size: 1.75rem;   // 28px
+  font-weight: 400;
+  line-height: 1.29;
+  letter-spacing: 0;
+}
+
+.mat-headline-small {
+  font-size: 1.5rem;    // 24px
+  font-weight: 400;
+  line-height: 1.33;
+  letter-spacing: 0;
+}
+
+// Title Typography (Medium-emphasis text)
+.mat-title-large {
+  font-size: 1.375rem;  // 22px
+  font-weight: 400;
+  line-height: 1.27;
+  letter-spacing: 0;
+}
+
+.mat-title-medium {
+  font-size: 1rem;      // 16px
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.15px;
+}
+
+.mat-title-small {
+  font-size: 0.875rem;  // 14px
+  font-weight: 500;
+  line-height: 1.43;
+  letter-spacing: 0.1px;
+}
+
+// Label Typography (Text for components)
+.mat-label-large {
+  font-size: 0.875rem;  // 14px
+  font-weight: 500;
+  line-height: 1.43;
+  letter-spacing: 0.1px;
+}
+
+.mat-label-medium {
+  font-size: 0.75rem;   // 12px
+  font-weight: 500;
+  line-height: 1.33;
+  letter-spacing: 0.5px;
+}
+
+.mat-label-small {
+  font-size: 0.6875rem; // 11px
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.5px;
+}
+
+// Body Typography (Reading text)
+.mat-body-large {
+  font-size: 1rem;      // 16px
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+
+.mat-body-medium {
+  font-size: 0.875rem;  // 14px
+  font-weight: 400;
+  line-height: 1.43;
+  letter-spacing: 0.25px;
+}
+
+.mat-body-small {
+  font-size: 0.75rem;   // 12px
+  font-weight: 400;
+  line-height: 1.33;
+  letter-spacing: 0.4px;
+}
+
+// Legacy Material Design Typography Classes (for backward compatibility)
+.mat-headline-1 { @extend .mat-display-large; }
+.mat-headline-2 { @extend .mat-display-medium; }
+.mat-headline-3 { @extend .mat-display-small; }
+.mat-headline-4 { @extend .mat-headline-large; }
+.mat-headline-5 { @extend .mat-headline-medium; }
+.mat-headline-6 { @extend .mat-headline-small; }
+
+.mat-subtitle-1 { @extend .mat-title-large; }
+.mat-subtitle-2 { @extend .mat-title-medium; }
+
+.mat-body-1 { @extend .mat-body-large; }
+.mat-body-2 { @extend .mat-body-medium; }
+
+.mat-caption { @extend .mat-label-medium; }
+.mat-button { @extend .mat-label-large; }
+.mat-overline { @extend .mat-label-small; }
+
+// Utility Classes for Common Typography Patterns
+.text-primary {
+  color: var(--mdc-theme-primary);
+}
+
+.text-secondary {
+  color: var(--mdc-theme-text-secondary);
+}
+
+.text-disabled {
+  color: var(--mdc-theme-text-disabled);
+}
+
+.text-error {
+  color: var(--mdc-theme-error);
+}
+
+.text-success {
+  color: var(--mdc-theme-success);
+}
+
+.text-warning {
+  color: var(--mdc-theme-warning);
+}
+
+.text-info {
+  color: var(--mdc-theme-info);
+}
+
+// Text Alignment Utilities
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-justify { text-align: justify; }
+
+// Font Weight Utilities
+.font-light { font-weight: 300; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+
+// Text Transform Utilities
+.text-uppercase { text-transform: uppercase; }
+.text-lowercase { text-transform: lowercase; }
+.text-capitalize { text-transform: capitalize; }
+.text-normal-case { text-transform: none; }
+
+// Text Decoration Utilities
+.text-underline { text-decoration: underline; }
+.text-line-through { text-decoration: line-through; }
+.text-no-underline { text-decoration: none; }
+
+// Line Height Utilities
+.leading-none { line-height: 1; }
+.leading-tight { line-height: 1.25; }
+.leading-snug { line-height: 1.375; }
+.leading-normal { line-height: 1.5; }
+.leading-relaxed { line-height: 1.625; }
+.leading-loose { line-height: 2; }
+
+// Letter Spacing Utilities
+.tracking-tighter { letter-spacing: -0.05em; }
+.tracking-tight { letter-spacing: -0.025em; }
+.tracking-normal { letter-spacing: 0; }
+.tracking-wide { letter-spacing: 0.025em; }
+.tracking-wider { letter-spacing: 0.05em; }
+.tracking-widest { letter-spacing: 0.1em; }
+
+// Responsive Typography Utilities
+@media (max-width: 599px) {
+  .mat-display-large { font-size: 2.8125rem; } // 45px on mobile
+  .mat-display-medium { font-size: 2.25rem; }  // 36px on mobile
+  .mat-display-small { font-size: 2rem; }      // 32px on mobile
+  .mat-headline-large { font-size: 1.75rem; }  // 28px on mobile
+  .mat-headline-medium { font-size: 1.5rem; }  // 24px on mobile
+}
+
+// Print Typography Adjustments
+@media print {
+  .mat-display-large,
+  .mat-display-medium,
+  .mat-display-small,
+  .mat-headline-large,
+  .mat-headline-medium,
+  .mat-headline-small {
+    color: black !important;
+  }
+  
+  .text-primary,
+  .text-secondary,
+  .text-error,
+  .text-success,
+  .text-warning,
+  .text-info {
+    color: black !important;
+  }
+} 

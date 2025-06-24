@@ -21,19 +21,19 @@ export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
   @Get()
-  @RequirePermission('permissions:read')
+  @RequirePermission('permissions:view')
   async findAll(): Promise<Permission[]> {
     return this.permissionsService.findAll();
   }
 
   @Get(':id')
-  @RequirePermission('permissions:read')
+  @RequirePermission('permissions:view')
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<Permission> {
     return this.permissionsService.findOne(id);
   }
 
   @Get('role/:roleId')
-  @RequirePermission('permissions:read')
+  @RequirePermission('permissions:view')
   async findByRole(
     @Param('roleId', ParseIntPipe) roleId: number,
   ): Promise<Permission[]> {
@@ -41,7 +41,7 @@ export class PermissionsController {
   }
 
   @Get('group/:groupId')
-  @RequirePermission('permissions:read')
+  @RequirePermission('permissions:view')
   async findByGroup(
     @Param('groupId', ParseIntPipe) groupId: number,
   ): Promise<Permission[]> {

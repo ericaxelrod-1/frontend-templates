@@ -7,14 +7,16 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, FindOptionsWhere } from 'typeorm';
+import { Repository, Like, FindOptionsWhere, In } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { RoleMembershipResult } from './dto/role-membership-result.dto';
 import { PasswordValidationService } from '../auth/password-validation.service';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/services/permissions.service';
+import { Group } from '../permissions/entities/group.entity';
 
 @Injectable()
 export class UsersService {
@@ -23,6 +25,8 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
+    @InjectRepository(Group)
+    private readonly groupRepository: Repository<Group>,
     @Inject(forwardRef(() => PasswordValidationService))
     private readonly passwordValidationService: PasswordValidationService,
     @Inject(forwardRef(() => PermissionsService))
@@ -31,12 +35,21 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     // Check if email already exists
-    const existingUser = await this.userRepository.findOne({
+    const existingUserByEmail = await this.userRepository.findOne({
       where: { email: createUserDto.email },
     });
 
-    if (existingUser) {
+    if (existingUserByEmail) {
       throw new ConflictException('Email already exists');
+    }
+
+    // Check if username already exists
+    const existingUserByUsername = await this.userRepository.findOne({
+      where: { username: createUserDto.username },
+    });
+
+    if (existingUserByUsername) {
+      throw new ConflictException('Username already exists');
     }
 
     // Validate password if provided
@@ -45,8 +58,18 @@ export class UsersService {
       createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
     }
 
-    // If role is not provided, use default role
-    if (!createUserDto.role) {
+    // Handle roles
+    let roles: Role[] = [];
+    if (createUserDto.roleIds && createUserDto.roleIds.length > 0) {
+      roles = await this.roleRepository.find({
+        where: { id: In(createUserDto.roleIds) },
+      });
+      
+      if (roles.length !== createUserDto.roleIds.length) {
+        throw new BadRequestException('One or more role IDs are invalid');
+      }
+    } else {
+      // If no roles provided, use default role
       const defaultRole = await this.roleRepository.findOne({
         where: { isDefault: true },
       });
@@ -55,12 +78,46 @@ export class UsersService {
         throw new BadRequestException('Default role not found');
       }
 
-      createUserDto.role = defaultRole;
+      roles = [defaultRole];
+    }
+
+    // Handle groups
+    let groups: Group[] = [];
+    if (createUserDto.groupIds && createUserDto.groupIds.length > 0) {
+      groups = await this.groupRepository.find({
+        where: { id: In(createUserDto.groupIds) },
+      });
+      
+      if (groups.length !== createUserDto.groupIds.length) {
+        throw new BadRequestException('One or more group IDs are invalid');
+      }
     }
 
     // Create and save the user
-    const user = this.userRepository.create(createUserDto);
-    return this.userRepository.save(user);
+    const user = this.userRepository.create({
+      username: createUserDto.username,
+      email: createUserDto.email,
+      password: createUserDto.password,
+      firstName: createUserDto.firstName,
+      lastName: createUserDto.lastName,
+      preferences: createUserDto.preferences,
+      requiresPasswordChange: createUserDto.requiresPasswordChange || false,
+      roles: roles,
+    });
+
+    const savedUser = await this.userRepository.save(user);
+
+    // Assign groups using pure many-to-many relationship
+    if (groups.length > 0) {
+      savedUser.groups = groups;
+      await this.userRepository.save(savedUser);
+    }
+
+    // Return user with relations
+    return this.userRepository.findOne({
+      where: { id: savedUser.id },
+      relations: ['roles', 'groups'],
+    });
   }
 
   async findAll(search?: string): Promise<Partial<User>[]> {
@@ -81,14 +138,14 @@ export class UsersService {
         'createdAt',
         'updatedAt',
       ],
-      relations: ['roles'],
+      relations: ['roles', 'groups'],
     });
   }
 
   async findOne(id: number): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['roles'],
+      relations: ['roles', 'groups'],
     });
 
     if (!user) {
@@ -187,6 +244,38 @@ export class UsersService {
     }
   }
 
+  async findByUsername(username: string): Promise<User | undefined> {
+    console.log(`Looking up user by username: ${username}`);
+
+    try {
+      const user = await this.userRepository.findOne({
+        where: { username },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          isActive: true,
+          isEmailVerified: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (user) {
+        console.log(`User lookup success for username ${username} with ID ${user.id}`);
+      } else {
+        console.log(`User not found for username: ${username}`);
+      }
+
+      return user;
+    } catch (error) {
+      console.error(`Critical error finding user by username ${username}:`, error);
+      throw error;
+    }
+  }
+
   async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
@@ -196,10 +285,95 @@ export class UsersService {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
-    // Update user data
+    // Handle roles if provided
+    if (updateUserDto.roleIds) {
+      const roles = await this.roleRepository.find({
+        where: { id: In(updateUserDto.roleIds) },
+      });
+      
+      if (roles.length !== updateUserDto.roleIds.length) {
+        console.error('Role validation failed:', {
+          requestedRoleIds: updateUserDto.roleIds,
+          foundRoles: roles.map(r => r.id),
+          missingRoleIds: updateUserDto.roleIds.filter(id => !roles.some(r => r.id === id))
+        });
+        throw new BadRequestException('One or more role IDs are invalid');
+      }
+      
+      user.roles = roles;
+      delete updateUserDto.roleIds; // Remove from DTO to prevent TypeORM issues
+    }
+
+    // Handle groups if provided
+    if (updateUserDto.groupIds) {
+      console.log('Processing group update for user:', {
+        userId: id,
+        requestedGroupIds: updateUserDto.groupIds,
+        currentUserGroups: user.groups?.map(g => g.id) || []
+      });
+
+      // Validate that all group IDs are valid numbers
+      const validGroupIds = updateUserDto.groupIds.filter(id => 
+        typeof id === 'number' && id > 0 && Number.isInteger(id)
+      );
+
+      if (validGroupIds.length !== updateUserDto.groupIds.length) {
+        console.error('Invalid group IDs detected:', {
+          originalIds: updateUserDto.groupIds,
+          validIds: validGroupIds,
+          invalidIds: updateUserDto.groupIds.filter(id => 
+            !(typeof id === 'number' && id > 0 && Number.isInteger(id))
+          )
+        });
+        throw new BadRequestException('One or more group IDs are invalid (not valid numbers)');
+      }
+
+      // Remove duplicates
+      const uniqueGroupIds = [...new Set(validGroupIds)];
+      
+      if (uniqueGroupIds.length !== validGroupIds.length) {
+        console.warn('Duplicate group IDs detected and removed:', {
+          originalIds: validGroupIds,
+          uniqueIds: uniqueGroupIds
+        });
+      }
+
+      const groups = await this.groupRepository.find({
+        where: { id: In(uniqueGroupIds) },
+      });
+      
+      if (groups.length !== uniqueGroupIds.length) {
+        const foundGroupIds = groups.map(g => g.id);
+        const missingGroupIds = uniqueGroupIds.filter(id => !foundGroupIds.includes(id));
+        
+        console.error('Group validation failed:', {
+          requestedGroupIds: uniqueGroupIds,
+          foundGroups: foundGroupIds,
+          missingGroupIds: missingGroupIds,
+          allGroupsInDb: await this.groupRepository.find({ select: ['id', 'name'] })
+        });
+        
+        throw new BadRequestException(`One or more group IDs are invalid: ${missingGroupIds.join(', ')}`);
+      }
+      
+      // Update user groups using pure many-to-many relationship
+      user.groups = groups;
+      
+      console.log('Successfully updated user groups:', {
+        userId: id,
+        newGroupIds: groups.map(g => g.id),
+        groupNames: groups.map(g => g.name)
+      });
+      
+      delete updateUserDto.groupIds; // Remove from DTO to prevent TypeORM issues
+    }
+
+    // Update user data (excluding roleIds and groupIds which are now handled above)
     Object.assign(user, updateUserDto);
 
-    return this.userRepository.save(user);
+    // Save the user and reload with fresh relations
+    await this.userRepository.save(user);
+    return this.findOne(id);
   }
 
   async remove(id: number): Promise<void> {
@@ -296,5 +470,191 @@ export class UsersService {
    */
   async count(): Promise<number> {
     return this.userRepository.count();
+  }
+
+  /**
+   * Add a user to a role with meaningful response
+   */
+  async addUserToRole(userId: number, roleId: number): Promise<RoleMembershipResult> {
+    // Load user and role with relations
+    const [user, role] = await Promise.all([
+      this.userRepository.findOne({
+        where: { id: userId },
+        relations: ['roles'],
+      }),
+      this.roleRepository.findOne({
+        where: { id: roleId },
+        relations: ['users'],
+      }),
+    ]);
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${roleId} not found`);
+    }
+
+    // Check if user already has this role
+    const hasRole = user.roles?.some(r => r.id === role.id);
+    if (hasRole) {
+      return {
+        success: false,
+        operation: 'added',
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        },
+        role: {
+          id: role.id,
+          name: role.name,
+          description: role.description
+        },
+        timestamp: new Date(),
+        message: `User is already a member of role ${role.name}`,
+        previousState: {
+          wasAlreadyMember: true
+        },
+        currentState: {
+          isMember: true,
+          totalRoleMembers: role.users?.length || 0
+        }
+      };
+    }
+
+    // Add user to role
+    if (!user.roles) {
+      user.roles = [];
+    }
+    user.roles.push(role);
+
+    // Save the user
+    await this.userRepository.save(user);
+
+    // Get updated role with fresh member count
+    const updatedRole = await this.roleRepository.findOne({
+      where: { id: roleId },
+      relations: ['users'],
+    });
+
+    return {
+      success: true,
+      operation: 'added',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      },
+      role: {
+        id: role.id,
+        name: role.name,
+        description: role.description
+      },
+      timestamp: new Date(),
+      message: `User successfully added to role ${role.name}`,
+      previousState: {
+        wasAlreadyMember: false
+      },
+      currentState: {
+        isMember: true,
+        memberSince: new Date(),
+        totalRoleMembers: updatedRole?.users?.length || 0
+      }
+    };
+  }
+
+  /**
+   * Remove a user from a role with meaningful response
+   */
+  async removeUserFromRole(userId: number, roleId: number): Promise<RoleMembershipResult> {
+    // Load user and role with relations
+    const [user, role] = await Promise.all([
+      this.userRepository.findOne({
+        where: { id: userId },
+        relations: ['roles'],
+      }),
+      this.roleRepository.findOne({
+        where: { id: roleId },
+        relations: ['users'],
+      }),
+    ]);
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${roleId} not found`);
+    }
+
+    // Check if user actually has this role
+    const hasRole = user.roles?.some(r => r.id === role.id);
+    if (!hasRole) {
+      return {
+        success: false,
+        operation: 'removed',
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        },
+        role: {
+          id: role.id,
+          name: role.name,
+          description: role.description
+        },
+        timestamp: new Date(),
+        message: `User is not a member of role ${role.name}`,
+        previousState: {
+          wasAlreadyMember: false
+        },
+        currentState: {
+          isMember: false,
+          totalRoleMembers: role.users?.length || 0
+        }
+      };
+    }
+
+    // Remove user from role
+    user.roles = user.roles.filter(r => r.id !== role.id);
+
+    // Save the user
+    await this.userRepository.save(user);
+
+    // Get updated role with fresh member count
+    const updatedRole = await this.roleRepository.findOne({
+      where: { id: roleId },
+      relations: ['users'],
+    });
+
+    return {
+      success: true,
+      operation: 'removed',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      },
+      role: {
+        id: role.id,
+        name: role.name,
+        description: role.description
+      },
+      timestamp: new Date(),
+      message: `User successfully removed from role ${role.name}`,
+      previousState: {
+        wasAlreadyMember: true
+      },
+      currentState: {
+        isMember: false,
+        totalRoleMembers: updatedRole?.users?.length || 0
+      }
+    };
   }
 }

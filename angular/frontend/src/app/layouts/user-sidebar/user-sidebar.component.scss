@@ -1,0 +1,131 @@
+@use '@angular/material' as mat;
+
+.user-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  background-color: var(--mdc-theme-surface);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  transform: translateX(100%);
+  transition: transform 0.3s ease-in-out;
+  z-index: 1100;
+  overflow-y: auto;
+  
+  &.sidebar-open {
+    transform: translateX(0);
+  }
+  
+  .sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 24px;
+    background-color: var(--mdc-theme-primary);
+    color: var(--mdc-theme-on-primary);
+    
+    .user-info {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      
+      .user-avatar {
+        font-size: 48px;
+        width: 48px;
+        height: 48px;
+        margin-right: 16px;
+      }
+      
+      .user-details {
+        flex: 1;
+        overflow: hidden;
+        
+        h3 {
+          margin: 0 0 8px 0;
+          font-size: 18px;
+          font-weight: 500;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        
+        p {
+          margin: 0;
+          font-size: 14px;
+          opacity: 0.9;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+    }
+    
+    button {
+      color: var(--mdc-theme-on-primary);
+    }
+  }
+  
+  mat-nav-list {
+    padding-top: 16px;
+    
+    a {
+      cursor: pointer;
+      
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+      }
+      
+      mat-icon {
+        margin-right: 16px;
+      }
+    }
+  }
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1099;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+  
+  &.backdrop-visible {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+// Mobile adjustments
+@media (max-width: 599px) {
+  .user-sidebar {
+    width: 280px;
+    
+    .sidebar-header {
+      padding: 16px;
+      
+      .user-info {
+        .user-avatar {
+          font-size: 40px;
+          width: 40px;
+          height: 40px;
+        }
+        
+        .user-details {
+          h3 {
+            font-size: 16px;
+          }
+          
+          p {
+            font-size: 13px;
+          }
+        }
+      }
+    }
+  }
+}

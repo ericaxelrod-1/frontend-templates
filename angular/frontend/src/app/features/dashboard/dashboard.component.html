@@ -1,38 +1,107 @@
 <div class="dashboard-container">
-  <div class="dashboard-header">
-    <div class="logo-container">
-      <img *ngIf="headerLogo" [src]="headerLogo" alt="{{appName}} Logo" class="dashboard-logo">
-      <h1 *ngIf="!headerLogo">{{appName}}</h1>
+  <!-- Dashboard Content with Proper Grid Layout -->
+  <section class="dashboard-content" role="region" aria-label="Dashboard content">
+    <div class="dashboard-header">
+      <h1 class="mat-headline-large dashboard-title">Dashboard</h1>
+      <p class="mat-body-1 text-secondary dashboard-subtitle">Welcome back! Here's an overview of your system.</p>
     </div>
-    <h1>Dashboard</h1>
-  </div>
-  
-  <div class="dashboard-grid">
-    <mat-card class="dashboard-card" [routerLink]="['/app/users']">
-      <mat-card-header>
-        <mat-card-title>Users</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>Total Users: 120</p>
-      </mat-card-content>
-    </mat-card>
     
-    <mat-card class="dashboard-card" [routerLink]="['/app/groups']">
-      <mat-card-header>
-        <mat-card-title>Groups</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>Total Groups: 15</p>
-      </mat-card-content>
-    </mat-card>
-    
-    <mat-card class="dashboard-card" [routerLink]="['/admin/login-monitoring']">
-      <mat-card-header>
-        <mat-card-title>Activity</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>Latest Activities: 67</p>
-      </mat-card-content>
-    </mat-card>
-  </div>
+    <div class="dashboard-grid">
+      <!-- Users Card -->
+      <mat-card class="dashboard-card users-card" 
+                [routerLink]="['/app/users']" 
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Navigate to Users management. Total users: 120'"
+                (keydown.enter)="navigateToUsers()"
+                (keydown.space)="navigateToUsers()">
+        <mat-card-header>
+          <div mat-card-avatar class="card-avatar users-avatar">
+            <mat-icon>people</mat-icon>
+          </div>
+          <mat-card-title class="mat-title-large">Users</mat-card-title>
+          <mat-card-subtitle class="mat-body-2">Manage user accounts</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="card-stats">
+            <span class="stat-number mat-headline-medium">120</span>
+            <span class="stat-label mat-body-2 text-secondary">Total Users</span>
+          </div>
+          <div class="card-description">
+            <p class="mat-body-2">View and manage all user accounts in the system.</p>
+          </div>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button mat-button color="primary" class="mat-label-large">
+            <mat-icon>arrow_forward</mat-icon>
+            View Users
+          </button>
+        </mat-card-actions>
+      </mat-card>
+      
+      <!-- Groups Card -->
+      <mat-card class="dashboard-card groups-card" 
+                [routerLink]="['/app/groups']"
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Navigate to Groups management. Total groups: 15'"
+                (keydown.enter)="navigateToGroups()"
+                (keydown.space)="navigateToGroups()">
+        <mat-card-header>
+          <div mat-card-avatar class="card-avatar groups-avatar">
+            <mat-icon>group_work</mat-icon>
+          </div>
+          <mat-card-title class="mat-title-large">Groups</mat-card-title>
+          <mat-card-subtitle class="mat-body-2">Organize user groups</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="card-stats">
+            <span class="stat-number mat-headline-medium">15</span>
+            <span class="stat-label mat-body-2 text-secondary">Total Groups</span>
+          </div>
+          <div class="card-description">
+            <p class="mat-body-2">Create and manage user groups and permissions.</p>
+          </div>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button mat-button color="primary" class="mat-label-large">
+            <mat-icon>arrow_forward</mat-icon>
+            View Groups
+          </button>
+        </mat-card-actions>
+      </mat-card>
+      
+      <!-- Activity Card -->
+      <mat-card class="dashboard-card activity-card" 
+                [routerLink]="['/admin/login-monitoring']"
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Navigate to Activity monitoring. Latest activities: 67'"
+                (keydown.enter)="navigateToActivity()"
+                (keydown.space)="navigateToActivity()">
+        <mat-card-header>
+          <div mat-card-avatar class="card-avatar activity-avatar">
+            <mat-icon>security</mat-icon>
+          </div>
+          <mat-card-title class="mat-title-large">Activity</mat-card-title>
+          <mat-card-subtitle class="mat-body-2">Monitor system activity</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="card-stats">
+            <span class="stat-number mat-headline-medium">67</span>
+            <span class="stat-label mat-body-2 text-secondary">Recent Activities</span>
+          </div>
+          <div class="card-description">
+            <p class="mat-body-2">View login attempts and system activity logs.</p>
+          </div>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button mat-button color="primary" class="mat-label-large">
+            <mat-icon>arrow_forward</mat-icon>
+            View Activity
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+  </section>
 </div>

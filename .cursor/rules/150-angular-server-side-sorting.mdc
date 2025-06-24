@@ -1,0 +1,518 @@
+---
+description: 
+globs: angular/**/*.ts,angular/**/*.html,angular/**/*.scss
+alwaysApply: false
+---
+---
+description: "Angular design patterns and implementation guidelines for proper component architecture"
+globs: ["angular/**/*.ts", "angular/**/*.html", "angular/**/*.scss"]
+tags: ["angular", "components", "material", "architecture", "patterns"]
+priority: 10
+---
+
+# Angular Material Server-Side Sorting Implementation Guide
+
+## CRITICAL ARCHITECTURE PRINCIPLES
+
+⚠️ **STOP**: You **MUST** understand these fundamental principles before implementing server-side sorting:
+
+### 1. ViewChild Availability is CRITICAL
+
+**⚠️ CRITICAL**: ViewChild must be available for reactive patterns to work.
+
+- **NEVER** conditionally render tables with `*ngIf` based on data length
+- **ALWAYS** render table structure so ViewChild is available
+- **ALWAYS** check ViewChild availability before initializing reactive patterns
+
+**Chicken-and-Egg Problem to AVOID**:
+```html
+<!-- PROHIBITED - Creates chicken-and-egg problem -->
+<mat-table [dataSource]="data" matSort *ngIf="data.length > 0">
+  <!-- Table never renders if data is empty -->
+  <!-- ViewChild never available if table never renders -->
+  <!-- Reactive pattern never initializes if ViewChild not available -->
+  <!-- Data never loads if reactive pattern never initializes -->
+</mat-table>
+```
+
+**Correct Implementation**:
+```html
+<!-- REQUIRED - Always render table structure -->
+<mat-table [dataSource]="data" matSort>
+  <!-- Table columns -->
+  <mat-header-row *matHeaderRowDef="columns"></mat-header-row>
+  <mat-row *matRowDef="let row; columns: columns;"></mat-row>
+  
+  <!-- Empty state inside table -->
+  <div *ngIf="!loading && data.length === 0" class="empty-state-in-table">
+    <mat-icon>info</mat-icon>
+    <p>No data found</p>
+  </div>
+</mat-table>
+```
+
+### 2. Angular Lifecycle Coordination
+
+**ALWAYS coordinate between ngOnInit and ngAfterViewInit**:
+- `ngOnInit()`: Handle async operations (permissions, initial data)
+- `ngAfterViewInit()`: Initialize reactive patterns when ViewChild is available
+- Use coordination flags to ensure proper timing
+
+**Required Pattern**:
+```typescript
+export class TableComponent implements OnInit, AfterViewInit {
+  @ViewChild(MatSort) sort!: MatSort;
+  
+  private shouldInitializeReactivePattern = false;
+  private reactivePatternInitialized = false;
+  hasPermission = false;
+
+  ngOnInit(): void {
+    // Handle async operations
+    this.checkPermissions().then(() => {
+      this.hasPermission = true;
+      this.shouldInitializeReactivePattern = true;
+      
+      // Initialize if ViewChild is already available
+      if (this.sort) {
+        this.initializeReactivePattern();
+      }
+    });
+  }
+
+  ngAfterViewInit(): void {
+    // Initialize reactive pattern if permissions are ready
+    if (this.shouldInitializeReactivePattern && !this.reactivePatternInitialized) {
+      this.initializeReactivePattern();
+    }
+  }
+
+  private initializeReactivePattern(): void {
+    // Guard against multiple initialization
+    if (this.reactivePatternInitialized || !this.sort || !this.hasPermission) {
+      return;
+    }
+    
+    this.reactivePatternInitialized = true;
+    // Setup reactive pattern
+  }
+}
+```
+
+## CRITICAL NG0100 ERROR PREVENTION
+
+⚠️ **STOP**: Default sort initialization MUST be handled carefully to avoid NG0100 errors.
+
+### 1. The aria-sort NG0100 Problem
+
+**Root Cause**: Setting `sort.active` and `sort.direction` in `ngAfterViewInit()` changes the `aria-sort` attribute during change detection, causing NG0100 error.
+
+**PROHIBITED Pattern**:
+```typescript
+ngAfterViewInit(): void {
+  // ❌ CAUSES NG0100 ERROR - changes aria-sort during change detection
+  this.sort.active = 'createdAt';
+  this.sort.direction = 'desc';
+}
+```
+
+**REQUIRED Solution - Use sort() method with setTimeout**:
+```typescript
+ngAfterViewInit(): void {
+  if (this.sort && this.hasPermission) {
+    // ✅ CORRECT - Use setTimeout to defer to next tick
+    setTimeout(() => {
+      this.sort.sort({
+        id: 'createdAt',        // Column ID from mat-sort-header
+        start: 'desc',          // Initial direction
+        disableClear: false
+      } as MatSortable);
+    }, 0);
+    
+    // Set up sort change handler
+    this.sort.sortChange.subscribe(() => {
+      this.currentPage = 0;
+      this.loadData();
+    });
+  }
+}
+```
+
+### 2. Alternative Solution - Template-Based Default Sort
+
+**Use matSortStart and matSortDirection in template**:
+```html
+<mat-table [dataSource]="dataSource" matSort 
+           matSortActive="createdAt" 
+           matSortDirection="desc">
+  <ng-container matColumnDef="timestamp">
+    <mat-header-cell *matHeaderCellDef mat-sort-header="createdAt">
+      Timestamp
+    </mat-header-cell>
+    <mat-cell *matCellDef="let item">{{ item.createdAt | date:'medium' }}</mat-cell>
+  </ng-container>
+</mat-table>
+```
+
+## REACTIVE PATTERN IMPLEMENTATION
+
+### 1. Simple Loading Pattern (Recommended)
+
+**Use simple loading pattern like Groups/Users components**:
+
+```typescript
+loadData(): void {
+  this.loading = true;
+  
+  const params = this.buildQueryParams();
+  
+  this.dataService.getData(params).subscribe({
+    next: (data) => {
+      this.dataSource = data.items;
+      this.totalCount = data.total;
+      this.loading = false;
+    },
+    error: (error) => {
+      console.error('Data loading error:', error);
+      this.loading = false;
+    }
+  });
+}
+
+private buildQueryParams(): any {
+  return {
+    sortBy: this.sort?.active || 'createdAt',
+    sortDirection: this.sort?.direction || 'desc',
+    page: this.currentPage,
+    pageSize: this.pageSize,
+    ...this.getFilterParams()
+  };
+}
+```
+
+### 2. Alternative: Industry-Standard RxJS Pattern
+
+**Only use if you need advanced reactive behavior**:
+
+```typescript
+import { merge } from 'rxjs';
+import { startWith, switchMap, debounceTime } from 'rxjs/operators';
+
+private initializeReactivePattern(): void {
+  // Combine all user interaction streams
+  merge(
+    this.sort.sortChange,
+    this.filterForm.valueChanges.pipe(debounceTime(300))
+  )
+  .pipe(
+    startWith({}), // Trigger initial load
+    switchMap(() => {
+      // Cancel previous requests automatically
+      return this.loadDataFromServer();
+    })
+  )
+  .subscribe({
+    next: (data) => {
+      this.dataSource = data.items;
+      this.totalCount = data.total;
+      this.loading = false;
+    },
+    error: (error) => {
+      console.error('Data loading error:', error);
+      this.loading = false;
+    }
+  });
+}
+```
+
+### 2. Server-Side API Requirements
+
+**Backend must support these parameters**:
+- `sortBy`: Column name to sort by
+- `sortDirection`: 'asc' or 'desc'
+- `page`: Page number (0-based or 1-based)
+- `pageSize`: Number of items per page
+- Filter parameters as needed
+
+**API Response Format**:
+```typescript
+interface ServerResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+```
+
+### 3. Field Mapping for Sort Headers
+
+**ALWAYS map frontend column names to backend field names**:
+
+```typescript
+private getSortField(sortHeaderId: string): string {
+  const fieldMapping: { [key: string]: string } = {
+    'timestamp': 'createdAt',        // Frontend column -> Backend field
+    'createdAt': 'attemptedAt',      // Handle both naming conventions
+    'details': 'failureReason',
+    'email': 'emailAttempted',       // Backend uses emailAttempted
+    'ipAddress': 'ipAddress',
+    'status': 'status',
+    'userAgent': 'userAgent',
+    'id': 'id'
+  };
+  
+  return fieldMapping[sortHeaderId] || sortHeaderId;
+}
+
+private loadDataFromServer(): Observable<ServerResponse<any>> {
+  const params = {
+    sortBy: this.getSortField(this.sort.active),
+    sortDirection: this.sort.direction || 'desc',
+    page: this.currentPage,
+    pageSize: this.pageSize,
+    ...this.getFilterParams()
+  };
+  
+  return this.dataService.getData(params);
+}
+```
+
+### 4. Complete Column Requirements
+
+**ALWAYS ensure all entity fields are represented in the table**:
+
+For LoginAttempt entity, these columns are REQUIRED:
+- `id` - Primary key
+- `timestamp` (createdAt/attemptedAt) - When attempt occurred
+- `email` (emailAttempted) - Email used in attempt
+- `ipAddress` - IP address of attempt
+- `status` - Success/failure status
+- `details` (failureReason) - Why attempt failed
+- `userAgent` - Browser/client information ⚠️ MISSING in most implementations
+- `metadata` - Additional JSON data ⚠️ MISSING in most implementations
+- `actions` - Administrative actions
+
+**Template Column Definition**:
+```html
+<!-- All columns must be defined -->
+attemptColumns: string[] = [
+  'id', 'timestamp', 'email', 'ipAddress', 
+  'userAgent', 'status', 'details', 'metadata', 'actions'
+];
+```
+```
+
+## TEMPLATE IMPLEMENTATION
+
+### 1. Required Mat-Table Structure
+
+```html
+<!-- Loading indicator -->
+<div *ngIf="loading" class="loading-placeholder">
+  <mat-spinner diameter="40"></mat-spinner>
+  <span>Loading data...</span>
+</div>
+
+<!-- Always render table structure -->
+<mat-table [dataSource]="dataSource" matSort>
+  <!-- Define columns with proper sort headers -->
+  <ng-container matColumnDef="timestamp">
+    <mat-header-cell *matHeaderCellDef mat-sort-header="createdAt">
+      Timestamp
+    </mat-header-cell>
+    <mat-cell *matCellDef="let item">
+      {{ item.createdAt | date:'medium' }}
+    </mat-cell>
+  </ng-container>
+  
+  <ng-container matColumnDef="email">
+    <mat-header-cell *matHeaderCellDef mat-sort-header>
+      Email
+    </mat-header-cell>
+    <mat-cell *matCellDef="let item">
+      {{ item.email }}
+    </mat-cell>
+  </ng-container>
+  
+  <!-- More columns... -->
+  
+  <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+  <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
+  
+  <!-- Empty state inside table -->
+  <div *ngIf="!loading && dataSource.length === 0" class="empty-state-in-table">
+    <mat-icon class="empty-icon">inbox</mat-icon>
+    <p>No data available</p>
+  </div>
+</mat-table>
+
+<!-- Pagination -->
+<mat-paginator
+  *ngIf="!loading && totalCount > 0"
+  [length]="totalCount"
+  [pageSize]="pageSize"
+  [pageSizeOptions]="[5, 10, 25, 50]"
+  (page)="onPageChange($event)">
+</mat-paginator>
+```
+
+### 2. Sort Header Configuration
+
+**Use mat-sort-header with proper field mapping**:
+- `mat-sort-header` without value uses column def name
+- `mat-sort-header="fieldName"` maps to specific backend field
+- Handle field name differences between frontend and backend
+
+## PROHIBITED PRACTICES - ALWAYS AVOID
+
+⚠️ **WARNING: NEVER use these anti-patterns:**
+
+### 1. **NEVER** conditionally render tables based on data
+```html
+<!-- PROHIBITED - Creates ViewChild unavailability -->
+<mat-table *ngIf="data.length > 0" [dataSource]="data" matSort>
+```
+
+### 2. **NEVER** use recursive retry logic for ViewChild
+```typescript
+/* PROHIBITED - Creates infinite loops */
+private initializeReactivePattern(): void {
+  if (!this.sort) {
+    setTimeout(() => this.initializeReactivePattern(), 100); // INFINITE LOOP
+    return;
+  }
+}
+```
+
+### 3. **NEVER** start reactive patterns before ViewChild is ready
+```typescript
+/* PROHIBITED - Race condition */
+ngOnInit(): void {
+  // ViewChild not available yet
+  this.initializeReactivePattern(); // WILL FAIL
+}
+```
+
+### 4. **NEVER** ignore permission checks in reactive patterns
+```typescript
+/* PROHIBITED - Security issue */
+private initializeReactivePattern(): void {
+  // Missing permission check
+  merge(this.sort.sortChange)
+    .pipe(switchMap(() => this.loadData())) // Unauthorized access
+    .subscribe();
+}
+```
+
+### 5. **NEVER** use client-side sorting for large datasets
+```typescript
+/* PROHIBITED - Performance issue */
+this.dataSource.sort = this.sort; // Client-side sorting
+```
+
+## DEBUGGING SERVER-SIDE SORTING
+
+### 1. Investigation Checklist
+
+**Before debugging, verify these prerequisites**:
+- [ ] Table structure always renders (no conditional `*ngIf`)
+- [ ] ViewChild is available (`this.sort` is defined)
+- [ ] Permission check passes
+- [ ] Reactive pattern initializes
+- [ ] Sort events fire when clicking headers
+- [ ] API calls include correct sort parameters
+- [ ] Backend returns sorted data
+
+### 2. Debug Console Logging
+
+**Add comprehensive debug logging**:
+```typescript
+private initializeReactivePattern(): void {
+  console.log('[DEBUG] initializeReactivePattern called', {
+    hasPermission: this.hasPermission,
+    sortAvailable: !!this.sort,
+    alreadyInitialized: this.reactivePatternInitialized
+  });
+  
+  if (!this.hasPermission || !this.sort || this.reactivePatternInitialized) {
+    console.log('[DEBUG] Prerequisites not met', {
+      hasPermission: this.hasPermission,
+      sortAvailable: !!this.sort
+    });
+    return;
+  }
+  
+  // Setup reactive pattern with logging
+  merge(this.sort.sortChange)
+    .pipe(
+      tap(() => console.log('[DEBUG] Sort changed:', this.sort.active, this.sort.direction)),
+      switchMap(() => {
+        console.log('[DEBUG] Loading data with sort:', {
+          sortBy: this.getSortField(this.sort.active),
+          sortDirection: this.sort.direction
+        });
+        return this.loadDataFromServer();
+      })
+    )
+    .subscribe({
+      next: (data) => console.log('[DEBUG] Data loaded:', data.items.length, 'items'),
+      error: (error) => console.error('[DEBUG] Loading error:', error)
+    });
+}
+```
+
+### 3. Common Issues and Solutions
+
+1. **Empty Table**: Check ViewChild availability and reactive pattern initialization
+2. **Sort Not Working**: Verify sort headers and field mapping
+3. **Infinite Loops**: Remove recursive retry logic, use proper lifecycle coordination
+4. **Race Conditions**: Coordinate ngOnInit and ngAfterViewInit properly
+5. **Permission Issues**: Ensure frontend and backend use same permission names
+
+## IMPLEMENTATION CHECKLIST
+
+### Before Starting Implementation
+- [ ] Plan ViewChild lifecycle coordination
+- [ ] Design reactive pattern with proper streams
+- [ ] Map frontend column names to backend fields
+- [ ] Ensure backend supports sort parameters
+- [ ] Plan permission checks and error handling
+
+### During Implementation
+- [ ] Always render table structure (no conditional rendering)
+- [ ] Use coordination flags between lifecycle methods
+- [ ] Implement comprehensive debug logging
+- [ ] Add proper error handling and loading states
+- [ ] Test with empty data scenarios
+
+### Before Declaring Complete
+- [ ] Table loads data on initial render
+- [ ] Sort headers trigger new API calls
+- [ ] Backend receives correct sort parameters
+- [ ] Data displays in correct sort order
+- [ ] Empty states display properly
+- [ ] No console errors or infinite loops
+- [ ] Permission checks work correctly
+
+## KEY LESSONS FROM PRODUCTION ISSUES
+
+### The ViewChild Chicken-and-Egg Problem
+- **Problem**: Conditional table rendering prevents ViewChild initialization
+- **Solution**: Always render table structure, show empty state inside table
+- **Impact**: Critical for reactive pattern initialization
+
+### Angular Lifecycle Coordination
+- **Problem**: Race conditions between async operations and ViewChild availability
+- **Solution**: Use coordination flags and proper lifecycle method timing
+- **Impact**: Ensures reliable initialization regardless of async timing
+
+### Reactive Pattern Best Practices
+- **Problem**: Custom retry logic creates infinite loops
+- **Solution**: Use industry-standard RxJS patterns with proper guards
+- **Impact**: Reliable, maintainable, and performant data loading
+
+**Remember**: Server-side sorting is about moving computation from client to server for better performance with large datasets. Every click should trigger a new SQL query with different ORDER BY clauses.
+
+
+
+

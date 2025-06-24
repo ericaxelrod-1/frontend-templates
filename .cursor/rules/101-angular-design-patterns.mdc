@@ -1,0 +1,228 @@
+---
+description: 
+globs: angular/**/*.ts,angular/**/*.html,angular/**/*.scss
+alwaysApply: false
+---
+---
+description: "Angular design patterns and implementation guidelines for proper component architecture"
+globs: ["angular/**/*.ts", "angular/**/*.html", "angular/**/*.scss"]
+tags: ["angular", "components", "material", "architecture", "patterns"]
+priority: 2
+---
+
+# Angular Design Patterns and Implementation Guide
+
+## CRITICAL ANGULAR COMPONENT RULES
+
+⚠️ **STOP**: You **MUST** understand these fundamental Angular principles before making any component changes:
+
+### 1. Template Priority and Conflicts
+
+**⚠️ CRITICAL**: Angular components can have EITHER inline templates OR external templates, NEVER both.
+
+- If a component has `template: '...'` (inline), Angular **IGNORES** any `templateUrl: './component.html'` file
+- Always check which template is actually being used before making edits
+- To switch from inline to external: Remove `template` property, ensure `templateUrl` exists
+
+**Investigation Steps**:
+1. Check the component's `@Component` decorator
+2. Look for `template:` (inline) vs `templateUrl:` (external)
+3. If both exist, only the inline template is used
+
+### 2. Event-Driven Architecture Pattern
+
+**ALWAYS verify the complete event flow**:
+- ✓ Child component has @Output() decorator
+- ✓ Child component emits event
+- ✓ Parent template has (eventName)="handler()"
+- ✓ Parent component has handler() method
+- ✓ No typos in event names
+
+**Child Component (Emitter)**:
+```typescript
+@Output() eventName = new EventEmitter<void>();
+
+onAction(): void {
+  this.eventName.emit();
+}
+```
+
+**Parent Component (Listener)**:
+```html
+<child-component (eventName)="handleEvent()"></child-component>
+```
+
+## ANGULAR MATERIAL BEST PRACTICES - ALWAYS DO
+
+⚠️ **STOP**: You **MUST** follow these patterns when implementing Angular Material components:
+
+### 1. Menu vs Sidebar Decision Tree
+
+```
+User Menu Requirements:
+├─ Simple (≤5 items) → Use mat-menu
+├─ Complex (>5 items) → Use mat-sidenav (right-side)
+├─ Mobile-first → Use mat-sidenav or MatBottomSheet
+└─ Has submenus → Use mat-sidenav
+```
+
+### 2. Sidebar Implementation Pattern
+
+Follow the working left sidebar pattern:
+
+**Container Structure**:
+```html
+<mat-sidenav-container>
+  <mat-sidenav [mode]="isMobile ? 'over' : 'side'">
+    <!-- Sidebar content -->
+  </mat-sidenav>
+  <mat-sidenav-content>
+    <!-- Main content -->
+  </mat-sidenav-content>
+</mat-sidenav-container>
+```
+
+**Responsive Behavior**:
+- Use `BreakpointObserver` for mobile detection
+- Mobile: `mode="over"`, starts closed
+- Desktop: `mode="side"`, starts open
+
+**State Management**:
+- Track `isCollapsed` for desktop
+- Track `isOpen` for mobile
+- Persist state in localStorage
+
+### 3. Component Communication Pattern
+
+**Header → Layout → Sidebar Flow**:
+
+1. **Header Component**:
+   - Has user button
+   - Emits userMenuToggle event
+   - No direct menu implementation
+
+2. **Layout Component**:
+   - Listens for userMenuToggle
+   - Manages sidebar state
+   - Calls openUserSidebar()
+
+3. **User Sidebar Component**:
+   - Receives isOpen state
+   - Displays user menu items
+   - Emits closeSidebar event
+
+## PROHIBITED PRACTICES - ALWAYS AVOID
+
+⚠️ **WARNING: NEVER use these anti-patterns in Angular components:**
+
+### 1. **NEVER** mix inline and external templates
+```typescript
+/* PROHIBITED */
+@Component({
+  selector: 'app-header',
+  template: `<div>...</div>`,  // This will be used
+  templateUrl: './header.component.html'  // This will be IGNORED!
+})
+```
+
+### 2. **NEVER** emit events without listeners
+```typescript
+/* PROHIBITED */
+// Child emits event
+@Output() userMenuToggle = new EventEmitter();
+
+// But parent doesn't listen
+<app-header></app-header>  <!-- Missing (userMenuToggle)="handler()" -->
+```
+
+### 3. **NEVER** use mat-menu for complex user menus
+```html
+/* PROHIBITED for user menus with >5 items */
+<button [matMenuTriggerFor]="userMenu">
+  User Menu
+</button>
+<mat-menu #userMenu="matMenu">
+  <!-- Too many items, use mat-sidenav instead -->
+</mat-menu>
+```
+
+### 4. **NEVER** ignore CDK overlay issues
+- Known issue: CDK overlay blocks clicks (GitHub #9320)
+- Workarounds rarely work reliably
+- Use alternative UI patterns (sidebars, bottom sheets)
+
+### 5. **NEVER** skip event flow verification
+- Always trace events from emission to handling
+- Add console.log statements to verify flow
+- Check browser console for errors
+
+## DEBUGGING ANGULAR ISSUES
+
+### Investigation Priority
+
+1. **Check Template Rendering**:
+   - Which template is actually being used?
+   - Is it inline or external?
+   - View browser DevTools Elements tab
+
+2. **Trace Event Flow**:
+   - Add console.log in emit method
+   - Add console.log in handler method
+   - Check browser console for output
+
+3. **Verify Component Structure**:
+   - Are all components imported?
+   - Are selectors correct?
+   - Is component declared/standalone?
+
+### Common Angular Pitfalls and Solutions
+
+1. **Template Override**: Component has both inline and external templates
+   - **Solution**: Remove one, keep the other
+
+2. **Missing Event Listener**: Event emitted but not listened to
+   - **Solution**: Add (eventName)="handler()" to parent template
+
+3. **CDK Overlay Issues**: Mat-menu clicks blocked
+   - **Solution**: Use mat-sidenav instead for complex menus
+
+4. **Change Detection**: Async data not updating view
+   - **Solution**: Use ChangeDetectorRef.detectChanges() or async pipe
+
+## IMPLEMENTATION CHECKLIST
+
+### Before Implementing User Menus
+- [ ] Count menu items and complexity
+- [ ] Choose appropriate pattern (menu vs sidebar)
+- [ ] Review working left sidebar implementation
+- [ ] Plan complete event flow
+
+### Before Fixing "Not Clickable" Issues
+- [ ] Verify element exists in DOM
+- [ ] Check event listeners are attached
+- [ ] Verify z-index and pointer-events
+- [ ] Consider CDK overlay conflicts
+
+### Before Declaring Component Communication "Fixed"
+- [ ] Event names match exactly
+- [ ] All components properly imported
+- [ ] Event flow logged and verified
+- [ ] Template syntax is correct
+
+## TESTING REQUIREMENTS
+
+### Before Submitting Changes
+1. Test on desktop (wide screen)
+2. Test on mobile (narrow screen)
+3. Test keyboard navigation
+4. Test screen reader compatibility
+5. Check browser console for errors
+6. Verify all user flows work
+
+## KEY LESSON FROM BUG-054
+
+The simplest solution that follows Angular patterns is usually the correct one. In BUG-054, hours were spent on complex overlay fixes when the actual issue was a missing event listener in the parent component template. 
+
+**Always trace the complete event flow before assuming complex problems.**
+
+

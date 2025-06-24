@@ -18,7 +18,7 @@ export interface Group {
   name: string;
   description: string;
   owner: string;
-  members: Member[];
+  users: any[];  // Use any[] to avoid circular dependency, will be typed as User[] in components
   permissions: Permission[];
 }
 
@@ -33,7 +33,7 @@ export const GROUP_PERMISSION_SETS: Record<string, Permission[]> = {
     { id: 3, name: 'member:manage', resourceName: 'member', actionName: 'manage', isGranted: true }
   ],
   'MEMBER': [
-    { id: 4, name: 'group:read', resourceName: 'group', actionName: 'read', isGranted: true },
-    { id: 5, name: 'member:read', resourceName: 'member', actionName: 'read', isGranted: true }
+    { id: 4, name: 'group:view', resourceName: 'group', actionName: 'view', isGranted: true },
+    { id: 5, name: 'member:view', resourceName: 'member', actionName: 'view', isGranted: true }
   ]
 }; 

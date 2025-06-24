@@ -1,0 +1,358 @@
+@use '../../../styles/abstracts' as *;
+
+/**
+ * CSS GRID LAYOUT IMPLEMENTATION - Modern Web App Pattern
+ * 
+ * This CSS implements a modern layout using CSS Grid:
+ * - Header: Fixed at top, full viewport width
+ * - Main Area: Flexible height containing sidebar and content
+ * - Footer: Fixed at bottom, full viewport width
+ * - Sidebar: Proper scrolling within allocated space
+ * 
+ * Key Benefits:
+ * - Automatic height management (no manual calc() needed)
+ * - Prevents navigation menu cut-off by footer
+ * - Responsive by default
+ * - Clean separation of layout zones
+ * - Modern CSS Grid standard
+ * - Admin context support with nested navigation
+ */
+
+// Component host element - ensure full viewport control
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+// CSS Grid Layout Container
+.app-layout {
+  display: grid;
+  grid-template-areas: 
+    "header"
+    "main"
+    "footer";
+  grid-template-rows: auto 1fr auto; // Header auto, main flexible, footer auto
+  height: 100vh; // Full viewport height
+  width: 100%;
+  
+  // Admin context modifications
+  &.admin-context {
+    .sidenav-container {
+      // Adjust for nested admin sidebar
+      .sidenav:not(.admin-sidenav) {
+        border-right: 1px solid var(--mdc-theme-outline);
+      }
+    }
+  }
+}
+
+// Layout Areas
+.layout-header {
+  grid-area: header;
+  z-index: 1000; // Above sidebar and content
+}
+
+.layout-main {
+  grid-area: main;
+  overflow: hidden; // Prevent content from spilling out
+  min-height: 0; // Important for proper grid behavior
+}
+
+.layout-footer {
+  grid-area: footer;
+  z-index: 800; // Below header, above content
+}
+
+// Sidenav Container - takes full height of main area
+.sidenav-container {
+  height: 100%; // Take full height of grid area
+  width: 100%;
+}
+
+// Sidenav styling with proper scrolling
+.sidenav {
+  width: 280px; // Default expanded width
+  overflow-y: auto; // Enable scrolling for long navigation menus
+  overflow-x: hidden; // Prevent horizontal scroll
+  
+  // Collapsed state for desktop (icons only)
+  &:not(.expanded) {
+    @media screen and (min-width: 600px) {
+      width: 64px; // Collapsed width for icons only
+    }
+  }
+  
+  // Expanded state for desktop
+  &.expanded {
+    width: 280px; // Full width with text
+  }
+  
+  // Mobile behavior - full width when open
+  @media screen and (max-width: 599px) {
+    width: 280px;
+  }
+}
+
+// Admin Sidebar - nested to the right of main sidebar
+.admin-sidenav {
+  width: 240px; // Slightly narrower than main sidebar
+  background-color: var(--mdc-theme-surface);
+  border-left: 1px solid var(--mdc-theme-outline);
+  z-index: 900; // Below main sidebar but above content
+  
+  // Mobile behavior - replace main sidebar
+  @media screen and (max-width: 599px) {
+    width: 280px;
+    border-left: none;
+  }
+  
+  .admin-sidebar-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: $spacing-md;
+  }
+  
+  .admin-sidebar-header {
+    padding-bottom: $spacing-md;
+    border-bottom: 1px solid var(--mdc-theme-outline);
+    margin-bottom: $spacing-md;
+    
+    h3 {
+      margin: 0;
+      color: var(--mdc-theme-on-surface);
+      font-size: 1.1rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      
+      &::before {
+        content: 'admin_panel_settings';
+        font-family: 'Material Icons';
+        margin-right: $spacing-xs;
+        color: var(--mdc-theme-primary);
+      }
+    }
+  }
+  
+  .admin-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+  }
+  
+  .admin-nav-item {
+    display: flex;
+    align-items: center;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $border-radius-md;
+    text-decoration: none;
+    color: var(--mdc-theme-on-surface);
+    transition: background-color 0.2s, color 0.2s;
+    
+    mat-icon {
+      margin-right: $spacing-sm;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+    
+    span {
+      font-weight: 400;
+      font-size: 0.9rem;
+    }
+    
+    &:hover {
+      background-color: var(--mdc-theme-action-hover);
+    }
+    
+    &.active {
+      background-color: var(--mdc-theme-primary-container);
+      color: var(--mdc-theme-on-primary-container);
+      
+      mat-icon {
+        color: var(--mdc-theme-primary);
+      }
+    }
+  }
+}
+
+// Admin Breadcrumb
+.admin-breadcrumb {
+  display: flex;
+  align-items: center;
+  padding: $spacing-md $spacing-lg;
+  background-color: var(--mdc-theme-surface-variant);
+  border-bottom: 1px solid var(--mdc-theme-outline);
+  color: var(--mdc-theme-on-surface-variant);
+  font-size: 0.9rem;
+  
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    margin-right: $spacing-xs;
+    
+    &:not(:first-child) {
+      margin-left: $spacing-xs;
+    }
+  }
+  
+  span {
+    font-weight: 500;
+    
+    &:last-child {
+      color: var(--mdc-theme-primary);
+    }
+  }
+  
+  // Mobile adjustments
+  @media screen and (max-width: 599px) {
+    padding: $spacing-sm $spacing-md;
+    font-size: 0.8rem;
+  }
+}
+
+// Sidenav Content - main content area
+.sidenav-content {
+  height: 100%; // Take full height of container
+  overflow-y: auto; // Enable content scrolling
+  overflow-x: hidden; // Prevent horizontal scroll
+}
+
+// Main content area with proper flex layout
+.main-content {
+  height: 100%; // Take full height of sidenav-content
+  display: flex;
+  flex-direction: column;
+  min-height: 0; // Important for proper flex behavior
+  
+  // Content wrapper for centering (content only, not navigation chrome)
+  .content-wrapper {
+    flex: 1;
+    width: 100%;
+    max-width: 1200px; // Center content for readability
+    margin: 0 auto; // Center content horizontally
+    box-sizing: border-box;
+    
+    // Mobile-first responsive padding
+    padding: $spacing-sm;
+    
+    // Tablet and up
+    @media (min-width: 768px) {
+      padding: $spacing-md;
+    }
+    
+    // Desktop and up
+    @media (min-width: 1024px) {
+      padding: $spacing-lg;
+    }
+  }
+}
+
+/**
+ * RESPONSIVE ADJUSTMENTS
+ */
+@media (max-width: 599px) {
+  // Mobile adjustments for admin context
+  .app-layout.admin-context {
+    .sidenav:not(.admin-sidenav) {
+      // Hide main sidebar on mobile when in admin context
+      display: none;
+    }
+    
+    .admin-sidenav {
+      // Admin sidebar takes full mobile space
+      width: 280px;
+    }
+  }
+}
+
+@media (min-width: 600px) {
+  // Desktop adjustments for admin context
+  .app-layout.admin-context {
+    .sidenav-container {
+      // Nested sidebar layout
+      display: flex;
+      
+      .sidenav:not(.admin-sidenav) {
+        // Main sidebar on left
+        position: relative;
+        transform: none;
+      }
+      
+      .admin-sidenav {
+        // Admin sidebar on right of main sidebar
+        position: relative;
+        transform: none;
+      }
+      
+      .sidenav-content {
+        // Content area takes remaining space
+        flex: 1;
+      }
+    }
+  }
+}
+
+/**
+ * HIGH CONTRAST MODE SUPPORT
+ */
+@media (prefers-contrast: high) {
+  .sidenav {
+    border-right-color: var(--mdc-theme-outline);
+    border-right-width: 2px;
+  }
+  
+  .admin-sidenav {
+    border-left-color: var(--mdc-theme-outline);
+    border-left-width: 2px;
+  }
+  
+  .admin-breadcrumb {
+    border-bottom-width: 2px;
+  }
+}
+
+/**
+ * REDUCED MOTION SUPPORT
+ */
+@media (prefers-reduced-motion: reduce) {
+  .sidenav, .admin-sidenav {
+    transition: none;
+  }
+  
+  .main-content {
+    scroll-behavior: auto;
+  }
+  
+  .admin-nav-item {
+    transition: none;
+  }
+}
+
+/**
+ * PRINT STYLES
+ */
+@media print {
+  .app-layout {
+    grid-template-areas: 
+      "header"
+      "main";
+    grid-template-rows: auto 1fr;
+  }
+  
+  .layout-footer {
+    display: none;
+  }
+  
+  .sidenav, .admin-sidenav {
+    display: none;
+  }
+  
+  .admin-breadcrumb {
+    display: none;
+  }
+} 

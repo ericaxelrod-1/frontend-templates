@@ -12,6 +12,7 @@ import {
   NotFoundException,
   BadRequestException,
   Query,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,6 +25,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { RoleMembershipResult } from './dto/role-membership-result.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { PermissionGuard } from '../permissions/guards/permission.guard';
 import { RequirePermission } from '../permissions/decorators/require-permission.decorator';
@@ -56,7 +58,7 @@ export class UsersController {
   })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission('users:read')
+  @RequirePermission('users:view')
   @Get()
   findAll() {
     return this.usersService.findAll();
@@ -70,7 +72,7 @@ export class UsersController {
   })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission('users:read')
+  @RequirePermission('users:view')
   @Get('search')
   search(@Query('q') query: string) {
     return this.usersService.searchUsers(query || '');
@@ -95,14 +97,14 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermission(['users:read', 'self:profile:read'])
+  @RequirePermission(['users:view', 'self:profile:read'])
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() currentUser) {
     // Users with only self:profile:read can only view their own profile
     const hasGeneralUserAccess = await this.usersService.checkUserHasPermission(
       currentUser.id,
       'users',
-      'read',
+      'view',
     );
 
     if (!hasGeneralUserAccess && currentUser.id !== +id) {
@@ -145,7 +147,7 @@ export class UsersController {
       }
 
       // Regular users cannot update their role
-      if (updateUserDto.role) {
+      if (updateUserDto.roleIds && updateUserDto.roleIds.length > 0) {
         throw new ForbiddenException('Regular users cannot update their role');
       }
     } else {
@@ -212,5 +214,53 @@ export class UsersController {
     }
 
     return this.usersService.remove(+id);
+  }
+
+  @Post(':id/roles/:roleId')
+  @ApiOperation({ summary: 'Add a user to a role' })
+  @ApiResponse({
+    status: 201,
+    description: 'User added to role successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User or role not found',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'User is already a member of this role',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission(['roles:assign', 'users:update'])
+  addToRole(
+    @Param('id', ParseIntPipe) userId: number,
+    @Param('roleId', ParseIntPipe) roleId: number,
+  ): Promise<RoleMembershipResult> {
+    return this.usersService.addUserToRole(userId, roleId);
+  }
+
+  @Delete(':id/roles/:roleId')
+  @ApiOperation({ summary: 'Remove a user from a role' })
+  @ApiResponse({
+    status: 200,
+    description: 'User removed from role successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User or role not found',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'User is not a member of this role',
+  })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission(['roles:assign', 'users:update'])
+  removeFromRole(
+    @Param('id', ParseIntPipe) userId: number,
+    @Param('roleId', ParseIntPipe) roleId: number,
+  ): Promise<RoleMembershipResult> {
+    return this.usersService.removeUserFromRole(userId, roleId);
   }
 }

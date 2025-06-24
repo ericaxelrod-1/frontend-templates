@@ -1,0 +1,201 @@
+@use '@angular/material' as mat;
+
+// Accessibility Utilities for WCAG AA Compliance
+// Day 4 of BUG-036: Testing and Validation
+
+// Screen Reader Only Content
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+// Focus Management
+.focus-visible {
+  outline: 2px solid var(--mdc-theme-primary) !important;
+  outline-offset: 2px !important;
+  border-radius: 4px !important;
+}
+
+// Skip Links
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--mdc-theme-primary);
+  color: var(--mdc-theme-on-primary);
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 1000;
+  font-weight: 500;
+  
+  &:focus {
+    top: 6px;
+  }
+}
+
+// High Contrast Mode Support
+@media (prefers-contrast: high) {
+  .mat-card,
+  .mat-list-item,
+  .mat-button,
+  .mat-raised-button {
+    border: 1px solid currentColor !important;
+  }
+  
+  .mat-icon {
+    filter: contrast(2) !important;
+  }
+}
+
+// Reduced Motion Support
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// Touch Target Sizing (WCAG 2.1 AA)
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  
+  @media (max-width: 599px) {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
+
+// Color Contrast Utilities
+.text-high-contrast {
+  color: var(--mdc-theme-on-surface);
+  background-color: var(--mdc-theme-surface);
+}
+
+.text-medium-contrast {
+  color: rgba(var(--mdc-theme-on-surface-rgb), 0.87);
+}
+
+.text-low-contrast {
+  color: rgba(var(--mdc-theme-on-surface-rgb), 0.6);
+}
+
+// Focus Indicators for Interactive Elements
+button,
+a,
+input,
+select,
+textarea,
+[tabindex]:not([tabindex="-1"]) {
+  &:focus-visible {
+    outline: 2px solid var(--mdc-theme-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+// Error States with Accessibility
+.error-state {
+  border-color: var(--mdc-theme-error) !important;
+  
+  &:focus {
+    outline-color: var(--mdc-theme-error) !important;
+  }
+}
+
+// Loading States
+.loading-state {
+  position: relative;
+  
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(var(--mdc-theme-surface-rgb), 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+}
+
+// Keyboard Navigation Helpers
+.keyboard-nav {
+  &:focus-within {
+    outline: 2px solid var(--mdc-theme-primary);
+    outline-offset: 2px;
+  }
+}
+
+// ARIA Live Regions
+.live-region {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+// Color Blind Friendly Indicators
+.status-indicator {
+  &.success {
+    background-color: #4caf50;
+    
+    &::before {
+      content: '✓';
+      color: white;
+      font-weight: bold;
+    }
+  }
+  
+  &.error {
+    background-color: var(--mdc-theme-error);
+    
+    &::before {
+      content: '✗';
+      color: white;
+      font-weight: bold;
+    }
+  }
+  
+  &.warning {
+    background-color: #ff9800;
+    
+    &::before {
+      content: '!';
+      color: white;
+      font-weight: bold;
+    }
+  }
+}
+
+// Print Styles for Accessibility
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  a[href]::after {
+    content: " (" attr(href) ")";
+  }
+  
+  .mat-card {
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+  }
+} 

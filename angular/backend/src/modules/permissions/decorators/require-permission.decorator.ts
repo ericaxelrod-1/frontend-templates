@@ -65,7 +65,7 @@ export const RequirePermission = (permissions: string | string[]) => {
  *
  * @example
  * // Require ALL of these permissions (AND logic)
- * @RequireAllPermissions(['users:read', 'roles:read'])
+ * @RequireAllPermissions(['users:view', 'roles:view'])
  * getDetailedUserWithRoles() { ... }
  */
 export const RequireAllPermissions = (permissions: string[]) => {

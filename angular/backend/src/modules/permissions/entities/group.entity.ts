@@ -11,7 +11,6 @@ import {
 } from 'typeorm';
 import { GroupPermission } from './group-permission.entity';
 import { User } from '../../users/entities/user.entity';
-import { UserGroup } from '../../users/entities/user-group.entity';
 
 /**
  * Group entity representing a collection of users with shared permissions
@@ -44,14 +43,7 @@ export class Group {
   )
   groupPermissions: GroupPermission[];
   
-  /**
-   * Relationships with UserGroup join entity
-   */
-  @OneToMany(
-    () => UserGroup,
-    (userGroup) => userGroup.group,
-  )
-  userGroups: UserGroup[];
+
   
   /**
    * Flag to indicate if this is a system-managed group that shouldn't be modified

@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PermissionsService } from '../../permissions/services/permissions.service';
 import { User } from '../entities/user.entity';
-import { Group } from '../entities/group.entity';
+import { Group } from '../../permissions/entities/group.entity';
 
 @Injectable()
 export class GroupsService {

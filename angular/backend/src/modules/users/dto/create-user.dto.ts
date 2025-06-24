@@ -3,12 +3,20 @@ import {
   IsEmail,
   MinLength,
   IsOptional,
-  IsObject,
+  IsArray,
+  IsNumber,
+  IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Role } from '../entities/role.entity';
 
 export class CreateUserDto {
+  @ApiProperty({
+    example: 'john.doe',
+    description: 'Username (unique identifier)',
+  })
+  @IsString()
+  username: string;
+
   @ApiProperty({
     example: 'user@example.com',
     description: 'User email address',
@@ -21,7 +29,7 @@ export class CreateUserDto {
     description: 'User password',
   })
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   password: string;
 
   @ApiPropertyOptional({
@@ -41,18 +49,36 @@ export class CreateUserDto {
   lastName?: string;
 
   @ApiPropertyOptional({
-    description: 'User role',
+    example: [1, 2],
+    description: 'Array of role IDs to assign to the user',
   })
+  @IsArray()
+  @IsNumber({}, { each: true })
   @IsOptional()
-  @IsObject()
-  role?: Role;
+  roleIds?: number[];
+
+  @ApiPropertyOptional({
+    example: [1, 3, 5],
+    description: 'Array of group IDs to assign the user to',
+  })
+  @IsArray()
+  @IsNumber({}, { each: true })
+  @IsOptional()
+  groupIds?: number[];
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the user should be required to change password on first login',
+  })
+  @IsBoolean()
+  @IsOptional()
+  requiresPasswordChange?: boolean;
 
   @ApiPropertyOptional({
     example: { theme: 'dark', language: 'en' },
     description: 'User preferences',
   })
   @IsOptional()
-  @IsObject()
   preferences?: {
     theme?: string;
     language?: string;

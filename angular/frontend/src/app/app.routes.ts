@@ -3,11 +3,14 @@ import { AuthGuard, PasswordChangeGuard } from './core/guards';
 import { PermissionGuard } from './core/guards/permission.guard';
 
 // Layout components
-import { DefaultLayoutComponent } from './layouts/default/default.component';
-import { AdminLayoutComponent } from './layouts/admin/admin.component';
+import { CustomLayoutComponent } from './layouts/custom-layout/custom-layout.component';
 
 /**
  * Main application routes
+ * 
+ * Updated to use CustomLayoutComponent for truly non-responsive sidebar behavior.
+ * The custom layout eliminates Angular Material's built-in responsive system
+ * and provides a fixed 280px sidebar at all screen sizes.
  * 
  * Permission-based routes should use the following format for data:
  * { permissions: 'resource:action' } OR
@@ -17,7 +20,7 @@ import { AdminLayoutComponent } from './layouts/admin/admin.component';
 export const routes: Routes = [
   {
     path: 'app',
-    component: DefaultLayoutComponent,
+    component: CustomLayoutComponent,
     canActivate: [AuthGuard],
     children: [
       {
@@ -45,15 +48,7 @@ export const routes: Routes = [
         loadChildren: () => import('./features/users/users.routes').then(m => m.routes),
         canActivate: [PermissionGuard],
         data: { 
-          permissions: 'users:read'
-        }
-      },
-      {
-        path: 'users/create',
-        loadComponent: () => import('./features/users/create-user.component').then(c => c.CreateUserComponent),
-        canActivate: [PermissionGuard],
-        data: { 
-          permissions: 'users:create'
+          permissions: 'users:view'
         }
       },
       {
@@ -61,7 +56,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent),
         canActivate: [PermissionGuard],
         data: { 
-          permissions: 'groups:read'
+          permissions: 'groups:view'
         }
       },
       {
@@ -69,19 +64,32 @@ export const routes: Routes = [
         loadComponent: () => import('./features/roles/roles.component').then(c => c.RolesComponent),
         canActivate: [PermissionGuard],
         data: { 
-          permissions: 'roles:read'
+          permissions: 'roles:view'
         }
+      },
+      {
+        path: 'admin',
+        canActivate: [PasswordChangeGuard, PermissionGuard],
+        data: { 
+          permissions: 'system:admin'
+        },
+        children: [
+          {
+            path: '',
+            redirectTo: 'login-monitoring',
+            pathMatch: 'full'
+          },
+          {
+            path: 'login-monitoring',
+            loadComponent: () => import('./modules/admin/login-monitoring/login-monitoring.component').then(c => c.LoginMonitoringComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'system:admin'
+            }
+          }
+        ]
       }
     ]
-  },
-  {
-    path: 'admin',
-    component: AdminLayoutComponent,
-    canActivate: [AuthGuard, PasswordChangeGuard, PermissionGuard],
-    data: { 
-      permissions: 'system:admin'
-    },
-    loadChildren: () => import('./modules/admin/admin.module').then(m => m.AdminModule)
   },
   {
     path: '',

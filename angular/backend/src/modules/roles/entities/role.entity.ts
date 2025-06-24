@@ -14,12 +14,12 @@ import { User } from '../../users/entities/user.entity';
 import { RolePermission } from './role-permission.entity';
 
 // Define role types as a string literal type - this provides type safety while allowing flexibility
+// These match the exact role names in the database (preferred roles with lowest IDs)
 export const SystemRoles = {
-  ADMIN: 'Administrator',
-  USER: 'User',
-  GUEST: 'Guest',
-  SUPERUSER: 'Super User',
-  SUPERADMIN: 'Super Administrator',
+  USER: 'user',                    // id: 1
+  SUPERUSER: 'superuser',          // id: 3  
+  ADMIN: 'Administrator',          // id: 6
+  SUPERADMIN: 'Super Administrator', // id: 8
 } as const;
 
 export type SystemRoleType = (typeof SystemRoles)[keyof typeof SystemRoles];

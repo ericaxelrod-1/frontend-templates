@@ -86,7 +86,7 @@ describe('PermissionGuard', () => {
 
   it('should throw UnauthorizedException if no user is found in request', async () => {
     // Arrange
-    jest.spyOn(reflector, 'get').mockReturnValue(['users:read']);
+    jest.spyOn(reflector, 'get').mockReturnValue(['users:view']);
 
     const customContext = {
       ...mockExecutionContext,
@@ -103,7 +103,7 @@ describe('PermissionGuard', () => {
 
   it('should allow access if user has any required permission', async () => {
     // Arrange
-    jest.spyOn(reflector, 'get').mockReturnValue(['users:read', 'users:write']);
+    jest.spyOn(reflector, 'get').mockReturnValue(['users:view', 'users:write']);
     permissionsService.checkUserPermission
       .mockResolvedValueOnce(false) // First permission check fails
       .mockResolvedValueOnce(true); // Second permission check succeeds
@@ -117,7 +117,7 @@ describe('PermissionGuard', () => {
     expect(permissionsService.checkUserPermission).toHaveBeenCalledWith(
       1,
       'users',
-      'read',
+      'view',
     );
     expect(permissionsService.checkUserPermission).toHaveBeenCalledWith(
       1,
@@ -128,7 +128,7 @@ describe('PermissionGuard', () => {
 
   it('should throw UnauthorizedException if user does not have any required permission', async () => {
     // Arrange
-    jest.spyOn(reflector, 'get').mockReturnValue(['users:read']);
+    jest.spyOn(reflector, 'get').mockReturnValue(['users:view']);
     permissionsService.checkUserPermission.mockResolvedValue(false);
 
     // Act & Assert
@@ -138,7 +138,7 @@ describe('PermissionGuard', () => {
     expect(permissionsService.checkUserPermission).toHaveBeenCalledWith(
       1,
       'users',
-      'read',
+      'view',
     );
   });
 
@@ -146,7 +146,7 @@ describe('PermissionGuard', () => {
     // Arrange
     jest
       .spyOn(reflector, 'get')
-      .mockReturnValue({ all: ['users:read', 'roles:read'] });
+      .mockReturnValue({ all: ['users:view', 'roles:view'] });
     permissionsService.checkUserPermission
       .mockResolvedValueOnce(true) // First permission check succeeds
       .mockResolvedValueOnce(true); // Second permission check succeeds
@@ -163,7 +163,7 @@ describe('PermissionGuard', () => {
     // Arrange
     jest
       .spyOn(reflector, 'get')
-      .mockReturnValue({ all: ['users:read', 'roles:read'] });
+      .mockReturnValue({ all: ['users:view', 'roles:view'] });
     permissionsService.checkUserPermission
       .mockResolvedValueOnce(true) // First permission check succeeds
       .mockResolvedValueOnce(false); // Second permission check fails
@@ -192,7 +192,7 @@ describe('PermissionGuard', () => {
     jest
       .spyOn(reflector, 'get')
       .mockReturnValueOnce(['users:write']) // Handler permissions
-      .mockReturnValueOnce(['users:read']); // Controller permissions
+      .mockReturnValueOnce(['users:view']); // Controller permissions
 
     permissionsService.checkUserPermission
       .mockResolvedValueOnce(false) // First permission check fails
@@ -212,7 +212,7 @@ describe('PermissionGuard', () => {
     expect(permissionsService.checkUserPermission).toHaveBeenCalledWith(
       1,
       'users',
-      'read',
+      'view',
     );
   });
 });

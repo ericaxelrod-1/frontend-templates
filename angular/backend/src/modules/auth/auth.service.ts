@@ -138,7 +138,7 @@ export class AuthService {
         await this.loginAttemptService.create({
           ipAddress,
           userAgent,
-          email,
+          emailAttempted: email,
           status: 'blocked',
           failureReason: 'IP address is blocked',
         });
@@ -171,7 +171,7 @@ export class AuthService {
           await this.loginAttemptService.create({
             ipAddress,
             userAgent,
-            email,
+            emailAttempted: email,
             status: 'captcha_required',
           });
           throw new BadRequestException({
@@ -192,7 +192,7 @@ export class AuthService {
           await this.loginAttemptService.create({
             ipAddress,
             userAgent,
-            email,
+            emailAttempted: email,
             status: 'failed',
             failureReason: 'Invalid CAPTCHA',
           });
@@ -206,7 +206,7 @@ export class AuthService {
         await this.loginAttemptService.create({
           ipAddress,
           userAgent,
-          email,
+          emailAttempted: email,
           status: 'failed',
           failureReason: 'Invalid credentials',
         });
@@ -218,7 +218,7 @@ export class AuthService {
       await this.loginAttemptService.create({
         ipAddress,
         userAgent,
-        email,
+        emailAttempted: email,
         status: 'success',
         user,
       });
@@ -373,24 +373,36 @@ export class AuthService {
       );
     }
 
-    // Create user with hashed password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await this.usersService.create({
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      role: defaultRole,
+    // Generate username from email (before @ symbol) with fallback
+    let username = email.split('@')[0];
+    
+    // Check if username already exists and make it unique if needed
+    let usernameExists = await this.usersService.findByUsername(username);
+    let counter = 1;
+    while (usernameExists) {
+      username = `${email.split('@')[0]}${counter}`;
+      usernameExists = await this.usersService.findByUsername(username);
+      counter++;
+    }
+
+    // Create user with default role
+    const newUser = await this.usersService.create({
+      username: registerDto.email,
+      email: registerDto.email,
+      password: registerDto.password,
+      firstName: registerDto.firstName,
+      lastName: registerDto.lastName,
+      roleIds: [defaultRole.id],
     });
 
     // Generate and send verification token
     // This would typically generate a token and send an email
     // For now, we'll just return the user
     return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      id: newUser.id,
+      email: newUser.email,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
     };
   }
 

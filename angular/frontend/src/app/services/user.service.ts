@@ -5,6 +5,8 @@ import { environment } from '../../environments/environment';
 import { LoggerService } from './logging/logger.service';
 import { User } from '../models/user.model';
 import { Group, Member, Permission } from '../models/group.model';
+import { GroupMembershipResult } from '../models/group-membership-result.interface';
+import { RoleMembershipResult } from '../models/role-membership-result.interface';
 
 export interface PasswordChange {
   currentPassword: string;
@@ -13,18 +15,33 @@ export interface PasswordChange {
 }
 
 export interface CreateUserRequest {
+  username: string;
   email: string;
   password: string;
   firstName?: string;
   lastName?: string;
-  roleId?: number;
+  roleIds?: number[];
+  groupIds?: number[];
   requiresPasswordChange: boolean;
 }
 
-export interface GroupMembershipResponse {
-  success: boolean;
-  message: string;
-  group?: Group;
+export interface UpdateUserRequest {
+  username?: string;
+  email?: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
+  roleIds?: number[];
+  groupIds?: number[];
+  requiresPasswordChange?: boolean;
+  preferences?: {
+    theme?: string;
+    language?: string;
+    notifications?: {
+      email?: boolean;
+      push?: boolean;
+    };
+  };
 }
 
 export interface PasswordRequirements {
@@ -69,9 +86,9 @@ export class UserService {
     return this.http.post<User>(this.apiUrl, user);
   }
 
-  updateUser(id: number, user: Partial<User>): Observable<User> {
+  updateUser(id: number, user: UpdateUserRequest): Observable<User> {
     this.logger.debug(`Updating user with id ${id}`, user);
-    return this.http.put<User>(`${this.apiUrl}/${id}`, user);
+    return this.http.patch<User>(`${this.apiUrl}/${id}`, user);
   }
 
   deleteUser(id: number): Observable<void> {
@@ -103,30 +120,58 @@ export class UserService {
     );
   }
 
-  addUserToGroup(userId: number, groupId: number): Observable<GroupMembershipResponse> {
+  addUserToGroup(userId: number, groupId: number): Observable<GroupMembershipResult> {
     this.logger.debug(`Adding user ${userId} to group ${groupId}`);
-    return this.http.post<GroupMembershipResponse>(`${this.apiUrl}/${userId}/groups/${groupId}`, {}).pipe(
-      map(response => {
-        this.logger.debug(`Successfully added user ${userId} to group ${groupId}`);
-        return response;
+    return this.http.post<GroupMembershipResult>(`${environment.apiUrl}/groups/${groupId}/members/${userId}`, {}).pipe(
+      map((result: GroupMembershipResult) => {
+        this.logger.debug(`Group membership operation result:`, {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          groupName: result.group.name
+        });
+        
+        if (result.success) {
+          this.logger.info(`Successfully added user ${userId} to group ${groupId}: ${result.message}`);
+        } else {
+          this.logger.warn(`Failed to add user ${userId} to group ${groupId}: ${result.message}`);
+        }
+        
+        return result;
       }),
       catchError(error => {
-        this.logger.error(`Failed to add user ${userId} to group ${groupId}:`, error);
-        throw error;
+        this.logger.error(`HTTP error adding user ${userId} to group ${groupId}:`, error);
+        const errorMessage = error.error?.message || error.message || 'Failed to add user to group';
+        throw { message: errorMessage };
       })
     );
   }
 
-  removeUserFromGroup(userId: number, groupId: number): Observable<GroupMembershipResponse> {
+  removeUserFromGroup(userId: number, groupId: number): Observable<GroupMembershipResult> {
     this.logger.debug(`Removing user ${userId} from group ${groupId}`);
-    return this.http.delete<GroupMembershipResponse>(`${this.apiUrl}/${userId}/groups/${groupId}`).pipe(
-      map(response => {
-        this.logger.debug(`Successfully removed user ${userId} from group ${groupId}`);
-        return response;
+    return this.http.delete<GroupMembershipResult>(`${environment.apiUrl}/groups/${groupId}/members/${userId}`).pipe(
+      map((result: GroupMembershipResult) => {
+        this.logger.debug(`Group membership operation result:`, {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          groupName: result.group.name
+        });
+        
+        if (result.success) {
+          this.logger.info(`Successfully removed user ${userId} from group ${groupId}: ${result.message}`);
+        } else {
+          this.logger.warn(`Failed to remove user ${userId} from group ${groupId}: ${result.message}`);
+        }
+        
+        return result;
       }),
       catchError(error => {
-        this.logger.error(`Failed to remove user ${userId} from group ${groupId}:`, error);
-        throw error;
+        this.logger.error(`HTTP error removing user ${userId} from group ${groupId}:`, error);
+        const errorMessage = error.error?.message || error.message || 'Failed to remove user from group';
+        throw { message: errorMessage };
       })
     );
   }
@@ -151,5 +196,61 @@ export class UserService {
     return this.http.get<LoginAttemptStatus>(`${this.apiUrl}/login-attempt-status`, {
       params: { email }
     });
+  }
+
+  addUserToRole(userId: number, roleId: number): Observable<RoleMembershipResult> {
+    this.logger.debug(`Adding user ${userId} to role ${roleId}`);
+    return this.http.post<RoleMembershipResult>(`${this.apiUrl}/${userId}/roles/${roleId}`, {}).pipe(
+      map((result: RoleMembershipResult) => {
+        this.logger.debug(`Role membership operation result:`, {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          roleName: result.role.name
+        });
+        
+        if (result.success) {
+          this.logger.info(`Successfully added user ${userId} to role ${roleId}: ${result.message}`);
+        } else {
+          this.logger.warn(`Failed to add user ${userId} to role ${roleId}: ${result.message}`);
+        }
+        
+        return result;
+      }),
+      catchError(error => {
+        this.logger.error(`HTTP error adding user ${userId} to role ${roleId}:`, error);
+        const errorMessage = error.error?.message || error.message || 'Failed to add user to role';
+        throw { message: errorMessage };
+      })
+    );
+  }
+
+  removeUserFromRole(userId: number, roleId: number): Observable<RoleMembershipResult> {
+    this.logger.debug(`Removing user ${userId} from role ${roleId}`);
+    return this.http.delete<RoleMembershipResult>(`${this.apiUrl}/${userId}/roles/${roleId}`).pipe(
+      map((result: RoleMembershipResult) => {
+        this.logger.debug(`Role membership operation result:`, {
+          success: result.success,
+          operation: result.operation,
+          message: result.message,
+          userId: result.user.id,
+          roleName: result.role.name
+        });
+        
+        if (result.success) {
+          this.logger.info(`Successfully removed user ${userId} from role ${roleId}: ${result.message}`);
+        } else {
+          this.logger.warn(`Failed to remove user ${userId} from role ${roleId}: ${result.message}`);
+        }
+        
+        return result;
+      }),
+      catchError(error => {
+        this.logger.error(`HTTP error removing user ${userId} from role ${roleId}:`, error);
+        const errorMessage = error.error?.message || error.message || 'Failed to remove user from role';
+        throw { message: errorMessage };
+      })
+    );
   }
 } 

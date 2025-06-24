@@ -1,74 +1,32 @@
-@use '@angular/material' as material;
-@use 'sass:map';
-@use 'variables' as var;
-@use '../themes/material-theme' as theme;
+// Essential utility mixins only - simplified theme architecture
 
-// Mixin to synchronize CSS variables with Material theme
-@mixin sync-theme-vars($is-dark: false) {
-  // Set CSS variables from our theme color map
-  // Primary colors
-  --primary-color: #{theme.get-primary-color()};
-  --primary-light: #{theme.get-primary-color('lighter')};
-  --primary-dark: #{theme.get-primary-color('darker')};
-  
-  // Add RGB values for colors to support transparency
-  --primary-rgb: #{theme.get-color-rgb('primary')};
-  --primary-light-rgb: #{theme.get-color-rgb('primary-light')};
-  --primary-dark-rgb: #{theme.get-color-rgb('primary-dark')};
-  
-  // Accent colors
-  --accent-color: #{theme.get-accent-color()};
-  --accent-light: #{theme.get-accent-color('lighter')};
-  --accent-dark: #{theme.get-accent-color('darker')};
-  
-  // Accent RGB values
-  --accent-rgb: #{theme.get-color-rgb('accent')};
-  --accent-light-rgb: #{theme.get-color-rgb('accent-light')};
-  --accent-dark-rgb: #{theme.get-color-rgb('accent-dark')};
-  
-  // Warn/Error colors
-  --warn-color: #{theme.get-warn-color()};
-  --error: #{theme.get-warn-color()};
-  
-  // Warn/Error RGB values
-  --warn-rgb: #{theme.get-color-rgb('warn')};
-  --error-rgb: #{theme.get-color-rgb('warn')};
+// Angular Material Mixins
+@use '@angular/material' as mat;
+@use 'variables' as vars;
 
-  // Set text and background colors based on theme brightness
-  @if $is-dark {
-    // Dark theme text and background colors
-    --text-on-primary: #ffffff;
-    --text-primary: #e0e0e0;
-    --text-secondary: #a0a0a0;
-    --background-dark: #303030;
-    --background-card: #424242;
-    --surface: #484848;
-  } @else {
-    // Light theme text and background colors
-    --text-on-primary: #ffffff;
-    --text-primary: #212121;
-    --text-secondary: #757575;
-    --background-dark: #f5f5f5;
-    --background-card: #ffffff;
-    --surface: #fafafa;
-  }
-
-  // Status colors remain consistent across light/dark themes
-  --success: #4caf50; // green 500
-  --warning: #ff9800; // orange 500
-  --info: #2196f3;    // blue 500
-  
-  // Status colors RGB values
-  --success-rgb: 76, 175, 80;
-  --warning-rgb: 255, 152, 0;
-  --info-rgb: 33, 150, 243;
-}
-
-// Flexbox mixins
+// Flexbox utilities
 @mixin flex-center {
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin flex-start {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+@mixin flex-end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 @mixin flex-column {
@@ -76,111 +34,257 @@
   flex-direction: column;
 }
 
-@mixin flex-row {
-  display: flex;
-  flex-direction: row;
-}
-
-@mixin flex-between {
-  display: flex;
-  justify-content: space-between;
+@mixin flex-column-center {
+  @include flex-column;
   align-items: center;
+  justify-content: center;
 }
 
-// Responsive mixins
-@mixin respond-to($breakpoint) {
-  @if $breakpoint == sm {
-    @media (min-width: 576px) { @content; }
-  } @else if $breakpoint == md {
-    @media (min-width: 768px) { @content; }
-  } @else if $breakpoint == lg {
-    @media (min-width: 992px) { @content; }
-  } @else if $breakpoint == xl {
-    @media (min-width: 1200px) { @content; }
-  }
+// Material Design Card
+@mixin mat-card {
+  background: vars.$background-card;
+  border-radius: vars.$border-radius-md;
+  box-shadow: vars.$elevation-2;
+  padding: vars.$spacing-lg;
+  margin: vars.$spacing-md 0;
 }
 
-// Typography mixins
-@mixin heading-1 {
-  font-size: 2.5rem;
-  font-weight: var.$font-weight-bold;
-  margin-bottom: var.$spacing-lg;
-  color: var.$text-primary;
-}
-
-@mixin heading-2 {
-  font-size: 2rem;
-  font-weight: var.$font-weight-bold;
-  margin-bottom: var.$spacing-md;
-  color: var.$text-primary;
-}
-
-@mixin heading-3 {
-  font-size: 1.5rem;
-  font-weight: var.$font-weight-medium;
-  margin-bottom: var.$spacing-md;
-  color: var.$text-primary;
-}
-
-// Card mixins
-@mixin card-base {
-  background-color: var(--background-card);
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  padding: 1rem;
-}
-
-// Form control mixins
-@mixin form-control {
+// Authentication Card
+@mixin auth-card {
+  @include mat-card;
+  max-width: 400px;
   width: 100%;
-  padding: var.$spacing-sm var.$spacing-md;
-  border: 1px solid #666;
-  border-radius: var.$border-radius-sm;
-  background-color: var.$background-card;
-  color: var.$text-primary;
-  transition: border-color 0.3s, box-shadow 0.3s;
   
-  &:focus {
-    border-color: var.$primary-light;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(174, 82, 212, 0.25);
+  .mat-card-title {
+    color: vars.$primary-color;
+    text-align: center;
+    margin-bottom: vars.$spacing-lg;
   }
   
-  &.is-invalid {
-    border-color: var.$error;
+  .mat-form-field {
+    width: 100%;
+    margin-bottom: vars.$spacing-sm;
+  }
+  
+  .mat-raised-button {
+    width: 100%;
+    margin-top: vars.$spacing-md;
   }
 }
 
-// Button mixins
-@mixin button-base {
-  padding: var.$spacing-sm var.$spacing-md;
-  border-radius: var.$border-radius-sm;
-  cursor: pointer;
-  transition: var.$transition-base;
-  border: none;
-  font-weight: var.$font-weight-medium;
-}
-
+// Button variants using Material theme
 @mixin button-primary {
-  @include button-base;
-  background-color: var.$primary;
-  color: var.$text-on-primary;
+  background-color: vars.$primary-color;
+  color: mat.get-contrast-color-from-palette(vars.$primary-palette, 500);
   
   &:hover {
-    background-color: var.$primary-light;
+    background-color: vars.$primary-dark;
   }
   
   &:disabled {
-    background-color: rgba(123, 31, 162, 0.5);
-    cursor: not-allowed;
-    opacity: 0.7;
+    background-color: vars.$text-disabled;
+    color: vars.$text-hint;
+  }
+}
+
+@mixin button-accent {
+  background-color: vars.$accent-color;
+  color: mat.get-contrast-color-from-palette(vars.$accent-palette, A200);
+  
+  &:hover {
+    background-color: mat.get-color-from-palette(vars.$accent-palette, A400);
+  }
+}
+
+@mixin button-warn {
+  background-color: vars.$warn-color;
+  color: mat.get-contrast-color-from-palette(vars.$warn-palette, 500);
+  
+  &:hover {
+    background-color: mat.get-color-from-palette(vars.$warn-palette, 700);
+  }
+}
+
+// Elevation mixins
+@mixin elevation($level) {
+  @if $level == 0 { box-shadow: vars.$elevation-0; }
+  @else if $level == 1 { box-shadow: vars.$elevation-1; }
+  @else if $level == 2 { box-shadow: vars.$elevation-2; }
+  @else if $level == 3 { box-shadow: vars.$elevation-3; }
+  @else if $level == 4 { box-shadow: vars.$elevation-4; }
+  @else if $level == 6 { box-shadow: vars.$elevation-6; }
+  @else if $level == 8 { box-shadow: vars.$elevation-8; }
+}
+
+// Typography mixins using Material typography
+@mixin mat-typography($level) {
+  @if $level == 'headline-1' {
+    font-size: 6rem;
+    line-height: 6rem;
+    font-weight: 300;
+    letter-spacing: -0.015625em;
+  }
+  @else if $level == 'headline-2' {
+    font-size: 3.75rem;
+    line-height: 3.75rem;
+    font-weight: 300;
+    letter-spacing: -0.0083333333em;
+  }
+  @else if $level == 'headline-3' {
+    font-size: 3rem;
+    line-height: 3.125rem;
+    font-weight: 400;
+    letter-spacing: normal;
+  }
+  @else if $level == 'headline-4' {
+    font-size: 2.125rem;
+    line-height: 2.5rem;
+    font-weight: 400;
+    letter-spacing: 0.0073529412em;
+  }
+  @else if $level == 'headline-5' {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 400;
+    letter-spacing: normal;
+  }
+  @else if $level == 'headline-6' {
+    font-size: 1.25rem;
+    line-height: 2rem;
+    font-weight: 500;
+    letter-spacing: 0.0125em;
+  }
+  @else if $level == 'subtitle-1' {
+    font-size: 1rem;
+    line-height: 1.75rem;
+    font-weight: 400;
+    letter-spacing: 0.009375em;
+  }
+  @else if $level == 'subtitle-2' {
+    font-size: 0.875rem;
+    line-height: 1.375rem;
+    font-weight: 500;
+    letter-spacing: 0.0071428571em;
+  }
+  @else if $level == 'body-1' {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 400;
+    letter-spacing: 0.03125em;
+  }
+  @else if $level == 'body-2' {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 400;
+    letter-spacing: 0.0178571429em;
+  }
+  @else if $level == 'caption' {
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    font-weight: 400;
+    letter-spacing: 0.0333333333em;
+  }
+  @else if $level == 'button' {
+    font-size: 0.875rem;
+    line-height: 2.25rem;
+    font-weight: 500;
+    letter-spacing: 0.0892857143em;
+    text-transform: uppercase;
+  }
+}
+
+// Responsive breakpoint mixins
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == 'xs' {
+    @media (max-width: #{vars.$breakpoint-sm - 1px}) { @content; }
+  }
+  @else if $breakpoint == 'sm' {
+    @media (min-width: #{vars.$breakpoint-sm}) { @content; }
+  }
+  @else if $breakpoint == 'md' {
+    @media (min-width: #{vars.$breakpoint-md}) { @content; }
+  }
+  @else if $breakpoint == 'lg' {
+    @media (min-width: #{vars.$breakpoint-lg}) { @content; }
+  }
+  @else if $breakpoint == 'xl' {
+    @media (min-width: #{vars.$breakpoint-xl}) { @content; }
+  }
+}
+
+// Accessibility mixins
+@mixin sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@mixin focus-visible {
+  &:focus-visible {
+    outline: 2px solid vars.$accent-color;
+    outline-offset: 2px;
+  }
+}
+
+// Layout mixins
+@mixin container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 vars.$spacing-md;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@mixin full-width {
+  width: 100%;
+  max-width: 100%;
+}
+
+// Form mixins
+@mixin form-field {
+  .mat-form-field {
+    width: 100%;
+    margin-bottom: vars.$spacing-sm;
+    
+    .mat-form-field-label {
+      color: vars.$text-secondary;
+    }
+    
+    &.mat-focused .mat-form-field-label {
+      color: vars.$primary-color;
+    }
+  }
+}
+
+// Loading state mixin
+@mixin loading-state {
+  position: relative;
+  
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
   }
 }
 
 // Logo container mixin
 @mixin logo-container($alignment: center) {
   text-align: $alignment;
-  margin-bottom: var.$spacing-lg;
+  margin-bottom: 24px;
   
   .app-logo {
     max-width: 180px;
@@ -188,9 +292,38 @@
   }
 }
 
-// Authentication card mixin
-@mixin auth-card {
-  @include card-base;
+// Form control mixin
+@mixin form-control {
   width: 100%;
-  max-width: 400px;
+  padding: 12px 16px;
+  border: 1px solid var(--mdc-theme-outline);
+  border-radius: 4px;
+  background-color: var(--mdc-theme-surface);
+  color: var(--mdc-theme-on-surface);
+  transition: border-color 0.3s, box-shadow 0.3s;
+  
+  &:focus {
+    border-color: var(--mdc-theme-primary);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(63, 81, 181, 0.25);
+  }
+  
+  &.error {
+    border-color: var(--mdc-theme-error);
+  }
+}
+
+// Accessibility helpers
+@mixin focus-indicator {
+  &:focus-visible {
+    outline: 2px solid var(--mdc-theme-accent);
+    outline-offset: 2px;
+  }
+}
+
+// Text truncation
+@mixin text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 } 

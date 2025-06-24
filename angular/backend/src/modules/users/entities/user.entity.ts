@@ -9,8 +9,7 @@ import {
   JoinTable,
 } from 'typeorm';
 import { Role } from '../../roles/entities/role.entity';
-import { Group } from './group.entity';
-import { UserGroup } from './user-group.entity';
+import { Group } from '../../permissions/entities/group.entity';
 import { UserPermission } from '../../permissions/entities/user-permission.entity';
 import { Permission } from '../../permissions/entities/permission.entity';
 import { Exclude } from 'class-transformer';
@@ -80,6 +79,9 @@ export class User {
   set lastLogin(value: Date) {
     this.lastLoginAt = value;
   }
+
+  @Column({ name: 'requires_password_change', default: false })
+  requiresPasswordChange: boolean;
 
   @Column({ type: 'simple-json', nullable: true })
   preferences: Record<string, any>;
@@ -162,8 +164,7 @@ export class User {
   @OneToMany(() => UserPermission, userPermission => userPermission.user)
   userPermissions: UserPermission[];
 
-  @OneToMany(() => UserGroup, (userGroup) => userGroup.user)
-  userGroups: UserGroup[];
+
 
   @ManyToMany(() => Permission)
   @JoinTable({

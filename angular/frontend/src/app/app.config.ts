@@ -3,13 +3,13 @@ import { provideRouter, withPreloading, PreloadAllModules, withDebugTracing } fr
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
 import { provideClientHydration } from '@angular/platform-browser';
-import { NgxsModule } from '@ngxs/store';
+import { NgxsModule, Store } from '@ngxs/store';
 import { NgxsRouterPluginModule } from '@ngxs/router-plugin';
 import { NgxsFormPluginModule } from '@ngxs/form-plugin';
 import { NgxsReduxDevtoolsPluginModule } from '@ngxs/devtools-plugin';
 import { provideHttpClient, withInterceptorsFromDi, withFetch } from '@angular/common/http';
 import { httpInterceptorProviders } from './core/interceptors';
-import { AuthState } from './store';
+import { AuthState, AuthActions } from './store';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { AppConfigService } from './core/services/app-config.service';
 import { LoggerService } from './services/logging/logger.service';
@@ -24,6 +24,27 @@ import { RolesConstantsService } from './core/constants/roles';
 export function initializeLogging() {
   return () => {
     return Promise.resolve();
+  };
+}
+
+// Function to initialize auth and permissions
+export function initializeAuth(authService: AuthService, store: Store) {
+  return async () => {
+    console.log('APP_INITIALIZER: Starting auth initialization...');
+    
+    // First, initialize the auth state (refresh tokens if available)
+    const authInitialized = await firstValueFrom(authService.initializeAuthState());
+    console.log(`APP_INITIALIZER: Auth service initialized. Authenticated: ${authInitialized}`);
+    
+    // Then dispatch AppInitialize to load permissions if authenticated
+    if (authInitialized) {
+      console.log('APP_INITIALIZER: Dispatching AppInitialize action to load permissions...');
+      await firstValueFrom(store.dispatch(new AuthActions.AppInitialize()));
+      console.log('APP_INITIALIZER: AppInitialize action completed');
+    }
+    
+    console.log('APP_INITIALIZER: Auth initialization complete');
+    return true;
   };
 }
 
@@ -57,8 +78,8 @@ export const appConfig: ApplicationConfig = {
     },
     {
       provide: APP_INITIALIZER,
-      useFactory: (authService: AuthService) => () => authService.initializeAuthState(),
-      deps: [AuthService],
+      useFactory: initializeAuth,
+      deps: [AuthService, Store],
       multi: true
     },
     importProvidersFrom(

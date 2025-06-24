@@ -78,7 +78,7 @@ async function testLoginAttemptForeignKey() {
         const loginAttempts = await connection
           .getRepository(LoginAttempt)
           .find({
-            where: { userId: user.id },
+            where: { user: { id: user.id } },
           });
         console.log(
           `Found ${loginAttempts.length} login attempts for user ${user.id}`,
@@ -88,7 +88,7 @@ async function testLoginAttemptForeignKey() {
         const loginAttemptsWithUser = await connection
           .getRepository(LoginAttempt)
           .find({
-            where: { userId: user.id },
+            where: { user: { id: user.id } },
             relations: ['user'],
           });
 

@@ -1,7 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { AppConfigService } from '../../core/services/app-config.service';
 
 @Component({
@@ -10,6 +12,8 @@ import { AppConfigService } from '../../core/services/app-config.service';
   imports: [
     CommonModule,
     MatCardModule,
+    MatButtonModule,
+    MatIconModule,
     RouterModule
   ],
   templateUrl: './dashboard.component.html',
@@ -20,10 +24,34 @@ export class DashboardComponent implements OnInit {
   appName = 'Angular Template';
   headerLogo: string | null = null;
   
-  constructor(private appConfig: AppConfigService) {}
+  constructor(
+    private appConfig: AppConfigService,
+    private router: Router
+  ) {}
 
   ngOnInit() {
     this.appName = this.appConfig.appName;
     this.headerLogo = this.appConfig.headerLogo;
+  }
+  
+  /**
+   * Navigate to Users management page
+   */
+  navigateToUsers(): void {
+    this.router.navigate(['/app/users']);
+  }
+  
+  /**
+   * Navigate to Groups management page
+   */
+  navigateToGroups(): void {
+    this.router.navigate(['/app/groups']);
+  }
+  
+  /**
+   * Navigate to Activity monitoring page
+   */
+  navigateToActivity(): void {
+    this.router.navigate(['/admin/login-monitoring']);
   }
 }

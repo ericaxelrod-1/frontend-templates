@@ -197,7 +197,40 @@ Analyze the schema alignment mismatches identified by the audit tool and documen
 
 ### 13. Schema Alignment Critical Fixes (ID: TECH-003.2)
 - **Status**: Complete
-- **Testing**: Passed 
+- **Testing**: Passed
+
+### 14. Duplicate Roles Data Cleanup (ID: BUG-052)
+- **Status**: Complete
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Last Updated**: 2025-01-25
+
+Fix duplicate role entries in database caused by conflicting seed scripts and migration files.
+
+**Issue Summary:**
+Database contains 8 duplicate roles across 4 role types, created by conflicting seeding mechanisms, affecting data integrity and access control consistency.
+
+**Sub-tasks:**
+- ✓ Database investigation and duplicate role identification
+- ✓ Root cause analysis of conflicting seed scripts
+- ✓ Document cleanup strategy (prefer smallest IDs)
+- ✗ Use SQLite MCP tools to update foreign key references:
+  - Update role_permissions table to point to preferred role IDs
+  - Update user_roles table to point to preferred role IDs
+- ✗ Delete duplicate role entries: User (5), admin (9), superadmin (10)
+- ✗ Fix conflicting seed scripts:
+  - Fix `angular/backend/src/database/seeds/initial.seed.ts`
+  - Align with `angular/backend/src/scripts/seed-roles.ts`
+- ✗ Test role permissions preservation after cleanup
+- ✗ Verify user access consistency after role ID updates
+
+**Duplicate Roles to Remove (Keep Smallest IDs):**
+- Remove "User" (id: 5), keep "user" (id: 1)
+- Remove "admin" (id: 9), keep "Administrator" (id: 6)  
+- Remove "superadmin" (id: 10), keep "Super Administrator" (id: 8)
+- Keep both "superuser" (id: 3) and "Super User" (id: 7) as distinct roles
+
+**Priority:** HIGH - Data integrity issue affecting role-based access control 
 - **Dependencies**: TECH-003.1
 - **Last Updated**: 2025-05-09
 
@@ -246,9 +279,31 @@ Add additional analytics features to the role monitoring tools.
 - Add permission impact analysis
 - Implement dashboard with visualizations
 
+### 17. Role Creation Data Format Error (ID: BUG-055)
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: None
+- **Last Updated**: 2025-01-26
+
+Fix role creation functionality failing due to data format mismatch between frontend and backend.
+
+**Sub-tasks:**
+- ✓ Investigate "each value in permissions must be a string" error in role creation
+- ✓ Analyze backend CreateRoleDto validation requirements in UsersModule
+- ✓ Identify data format mismatch: Permission objects vs permission strings
+- ✓ Update RoleCreationSidebarComponent onSave() method to send correct format
+- ✓ Transform Permission[] to string[] in frontend component
+- ✓ Test role creation functionality after fix
+- ✓ Verify frontend build compiles successfully
+- ✓ Document backend architecture: two RolesControllers, only UsersModule active
+- ✓ Fix AJAX refresh issue: newly created roles not appearing without page refresh
+- ✓ Add backend data transformation to match frontend expectations
+- ✓ Ensure consistent data structure between initial load and new role creation
+- ✓ Verify backend build compiles successfully
+
 ## Phase 3: Integration and Deployment
 
-### 17. Continuous Integration Setup (ID: TECH-004.1)
+### 18. Continuous Integration Setup (ID: TECH-004.1)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: TECH-001.2, TECH-001.3
@@ -262,7 +317,7 @@ Set up automated testing and continuous integration for the project.
 - Implement linting checks
 - Create automated documentation generation
 
-### 18. Deployment Pipeline (ID: TECH-004.2)
+### 19. Deployment Pipeline (ID: TECH-004.2)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: TECH-004.1
@@ -278,7 +333,7 @@ Create a deployment pipeline for the tools and applications.
 
 ## Phase 4: Feature Implementation
 
-### 19. Role Hierarchy Management (ID: FEAT-001)
+### 20. Role Hierarchy Management (ID: FEAT-001)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: TECH-001.3
@@ -292,7 +347,7 @@ Implement a role hierarchy management system.
 - Implement permission propagation
 - Add validation for circular dependencies
 
-### 20. Permission Auditing (ID: FEAT-002)
+### 21. Permission Auditing (ID: FEAT-002)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: TECH-001.3, FEAT-001
@@ -352,7 +407,7 @@ Add permission auditing capabilities to track changes to permissions.
     - cache_endpoints
   - Should follow established patterns for column names and constraints 
 
-### 21. Create API Status/Health Endpoint (ID: FEAT-007)
+### 22. Create API Status/Health Endpoint (ID: FEAT-007)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: None
@@ -369,7 +424,7 @@ Create a comprehensive API status/health endpoint for system monitoring and debu
 - Add different detail levels (basic vs detailed)
 - Test endpoint functionality
 
-### 22. Fix Critical TypeScript Compilation Errors (ID: BUG-033)
+### 23. Fix Critical TypeScript Compilation Errors (ID: BUG-033)
 - **Status**: Complete
 - **Testing**: Passed
 - **Dependencies**: None
@@ -388,7 +443,7 @@ Fix critical TypeScript compilation errors in cache-sync.service.ts related to '
 - ✓ Test that build compiles successfully
 - ✓ Update documentation to reflect resolution
 
-### 23. Database Schema Alignment Investigation (ID: TECH-004)
+### 24. Database Schema Alignment Investigation (ID: TECH-004)
 - **Status**: Not Started
 - **Testing**: Not Started
 - **Dependencies**: None

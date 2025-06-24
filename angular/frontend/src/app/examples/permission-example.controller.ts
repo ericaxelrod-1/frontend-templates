@@ -37,11 +37,11 @@ export class ResourceController {
   }
 
   /**
-   * Get a specific resource - requires 'resources:read' permission
+   * Get a specific resource - requires 'resources:view' permission
    */
   @Get(':id')
   @UseGuards(PermissionGuard)
-  @RequirePermission('resources:read')
+  @RequirePermission('resources:view')
   async findOne(@Param('id') id: string, @GetUser() user: User) {
     // Method implementation would go here
     return { id: parseInt(id), name: `Resource ${id}`, description: `Description for resource ${id}` };
@@ -123,11 +123,11 @@ export class ResourceController {
   @Get(':id/analytics')
   @UseGuards(JwtAuthGuard) // Only authenticate, manual permission check
   async getResourceAnalytics(@Param('id') id: string, @GetUser() user: User) {
-    // Check for read permission on resources
+    // Check for view permission on resources
     const canReadResource = await this.permissionsService.checkUserPermission(
       user.id,
       'resources', 
-      'read'
+      'view'
     );
     
     if (!canReadResource) {

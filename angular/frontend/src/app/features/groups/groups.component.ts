@@ -4,14 +4,15 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { GroupService } from '../../services/group.service';
-import { Group, Member } from '../../models/group.model';
-import { GroupDialogComponent } from './group-dialog/group-dialog.component';
-import { AddMemberDialogComponent } from './add-member-dialog/add-member-dialog.component';
+import { UserService } from '../../services/user.service';
+import { Group, Permission, GROUP_PERMISSION_SETS } from '../../models/group.model';
+import { User } from '../../models/user.model';
+import { UserSelectorSidebarComponent } from './user-selector-sidebar/user-selector-sidebar.component';
+import { MemberActionsSidebarComponent, MemberAction } from './member-actions-sidebar/member-actions-sidebar.component';
+import { GroupCreationSidebarComponent } from './group-creation-sidebar/group-creation-sidebar.component';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
@@ -25,9 +26,10 @@ import { PermissionService } from '../../core/services/permission.service';
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatDialogModule,
-    MatMenuModule,
-    MatListModule
+    MatListModule,
+    UserSelectorSidebarComponent,
+    MemberActionsSidebarComponent,
+    GroupCreationSidebarComponent
   ],
   template: `
     <div class="groups-container">
@@ -60,31 +62,21 @@ import { PermissionService } from '../../core/services/permission.service';
               <p>{{ group.description }}</p>
               
               <div class="members-section">
-                <h3>Members ({{ group.members ? group.members.length : 0 }})</h3>
-                <mat-list *ngIf="group.members && group.members.length > 0">
-                  <mat-list-item *ngFor="let member of group.members">
-                    <span matListItemTitle>{{ member.name }}</span>
-                    <span matListItemLine>{{ member.role || 'Member' }}</span>
-                    <button mat-icon-button [matMenuTriggerFor]="memberMenu" matListItemMeta>
+                <h3>Members ({{ group.users ? group.users.length : 0 }})</h3>
+                <mat-list *ngIf="group.users && group.users.length > 0">
+                  <mat-list-item *ngFor="let user of group.users">
+                    <span matListItemTitle>{{ (user.firstName || '') + ' ' + (user.lastName || '') || user.email }}</span>
+                    <span matListItemLine>{{ user.roles?.[0]?.name || 'Member' }}</span>
+                    <button mat-icon-button (click)="openMemberActions(group, user)" matListItemMeta class="member-actions-button">
                       <mat-icon>more_vert</mat-icon>
                     </button>
-                    <mat-menu #memberMenu="matMenu">
-                      <button mat-menu-item (click)="makeAdmin(group, member)">
-                        <mat-icon>admin_panel_settings</mat-icon>
-                        <span>Make Admin</span>
-                      </button>
-                      <button mat-menu-item (click)="removeMember(group, member)">
-                        <mat-icon>remove_circle</mat-icon>
-                        <span>Remove from Group</span>
-                      </button>
-                    </mat-menu>
                   </mat-list-item>
                 </mat-list>
-                <div *ngIf="!group.members || group.members.length === 0" class="no-members">
+                <div *ngIf="!group.users || group.users.length === 0" class="no-members">
                   No members in this group.
                 </div>
                 
-                <button mat-button color="primary" (click)="addMember(group)">
+                <button mat-button color="primary" (click)="addMember(group)" class="add-member-button">
                   <mat-icon>person_add</mat-icon> Add Member
                 </button>
               </div>
@@ -101,6 +93,32 @@ import { PermissionService } from '../../core/services/permission.service';
           </mat-card>
         </div>
       </ng-container>
+      
+      <!-- User Selector Sidebar -->
+      <app-user-selector-sidebar
+        [isOpen]="isUserSelectorOpen"
+        [group]="selectedGroupForUser"
+        [availableUsers]="availableUsers"
+        (closeSidebar)="closeUserSelector()"
+        (userSelected)="onUserSelected($event)">
+      </app-user-selector-sidebar>
+      
+      <!-- Member Actions Sidebar -->
+      <app-member-actions-sidebar
+        [isOpen]="isMemberActionsOpen"
+        [member]="selectedMember"
+        [group]="selectedGroupForMember"
+        (closeSidebar)="closeMemberActions()"
+        (actionSelected)="onMemberActionSelected($event)">
+      </app-member-actions-sidebar>
+      
+      <!-- Group Creation Sidebar -->
+      <app-group-creation-sidebar
+        [isOpen]="isGroupCreationOpen"
+        [groupData]="selectedGroupForEdit"
+        (closeSidebar)="closeGroupCreation()"
+        (groupSaved)="onGroupSaved($event)">
+      </app-group-creation-sidebar>
     </div>
   `,
   styles: [`
@@ -153,6 +171,18 @@ import { PermissionService } from '../../core/services/permission.service';
       color: #666;
       margin: 16px 0;
     }
+    
+    .add-member-button {
+      z-index: 10;
+      position: relative;
+      pointer-events: auto;
+    }
+    
+    .member-actions-button {
+      z-index: 10;
+      position: relative;
+      pointer-events: auto;
+    }
   `]
 })
 export class GroupsComponent implements OnInit {
@@ -160,9 +190,23 @@ export class GroupsComponent implements OnInit {
   hasPermission = false;
   loading = true;
   
+  // Sidebar state management
+  isUserSelectorOpen = false;
+  selectedGroupForUser: Group | null = null;
+  availableUsers: User[] = [];
+  
+  // Member actions sidebar state
+  isMemberActionsOpen = false;
+  selectedMember: User | null = null;
+  selectedGroupForMember: Group | null = null;
+  
+  // Group creation sidebar state
+  isGroupCreationOpen = false;
+  selectedGroupForEdit: Group | null = null;
+  
   constructor(
     private groupService: GroupService,
-    private dialog: MatDialog,
+    private userService: UserService,
     private snackBar: MatSnackBar,
     private authService: AuthService,
     private router: Router,
@@ -171,7 +215,7 @@ export class GroupsComponent implements OnInit {
 
   ngOnInit(): void {
     // Check permission to view groups using resource:action format
-    this.permissionService.hasPermission('groups:read').subscribe(hasPermission => {
+    this.permissionService.hasPermission('groups:view').subscribe(hasPermission => {
       console.log('[GroupsComponent] Permission check result:', hasPermission);
       this.hasPermission = hasPermission;
       
@@ -189,9 +233,9 @@ export class GroupsComponent implements OnInit {
     this.groupService.getGroups().subscribe({
       next: (groups) => {
         this.groups = groups.map(group => {
-          // Ensure members is an array
-          if (!group.members) {
-            group.members = [];
+          // Ensure users is an array
+          if (!group.users) {
+            group.users = [];
           }
           return group;
         });
@@ -211,48 +255,51 @@ export class GroupsComponent implements OnInit {
   }
 
   createGroup(): void {
-    const dialogRef = this.dialog.open(GroupDialogComponent, {
-      data: { group: null }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.groupService.createGroup(result).subscribe({
-          next: (group) => {
-            if (!group.members) {
-              group.members = [];
-            }
-            this.groups.push(group);
-            this.snackBar.open('Group created successfully', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            console.error('Error creating group:', error);
-            this.snackBar.open('Error creating group', 'Close', { duration: 3000 });
-          }
-        });
-      }
-    });
+    this.selectedGroupForEdit = null; // Create mode
+    this.isGroupCreationOpen = true;
   }
 
   editGroup(group: Group): void {
-    const dialogRef = this.dialog.open(GroupDialogComponent, {
-      data: { group }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.groupService.updateGroup(group.id, result).subscribe({
-          next: () => {
-            Object.assign(group, result);
-            this.snackBar.open('Group updated successfully', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            console.error('Error updating group:', error);
-            this.snackBar.open('Error updating group', 'Close', { duration: 3000 });
+    this.selectedGroupForEdit = group; // Edit mode
+    this.isGroupCreationOpen = true;
+  }
+  
+  closeGroupCreation(): void {
+    this.isGroupCreationOpen = false;
+    this.selectedGroupForEdit = null;
+  }
+  
+  onGroupSaved(groupData: Partial<Group>): void {
+    if (this.selectedGroupForEdit) {
+      // Edit mode
+      this.groupService.updateGroup(this.selectedGroupForEdit.id, groupData).subscribe({
+        next: () => {
+          Object.assign(this.selectedGroupForEdit!, groupData);
+          this.snackBar.open('Group updated successfully', 'Close', { duration: 3000 });
+          this.closeGroupCreation();
+        },
+        error: (error) => {
+          console.error('Error updating group:', error);
+          this.snackBar.open('Error updating group', 'Close', { duration: 3000 });
+        }
+      });
+    } else {
+      // Create mode
+      this.groupService.createGroup(groupData).subscribe({
+        next: (group) => {
+          if (!group.users) {
+            group.users = [];
           }
-        });
-      }
-    });
+          this.groups.push(group);
+          this.snackBar.open('Group created successfully', 'Close', { duration: 3000 });
+          this.closeGroupCreation();
+        },
+        error: (error) => {
+          console.error('Error creating group:', error);
+          this.snackBar.open('Error creating group', 'Close', { duration: 3000 });
+        }
+      });
+    }
   }
 
   deleteGroup(group: Group): void {
@@ -275,32 +322,56 @@ export class GroupsComponent implements OnInit {
   }
 
   addMember(group: Group): void {
-    const dialogRef = this.dialog.open(AddMemberDialogComponent, {
-      data: { group }
+    this.selectedGroupForUser = group;
+    this.loadAvailableUsers(group);
+    this.isUserSelectorOpen = true;
+  }
+  
+  private loadAvailableUsers(group: Group): void {
+    this.userService.getUsers().subscribe({
+      next: (users) => {
+        // Filter out users who are already members of the group
+        const memberIds = group.users?.map(user => user.id) || [];
+        this.availableUsers = users.filter(user => !memberIds.includes(user.id));
+      },
+      error: (error) => {
+        console.error('Error loading available users:', error);
+        this.snackBar.open('Error loading available users', 'Close', { duration: 3000 });
+        this.availableUsers = [];
+      }
     });
-
-    dialogRef.afterClosed().subscribe(userId => {
-      if (userId) {
-        this.groupService.addMember(group.id, userId).subscribe({
-          next: () => {
-            this.loadGroups(); // Reload to get updated member list
-            this.snackBar.open('Member added successfully', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            console.error('Error adding member:', error);
-            this.snackBar.open('Error adding member', 'Close', { duration: 3000 });
-          }
-        });
+  }
+  
+  closeUserSelector(): void {
+    this.isUserSelectorOpen = false;
+    this.selectedGroupForUser = null;
+    this.availableUsers = [];
+  }
+  
+  onUserSelected(event: { user: User; group: Group }): void {
+    const { user, group } = event;
+    
+    // Use non-deprecated method with default member permissions
+    const defaultPermissions: Permission[] = GROUP_PERMISSION_SETS['MEMBER'];
+    this.groupService.addMemberWithPermissions(group.id, user.id, defaultPermissions).subscribe({
+      next: () => {
+        this.loadGroups(); // Reload to get updated member list
+        this.snackBar.open(`${user.firstName} ${user.lastName} added to ${group.name} successfully`, 'Close', { duration: 3000 });
+        this.closeUserSelector();
+      },
+      error: (error) => {
+        console.error('Error adding member:', error);
+        this.snackBar.open('Error adding member to group', 'Close', { duration: 3000 });
       }
     });
   }
 
-  removeMember(group: Group, member: Member): void {
-    if (confirm(`Are you sure you want to remove ${member.name} from the group?`)) {
+  removeMember(group: Group, member: User): void {
+    if (confirm(`Are you sure you want to remove ${(member.firstName || '') + ' ' + (member.lastName || '') || member.email} from the group?`)) {
       this.groupService.removeMember(group.id, member.id).subscribe({
         next: () => {
-          if (group.members) {
-            group.members = group.members.filter(m => m.id !== member.id);
+          if (group.users) {
+            group.users = group.users.filter(u => u.id !== member.id);
           }
           this.snackBar.open('Member removed successfully', 'Close', { duration: 3000 });
         },
@@ -312,20 +383,56 @@ export class GroupsComponent implements OnInit {
     }
   }
 
-  makeAdmin(group: Group, member: Member): void {
-    this.groupService.updateMemberRole(group.id, member.id, 'Admin').subscribe({
+  makeAdmin(group: Group, member: User): void {
+    // Use non-deprecated method with admin permissions
+    const adminPermissions: Permission[] = GROUP_PERMISSION_SETS['ADMIN'];
+    this.groupService.updateMemberPermissions(group.id, member.id, adminPermissions).subscribe({
       next: () => {
-        member.role = 'Admin';
+        // Update the user's role in the local data
+        if (member.roles && member.roles.length > 0) {
+          member.roles[0].name = 'Admin';
+        }
         this.snackBar.open('Member role updated successfully', 'Close', { duration: 3000 });
       },
       error: (error) => {
-        console.error('Error updating member role:', error);
-        this.snackBar.open('Error updating member role', 'Close', { duration: 3000 });
+        console.error('Error updating member permissions:', error);
+        this.snackBar.open('Error updating member permissions', 'Close', { duration: 3000 });
       }
     });
   }
 
+  openMemberActions(group: Group, member: User): void {
+    console.log('[GroupsComponent] Opening member actions for:', (member.firstName || '') + ' ' + (member.lastName || '') || member.email, 'in group:', group.name);
+    this.selectedMember = member;
+    this.selectedGroupForMember = group;
+    this.isMemberActionsOpen = true;
+  }
+  
+  closeMemberActions(): void {
+    console.log('[GroupsComponent] Closing member actions sidebar');
+    this.isMemberActionsOpen = false;
+    this.selectedMember = null;
+    this.selectedGroupForMember = null;
+  }
+  
+  onMemberActionSelected(event: { action: MemberAction; member: User; group: Group }): void {
+    console.log('[GroupsComponent] Member action selected:', event.action.id, 'for member:', (event.member.firstName || '') + ' ' + (event.member.lastName || '') || event.member.email);
+    
+    switch (event.action.id) {
+      case 'make-admin':
+        this.makeAdmin(event.group, event.member);
+        break;
+      case 'remove-member':
+        this.removeMember(event.group, event.member);
+        break;
+      default:
+        console.warn('[GroupsComponent] Unknown action:', event.action.id);
+    }
+    
+    this.closeMemberActions();
+  }
+
   goToDashboard(): void {
-    this.router.navigate(['/dashboard']);
+    this.router.navigate(['/app/dashboard']);
   }
 }

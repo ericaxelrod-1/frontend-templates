@@ -5,7 +5,7 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
-import { Group, Member } from '../../../models/group.model';
+import { Group } from '../../../models/group.model';
 import { User } from '../../../models/user.model';
 import { UserService } from '../../../services/user.service';
 
@@ -66,7 +66,7 @@ export class AddMemberDialogComponent implements OnInit {
     this.userService.getUsers().subscribe({
       next: (users) => {
         this.availableUsers = users.filter(user => 
-          !this.data.group.members.some(member => member.id === user.id)
+          !this.data.group.users.some(groupUser => groupUser.id === user.id)
         );
       },
       error: (error) => {

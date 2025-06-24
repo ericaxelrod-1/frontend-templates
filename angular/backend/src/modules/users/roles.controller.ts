@@ -4,6 +4,8 @@ import {
   Post,
   Param,
   Put,
+  Patch,
+  Delete,
   Body,
   UseGuards,
   Logger,
@@ -19,6 +21,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Role, SystemRoles } from './entities/role.entity';
 import {
   UpdateRolePermissionsDto,
+  UpdateRoleDto,
   AssignRoleDto,
   CreateRoleDto,
 } from './dto/role.dto';
@@ -40,7 +43,7 @@ export class RolesController {
   @ApiOperation({ summary: 'Get all roles' })
   @ApiResponse({ status: 200, description: 'List of all roles', type: [Role] })
   @UseGuards(PermissionGuard)
-  @RequirePermission('roles:read')
+  @RequirePermission('roles:view')
   findAll(): Promise<Role[]> {
     this.logger.debug('Getting all roles');
     return this.rolesService.findAll();
@@ -51,9 +54,31 @@ export class RolesController {
   @ApiResponse({ status: 200, description: 'Role details', type: Role })
   @ApiResponse({ status: 404, description: 'Role not found' })
   @UseGuards(PermissionGuard)
-  @RequirePermission('roles:read')
+  @RequirePermission('roles:view')
   findOne(@Param('id') id: number): Promise<Role> {
     return this.rolesService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update role basic information' })
+  @ApiResponse({
+    status: 200,
+    description: 'Role updated successfully',
+    type: Role,
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions',
+  })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:update')
+  update(
+    @Param('id') id: number,
+    @Body() updateRoleDto: UpdateRoleDto,
+    @CurrentUser() currentUser: User,
+  ): Promise<Role> {
+    return this.rolesService.update(id, updateRoleDto, currentUser);
   }
 
   @Get('permissions/available')
@@ -173,5 +198,25 @@ export class RolesController {
       assignRoleDto.roleId,
       currentUser,
     );
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a role' })
+  @ApiResponse({
+    status: 200,
+    description: 'Role deleted successfully',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions',
+  })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:delete')
+  remove(
+    @Param('id') id: number,
+    @CurrentUser() currentUser: User,
+  ): Promise<void> {
+    return this.rolesService.remove(id, currentUser);
   }
 }
