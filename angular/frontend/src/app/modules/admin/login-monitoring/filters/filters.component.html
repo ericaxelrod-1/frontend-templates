@@ -1,0 +1,93 @@
+<mat-card class="filters-card">
+  <mat-card-header>
+    <mat-card-title>
+      <mat-icon>filter_list</mat-icon>
+      Filters
+    </mat-card-title>
+  </mat-card-header>
+  
+  <mat-card-content>
+    <form [formGroup]="filterForm" class="filters-form">
+      <div class="filters-row">
+        <!-- Email Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Email</mat-label>
+          <input matInput 
+                 formControlName="email"
+                 placeholder="Enter email address"
+                 [disabled]="!hasPermission">
+          <mat-icon matSuffix>email</mat-icon>
+        </mat-form-field>
+
+        <!-- IP Address Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>IP Address</mat-label>
+          <input matInput 
+                 formControlName="ipAddress"
+                 placeholder="Enter IP address"
+                 [disabled]="!hasPermission">
+          <mat-icon matSuffix>computer</mat-icon>
+        </mat-form-field>
+
+        <!-- Status Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Status</mat-label>
+          <mat-select formControlName="status" [disabled]="!hasPermission">
+            <mat-option value="">All Statuses</mat-option>
+            <mat-option value="success">Success</mat-option>
+            <mat-option value="failed">Failed</mat-option>
+            <mat-option value="blocked">Blocked</mat-option>
+            <mat-option value="captcha_required">CAPTCHA Required</mat-option>
+          </mat-select>
+          <mat-icon matSuffix>assignment_turned_in</mat-icon>
+        </mat-form-field>
+      </div>
+
+      <div class="filters-row">
+        <!-- Date From Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>From Date</mat-label>
+          <input matInput 
+                 [matDatepicker]="fromPicker"
+                 formControlName="dateFrom"
+                 placeholder="Select start date"
+                 [disabled]="!hasPermission">
+          <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
+
+        <!-- Date To Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>To Date</mat-label>
+          <input matInput 
+                 [matDatepicker]="toPicker"
+                 formControlName="dateTo"
+                 placeholder="Select end date"
+                 [disabled]="!hasPermission">
+          <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
+
+        <!-- Action Buttons -->
+        <div class="filter-actions">
+          <button mat-raised-button 
+                  color="primary" 
+                  (click)="onApplyFilters()"
+                  [disabled]="!hasPermission"
+                  class="apply-btn">
+            <mat-icon>search</mat-icon>
+            Apply Filters
+          </button>
+          
+          <button mat-button 
+                  (click)="onResetFilters()"
+                  [disabled]="!hasPermission"
+                  class="reset-btn">
+            <mat-icon>clear</mat-icon>
+            Reset
+          </button>
+        </div>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card> 

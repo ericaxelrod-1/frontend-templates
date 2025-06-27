@@ -24,21 +24,21 @@ export const createMockUser = (overrides?: Partial<User>): User => ({
   isVerified: true,
   permissions: [
     {
-      id: 'user:view',
+      id: 1,
       name: 'View User',
       description: 'Can view user data',
       resourceName: 'user',
       actionName: 'view'
     },
     {
-      id: 'user:create',
+      id: 2,
       name: 'Create User',
       description: 'Can create users',
       resourceName: 'user',
       actionName: 'create'
     }
   ],
-  roles: ['USER'],
+  roles: [{ id: 1, name: 'USER', description: 'Standard user role' }],
   ...overrides
 });
 
@@ -49,6 +49,10 @@ export const setupTestBed = ({
   declarations = [],
   imports = [],
   providers = []
+}: {
+  declarations?: any[];
+  imports?: any[];
+  providers?: any[];
 } = {}) => {
   // Create mock services
   const mockPermissionService = jasmine.createSpyObj('PermissionService', {
@@ -119,7 +123,7 @@ export function createComponentFixture<T>(
     providers?: any[];
   }
 ): ComponentFixture<T> {
-  TestBed.configureTestingModule(setupTestBed(config));
+  TestBed.configureTestingModule(setupTestBed(config || {}));
   return TestBed.createComponent(component);
 }
 
@@ -146,11 +150,12 @@ export function configurePermissions(
   if (typeof config.hasPermission === 'boolean') {
     // Global permission setting
     permissionService.hasPermission.and.returnValue(of(config.hasPermission));
-  } else if (typeof config.hasPermission === 'object') {
+  } else if (typeof config.hasPermission === 'object' && config.hasPermission !== null) {
     // Permission map for different resources/actions
     permissionService.hasPermission.and.callFake((resource: string, action?: string) => {
       const key = action ? `${resource}:${action}` : resource;
-      return of(config.hasPermission[key] ?? false);
+      const permissionMap = config.hasPermission as Record<string, boolean>;
+      return of(permissionMap[key] ?? false);
     });
   }
   

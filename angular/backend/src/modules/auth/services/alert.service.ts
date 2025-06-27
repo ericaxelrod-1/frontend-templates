@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DetectedPattern } from './pattern-detection.service';
+import { SecurityAlertService } from './security-alert.service';
 
 export enum AlertChannel {
   CONSOLE = 'console',
@@ -42,10 +43,14 @@ export class AlertService {
     headers: Record<string, string>;
   };
 
-  constructor(private readonly configService: ConfigService) {
-    // Load configuration
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly securityAlertService: SecurityAlertService,
+  ) {
+    // Load configuration - default to both console and database channels
     this.channels = this.configService.get<AlertChannel[]>('alerts.channels', [
       AlertChannel.CONSOLE,
+      AlertChannel.DATABASE,
     ]);
     this.thresholdSeverity = this.configService.get<AlertSeverity>(
       'alerts.thresholdSeverity',
@@ -83,7 +88,10 @@ export class AlertService {
       timestamp: pattern.timestamp,
       ipAddress: pattern.ipAddress,
       userId: pattern.userId,
-      data: pattern.evidence,
+      data: {
+        patternType: pattern.type,
+        ...pattern.evidence,
+      },
     };
 
     return this.sendAlert(alert);
@@ -246,12 +254,85 @@ export class AlertService {
    * Store the alert in the database
    */
   private async sendDatabaseAlert(alert: AlertPayload): Promise<boolean> {
-    // In a real implementation, this would store the alert in a database
-    // For now, we'll just log that we would store an alert
-    this.logger.log(
-      `[DATABASE ALERT] Would store alert in database: ${alert.title}`,
-    );
-    return true;
+    try {
+      // Map AlertPayload to SecurityAlert entity structure
+      const securityAlertData = {
+        alertType: this.determineAlertType(alert),
+        severity: alert.severity,
+        title: alert.title,
+        message: alert.message,
+        source: 'system',
+        ipAddress: alert.ipAddress || null,
+        user: alert.userId ? { id: alert.userId } as any : null,
+        status: 'active',
+        alertData: alert.data ? JSON.stringify(alert.data) : null,
+        expiresAt: null, // Could be configured based on severity
+      };
+
+      const savedAlert = await this.securityAlertService.createAlert(securityAlertData);
+      
+      this.logger.log(
+        `[DATABASE ALERT] Successfully stored alert in database: ${alert.title} (ID: ${savedAlert.id})`
+      );
+      
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `[DATABASE ALERT] Failed to store alert in database: ${error.message}`,
+        error.stack
+      );
+      
+      // Fallback to console logging if database fails
+      this.logger.warn(
+        `[DATABASE ALERT] Falling back to console logging: ${alert.title}`
+      );
+      
+      return false;
+    }
+  }
+
+  /**
+   * Determine alert type based on alert payload
+   */
+  private determineAlertType(alert: AlertPayload): string {
+    // Check if this is a pattern-based alert
+    if (alert.data && typeof alert.data === 'object') {
+      if (alert.data.patternType) {
+        return `pattern_${alert.data.patternType}`;
+      }
+      if (alert.data.attemptCount) {
+        return 'security_pattern';
+      }
+    }
+    
+    // Check title for common alert types
+    if (alert.title.toLowerCase().includes('brute force')) {
+      return 'pattern_brute_force';
+    }
+    if (alert.title.toLowerCase().includes('credential stuffing')) {
+      return 'pattern_credential_stuffing';
+    }
+    if (alert.title.toLowerCase().includes('distributed attack')) {
+      return 'pattern_distributed_attack';
+    }
+    if (alert.title.toLowerCase().includes('login')) {
+      return 'auth_login';
+    }
+    if (alert.title.toLowerCase().includes('password')) {
+      return 'auth_password';
+    }
+    if (alert.title.toLowerCase().includes('account')) {
+      return 'auth_account';
+    }
+    if (alert.title.toLowerCase().includes('security')) {
+      return 'security_alert';
+    }
+    if (alert.title.toLowerCase().includes('test')) {
+      return 'test_alert';
+    }
+    
+    // Default alert type
+    return 'system_alert';
   }
 
   /**

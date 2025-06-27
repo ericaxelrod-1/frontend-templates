@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, Between, LessThan } from 'typeorm';
 import { LoginAttempt } from '../entities/login-attempt.entity';
 import { IPReputation } from '../entities/ip-reputation.entity';
+import { SecurityDetectedPattern } from '../entities/security-detected-pattern.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 
@@ -13,16 +14,24 @@ export enum PatternType {
   TIME_ANOMALY = 'time_anomaly',
   RAPID_ACCOUNT_SWITCHING = 'rapid_account_switching',
   IP_HOPPING = 'ip_hopping',
+  CREDENTIAL_STUFFING = 'credential_stuffing',
 }
 
 export interface DetectedPattern {
+  id?: string;
   type: PatternType;
   severity: 'low' | 'medium' | 'high' | 'critical';
   details: string;
   evidence: any;
   timestamp: Date;
   userId?: number;
-  ipAddress?: string;
+  ipAddress?: string; // Keep for backwards compatibility
+  ipAddresses: string[]; // New: Array of all affected IP addresses
+  email?: string; // Keep for backwards compatibility  
+  emails: string[]; // New: Array of all affected emails
+  isHistorical?: boolean;
+  status?: string;
+  expanded?: boolean; // For frontend UI state
 }
 
 @Injectable()
@@ -41,6 +50,8 @@ export class PatternDetectionService {
     private readonly loginAttemptRepository: Repository<LoginAttempt>,
     @InjectRepository(IPReputation)
     private readonly ipReputationRepository: Repository<IPReputation>,
+    @InjectRepository(SecurityDetectedPattern)
+    private readonly securityDetectedPatternRepository: Repository<SecurityDetectedPattern>,
     private readonly configService: ConfigService,
   ) {
     // Override defaults with config values if provided
@@ -52,8 +63,36 @@ export class PatternDetectionService {
     }
   }
 
+  /**
+   * Enhanced pattern detection that returns both real-time and historical patterns
+   */
+  async detectPatternsEnhanced(): Promise<DetectedPattern[]> {
+    const patterns: DetectedPattern[] = [];
+
+    // Get real-time patterns (current active threats)
+    const realTimePatterns = await this.detectRealTimePatterns();
+    
+    // Get historical patterns (stored in database)
+    const historicalPatterns = await this.getHistoricalPatterns();
+
+    // Combine both types
+    patterns.push(...realTimePatterns, ...historicalPatterns);
+
+    return patterns;
+  }
+
+  /**
+   * Original method kept for backwards compatibility and cron job
+   */
   @Cron(CronExpression.EVERY_10_MINUTES)
   async detectPatterns(): Promise<DetectedPattern[]> {
+    return this.detectRealTimePatterns();
+  }
+
+  /**
+   * Detect real-time patterns (active threats happening now)
+   */
+  async detectRealTimePatterns(): Promise<DetectedPattern[]> {
     const patterns: DetectedPattern[] = [];
 
     // Run various pattern detection methods
@@ -73,7 +112,171 @@ export class PatternDetectionService {
       ...ipHoppingPatterns,
     );
 
+    // Mark as real-time patterns
+    patterns.forEach(pattern => {
+      pattern.isHistorical = false;
+    });
+
     return patterns;
+  }
+
+  /**
+   * Get historical patterns from database with proper aggregation
+   */
+  async getHistoricalPatterns(limit: number = 50): Promise<DetectedPattern[]> {
+    const storedPatterns = await this.securityDetectedPatternRepository.find({
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+
+    return storedPatterns.map(pattern => {
+      const evidence = JSON.parse(pattern.evidence || '{}');
+      
+      // Extract IP addresses from evidence
+      let ipAddresses: string[] = [];
+      if (evidence.ips && Array.isArray(evidence.ips)) {
+        ipAddresses = evidence.ips;
+      } else if (evidence.ipAddress) {
+        ipAddresses = [evidence.ipAddress];
+      } else if (pattern.ipAddress) {
+        ipAddresses = [pattern.ipAddress];
+      }
+      
+      // Extract emails from evidence
+      let emails: string[] = [];
+      if (evidence.emails && Array.isArray(evidence.emails)) {
+        emails = evidence.emails;
+      } else if (evidence.email) {
+        emails = [evidence.email];
+      }
+      
+      return {
+        id: pattern.id.toString(),
+        type: pattern.patternType as PatternType,
+        severity: pattern.severity as 'low' | 'medium' | 'high' | 'critical',
+        details: `Historical pattern: ${pattern.patternType} from IP ${pattern.ipAddress}`,
+        evidence,
+        timestamp: pattern.detectionTimestamp,
+        ipAddress: pattern.ipAddress, // Keep for backwards compatibility
+        ipAddresses, // New aggregated field
+        email: evidence.email, // Keep for backwards compatibility
+        emails, // New aggregated field
+        isHistorical: true,
+        status: pattern.status,
+      };
+    });
+  }
+
+  /**
+   * Create simulated login attempts for testing real-time pattern detection
+   */
+  async createTestLoginAttempts(scenarioType: 'brute_force' | 'distributed_attack' | 'credential_stuffing' | 'account_switching'): Promise<void> {
+    const now = new Date();
+    
+    switch (scenarioType) {
+      case 'brute_force':
+        // Create 8 failed attempts from same IP in last 10 minutes
+        for (let i = 0; i < 8; i++) {
+          const attemptTime = new Date(now.getTime() - (i * 60000)); // 1 minute apart
+          await this.createTestAttempt({
+            ipAddress: '192.168.100.50',
+            emailAttempted: `test${i % 3}@example.com`, // Rotate between 3 emails
+            status: 'failed',
+            attemptedAt: attemptTime,
+            userAgent: 'Mozilla/5.0 (Test Browser)',
+            failureReason: 'invalid_credentials',
+          });
+        }
+        break;
+
+      case 'distributed_attack':
+        // Create attempts for same email from 4 different IPs
+        const targetEmail = 'admin@example.com';
+        const ips = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
+        for (let i = 0; i < ips.length; i++) {
+          const attemptTime = new Date(now.getTime() - (i * 300000)); // 5 minutes apart
+          await this.createTestAttempt({
+            ipAddress: ips[i],
+            emailAttempted: targetEmail,
+            status: Math.random() > 0.5 ? 'failed' : 'success',
+            attemptedAt: attemptTime,
+            userAgent: `Mozilla/5.0 (Test Browser ${i})`,
+            failureReason: Math.random() > 0.5 ? 'invalid_credentials' : undefined,
+          });
+        }
+        break;
+
+      case 'credential_stuffing':
+        // Create attempts with many different emails from same IP
+        const stuffingIP = '172.16.0.100';
+        const emails = [
+          'admin@test.com', 'user@test.com', 'manager@test.com', 'support@test.com',
+          'info@test.com', 'sales@test.com', 'contact@test.com', 'help@test.com',
+          'service@test.com', 'team@test.com', 'office@test.com', 'staff@test.com'
+        ];
+        for (let i = 0; i < emails.length; i++) {
+          const attemptTime = new Date(now.getTime() - (i * 30000)); // 30 seconds apart
+          await this.createTestAttempt({
+            ipAddress: stuffingIP,
+            emailAttempted: emails[i],
+            status: 'failed',
+            attemptedAt: attemptTime,
+            userAgent: 'curl/7.68.0',
+            failureReason: 'invalid_credentials',
+          });
+        }
+        break;
+
+      case 'account_switching':
+        // Create attempts with multiple different emails from same IP
+        const switchingIP = '203.0.113.10';
+        const switchEmails = ['alice@corp.com', 'bob@corp.com', 'charlie@corp.com', 'diana@corp.com'];
+        for (let i = 0; i < switchEmails.length; i++) {
+          const attemptTime = new Date(now.getTime() - (i * 120000)); // 2 minutes apart
+          await this.createTestAttempt({
+            ipAddress: switchingIP,
+            emailAttempted: switchEmails[i],
+            status: Math.random() > 0.3 ? 'failed' : 'success',
+            attemptedAt: attemptTime,
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            failureReason: Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+          });
+        }
+        break;
+    }
+  }
+
+  /**
+   * Helper method to create a test login attempt
+   */
+  private async createTestAttempt(attemptData: Partial<LoginAttempt>): Promise<LoginAttempt> {
+    const attempt = this.loginAttemptRepository.create({
+      ipAddress: attemptData.ipAddress,
+      emailAttempted: attemptData.emailAttempted,
+      status: attemptData.status,
+      attemptedAt: attemptData.attemptedAt || new Date(),
+      userAgent: attemptData.userAgent || 'Test User Agent',
+      failureReason: attemptData.failureReason,
+      metadata: JSON.stringify({ source: 'test_simulation', timestamp: new Date() }),
+    });
+
+    return this.loginAttemptRepository.save(attempt);
+  }
+
+  /**
+   * Clear test data (remove attempts created in last 30 minutes with test metadata)
+   */
+  async clearTestData(): Promise<{ deleted: number }> {
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    
+    const result = await this.loginAttemptRepository
+      .createQueryBuilder()
+      .delete()
+      .where('attempted_at > :startTime', { startTime: thirtyMinutesAgo })
+      .andWhere('metadata LIKE :testSource', { testSource: '%test_simulation%' })
+      .execute();
+
+    return { deleted: result.affected || 0 };
   }
 
   async detectBruteForceAttempts(): Promise<DetectedPattern[]> {
@@ -129,6 +332,8 @@ export class PatternDetectionService {
         },
         timestamp: new Date(),
         ipAddress: item.ip_address,
+        ipAddresses: [item.ip_address],
+        emails: uniqueEmails,
       });
     }
 
@@ -165,7 +370,7 @@ export class PatternDetectionService {
         order: { attemptedAt: 'DESC' },
       });
 
-      const uniqueIPs = [...new Set(attempts.map((a) => a.ipAddress))];
+      const uniqueIPs = [...new Set(attempts.map((a) => a.ipAddress))] as string[];
 
       patterns.push({
         type: PatternType.DISTRIBUTED_ATTACK,
@@ -184,6 +389,8 @@ export class PatternDetectionService {
         },
         timestamp: new Date(),
         userId: attempts[0]?.user?.id || null,
+        ipAddresses: uniqueIPs,
+        emails: [item.emailAttempted].filter(Boolean),
       });
     }
 
@@ -250,6 +457,8 @@ export class PatternDetectionService {
         },
         timestamp: new Date(),
         ipAddress: item.ip_address,
+        ipAddresses: [item.ip_address],
+        emails: uniqueEmails,
       });
     }
 
@@ -295,7 +504,7 @@ export class PatternDetectionService {
         });
       }
 
-      const uniqueIPs = [...new Set(attempts.map((a) => a.ipAddress))];
+      const uniqueIPs = [...new Set(attempts.map((a) => a.ipAddress))] as string[];
 
       if (uniqueIPs.length > 1) {
         // Check time between attempts from different IPs
@@ -326,6 +535,8 @@ export class PatternDetectionService {
                 timestamp: new Date(),
                 userId: user.userId,
                 ipAddress: attempts[i].ipAddress,
+                ipAddresses: uniqueIPs,
+                emails: user.emailAttempted ? [user.emailAttempted] : [],
               });
 
               // Only report the first instance for this user

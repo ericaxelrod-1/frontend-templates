@@ -657,4 +657,75 @@ export class UsersService {
       }
     };
   }
+
+  /**
+   * Block a user account
+   */
+  async blockUser(
+    userId: number,
+    blockData: {
+      reason: string;
+      blockedUntil?: Date;
+      blockedBy: number;
+    },
+  ): Promise<void> {
+    await this.userRepository.update(userId, {
+      isBlocked: true,
+      blockedAt: new Date(),
+      blockedUntil: blockData.blockedUntil,
+      blockedReason: blockData.reason,
+    });
+  }
+
+  /**
+   * Unblock a user account
+   */
+  async unblockUser(userId: number, unblockedBy: number): Promise<void> {
+    await this.userRepository.update(userId, {
+      isBlocked: false,
+      blockedAt: null,
+      blockedUntil: null,
+      blockedReason: null,
+    });
+  }
+
+  /**
+   * Get list of blocked users
+   */
+  async getBlockedUsers(
+    limit: number = 50,
+    offset: number = 0,
+  ): Promise<{ items: User[]; total: number }> {
+    const [items, total] = await this.userRepository.findAndCount({
+      where: { isBlocked: true },
+      order: { blockedAt: 'DESC' },
+      take: limit,
+      skip: offset,
+    });
+
+    return { items, total };
+  }
+
+  /**
+   * Check if user is currently blocked
+   */
+  async isUserBlocked(userId: number): Promise<boolean> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['isBlocked', 'blockedUntil'],
+    });
+
+    if (!user || !user.isBlocked) {
+      return false;
+    }
+
+    // Check if temporary block has expired
+    if (user.blockedUntil && new Date() > user.blockedUntil) {
+      // Auto-unblock expired temporary blocks
+      await this.unblockUser(userId, 0); // System user
+      return false;
+    }
+
+    return true;
+  }
 }
