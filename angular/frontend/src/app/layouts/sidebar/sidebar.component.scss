@@ -63,6 +63,19 @@
   
   &:last-child { margin-bottom: 0; }
   
+  // Admin context active styling
+  &.admin-context-active {
+    background: rgba(var(--mdc-theme-primary-rgb), 0.04);
+    border-radius: 8px;
+    margin: 0 $spacing-sm $spacing-lg $spacing-sm;
+    padding: $spacing-sm;
+    
+    .section-title {
+      color: var(--mdc-theme-primary);
+      font-weight: 700;
+    }
+  }
+  
   .section-title {
     padding: 0 $spacing-lg $spacing-sm $spacing-lg;
     font-size: 0.75rem;

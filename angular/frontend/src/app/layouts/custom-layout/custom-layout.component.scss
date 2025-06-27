@@ -91,102 +91,7 @@
   }
 }
 
-// Admin Sidebar - nested to the right of main sidebar
-.admin-sidenav {
-  width: 240px; // Slightly narrower than main sidebar
-  background-color: var(--mat-sys-surface);
-  z-index: 900; // Below main sidebar but above content
-  
-  // Mobile behavior - replace main sidebar
-  @media screen and (max-width: 599px) {
-    width: 280px;
-  }
-  
-  .admin-sidebar-content {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    padding: $spacing-md;
-  }
-  
-  .admin-sidebar-header {
-    padding-bottom: $spacing-md;
-    margin-bottom: $spacing-md;
-    
-    h3 {
-      margin: 0;
-      color: var(--mdc-theme-on-surface);
-      font-size: 1.1rem;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      
-      &::before {
-        content: 'admin_panel_settings';
-        font-family: 'Material Icons';
-        margin-right: $spacing-xs;
-        color: var(--mdc-theme-primary);
-      }
-    }
-  }
-  
-  .admin-nav {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: $spacing-xs;
-  }
-  
-  .admin-nav-item {
-    display: flex;
-    align-items: center;
-    padding: $spacing-sm $spacing-md;
-    border-radius: $border-radius-md;
-    text-decoration: none;
-    color: var(--mdc-theme-on-surface);
-    transition: background-color 0.2s, color 0.2s;
-    
-    mat-icon {
-      margin-right: $spacing-sm;
-      font-size: 20px;
-      width: 20px;
-      height: 20px;
-    }
-    
-    span {
-      font-weight: 400;
-      font-size: 0.9rem;
-    }
-    
-    &:hover {
-      background-color: var(--mdc-theme-action-hover);
-    }
-    
-    &.active {
-      background-color: var(--mdc-theme-primary-container);
-      color: var(--mdc-theme-on-primary-container);
-      
-      mat-icon {
-        color: var(--mdc-theme-primary);
-      }
-    }
-    
-    // Special styling for back to dashboard link
-    &.back-to-dashboard {
-      margin-bottom: $spacing-sm;
-      padding-bottom: $spacing-md;
-      
-      &:hover {
-        background-color: var(--mat-sys-secondary-container);
-        color: var(--mat-sys-on-secondary-container);
-      }
-      
-      mat-icon {
-        color: var(--mat-sys-secondary);
-      }
-    }
-  }
-}
+
 
 // Admin Breadcrumb
 .admin-breadcrumb {
@@ -263,47 +168,7 @@
 /**
  * RESPONSIVE ADJUSTMENTS
  */
-@media (max-width: 599px) {
-  // Mobile adjustments for admin context
-  .app-layout.admin-context {
-    .sidenav:not(.admin-sidenav) {
-      // Hide main sidebar on mobile when in admin context
-      display: none;
-    }
-    
-    .admin-sidenav {
-      // Admin sidebar takes full mobile space
-      width: 280px;
-    }
-  }
-}
-
-@media (min-width: 600px) {
-  // Desktop adjustments for admin context
-  .app-layout.admin-context {
-    .sidenav-container {
-      // Nested sidebar layout
-      display: flex;
-      
-      .sidenav:not(.admin-sidenav) {
-        // Main sidebar on left
-        position: relative;
-        transform: none;
-      }
-      
-      .admin-sidenav {
-        // Admin sidebar on right of main sidebar
-        position: relative;
-        transform: none;
-      }
-      
-      .sidenav-content {
-        // Content area takes remaining space
-        flex: 1;
-      }
-    }
-  }
-}
+// No admin-specific responsive adjustments needed - using unified sidebar
 
 /**
  * HIGH CONTRAST MODE SUPPORT
@@ -317,16 +182,12 @@
  * REDUCED MOTION SUPPORT
  */
 @media (prefers-reduced-motion: reduce) {
-  .sidenav, .admin-sidenav {
+  .sidenav {
     transition: none;
   }
   
   .main-content {
     scroll-behavior: auto;
-  }
-  
-  .admin-nav-item {
-    transition: none;
   }
 }
 
@@ -345,7 +206,7 @@
     display: none;
   }
   
-  .sidenav, .admin-sidenav {
+  .sidenav {
     display: none;
   }
   

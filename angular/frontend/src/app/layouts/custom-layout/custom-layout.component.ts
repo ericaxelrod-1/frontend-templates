@@ -60,7 +60,7 @@ import { filter } from 'rxjs/operators';
       <div class="layout-main">
         <!-- Material Sidenav Container with proper height constraints -->
         <mat-sidenav-container class="sidenav-container">
-          <!-- Single Dynamic Sidenav with context-based content -->
+          <!-- Unified Sidenav - Always use standard sidebar for consistent navigation -->
           <mat-sidenav
             #sidenav
             [mode]="isMobile ? 'over' : 'side'"
@@ -69,40 +69,11 @@ import { filter } from 'rxjs/operators';
             class="sidenav"
             position="start">
             
-            <!-- Dynamic content based on context -->
-            <ng-container *ngIf="!isAdminContext">
-              <!-- Main navigation content -->
-              <app-sidebar 
-                [isCollapsed]="isCollapsed"
-                [isAdminContext]="isAdminContext">
-              </app-sidebar>
-            </ng-container>
-            
-            <ng-container *ngIf="isAdminContext">
-              <!-- Admin navigation content -->
-              <div class="admin-sidebar-content">
-                <div class="admin-sidebar-header">
-                  <h3>Admin Panel</h3>
-                </div>
-                <nav class="admin-nav">
-                  <!-- Back to Dashboard Link -->
-                  <a routerLink="/app/dashboard" 
-                     class="admin-nav-item back-to-dashboard">
-                    <mat-icon>arrow_back</mat-icon>
-                    <span>Back to Dashboard</span>
-                  </a>
-                  
-                  <!-- Admin Menu Items -->
-                  <a routerLink="/app/admin/login-monitoring" 
-                     routerLinkActive="active"
-                     class="admin-nav-item">
-                    <mat-icon>security</mat-icon>
-                    <span>Login Monitoring</span>
-                  </a>
-                  <!-- Future admin navigation items can be added here -->
-                </nav>
-              </div>
-            </ng-container>
+            <!-- Always use unified sidebar - no separate admin context -->
+            <app-sidebar 
+              [isCollapsed]="isCollapsed"
+              [isAdminContext]="isAdminContext">
+            </app-sidebar>
           </mat-sidenav>
 
           <!-- Sidenav Content - Main content area -->
