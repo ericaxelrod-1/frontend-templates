@@ -42,13 +42,25 @@ export interface IPReputation {
 }
 
 export interface SecurityAlert {
-  id: string;
-  type: string;
+  id: number;
+  alertType: string;
   severity: string;
+  title: string;
   message: string;
-  timestamp: Date;
-  status: 'new' | 'acknowledged' | 'resolved' | 'dismissed';
-  details?: any;
+  source: string;
+  ipAddress?: string;
+  status: 'active' | 'acknowledged' | 'resolved' | 'dismissed';
+  acknowledgedAt?: Date;
+  resolvedAt?: Date;
+  resolutionNotes?: string;
+  alertData?: string;
+  expiresAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  // Legacy support for template compatibility
+  type?: string; // Maps to alertType
+  timestamp?: Date; // Maps to createdAt
+  details?: any; // Maps to alertData
 }
 
 export interface LoginMonitoringFilters {

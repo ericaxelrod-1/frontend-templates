@@ -104,10 +104,13 @@ export class LoginMonitoringService {
       .pipe(catchError(this.handleError));
   }
 
-  // Security Alerts API - Fixed to use correct endpoint
+  // Security Alerts API - Fixed to use correct endpoint and handle paginated response
   getSecurityAlerts(): Observable<SecurityAlert[]> {
-    return this.http.get<SecurityAlert[]>(`${environment.apiUrl}/security-alerts/alerts`)
-      .pipe(catchError(this.handleError));
+    return this.http.get<{items: any[], total: number}>(`${environment.apiUrl}/security-alerts/alerts`)
+      .pipe(
+        map(response => (response.items || []).map(alert => this.transformSecurityAlert(alert))),
+        catchError(this.handleError)
+      );
   }
 
   acknowledgeAlert(alertId: string): Observable<SecurityAlert> {
@@ -147,6 +150,26 @@ export class LoginMonitoringService {
   unblockIP(ipAddress: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/ip/${encodeURIComponent(ipAddress)}/unblock`, {})
       .pipe(catchError(this.handleError));
+  }
+
+  /**
+   * Transform backend SecurityAlert to frontend SecurityAlert interface
+   * Adds legacy field mappings for template compatibility
+   */
+  private transformSecurityAlert(backendAlert: any): SecurityAlert {
+    return {
+      ...backendAlert,
+      // Legacy field mappings for template compatibility
+      type: backendAlert.alertType,
+      timestamp: backendAlert.createdAt ? new Date(backendAlert.createdAt) : new Date(),
+      details: backendAlert.alertData ? JSON.parse(backendAlert.alertData) : null,
+      // Ensure dates are Date objects
+      createdAt: new Date(backendAlert.createdAt),
+      updatedAt: new Date(backendAlert.updatedAt),
+      acknowledgedAt: backendAlert.acknowledgedAt ? new Date(backendAlert.acknowledgedAt) : undefined,
+      resolvedAt: backendAlert.resolvedAt ? new Date(backendAlert.resolvedAt) : undefined,
+      expiresAt: backendAlert.expiresAt ? new Date(backendAlert.expiresAt) : undefined,
+    };
   }
 
   /**
