@@ -1,0 +1,77 @@
+<!-- Statistics Cards -->
+<div class="stats-container" *ngIf="statistics">
+  <mat-card class="stats-card">
+    <mat-card-header>
+      <mat-card-title>Total Attempts</mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="stats-content">
+      <div class="stats-number">{{ statistics.total }}</div>
+    </mat-card-content>
+  </mat-card>
+  
+  <mat-card class="stats-card success">
+    <mat-card-header>
+      <mat-card-title>Successful</mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="stats-content">
+      <div class="stats-number">{{ statistics.successful }}</div>
+      <div class="stats-percent" *ngIf="statistics.total > 0">
+        {{ (statistics.successful / statistics.total * 100).toFixed(1) }}%
+      </div>
+    </mat-card-content>
+  </mat-card>
+  
+  <mat-card class="stats-card warning">
+    <mat-card-header>
+      <mat-card-title>Failed</mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="stats-content">
+      <div class="stats-number">{{ statistics.failed }}</div>
+      <div class="stats-percent" *ngIf="statistics.total > 0">
+        {{ (statistics.failed / statistics.total * 100).toFixed(1) }}%
+      </div>
+    </mat-card-content>
+  </mat-card>
+  
+  <mat-card class="stats-card danger">
+    <mat-card-header>
+      <mat-card-title>Blocked</mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="stats-content">
+      <div class="stats-number">{{ statistics.blocked }}</div>
+      <div class="stats-percent" *ngIf="statistics.total > 0">
+        {{ (statistics.blocked / statistics.total * 100).toFixed(1) }}%
+      </div>
+    </mat-card-content>
+  </mat-card>
+  
+  <mat-card class="stats-card info">
+    <mat-card-header>
+      <mat-card-title>CAPTCHA Required</mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="stats-content">
+      <div class="stats-number">{{ statistics.captchaRequired }}</div>
+      <div class="stats-percent" *ngIf="statistics.total > 0">
+        {{ (statistics.captchaRequired / statistics.total * 100).toFixed(1) }}%
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+
+<!-- Loading spinner for stats -->
+<div *ngIf="!statistics && loading" class="loading-container">
+  <mat-spinner diameter="40"></mat-spinner>
+  <p>Loading statistics...</p>
+</div>
+
+<!-- Stats Error Message -->
+<div *ngIf="!statistics && !loading" class="error-message">
+  <mat-card>
+    <mat-card-content>
+      <p>Unable to load statistics. Please try again later.</p>
+      <button mat-button color="primary" (click)="loadStats()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </mat-card-content>
+  </mat-card>
+</div> 

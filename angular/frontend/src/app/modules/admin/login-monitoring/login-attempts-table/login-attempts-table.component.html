@@ -1,0 +1,158 @@
+<!-- Loading indicator -->
+<div *ngIf="loading" class="loading-placeholder">
+  <mat-spinner diameter="40"></mat-spinner>
+  <span>Loading login attempts...</span>
+</div>
+
+<!-- Always render table structure - following 150-angular-server-side-sorting rule -->
+<mat-table [dataSource]="recentAttempts" matSort 
+           matSortActive="createdAt" 
+           matSortDirection="desc"
+           class="login-attempts-table">
+
+  <!-- ID Column -->
+  <ng-container matColumnDef="id">
+    <mat-header-cell *matHeaderCellDef mat-sort-header>ID</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <span class="attempt-id">{{ attempt.id }}</span>
+    </mat-cell>
+  </ng-container>
+
+  <!-- Timestamp Column -->
+  <ng-container matColumnDef="timestamp">
+    <mat-header-cell *matHeaderCellDef mat-sort-header="createdAt">Timestamp</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <span class="timestamp">{{ attempt.createdAt | date:'medium' }}</span>
+    </mat-cell>
+  </ng-container>
+
+  <!-- Email Column -->
+  <ng-container matColumnDef="email">
+    <mat-header-cell *matHeaderCellDef mat-sort-header>Email</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <span class="email">{{ attempt.email }}</span>
+    </mat-cell>
+  </ng-container>
+
+  <!-- IP Address Column -->
+  <ng-container matColumnDef="ipAddress">
+    <mat-header-cell *matHeaderCellDef mat-sort-header>IP Address</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <span class="ip-address" 
+            [matTooltip]="'Click to view IP reputation'"
+            (click)="onIPReputationRequest(attempt.ipAddress)">
+        {{ attempt.ipAddress }}
+      </span>
+    </mat-cell>
+  </ng-container>
+
+  <!-- User Agent Column -->
+  <ng-container matColumnDef="userAgent">
+    <mat-header-cell *matHeaderCellDef mat-sort-header>User Agent</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <span class="user-agent" [matTooltip]="attempt.userAgent">
+        {{ attempt.userAgent | slice:0:50 }}{{ attempt.userAgent?.length > 50 ? '...' : '' }}
+      </span>
+    </mat-cell>
+  </ng-container>
+
+  <!-- Status Column -->
+  <ng-container matColumnDef="status">
+    <mat-header-cell *matHeaderCellDef mat-sort-header>Status</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <mat-chip [class]="'status-' + attempt.status.toLowerCase()">
+        {{ attempt.status }}
+      </mat-chip>
+    </mat-cell>
+  </ng-container>
+
+  <!-- Details Column -->
+  <ng-container matColumnDef="details">
+    <mat-header-cell *matHeaderCellDef mat-sort-header="failureReason">Details</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <span class="details" *ngIf="attempt.failureReason">
+        {{ attempt.failureReason }}
+      </span>
+      <span class="no-details" *ngIf="!attempt.failureReason">-</span>
+    </mat-cell>
+  </ng-container>
+
+  <!-- Metadata Column -->
+  <ng-container matColumnDef="metadata">
+    <mat-header-cell *matHeaderCellDef>Metadata</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <button mat-icon-button 
+              *ngIf="attempt.metadata"
+              [matTooltip]="attempt.metadata"
+              matTooltipClass="metadata-tooltip">
+        <mat-icon>info</mat-icon>
+      </button>
+      <span *ngIf="!attempt.metadata" class="no-metadata">-</span>
+    </mat-cell>
+  </ng-container>
+
+  <!-- Actions Column -->
+  <ng-container matColumnDef="actions">
+    <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
+    <mat-cell *matCellDef="let attempt">
+      <button mat-icon-button 
+              [matMenuTriggerFor]="actionsMenu"
+              matTooltip="More actions">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+      
+      <mat-menu #actionsMenu="matMenu">
+        <button mat-menu-item (click)="onAttemptSelected(attempt)">
+          <mat-icon>visibility</mat-icon>
+          <span>View Details</span>
+        </button>
+        <button mat-menu-item (click)="onIPReputationRequest(attempt.ipAddress)">
+          <mat-icon>security</mat-icon>
+          <span>Check IP Reputation</span>
+        </button>
+        <button mat-menu-item (click)="navigateToLoginAttempt(attempt.id)">
+          <mat-icon>open_in_new</mat-icon>
+          <span>Open in New Tab</span>
+        </button>
+      </mat-menu>
+    </mat-cell>
+  </ng-container>
+
+  <!-- Table Headers and Rows -->
+  <mat-header-row *matHeaderRowDef="attemptColumns"></mat-header-row>
+  <mat-row *matRowDef="let row; columns: attemptColumns;" 
+           [class.clickable-row]="true"
+           (click)="onAttemptSelected(row)"></mat-row>
+
+  <!-- Empty state inside table - following 150-angular-server-side-sorting rule -->
+  <div *ngIf="!loading && recentAttempts.length === 0" class="empty-state-in-table">
+    <mat-icon class="empty-icon">inbox</mat-icon>
+    <p>No login attempts found</p>
+    <p class="empty-subtitle">Try adjusting your filters or check back later</p>
+  </div>
+</mat-table>
+
+<!-- Pagination -->
+<mat-paginator
+  *ngIf="!loading && totalAttempts > 0"
+  [length]="totalAttempts"
+  [pageSize]="pageSize"
+  [pageSizeOptions]="[5, 10, 25, 50]"
+  [pageIndex]="currentPage"
+  (page)="pageChange($event)"
+  showFirstLastButtons>
+</mat-paginator>
+
+<!-- No data message when not loading and no results -->
+<div *ngIf="!loading && totalAttempts === 0" class="no-data-message">
+  <mat-card>
+    <mat-card-content>
+      <mat-icon class="no-data-icon">search_off</mat-icon>
+      <h3>No login attempts found</h3>
+      <p>There are no login attempts matching your current filters.</p>
+      <button mat-button color="primary" (click)="triggerDataRefresh()">
+        <mat-icon>refresh</mat-icon> Refresh
+      </button>
+    </mat-card-content>
+  </mat-card>
+</div> 

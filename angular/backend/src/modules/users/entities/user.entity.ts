@@ -133,6 +133,18 @@ export class User {
   @Column({ name: 'deleted_at', nullable: true })
   deletedAt: Date;
 
+  @Column({ name: 'is_blocked', default: false })
+  isBlocked: boolean;
+
+  @Column({ name: 'blocked_at', nullable: true })
+  blockedAt: Date;
+
+  @Column({ name: 'blocked_until', nullable: true })
+  blockedUntil: Date;
+
+  @Column({ name: 'blocked_reason', type: 'text', nullable: true })
+  blockedReason: string;
+
   @ManyToMany(() => Role, role => role.users)
   @JoinTable({
     name: 'user_roles',

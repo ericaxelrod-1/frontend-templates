@@ -248,4 +248,56 @@ export class LoginAttemptService {
 
     return query.getCount();
   }
+
+  /**
+   * Get aggregated statistics for a specific IP address with SQL GROUP BY
+   */
+  async getAggregatedStatsForIP(ipAddress: string, since: Date): Promise<{
+    totalAttempts: number;
+    successfulAttempts: number;
+    failedAttempts: number;
+    blockedAttempts: number;
+    uniqueEmailsAttempted: number;
+    firstAttempt: Date | null;
+    lastAttempt: Date | null;
+    emailsAttempted: string[];
+  }> {
+    // Get basic counts using SQL aggregation
+    const stats = await this.loginAttemptRepository
+      .createQueryBuilder('attempt')
+      .select([
+        'COUNT(*) as totalAttempts',
+        'SUM(CASE WHEN attempt.status = "success" THEN 1 ELSE 0 END) as successfulAttempts',
+        'SUM(CASE WHEN attempt.status = "failed" THEN 1 ELSE 0 END) as failedAttempts',
+        'SUM(CASE WHEN attempt.status = "blocked" THEN 1 ELSE 0 END) as blockedAttempts',
+        'COUNT(DISTINCT attempt.emailAttempted) as uniqueEmailsAttempted',
+        'MIN(attempt.attemptedAt) as firstAttempt',
+        'MAX(attempt.attemptedAt) as lastAttempt'
+      ])
+      .where('attempt.ipAddress = :ipAddress', { ipAddress })
+      .andWhere('attempt.attemptedAt >= :since', { since })
+      .getRawOne();
+
+    // Get unique emails attempted (SQL DISTINCT equivalent)
+    const emailsResult = await this.loginAttemptRepository
+      .createQueryBuilder('attempt')
+      .select('DISTINCT attempt.emailAttempted', 'email')
+      .where('attempt.ipAddress = :ipAddress', { ipAddress })
+      .andWhere('attempt.attemptedAt >= :since', { since })
+      .andWhere('attempt.emailAttempted IS NOT NULL')
+      .getRawMany();
+
+    const emailsAttempted = emailsResult.map(row => row.email).filter(Boolean);
+
+    return {
+      totalAttempts: parseInt(stats.totalAttempts) || 0,
+      successfulAttempts: parseInt(stats.successfulAttempts) || 0,
+      failedAttempts: parseInt(stats.failedAttempts) || 0,
+      blockedAttempts: parseInt(stats.blockedAttempts) || 0,
+      uniqueEmailsAttempted: parseInt(stats.uniqueEmailsAttempted) || 0,
+      firstAttempt: stats.firstAttempt ? new Date(stats.firstAttempt) : null,
+      lastAttempt: stats.lastAttempt ? new Date(stats.lastAttempt) : null,
+      emailsAttempted,
+    };
+  }
 }

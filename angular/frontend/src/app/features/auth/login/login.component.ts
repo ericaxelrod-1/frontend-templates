@@ -228,53 +228,15 @@ export class LoginComponent implements OnInit, OnDestroy {
     
     this.logger.debug('About to dispatch login action');
     
-    // Dispatch login action
+    // Dispatch login action - NgRx actions don't return results, they update state
     this.store.dispatch(new AuthActions.Login(
       loginData.email,
       loginData.password,
       loginData.recaptchaToken
-    )).subscribe({
-      next: (result) => {
-        this.logger.info('Login action dispatched successfully');
-        // Check if the result contains any error information
-        if (result.auth && result.auth.error) {
-          this.error = result.auth.error;
-          this.loading = false;
-          
-          // Refresh captcha on error if enabled
-          if (this.captchaEnabled && this.captchaSelector) {
-            const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-            if (activeCaptcha?.refreshChallenge) {
-              activeCaptcha.refreshChallenge();
-            }
-          }
-        }
-      },
-      error: (err) => {
-        this.logger.error('Error dispatching login action:', err);
-        
-        // Set a more specific error message based on the error type
-        if (err.status === 401) {
-          this.error = 'Invalid email or password. Please try again.';
-        } else if (err.status === 403) {
-          this.error = 'Your account is locked. Please contact an administrator.';
-        } else if (err.status === 400) {
-          this.error = err.error?.message || 'Invalid login request. Please check your credentials.';
-        } else {
-          this.error = 'An error occurred during login. Please try again later.';
-        }
-        
-        this.loading = false;
-        
-        // Refresh captcha on error if enabled
-        if (this.captchaEnabled && this.captchaSelector) {
-          const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-          if (activeCaptcha?.refreshChallenge) {
-            activeCaptcha.refreshChallenge();
-          }
-        }
-      }
-    });
+    ));
+    
+    // Error handling is done via the error$ observable subscription in ngOnInit
+    // Loading state is handled via the loading$ observable subscription in ngOnInit
   }
   
   // Navigate to forgot password page

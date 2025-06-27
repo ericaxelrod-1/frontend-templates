@@ -1,0 +1,172 @@
+@use '@angular/material' as mat;
+@use '../../../../../styles/abstracts' as *;
+
+.loading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  
+  span {
+    margin-top: 1rem;
+    color: $text-secondary;
+  }
+}
+
+.login-attempts-table {
+  width: 100%;
+  
+  .mat-mdc-header-cell {
+    font-weight: 600;
+    color: $text-primary;
+  }
+  
+  .mat-mdc-cell {
+    padding: 0.5rem;
+  }
+  
+  .clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+  }
+}
+
+// Column specific styles
+.attempt-id {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: $text-secondary;
+}
+
+.timestamp {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.email {
+  font-weight: 500;
+  color: $primary-color;
+}
+
+.ip-address {
+  font-family: monospace;
+  cursor: pointer;
+  color: $info-color;
+  text-decoration: underline;
+  
+  &:hover {
+    color: $primary-dark;
+  }
+}
+
+.user-agent {
+  font-size: 0.75rem;
+  color: $text-secondary;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Status chips
+.mat-mdc-chip {
+  &.status-success {
+    background-color: $success-color;
+    color: white;
+  }
+  
+  &.status-failed {
+    background-color: $error-color;
+    color: white;
+  }
+  
+  &.status-blocked {
+    background-color: $warning-color;
+    color: white;
+  }
+  
+  &.status-captcha_required {
+    background-color: $info-color;
+    color: white;
+  }
+}
+
+.details {
+  font-size: 0.875rem;
+  color: $text-secondary;
+}
+
+.no-details, .no-metadata {
+  color: $text-disabled;
+  font-style: italic;
+}
+
+// Empty state
+.empty-state-in-table {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 2rem;
+  text-align: center;
+  
+  .empty-icon {
+    font-size: 3rem;
+    width: 3rem;
+    height: 3rem;
+    color: $text-disabled;
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    margin: 0.5rem 0;
+    color: $text-secondary;
+  }
+  
+  .empty-subtitle {
+    font-size: 0.875rem;
+    color: $text-disabled;
+  }
+}
+
+// No data message
+.no-data-message {
+  text-align: center;
+  margin: 2rem 0;
+  
+  .no-data-icon {
+    font-size: 4rem;
+    width: 4rem;
+    height: 4rem;
+    color: $text-disabled;
+    margin-bottom: 1rem;
+  }
+  
+  h3 {
+    color: $text-primary;
+    margin-bottom: 0.5rem;
+  }
+  
+  p {
+    color: $text-secondary;
+    margin-bottom: 1rem;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .login-attempts-table {
+    .mat-mdc-cell, .mat-mdc-header-cell {
+      padding: 0.25rem;
+      font-size: 0.75rem;
+    }
+    
+    .user-agent {
+      max-width: 100px;
+    }
+  }
+} 

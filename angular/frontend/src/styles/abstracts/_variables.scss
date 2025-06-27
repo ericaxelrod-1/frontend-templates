@@ -1,48 +1,43 @@
-// Angular Material Theme Variables
-// Import Angular Material theming functions
-@use '@angular/material' as mat;
+// Angular Material 18+ Theme Variables
+// Using CSS Custom Properties for Angular Material compatibility
 
-// Define the palettes (these should match styles.scss)
-$primary-palette: mat.define-palette(mat.$indigo-palette);
-$accent-palette: mat.define-palette(mat.$pink-palette, A200, A100, A400);
-$warn-palette: mat.define-palette(mat.$red-palette);
+// DEPRECATED: Use CSS custom properties instead
+// Primary colors - Use var(--mat-sys-primary) instead
+$primary-color: var(--mat-sys-primary, #6750a4);
+$primary-light: var(--mat-sys-primary-container, #eaddff);
+$primary-dark: var(--mat-sys-primary, #6750a4);
 
-// Create the theme (this should match styles.scss)
-$light-theme: mat.define-light-theme((
-  color: (
-    primary: $primary-palette,
-    accent: $accent-palette,
-    warn: $warn-palette,
-  )
-));
+// DEPRECATED: Use CSS custom properties instead
+// Accent colors - Use var(--mat-sys-secondary) instead
+$accent-color: var(--mat-sys-secondary, #625b71);
 
-// Extract colors from the theme
-$primary-color: mat.get-color-from-palette($primary-palette, 500);
-$primary-light: mat.get-color-from-palette($primary-palette, 100);
-$primary-dark: mat.get-color-from-palette($primary-palette, 700);
-$accent-color: mat.get-color-from-palette($accent-palette, A200);
-$warn-color: mat.get-color-from-palette($warn-palette, 500);
-
-// Background colors from theme
-$background-color: mat.get-color-from-palette(mat.$grey-palette, 50);
-$background-card: #ffffff;
-$background-hover: mat.get-color-from-palette(mat.$grey-palette, 100);
-
-// Text colors from theme
-$text-primary: rgba(0, 0, 0, 0.87);
-$text-secondary: rgba(0, 0, 0, 0.6);
-$text-disabled: rgba(0, 0, 0, 0.38);
-$text-hint: rgba(0, 0, 0, 0.38);
-
-// Border and divider colors
-$border-color: rgba(0, 0, 0, 0.12);
-$divider-color: rgba(0, 0, 0, 0.12);
-
-// Semantic colors
-$success-color: #4caf50;
-$warning-color: #ff9800;
-$info-color: #2196f3;
+// DEPRECATED: Use CSS custom properties instead
+// Error colors - Use var(--mat-sys-error) instead
+$warn-color: var(--mat-sys-error, #ba1a1a);
 $error-color: $warn-color;
+
+// DEPRECATED: Use CSS custom properties instead
+// Background colors - Use var(--mat-sys-surface) instead
+$background-color: var(--mat-sys-surface, #fffbfe);
+$background-card: var(--mat-sys-surface, #fffbfe);
+$background-hover: var(--mat-sys-surface-variant, #e7e0ec);
+
+// DEPRECATED: Use CSS custom properties instead
+// Text colors - Use var(--mat-sys-on-surface) instead
+$text-primary: var(--mat-sys-on-surface, #1c1b1f);
+$text-secondary: var(--mat-sys-on-surface-variant, #49454f);
+$text-disabled: var(--mat-sys-on-surface, #1c1b1f);
+$text-hint: var(--mat-sys-on-surface-variant, #49454f);
+
+// DEPRECATED: Use CSS custom properties instead
+// Border colors - Use var(--mat-sys-outline) instead
+$border-color: var(--mat-sys-outline, #79747e);
+$divider-color: var(--mat-sys-outline-variant, #cac4d0);
+
+// Semantic colors - Use CSS custom properties
+$success-color: var(--app-success, #4caf50);
+$warning-color: var(--app-warning, #ff9800);
+$info-color: var(--app-info, #2196f3);
 
 // Material Design spacing system (8dp grid)
 $spacing-xs: 4px;   // 0.5 * 8dp

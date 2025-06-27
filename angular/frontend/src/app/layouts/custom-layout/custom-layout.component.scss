@@ -39,10 +39,7 @@
   // Admin context modifications
   &.admin-context {
     .sidenav-container {
-      // Adjust for nested admin sidebar
-      .sidenav:not(.admin-sidenav) {
-        border-right: 1px solid var(--mdc-theme-outline);
-      }
+      // Let Angular Material handle sidebar borders automatically
     }
   }
 }
@@ -97,14 +94,12 @@
 // Admin Sidebar - nested to the right of main sidebar
 .admin-sidenav {
   width: 240px; // Slightly narrower than main sidebar
-  background-color: var(--mdc-theme-surface);
-  border-left: 1px solid var(--mdc-theme-outline);
+  background-color: var(--mat-sys-surface);
   z-index: 900; // Below main sidebar but above content
   
   // Mobile behavior - replace main sidebar
   @media screen and (max-width: 599px) {
     width: 280px;
-    border-left: none;
   }
   
   .admin-sidebar-content {
@@ -116,7 +111,6 @@
   
   .admin-sidebar-header {
     padding-bottom: $spacing-md;
-    border-bottom: 1px solid var(--mdc-theme-outline);
     margin-bottom: $spacing-md;
     
     h3 {
@@ -176,6 +170,21 @@
         color: var(--mdc-theme-primary);
       }
     }
+    
+    // Special styling for back to dashboard link
+    &.back-to-dashboard {
+      margin-bottom: $spacing-sm;
+      padding-bottom: $spacing-md;
+      
+      &:hover {
+        background-color: var(--mat-sys-secondary-container);
+        color: var(--mat-sys-on-secondary-container);
+      }
+      
+      mat-icon {
+        color: var(--mat-sys-secondary);
+      }
+    }
   }
 }
 
@@ -184,9 +193,8 @@
   display: flex;
   align-items: center;
   padding: $spacing-md $spacing-lg;
-  background-color: var(--mdc-theme-surface-variant);
-  border-bottom: 1px solid var(--mdc-theme-outline);
-  color: var(--mdc-theme-on-surface-variant);
+  background-color: var(--mat-sys-surface-variant);
+  color: var(--mat-sys-on-surface-variant);
   font-size: 0.9rem;
   
   mat-icon {
@@ -299,21 +307,10 @@
 
 /**
  * HIGH CONTRAST MODE SUPPORT
+ * Let Angular Material handle contrast adjustments automatically
  */
 @media (prefers-contrast: high) {
-  .sidenav {
-    border-right-color: var(--mdc-theme-outline);
-    border-right-width: 2px;
-  }
-  
-  .admin-sidenav {
-    border-left-color: var(--mdc-theme-outline);
-    border-left-width: 2px;
-  }
-  
-  .admin-breadcrumb {
-    border-bottom-width: 2px;
-  }
+  /* Angular Material automatically adjusts contrast - no custom styling needed */
 }
 
 /**

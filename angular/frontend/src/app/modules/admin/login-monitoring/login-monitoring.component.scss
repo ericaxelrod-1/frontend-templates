@@ -1,499 +1,219 @@
+@use '@angular/material' as mat;
 @use '../../../../styles/abstracts' as *;
 
 .login-monitoring-container {
-  padding: $spacing-lg;
-  max-width: 1600px;
-  margin: 0 auto;
-  
-  h1 {
-    margin-bottom: $spacing-xl;
-    color: var(--mdc-theme-on-surface);
-  }
+  padding: 20px;
 }
 
-// Permission error message
-.permission-error {
-  margin: $spacing-lg 0;
-  text-align: center;
-
-  mat-card {
-    max-width: 500px;
-    margin: 0 auto;
-    
-    h2 {
-      color: var(--mdc-theme-error);
-      margin-bottom: $spacing-md;
-    }
-    
-    p {
-      margin-bottom: $spacing-lg;
-    }
-  }
-}
-
-// Statistics cards
-.stats-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: $spacing-lg;
-  margin-bottom: $spacing-lg;
-  position: relative;
-}
-
-.stats-card {
-  height: 100%;
-  border-radius: $border-radius-md;
-  transition: transform 0.2s, box-shadow 0.2s;
-  
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: $elevation-4;
-  }
-  
-  &.success {
-    border-top: 4px solid var(--mdc-theme-success);
-  }
-  
-  &.warning {
-    border-top: 4px solid var(--mdc-theme-warning);
-  }
-  
-  &.danger {
-    border-top: 4px solid var(--mdc-theme-error);
-  }
-  
-  &.info {
-    border-top: 4px solid var(--mdc-theme-info);
-  }
-  
-  mat-card-header {
-    padding: $spacing-md $spacing-md 0;
-  }
-  
-  .stats-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: $spacing-md;
-  }
-  
-  .stats-number {
-    font-size: 2.5rem;
-    font-weight: 500;
-    margin-bottom: $spacing-xs;
-    color: var(--mdc-theme-on-surface);
-  }
-  
-  .stats-percent {
-    font-size: 1.2rem;
-    opacity: 0.7;
-    color: var(--mdc-theme-text-secondary);
-  }
-}
-
-// Section cards
-.section-card {
-  margin-bottom: $spacing-lg;
-  overflow: hidden;
-  border-radius: $border-radius-md;
-  
-  mat-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: $spacing-md $spacing-md 0;
-    
-    .mat-card-title {
-      display: flex;
-      align-items: center;
-      
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 24px;
-        height: 24px;
-        border-radius: 12px;
-        padding: 0 $spacing-xs;
-        margin-left: $spacing-xs;
-        font-size: 12px;
-        font-weight: 500;
-        
-        &.danger {
-          background-color: var(--mdc-theme-error);
-          color: var(--mdc-theme-on-error);
-        }
-      }
-    }
-    
-    .header-actions {
-      margin-left: auto;
-      display: flex;
-      gap: $spacing-xs;
-      
-      button {
-        display: flex;
-        align-items: center;
-        
-        mat-icon {
-          margin-right: 4px;
-        }
-      }
-    }
-  }
-  
-  mat-card-content {
-    padding: $spacing-md;
-  }
-}
-
-// Tables
-.table-container {
-  position: relative;
-  min-height: 200px;
-  margin-top: $spacing-md;
-}
-
-table {
-  width: 100%;
-}
-
-.mat-column-details {
-  max-width: 250px;
-}
-
-.user-agent {
-  font-size: 0.8rem;
-  color: var(--mdc-theme-text-secondary);
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  max-width: 250px;
-}
-
-// Badges
-.severity-badge, .status-badge {
-  display: inline-block;
-  padding: 4px $spacing-xs;
-  border-radius: $border-radius-sm;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.severity-high {
-  background-color: rgba(var(--mdc-theme-error-rgb), 0.1);
-  color: var(--mdc-theme-error);
-}
-
-.severity-medium {
-  background-color: rgba(var(--mdc-theme-warning-rgb), 0.1);
-  color: var(--mdc-theme-warning);
-}
-
-.severity-low {
-  background-color: rgba(var(--mdc-theme-success-rgb), 0.1);
-  color: var(--mdc-theme-success);
-}
-
-.status-success {
-  background-color: rgba(var(--mdc-theme-success-rgb), 0.1);
-  color: var(--mdc-theme-success);
-}
-
-.status-failed {
-  background-color: rgba(var(--mdc-theme-warning-rgb), 0.1);
-  color: var(--mdc-theme-warning);
-}
-
-.status-blocked {
-  background-color: rgba(var(--mdc-theme-error-rgb), 0.1);
-  color: var(--mdc-theme-error);
-}
-
-.status-captcha_required, .status-captcha_failed {
-  background-color: rgba(var(--mdc-theme-info-rgb), 0.1);
-  color: var(--mdc-theme-info);
-}
-
-// IP link
-.ip-link {
-  color: var(--mdc-theme-primary);
-  text-decoration: underline;
-  cursor: pointer;
-  
-  &:hover {
-    text-decoration: none;
-  }
-}
-
-// User Agent column styling
-.user-agent-cell {
-  max-width: 200px;
-  
-  .user-agent-text {
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-family: monospace;
-    font-size: 12px;
-    color: var(--mdc-theme-text-secondary);
-    cursor: help;
-  }
-}
-
-// Metadata column styling
-.metadata-cell {
-  max-width: 150px;
-  
-  .metadata-text {
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-family: monospace;
-    font-size: 12px;
-    color: var(--mdc-theme-text-secondary);
-    cursor: help;
-  }
-  
-  .no-metadata {
-    color: var(--mdc-theme-text-disabled);
-    font-style: italic;
-  }
-}
-
-// Loading placeholder
-.loading-placeholder {
+.page-header {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  padding: $spacing-xxl;
-  
-  span {
-    margin-top: $spacing-md;
-    color: var(--mdc-theme-text-secondary);
-  }
+  margin-bottom: 20px;
 }
 
-// Empty state
-.empty-state {
+.page-header h1 {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: $spacing-xxl 0;
-  color: var(--mdc-theme-text-secondary);
-  
-  .empty-icon {
-    font-size: 48px;
-    height: 48px;
-    width: 48px;
-    margin-bottom: $spacing-md;
-    opacity: 0.5;
-  }
-  
-  p {
-    font-size: 16px;
-  }
+  gap: 8px;
+  margin: 0;
 }
 
-.empty-state-in-table {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: $spacing-xxl;
-  color: var(--mdc-theme-text-secondary);
-  
-  .empty-icon {
-    font-size: 48px;
-    height: 48px;
-    width: 48px;
-    margin-bottom: $spacing-md;
-    opacity: 0.5;
-  }
-  
-  p {
-    font-size: 16px;
-  }
+.no-permission {
+  margin-top: 20px;
 }
 
-// Filters
-.filters-form {
-  padding: $spacing-md 0;
+.warning-icon {
+  color: var(--mat-sys-error);
+  font-size: 48px;
+  margin-bottom: 16px;
 }
 
-.filters-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $spacing-md;
-  margin-bottom: $spacing-md;
-  
-  mat-form-field {
-    flex: 1;
-    min-width: 200px;
-  }
-  
-  .filter-actions {
-    display: flex;
-    gap: $spacing-xs;
-    align-items: flex-start;
-    margin-top: 4px;
-  }
-}
-
-// IP Reputation Dialog
-.ip-reputation-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.ip-reputation-card {
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: $elevation-8;
-  
-  mat-card-header {
-    position: relative;
-    
-    .close-button {
-      position: absolute;
-      top: $spacing-xs;
-      right: $spacing-xs;
-    }
-  }
-  
-  .reputation-stats {
-    margin: $spacing-md 0;
-    
-    .reputation-item {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: $spacing-xs;
-      padding: $spacing-xs;
-      background-color: var(--mdc-theme-surface);
-      border: 1px solid var(--mdc-theme-outline);
-      border-radius: $border-radius-sm;
-      
-      .reputation-label {
-        font-weight: 500;
-        color: var(--mdc-theme-on-surface);
-      }
-      
-      .reputation-value {
-        color: var(--mdc-theme-on-surface);
-        
-        &.status-blocked {
-          color: var(--mdc-theme-error);
-          font-weight: 500;
-        }
-        
-        &.status-allowed {
-          color: var(--mdc-theme-success);
-          font-weight: 500;
-        }
-        
-        &.score-good {
-          color: var(--mdc-theme-success);
-          font-weight: 500;
-        }
-        
-        &.score-medium {
-          color: var(--mdc-theme-warning);
-          font-weight: 500;
-        }
-        
-        &.score-bad {
-          color: var(--mdc-theme-error);
-          font-weight: 500;
-        }
-      }
-    }
-  }
-  
-  .action-buttons {
-    display: flex;
-    justify-content: center;
-    gap: $spacing-md;
-    margin-top: $spacing-xl;
-    
-    button {
-      min-width: 120px;
-    }
-  }
-}
-
-// Pattern table
-.pattern-ip-list {
-  margin-top: $spacing-xs;
-  
-  a {
-    color: var(--mdc-theme-primary);
-    text-decoration: underline;
-    cursor: pointer;
-    
-    &:hover {
-      text-decoration: none;
-    }
-  }
-}
-
-// Loading states
 .loading-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: $spacing-xxl;
-  
-  p {
-    margin-top: $spacing-md;
-    color: var(--mdc-theme-text-secondary);
-  }
+  padding: 40px;
+  gap: 16px;
 }
 
-.loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(var(--mdc-theme-surface-rgb), 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
+.main-content {
+  margin-top: 20px;
 }
 
-.no-data-message {
+.statistics-section {
+  margin-bottom: 30px;
+}
+
+.statistics-section h2 {
+  margin-bottom: 16px;
+  color: var(--mat-sys-on-surface);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
   text-align: center;
-  padding: $spacing-xxl;
-  color: var(--mdc-theme-text-secondary);
 }
 
-// Error messages
-.error-message {
-  margin: $spacing-lg 0;
+.stat-card.success {
+  border-left: 4px solid $success-color;
+}
+
+.stat-card.failed {
+  border-left: 4px solid var(--mat-sys-error);
+}
+
+.stat-card.blocked {
+  border-left: 4px solid $warning-color;
+}
+
+.stat-card.captcha {
+  border-left: 4px solid $info-color;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--mat-sys-on-surface);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
+  margin-top: 4px;
+}
+
+.monitoring-tabs {
+  margin-top: 20px;
+}
+
+.tab-content {
+  padding: 20px 0;
+}
+
+.attempts-table {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
+}
+
+.info-icon,
+.success-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.info-icon {
+  color: $info-color;
+}
+
+.success-icon {
+  color: $success-color;
+}
+
+.patterns-list,
+.alerts-list {
+  margin-top: 16px;
+}
+
+.pattern-item,
+.alert-item {
+  border: 1px solid var(--mat-sys-outline);
+  border-radius: $border-radius-sm;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.pattern-header,
+.alert-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pattern-type,
+.alert-type {
+  font-weight: 500;
+  color: var(--mat-sys-on-surface);
+}
+
+.pattern-details,
+.alert-message {
+  margin: 8px 0;
+  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
+}
+
+.pattern-meta,
+.alert-timestamp {
+  font-size: 0.875rem;
+  color: $text-disabled;
+}
+
+.alert-status {
+  margin-left: auto;
+  font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
+}
+
+/* Severity classes */
+.severity-high {
+  background-color: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+}
+
+.severity-medium {
+  background-color: $warning-color;
+  color: white;
+}
+
+.severity-low {
+  background-color: $success-color;
+  color: white;
+}
+
+.severity-default {
+  background-color: $text-disabled;
+  color: white;
+}
+
+/* Status classes */
+.status-success {
+  background-color: $success-color;
+  color: white;
+}
+
+.status-failed {
+  background-color: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .login-monitoring-container {
+    padding: 0.5rem;
+  }
   
-  mat-card {
+  .page-header {
+    flex-direction: column;
+    gap: 1rem;
     text-align: center;
-    
-    p {
-      margin-bottom: $spacing-md;
-      color: var(--mdc-theme-on-surface);
-    }
+  }
+  
+  .alerts-list .alert-item {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
   }
 } 

@@ -1,0 +1,69 @@
+@use '@angular/material' as mat;
+@use '../../../../../styles/abstracts' as *;
+
+.stats-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stats-card {
+  text-align: center;
+  transition: transform 0.2s ease-in-out;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+  }
+
+  &.success {
+    border-left: 4px solid $success-color;
+  }
+
+  &.warning {
+    border-left: 4px solid $warning-color;
+  }
+
+  &.danger {
+    border-left: 4px solid $error-color;
+  }
+
+  &.info {
+    border-left: 4px solid $info-color;
+  }
+}
+
+.stats-content {
+  padding: 1rem;
+}
+
+.stats-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: $primary-color;
+  margin-bottom: 0.5rem;
+}
+
+.stats-percent {
+  font-size: 0.875rem;
+  color: $text-secondary;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  
+  p {
+    margin-top: 1rem;
+    color: $text-secondary;
+  }
+}
+
+.error-message {
+  text-align: center;
+  margin: 2rem 0;
+} 

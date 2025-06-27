@@ -85,6 +85,14 @@ import { filter } from 'rxjs/operators';
                   <h3>Admin Panel</h3>
                 </div>
                 <nav class="admin-nav">
+                  <!-- Back to Dashboard Link -->
+                  <a routerLink="/app/dashboard" 
+                     class="admin-nav-item back-to-dashboard">
+                    <mat-icon>arrow_back</mat-icon>
+                    <span>Back to Dashboard</span>
+                  </a>
+                  
+                  <!-- Admin Menu Items -->
                   <a routerLink="/app/admin/login-monitoring" 
                      routerLinkActive="active"
                      class="admin-nav-item">

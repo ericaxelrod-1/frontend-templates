@@ -14,14 +14,19 @@ import { Role } from '../users/entities/role.entity';
 import { LoginAttempt } from './entities/login-attempt.entity';
 import { IPReputation } from './entities/ip-reputation.entity';
 import { Captcha } from './entities/captcha.entity';
+import { SecurityAlert } from './entities/security-alert.entity';
+import { SecurityDetectedPattern } from './entities/security-detected-pattern.entity';
+import { PatternLoginAttempt } from './entities/pattern-login-attempt.entity';
 import { LoginAttemptService } from './services/login-attempt.service';
 import { IPReputationService } from './services/ip-reputation.service';
 import { CaptchaService } from './services/captcha.service';
 import { PatternDetectionService } from './services/pattern-detection.service';
 import { AlertService } from './services/alert.service';
+import { SecurityAlertService } from './services/security-alert.service';
 import { CleanupTask } from './tasks/cleanup.task';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoginMonitoringController } from './controllers/login-monitoring.controller';
+import { SecurityAlertController } from './controllers/security-alert.controller';
 import { User } from '../users/entities/user.entity';
 
 @Module({
@@ -29,7 +34,16 @@ import { User } from '../users/entities/user.entity';
     forwardRef(() => UsersModule),
     forwardRef(() => PermissionsModule),
     PassportModule,
-    TypeOrmModule.forFeature([Role, LoginAttempt, IPReputation, Captcha, User]),
+    TypeOrmModule.forFeature([
+      Role, 
+      LoginAttempt, 
+      IPReputation, 
+      Captcha, 
+      User,
+      SecurityAlert,
+      SecurityDetectedPattern,
+      PatternLoginAttempt,
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -42,7 +56,7 @@ import { User } from '../users/entities/user.entity';
     }),
     ScheduleModule.forRoot(),
   ],
-  controllers: [AuthController, LoginMonitoringController],
+  controllers: [AuthController, LoginMonitoringController, SecurityAlertController],
   providers: [
     AuthService,
     LocalStrategy,
@@ -53,6 +67,7 @@ import { User } from '../users/entities/user.entity';
     CaptchaService,
     PatternDetectionService,
     AlertService,
+    SecurityAlertService,
     CleanupTask,
   ],
   exports: [
@@ -64,6 +79,7 @@ import { User } from '../users/entities/user.entity';
     CaptchaService,
     PatternDetectionService,
     AlertService,
+    SecurityAlertService,
   ],
 })
 export class AuthModule {}

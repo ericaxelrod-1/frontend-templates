@@ -75,7 +75,7 @@
 // Button variants using Material theme
 @mixin button-primary {
   background-color: vars.$primary-color;
-  color: mat.get-contrast-color-from-palette(vars.$primary-palette, 500);
+  color: white; // Use white for primary button text (Material Design standard)
   
   &:hover {
     background-color: vars.$primary-dark;
@@ -89,19 +89,21 @@
 
 @mixin button-accent {
   background-color: vars.$accent-color;
-  color: mat.get-contrast-color-from-palette(vars.$accent-palette, A200);
+  color: white;
   
   &:hover {
-    background-color: mat.get-color-from-palette(vars.$accent-palette, A400);
+    background-color: var(--mdc-theme-accent, #{vars.$accent-color});
+    filter: brightness(0.9);
   }
 }
 
 @mixin button-warn {
   background-color: vars.$warn-color;
-  color: mat.get-contrast-color-from-palette(vars.$warn-palette, 500);
+  color: white;
   
   &:hover {
-    background-color: mat.get-color-from-palette(vars.$warn-palette, 700);
+    background-color: var(--mdc-theme-error, #{vars.$warn-color});
+    filter: brightness(0.9);
   }
 }
 
@@ -227,7 +229,7 @@
 
 @mixin focus-visible {
   &:focus-visible {
-    outline: 2px solid vars.$accent-color;
+    outline: 2px solid var(--mat-sys-primary);
     outline-offset: 2px;
   }
 }
@@ -292,31 +294,17 @@
   }
 }
 
-// Form control mixin
+// Form control mixin - Let Angular Material handle styling
 @mixin form-control {
   width: 100%;
-  padding: 12px 16px;
-  border: 1px solid var(--mdc-theme-outline);
-  border-radius: 4px;
-  background-color: var(--mdc-theme-surface);
-  color: var(--mdc-theme-on-surface);
-  transition: border-color 0.3s, box-shadow 0.3s;
-  
-  &:focus {
-    border-color: var(--mdc-theme-primary);
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(63, 81, 181, 0.25);
-  }
-  
-  &.error {
-    border-color: var(--mdc-theme-error);
-  }
+  // Angular Material 18+ handles all form control styling automatically
+  // No custom border styling needed
 }
 
 // Accessibility helpers
 @mixin focus-indicator {
   &:focus-visible {
-    outline: 2px solid var(--mdc-theme-accent);
+    outline: 2px solid var(--mat-sys-primary);
     outline-offset: 2px;
   }
 }
