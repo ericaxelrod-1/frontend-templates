@@ -60,6 +60,49 @@
             </mat-card-header>
             <mat-card-content>
               
+              <!-- Test Buttons Section -->
+              <div class="test-buttons-section" *ngIf="hasPermission">
+                <h4>Pattern Testing</h4>
+                <p class="test-description">Create test patterns to validate detection algorithms and database integration</p>
+                <div class="test-buttons-grid">
+                  <button mat-raised-button color="accent" 
+                          (click)="testBruteForcePattern()"
+                          [disabled]="loading.patterns">
+                    <mat-icon>security</mat-icon>
+                    Test Brute Force Attack
+                  </button>
+                  
+                  <button mat-raised-button color="accent" 
+                          (click)="testDistributedAttackPattern()"
+                          [disabled]="loading.patterns">
+                    <mat-icon>network_check</mat-icon>
+                    Test Distributed Attack
+                  </button>
+                  
+                  <button mat-raised-button color="accent" 
+                          (click)="testCredentialStuffingPattern()"
+                          [disabled]="loading.patterns">
+                    <mat-icon>vpn_key</mat-icon>
+                    Test Credential Stuffing
+                  </button>
+                  
+                  <button mat-raised-button color="accent" 
+                          (click)="testAccountSwitchingPattern()"
+                          [disabled]="loading.patterns">
+                    <mat-icon>swap_horiz</mat-icon>
+                    Test Account Switching
+                  </button>
+                  
+                  <button mat-raised-button color="warn" 
+                          (click)="clearTestData()"
+                          [disabled]="loading.patterns">
+                    <mat-icon>clear_all</mat-icon>
+                    Clear Test Data
+                  </button>
+                </div>
+                <mat-divider></mat-divider>
+              </div>
+
               <!-- Loading spinner for patterns -->
               <div *ngIf="loading.patterns" class="loading-container">
                 <mat-spinner diameter="40"></mat-spinner>
@@ -114,6 +157,21 @@
             </mat-card-header>
             <mat-card-content>
               
+              <!-- Test Buttons Section -->
+              <div class="test-buttons-section" *ngIf="hasPermission">
+                <h4>Alert Testing</h4>
+                <p class="test-description">Create test alerts to validate alert system and database persistence</p>
+                <div class="test-buttons-grid">
+                  <button mat-raised-button color="accent" 
+                          (click)="sendTestAlert()"
+                          [disabled]="loading.alerts">
+                    <mat-icon>notification_add</mat-icon>
+                    Test Alert
+                  </button>
+                </div>
+                <mat-divider></mat-divider>
+              </div>
+
               <!-- Loading spinner for alerts -->
               <div *ngIf="loading.alerts" class="loading-container">
                 <mat-spinner diameter="40"></mat-spinner>

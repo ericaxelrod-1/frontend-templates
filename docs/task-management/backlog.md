@@ -4,6 +4,113 @@ Last Updated: 2025-01-26
 
 ## Critical Priority
 
+### BUG-111: IP Reputation Tab Shows "No IP Selected" with No Selection Interface
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-26 19:30:00
+- **Description**: IP Reputation tab shows "No IP Selected" message with no way to select IPs. User expects vertical bar chart of IPs ranked by recent attempts with block/unblock status, but current implementation requires clicking IPs in login attempts table.
+
+#### Investigation Results (@999-bugfinder)
+- **Current Architecture**: Click-based IP selection from login attempts table to view individual IP reputation
+- **User Expectation**: Dashboard/overview approach with bar chart showing IP rankings and block status
+- **Backend Support**: `/api/login-monitoring/ip/:ipAddress` endpoint exists for individual IP lookup
+- **Missing**: Overview/dashboard endpoint for all IPs with statistics and ranking
+
+#### Implementation Requirements
+- Create dashboard view of all IPs with attempt counts
+- Implement bar chart visualization (suggested: vertical bars)
+- Add bulk IP management with block/unblock capabilities
+- Design IP ranking algorithm based on recent attempts
+- Add filtering for IP reputation dashboard
+
+### BUG-110: Missing Specific Filters for Pattern Detection and Security Alerts Tabs
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: BUG-109
+- **Added**: 2025-01-26 19:25:00
+- **Description**: Pattern Detection and Security Alerts tabs lack appropriate filtering capabilities. Pattern Detection needs date range, pattern type, and affected IPs filters. Security Alerts needs status, severity, and alert type filters.
+
+#### Investigation Results (@999-bugfinder)
+- **Current State**: Only generic filters component exists (email, IP, status, date range)
+- **Pattern Detection Needs**: Date range, pattern type (brute_force, credential_stuffing, etc.), affected IPs, severity
+- **Security Alerts Needs**: Status (active, acknowledged, resolved), severity, alert type, date range
+- **IP Reputation Needs**: Block status, reputation score range, attempt count filters
+- **Architecture Gap**: Each tab requires specific filter components for their data types
+
+#### Implementation Requirements
+- Create PatternDetectionFiltersComponent with pattern-specific filters
+- Create SecurityAlertsFiltersComponent with alert-specific filters  
+- Create IPReputationFiltersComponent with IP-specific filters
+- Update backend services to support new filter parameters
+- Implement tab-specific filter logic in main component
+
+### BUG-109: Filter Box Doesn't Work At All - No Connection Between Filters and Table
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-26 20:20:00
+- **Description**: The filter box doesn't apply to any tabs and doesn't work at all. While backend supports filtering, there's no trigger mechanism connecting filter changes to table refresh. Also needs to be nested within Recent Login Attempts tab only.
+
+#### Investigation Results (@999-bugfinder)
+- **Backend Support**: ✅ `/api/login-monitoring/attempts/recent` endpoint supports `email`, `ipAddress`, `status`, `dateFrom`, `dateTo`, `sortBy`, `sortDirection` parameters
+- **Service Implementation**: ✅ `LoginAttemptService.getRecentAttemptsForDashboard()` implements proper LIKE queries and date range filtering
+- **Frontend Issue**: ❌ Filter component captures changes via `onFiltersChanged()` but NEVER triggers table refresh
+- **Missing Connection**: ❌ Main component `onFiltersChanged()` method doesn't call table's `applyFilters()` method
+- **Template Structure**: ❌ Filters rendered globally above tabs instead of inside Recent Login Attempts tab
+
+#### Implementation Requirements
+- Connect filter changes to table refresh by calling `applyFilters()` on table component
+- Move filters component inside Recent Login Attempts tab content
+- Add "Apply Filters" button behavior to actually trigger filtering
+- Test that backend filtering parameters work correctly
+- Implement reactive filtering or manual apply button pattern
+
+### BUG-108: Security Alerts Tab Shows Nothing Despite 11 Alerts in Database
+- **Status**: Not Started  
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-26 19:15:00
+- **Description**: Security Alerts tab displays "No Active Alerts" message despite 11 security alerts existing in database with status="active". Frontend display issue preventing alert visualization.
+
+#### Investigation Results (@999-bugfinder)
+- **Database Evidence**: 11 security alerts confirmed in database, all with status="active"
+- **Backend Logic**: `SecurityAlertService.getSecurityAlerts()` does NOT filter by status="active" by default
+- **Frontend Endpoint**: Correctly calls `/api/security-alerts/alerts` 
+- **Alert Types**: Mix of test_alert and security_pattern types with recent timestamps
+- **Root Cause**: Frontend display/rendering issue, NOT backend filtering problem
+- **Data Flow**: Backend → Frontend service → Component display chain broken
+
+#### Implementation Requirements
+- Debug frontend SecurityAlert data reception in login-monitoring component
+- Verify `loadSecurityAlerts()` method in login-monitoring.component.ts
+- Check `securityAlerts` array population and template binding
+- Test alert display logic and loading states
+- Verify Material Design template rendering for alerts list
+
+### BUG-107: Login-Monitoring Deviates from Standard Sidebar Navigation Pattern
+- **Status**: Not Started
+- **Testing**: Not Started  
+- **Dependencies**: None
+- **Added**: 2025-01-26 20:20:00
+- **Description**: Login-monitoring page deviates from the standard sidebar navigation pattern used elsewhere in the dashboard. Instead of unified navigation, it shows separate "admin sidebar" causing users to lose access to normal navigation.
+
+#### Investigation Results (@999-bugfinder)
+- **Standard Pattern**: Unified sidebar showing Dashboard, Users, Groups, Roles, Administration based on permissions
+- **Current Deviation**: CustomLayoutComponent creates separate "admin sidebar" with only "Back to Dashboard" and "Login Monitoring"
+- **Navigation Loss**: Users lose access to normal navigation (Users, Groups, Roles) when in admin context
+- **Pattern Inconsistency**: Other pages maintain unified navigation; only login-monitoring breaks this pattern
+- **User Experience**: Creates disjointed navigation experience compared to rest of application
+
+#### Implementation Requirements
+- Modify login-monitoring to use standard unified sidebar pattern
+- Ensure admin context maintains access to all user's permitted navigation items
+- Remove separate admin sidebar implementation from CustomLayoutComponent
+- Test that admin users can navigate to Users, Groups, Roles while in login-monitoring
+- Maintain "Administration" section highlight while preserving full navigation
+
+
+
 ## High Priority
 
 ## Medium Priority

@@ -216,4 +216,83 @@
     gap: 1rem;
     align-items: flex-start;
   }
+}
+
+// Test buttons styling
+.test-buttons-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background-color: var(--mat-sys-surface-container-low);
+  border-radius: 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+
+  h4 {
+    margin: 0 0 8px 0;
+    color: var(--mat-sys-on-surface);
+    font-weight: 500;
+  }
+
+  .test-description {
+    margin: 0 0 16px 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+
+  .test-buttons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+
+    button {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 12px 16px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+      mat-icon {
+        margin-right: 8px;
+        flex-shrink: 0;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+      }
+
+      // Pattern test buttons (accent color)
+      &[color="accent"] {
+        background-color: var(--mat-sys-secondary-container);
+        color: var(--mat-sys-on-secondary-container);
+
+        &:hover:not(:disabled) {
+          background-color: var(--mat-sys-secondary);
+          color: var(--mat-sys-on-secondary);
+        }
+      }
+
+      // Clear data button (warn color)
+      &[color="warn"] {
+        background-color: var(--mat-sys-error-container);
+        color: var(--mat-sys-on-error-container);
+
+        &:hover:not(:disabled) {
+          background-color: var(--mat-sys-error);
+          color: var(--mat-sys-on-error);
+        }
+      }
+    }
+  }
+
+  mat-divider {
+    margin-top: 16px;
+  }
 } 

@@ -95,12 +95,12 @@ export class LoginMonitoringService {
   }
 
   createTestPattern(patternType: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/patterns/test`, { type: patternType })
+    return this.http.post(`${this.apiUrl}/patterns/test/${patternType}`, {})
       .pipe(catchError(this.handleError));
   }
 
   clearTestData(): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/patterns/test`)
+    return this.http.delete(`${this.apiUrl}/patterns/test-data`)
       .pipe(catchError(this.handleError));
   }
 
@@ -126,7 +126,10 @@ export class LoginMonitoringService {
   }
 
   sendTestAlert(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/alerts/test`, {})
+    return this.http.post(`${this.apiUrl}/alert/test`, {
+      message: 'Test alert from UI',
+      severity: 'medium'
+    })
       .pipe(catchError(this.handleError));
   }
 

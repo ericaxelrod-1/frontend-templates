@@ -54,7 +54,7 @@
     </div>
 
     <!-- Admin Section -->
-    <div class="nav-section" *ngIf="hasAdminAccess()">
+    <div class="nav-section" *ngIf="hasAdminAccess()" [class.admin-context-active]="isAdminContext">
       <h3 class="section-title" id="admin-nav-heading" *ngIf="!isCollapsed">Administration</h3>
       
       <ul class="nav-list" role="menu" aria-labelledby="admin-nav-heading">

@@ -184,6 +184,104 @@ export class LoginMonitoringComponent implements OnInit {
         return 'severity-default';
     }
   }
-  
 
+  // Test button methods for TASK-102.2 validation
+  testBruteForcePattern(): void {
+    if (!this.hasPermission) return;
+    
+    this.loginMonitoringService.createTestPattern('brute_force').subscribe({
+      next: (response) => {
+        this.snackBar.open('Brute force test pattern created successfully', 'Close', { duration: 5000 });
+        // Refresh patterns after test creation
+        setTimeout(() => this.loadPatterns(), 2000);
+      },
+      error: (error) => {
+        console.error('Error creating brute force test pattern:', error);
+        this.snackBar.open('Failed to create brute force test pattern', 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  testDistributedAttackPattern(): void {
+    if (!this.hasPermission) return;
+    
+    this.loginMonitoringService.createTestPattern('distributed_attack').subscribe({
+      next: (response) => {
+        this.snackBar.open('Distributed attack test pattern created successfully', 'Close', { duration: 5000 });
+        // Refresh patterns after test creation
+        setTimeout(() => this.loadPatterns(), 2000);
+      },
+      error: (error) => {
+        console.error('Error creating distributed attack test pattern:', error);
+        this.snackBar.open('Failed to create distributed attack test pattern', 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  testCredentialStuffingPattern(): void {
+    if (!this.hasPermission) return;
+    
+    this.loginMonitoringService.createTestPattern('credential_stuffing').subscribe({
+      next: (response) => {
+        this.snackBar.open('Credential stuffing test pattern created successfully', 'Close', { duration: 5000 });
+        // Refresh patterns after test creation
+        setTimeout(() => this.loadPatterns(), 2000);
+      },
+      error: (error) => {
+        console.error('Error creating credential stuffing test pattern:', error);
+        this.snackBar.open('Failed to create credential stuffing test pattern', 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  testAccountSwitchingPattern(): void {
+    if (!this.hasPermission) return;
+    
+    this.loginMonitoringService.createTestPattern('account_switching').subscribe({
+      next: (response) => {
+        this.snackBar.open('Account switching test pattern created successfully', 'Close', { duration: 5000 });
+        // Refresh patterns after test creation
+        setTimeout(() => this.loadPatterns(), 2000);
+      },
+      error: (error) => {
+        console.error('Error creating account switching test pattern:', error);
+        this.snackBar.open('Failed to create account switching test pattern', 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  sendTestAlert(): void {
+    if (!this.hasPermission) return;
+    
+    this.loginMonitoringService.sendTestAlert().subscribe({
+      next: (response) => {
+        this.snackBar.open('Test alert sent successfully', 'Close', { duration: 5000 });
+        // Refresh security alerts after test creation
+        setTimeout(() => this.loadSecurityAlerts(), 2000);
+      },
+      error: (error) => {
+        console.error('Error sending test alert:', error);
+        this.snackBar.open('Failed to send test alert', 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  clearTestData(): void {
+    if (!this.hasPermission) return;
+    
+    this.loginMonitoringService.clearTestData().subscribe({
+      next: (response) => {
+        this.snackBar.open('Test data cleared successfully', 'Close', { duration: 5000 });
+        // Refresh both patterns and alerts after clearing
+        setTimeout(() => {
+          this.loadPatterns();
+          this.loadSecurityAlerts();
+        }, 1000);
+      },
+      error: (error) => {
+        console.error('Error clearing test data:', error);
+        this.snackBar.open('Failed to clear test data', 'Close', { duration: 5000 });
+      }
+    });
+  }
 } 
