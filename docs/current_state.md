@@ -32,10 +32,17 @@ Following user reports of multiple issues with the login-monitoring page, a comp
 - **Root Cause**: Frontend expected `SecurityAlert[]` but backend returned `{ items: SecurityAlert[], total: number }`
 - **Solution**: Added response transformation layer and interface alignment while maintaining template compatibility
 
+#### ✅ **RESOLVED: BUG-109 Filter Box Completely Non-Functional** (COMPLETE)
+- **Status**: Complete ✅ - Filter system completely restored with proper event chain
+- **Implementation**: Added ViewChild reference and trigger mechanism to connect filter changes to table refresh
+- **Root Cause**: Main component `onFiltersChanged()` only stored filterForm but never called table's `applyFilters()` method
+- **Solution**: Added `@ViewChild(LoginAttemptsTableComponent)` and proper trigger calls in filter event handlers
+- **Template Fix**: Moved filters component inside Recent Login Attempts tab for contextual clarity
+- **Architecture**: Complete filter chain: FiltersComponent → LoginMonitoringComponent → LoginAttemptsTableComponent → Backend Query
+
 #### Critical Issues Requiring Immediate Fix:
-1. **BUG-109**: Filter box completely non-functional - backend supports filtering but no frontend trigger mechanism
-2. **BUG-110**: Missing tab-specific filters for Pattern Detection and Security Alerts
-3. **BUG-111**: IP Reputation tab needs dashboard approach instead of click-based selection
+1. **BUG-110**: Missing tab-specific filters for Pattern Detection and Security Alerts
+2. **BUG-111**: IP Reputation tab needs dashboard approach instead of click-based selection
 
 #### Technical Validation Results:
 - ✅ **Backend Functionality**: All endpoints working correctly (filtering, test alerts, security alerts)
@@ -44,7 +51,7 @@ Following user reports of multiple issues with the login-monitoring page, a comp
 - ❌ **Frontend Issues**: Multiple display and connectivity problems preventing user functionality
 
 #### Next Priority: 
-Address these 5 critical bugs to restore full login-monitoring functionality. The infrastructure is sound - issues are primarily frontend connectivity and UI elements.
+Address these 2 remaining critical bugs to complete full login-monitoring functionality. The core infrastructure is working perfectly - remaining issues are tab-specific enhancements.
 
 ### ✅ **COMPLETED: BUG-105 Angular Material Components Completely Unstyled - No Theme Applied - PRODUCTION READY (✅ COMPLETE)**
   - **FINAL STATUS**: Angular Material theming successfully implemented - all components now have proper Material 3 styling

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
@@ -34,6 +34,9 @@ export class LoginMonitoringComponent implements OnInit {
   
   // Component references
   filterForm: FormGroup | null = null;
+  
+  // ViewChild reference to table component for filter triggering
+  @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
   
   // Data for tabs that aren't yet refactored
   detectedPatterns: Pattern[] = [];
@@ -72,10 +75,20 @@ export class LoginMonitoringComponent implements OnInit {
   // Event handlers for child components
   onFiltersChanged(filterForm: FormGroup): void {
     this.filterForm = filterForm;
+    
+    // BUG-109 FIX: Trigger table refresh when filters change
+    if (this.loginAttemptsTable) {
+      this.loginAttemptsTable.applyFilters();
+    }
   }
 
   onFiltersReset(): void {
     // Reset handled by filters component
+    
+    // BUG-109 FIX: Trigger table refresh when filters are reset
+    if (this.loginAttemptsTable) {
+      this.loginAttemptsTable.applyFilters();
+    }
   }
 
   onStatsLoaded(stats: Statistics): void {

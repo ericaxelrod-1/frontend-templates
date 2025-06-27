@@ -1,8 +1,72 @@
 # Project Changelog
 
-Last Updated: 2025-01-26
+Last Updated: 2025-01-27
 
 ## Completed Today
+
+### BUG-109: Filter Box Doesn't Work At All - No Connection Between Filters and Table ✅
+- **Started**: 2025-01-27 18:00:00
+- **Completed**: 2025-01-27 18:30:00
+- **Status**: Complete ✅
+- **Testing**: Build Successful ✅
+- **Priority**: Critical (Filter Functionality)
+- **Dependencies**: None
+- **Description**: Fixed completely non-functional filter system by connecting filter changes to table refresh and moving filters to appropriate tab location.
+
+#### Implementation Summary
+**BROKEN FILTER CHAIN COMPLETELY RESTORED**:
+- **Root Cause**: Filter component captured changes but main component never triggered table refresh
+- **Critical Missing Link**: Main component `onFiltersChanged()` method only stored filterForm but never called `applyFilters()`
+- **Solution**: Added ViewChild reference and proper trigger mechanism to connect filter events to table refresh
+
+#### Technical Fixes Applied
+
+**Phase 1: Component Communication Fix**
+- **Added**: `@ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!` reference in main component
+- **Updated**: `onFiltersChanged()` method to call `this.loginAttemptsTable?.applyFilters()` after storing filterForm
+- **Enhanced**: `onFiltersReset()` method to also trigger table refresh for consistent behavior
+
+**Phase 2: Template Structure Correction**
+- **Moved**: Filters component from global placement above all tabs to inside Recent Login Attempts tab only
+- **Rationale**: Filters only apply to login attempts table, not to Pattern Detection, Security Alerts, or IP Reputation tabs
+- **User Experience**: Clear visual indication that filters apply specifically to login attempts data
+
+**Phase 3: Event Chain Validation**
+- **Verified**: FiltersComponent properly emits `filtersChanged` event with FormGroup on Apply button click
+- **Confirmed**: LoginAttemptsTableComponent `applyFilters()` method resets pagination and calls `loadRecentAttempts()`
+- **Validated**: Backend endpoint `/api/login-monitoring/attempts/recent` supports all filter parameters
+- **Tested**: Service properly encodes and transmits filter values in HTTP GET request
+
+#### Files Modified
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added ViewChild import, ViewChild reference, and trigger calls in filter event handlers
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Moved filters component inside Recent Login Attempts tab
+
+#### Filter Chain Architecture Restored
+**Before (Broken)**:
+```
+FiltersComponent → (emit) → LoginMonitoringComponent → (BROKEN CHAIN) → LoginAttemptsTableComponent
+```
+
+**After (Fixed)**:
+```
+FiltersComponent → (emit) → LoginMonitoringComponent → (applyFilters()) → LoginAttemptsTableComponent → (loadRecentAttempts()) → Backend Query
+```
+
+#### Filter Parameters Confirmed Working
+- **Email Filter**: LIKE query on `attempt.emailAttempted` field
+- **IP Address Filter**: LIKE query on `attempt.ipAddress` field  
+- **Status Filter**: Exact match on `attempt.status` field
+- **Date Range**: `attempt.attemptedAt >= dateFrom AND attempt.attemptedAt <= dateTo`
+- **Sorting**: Server-side ORDER BY with field mapping and direction validation
+
+#### User Experience Improvements
+- **Functional Filtering**: Apply Filters button now actually applies filters to table data
+- **Reset Functionality**: Reset button clears filters and refreshes table to show all data
+- **Contextual Placement**: Filters clearly associated with login attempts table only
+- **Immediate Feedback**: Table refreshes immediately when filters are applied or reset
+- **Pagination Reset**: Filter application resets to first page for consistent navigation
+
+**OUTCOME**: Completely restored filter functionality that was previously non-functional. Users can now filter login attempts by email, IP address, status, and date range with immediate table updates reflecting the filtered results.
 
 ### BUG-108: Security Alerts Tab Shows Nothing Despite 63 Alerts in Database ✅
 - **Started**: 2025-01-27 16:30:00

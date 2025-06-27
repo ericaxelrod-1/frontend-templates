@@ -28,19 +28,19 @@
       (statsLoaded)="onStatsLoaded($event)">
     </app-statistics-dashboard>
 
-    <!-- Filters Component -->
-    <app-login-monitoring-filters 
-      [hasPermission]="hasPermission"
-      (filtersChanged)="onFiltersChanged($event)"
-      (filtersReset)="onFiltersReset()">
-    </app-login-monitoring-filters>
-
     <!-- Tabbed Content -->
     <mat-tab-group class="monitoring-tabs">
       
       <!-- Login Attempts Tab -->
       <mat-tab label="Recent Login Attempts">
         <div class="tab-content">
+          <!-- Filters Component - BUG-109 FIX: Moved inside Recent Login Attempts tab -->
+          <app-login-monitoring-filters 
+            [hasPermission]="hasPermission"
+            (filtersChanged)="onFiltersChanged($event)"
+            (filtersReset)="onFiltersReset()">
+          </app-login-monitoring-filters>
+          
           <app-login-attempts-table 
             [hasPermission]="hasPermission"
             [filterForm]="filterForm!"
