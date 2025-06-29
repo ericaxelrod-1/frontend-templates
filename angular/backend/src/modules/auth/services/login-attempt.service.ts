@@ -172,15 +172,15 @@ export class LoginAttemptService {
     }
 
     // Handle sorting - Enhanced server-side sorting with comprehensive field mapping
-    const sortBy = filters?.sortBy || 'attemptedAt';
-    const sortDirection = filters?.sortDirection || 'desc';
+    const sortBy = filters?.sortBy || 'createdAt';      // Changed default from 'attemptedAt' to 'createdAt' to match frontend
+    const sortDirection = filters?.sortDirection || 'desc'; // Ensure descending is default (newest first)
     
     // Comprehensive mapping from frontend field names to database field names
     const fieldMapping: { [key: string]: string } = {
       'id': 'attempt.id',
-      'createdAt': 'attempt.attemptedAt',
-      'timestamp': 'attempt.attemptedAt', // Alternative name for timestamp column
-      'attemptedAt': 'attempt.attemptedAt',
+      'createdAt': 'attempt.attemptedAt',        // Frontend 'createdAt' maps to database 'attemptedAt'
+      'timestamp': 'attempt.attemptedAt',        // Alternative name for timestamp column
+      'attemptedAt': 'attempt.attemptedAt',      // Direct mapping for backwards compatibility
       'email': 'attempt.emailAttempted',
       'emailAttempted': 'attempt.emailAttempted',
       'ipAddress': 'attempt.ipAddress',
@@ -192,7 +192,7 @@ export class LoginAttemptService {
     // Validate sort field and use safe default
     const dbField = fieldMapping[sortBy] || 'attempt.attemptedAt';
     
-    // Validate sort direction
+    // Validate sort direction - ENSURE DESCENDING BY DEFAULT (newest first)
     const validDirection = (sortDirection?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
     
     // Apply ORDER BY clause - this generates SQL like: ORDER BY attempt.attemptedAt DESC

@@ -32,13 +32,16 @@ Following user reports of multiple issues with the login-monitoring page, a comp
 - **Root Cause**: Frontend expected `SecurityAlert[]` but backend returned `{ items: SecurityAlert[], total: number }`
 - **Solution**: Added response transformation layer and interface alignment while maintaining template compatibility
 
-#### ✅ **RESOLVED: BUG-109 Filter Box Completely Non-Functional** (COMPLETE)
-- **Status**: Complete ✅ - Filter system completely restored with proper event chain
+#### ✅ **RESOLVED: BUG-109 Filter Box Completely Non-Functional + Default Date Range + Sort Fix** (COMPLETE)
+- **Status**: Complete ✅ - Filter system completely restored with proper event chain, smart defaults, and correct sort order
 - **Implementation**: Added ViewChild reference and trigger mechanism to connect filter changes to table refresh
 - **Root Cause**: Main component `onFiltersChanged()` only stored filterForm but never called table's `applyFilters()` method
+- **Sort Race Condition**: MatSort programmatic initialization conflicted with template initialization causing wrong sort direction
 - **Solution**: Added `@ViewChild(LoginAttemptsTableComponent)` and proper trigger calls in filter event handlers
-- **Template Fix**: Moved filters component inside Recent Login Attempts tab for contextual clarity
-- **Architecture**: Complete filter chain: FiltersComponent → LoginMonitoringComponent → LoginAttemptsTableComponent → Backend Query
+- **Template Fix**: Moved filters component inside Recent Login Attempts tab for proper contextual placement
+- **UX Enhancement**: Added default date range (last 7 days) that auto-populates on page load for immediate usability
+- **Sort Fix**: Removed conflicting programmatic sort initialization, rely on template-based initialization for proper descending order
+- **Result**: Filters work perfectly, dates auto-populate, and most recent attempts appear first as expected
 
 #### Critical Issues Requiring Immediate Fix:
 1. **BUG-110**: Missing tab-specific filters for Pattern Detection and Security Alerts

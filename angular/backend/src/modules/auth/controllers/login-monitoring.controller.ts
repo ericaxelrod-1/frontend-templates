@@ -58,7 +58,7 @@ export class LoginMonitoringController {
       status,
       dateFrom: dateFrom ? new Date(dateFrom) : undefined,
       dateTo: dateTo ? new Date(dateTo) : undefined,
-      sortBy: sortBy || 'attemptedAt',
+      sortBy: sortBy || 'createdAt',
       sortDirection: sortDirection || 'desc',
     };
     

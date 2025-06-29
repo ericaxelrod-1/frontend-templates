@@ -6,18 +6,21 @@ Last Updated: 2025-01-27
 
 ### BUG-109: Filter Box Doesn't Work At All - No Connection Between Filters and Table ✅
 - **Started**: 2025-01-27 18:00:00
-- **Completed**: 2025-01-27 18:30:00
+- **Completed**: 2025-01-27 19:30:00
 - **Status**: Complete ✅
 - **Testing**: Build Successful ✅
-- **Priority**: Critical (Filter Functionality)
+- **Priority**: Critical (Filter Functionality + Sort Direction)
 - **Dependencies**: None
-- **Description**: Fixed completely non-functional filter system by connecting filter changes to table refresh and moving filters to appropriate tab location.
+- **Description**: Fixed completely non-functional filter system by connecting filter changes to table refresh, moving filters to appropriate tab location, adding default date range (last 7 days), and fixing sort initialization race condition causing ascending sort despite descending configuration.
 
 #### Implementation Summary
-**BROKEN FILTER CHAIN COMPLETELY RESTORED**:
+**BROKEN FILTER CHAIN COMPLETELY RESTORED + DEFAULT DATE RANGE + SORT FIX**:
 - **Root Cause**: Filter component captured changes but main component never triggered table refresh
 - **Critical Missing Link**: Main component `onFiltersChanged()` method only stored filterForm but never called `applyFilters()`
+- **Sort Race Condition**: MatSort programmatic initialization conflicted with template initialization causing wrong sort direction
 - **Solution**: Added ViewChild reference and proper trigger mechanism to connect filter events to table refresh
+- **Sort Fix**: Removed conflicting programmatic sort initialization, rely on template-based initialization for proper descending order
+- **UX Enhancement**: Added default date range (last 7 days) that auto-populates on initial page load
 
 #### Technical Fixes Applied
 
@@ -40,6 +43,8 @@ Last Updated: 2025-01-27
 #### Files Modified
 - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added ViewChild import, ViewChild reference, and trigger calls in filter event handlers
 - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Moved filters component inside Recent Login Attempts tab
+- `angular/frontend/src/app/modules/admin/login-monitoring/filters/filters.component.ts`: Added default date range calculation (last 7 days) for auto-population
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-attempts-table/login-attempts-table.component.ts`: Fixed sort initialization race condition by removing conflicting programmatic initialization
 
 #### Filter Chain Architecture Restored
 **Before (Broken)**:
@@ -65,6 +70,10 @@ FiltersComponent → (emit) → LoginMonitoringComponent → (applyFilters()) �
 - **Contextual Placement**: Filters clearly associated with login attempts table only
 - **Immediate Feedback**: Table refreshes immediately when filters are applied or reset
 - **Pagination Reset**: Filter application resets to first page for consistent navigation
+- **Smart Date Defaults**: Last 7 days auto-populated for immediate usability without manual date entry
+- **Correct Sort Order**: Most recent login attempts now appear first (descending order) as expected
+- **Default Date Range**: Date filters auto-populate with last 7 days on initial load for immediate useful data
+- **Smart Reset**: Reset button restores default 7-day range instead of clearing to empty dates
 
 **OUTCOME**: Completely restored filter functionality that was previously non-functional. Users can now filter login attempts by email, IP address, status, and date range with immediate table updates reflecting the filtered results.
 
