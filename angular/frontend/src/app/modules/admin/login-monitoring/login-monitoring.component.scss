@@ -143,6 +143,34 @@
   margin-bottom: 8px;
 }
 
+.pattern-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.pattern-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Group counter chip styling */
+.group-counter {
+  background-color: var(--mat-sys-tertiary-container) !important;
+  color: var(--mat-sys-on-tertiary-container) !important;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  
+  .group-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+  }
+}
+
 .pattern-type,
 .alert-type {
   font-weight: 500;

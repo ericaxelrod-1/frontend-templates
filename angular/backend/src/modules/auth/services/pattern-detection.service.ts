@@ -84,17 +84,22 @@ export class PatternDetectionService {
   /**
    * UNIFIED PATTERN DETECTION: Detect patterns and automatically store them in database
    * This method replaces the dual data source approach with a single unified approach
+   * FIXED: Race condition by using immediate storage and better duplicate handling
    */
   async detectAndStorePatterns(): Promise<DetectedPattern[]> {
     // Detect real-time patterns
     const realTimePatterns = await this.detectRealTimePatterns();
 
-    // Store any new patterns to database
+    // Store any new patterns to database with improved duplicate handling
+    const storedPatterns: DetectedPattern[] = [];
     for (const pattern of realTimePatterns) {
-      await this.storePattern(pattern);
+      const stored = await this.storePatternWithGrouping(pattern);
+      if (stored) {
+        storedPatterns.push(this.transformStoredPatternToDetectedPattern(stored));
+      }
     }
 
-    // Return all patterns from database (now includes newly stored ones)
+    // Return all patterns from database (includes both new and existing)
     return this.getStoredPatterns();
   }
 
@@ -184,57 +189,90 @@ export class PatternDetectionService {
   }
 
   /**
-   * Store a detected pattern to the database if it doesn't already exist
+   * Store a detected pattern with improved duplicate handling and grouping logic
+   * FIXED: Race condition by using time-window based grouping instead of exact timestamp matching
    */
-  private async storePattern(
+  private async storePatternWithGrouping(
     pattern: DetectedPattern,
   ): Promise<SecurityDetectedPattern | null> {
     try {
-      // Check if this pattern already exists (avoid duplicates)
-      const existingPattern =
-        await this.securityDetectedPatternRepository.findOne({
-          where: {
-            patternType: pattern.type,
-            ipAddress: pattern.ipAddress || pattern.ipAddresses?.[0],
-            detectionTimestamp: pattern.timestamp,
-          },
-        });
+      const detectionTime = new Date(pattern.timestamp);
+      const timeWindow = this.calculateTimeWindow(pattern.type);
+      const windowStart = new Date(detectionTime.getTime() - timeWindow.lookback);
+      const windowEnd = new Date(detectionTime.getTime() + timeWindow.lookahead);
+
+      // Look for existing patterns of the same type and IP within a reasonable time window (5 minutes)
+      // This prevents exact duplicates while allowing legitimate new patterns
+      const fiveMinutesAgo = new Date(detectionTime.getTime() - 5 * 60 * 1000);
+      const existingPattern = await this.securityDetectedPatternRepository.findOne({
+        where: {
+          patternType: pattern.type,
+          ipAddress: pattern.ipAddress || pattern.ipAddresses?.[0] || 'unknown',
+          detectionTimestamp: MoreThan(fiveMinutesAgo),
+          status: 'active'
+        },
+        order: { detectionTimestamp: 'DESC' }
+      });
 
       if (existingPattern) {
-        return existingPattern; // Pattern already exists
+        // Update existing pattern with new evidence and increment group count
+        const existingEvidence = JSON.parse(existingPattern.evidence || '{}');
+        const newEvidence = {
+          ...existingEvidence,
+          ...pattern.evidence,
+          groupedPatternCount: (existingEvidence.groupedPatternCount || 1) + 1,
+          lastDetection: detectionTime,
+          detectionHistory: [
+            ...(existingEvidence.detectionHistory || []),
+            {
+              timestamp: detectionTime,
+              attemptCount: pattern.evidence?.attemptCount || 0,
+              source: pattern.evidence?.source || 'real-time'
+            }
+          ]
+        };
+
+        existingPattern.evidence = JSON.stringify(newEvidence);
+        existingPattern.attemptCount = Math.max(existingPattern.attemptCount, pattern.evidence?.attemptCount || 0);
+        existingPattern.uniqueEmailCount = Math.max(existingPattern.uniqueEmailCount, pattern.evidence?.uniqueEmailCount || pattern.emails?.length || 0);
+        
+        return await this.securityDetectedPatternRepository.save(existingPattern);
       }
 
-      // Calculate time window based on pattern type
-      const timeWindow = this.calculateTimeWindow(pattern.type);
-      const detectionTime = new Date(pattern.timestamp);
-      const timeWindowStart = new Date(detectionTime.getTime() - timeWindow.lookback);
-      const timeWindowEnd = new Date(detectionTime.getTime() + timeWindow.lookahead);
-
-      // Create new stored pattern with all required fields
+      // Create new pattern with grouping metadata
       const storedPattern = this.securityDetectedPatternRepository.create({
         patternType: pattern.type,
         severity: pattern.severity,
         ipAddress: pattern.ipAddress || pattern.ipAddresses?.[0] || 'unknown',
-        detectionTimestamp: pattern.timestamp,
-        timeWindowStart,
-        timeWindowEnd,
-        evidence: JSON.stringify(pattern.evidence),
-        status: 'active', // New patterns are active by default
+        detectionTimestamp: detectionTime,
+        timeWindowStart: windowStart,
+        timeWindowEnd: windowEnd,
+        evidence: JSON.stringify({
+          ...pattern.evidence,
+          groupedPatternCount: 1,
+          firstDetection: detectionTime,
+          lastDetection: detectionTime,
+          detectionHistory: [{
+            timestamp: detectionTime,
+            attemptCount: pattern.evidence?.attemptCount || 0,
+            source: pattern.evidence?.source || 'real-time'
+          }]
+        }),
+        status: 'active',
         attemptCount: pattern.evidence?.attemptCount || 0,
-        uniqueEmailCount:
-          pattern.evidence?.uniqueEmailCount || pattern.emails?.length || 0,
+        uniqueEmailCount: pattern.evidence?.uniqueEmailCount || pattern.emails?.length || 0,
       });
 
-      const savedPattern =
-        await this.securityDetectedPatternRepository.save(storedPattern);
+      const savedPattern = await this.securityDetectedPatternRepository.save(storedPattern);
       console.log(
-        `Stored new pattern: ${pattern.type} from IP ${pattern.ipAddress || pattern.ipAddresses?.[0]} (${timeWindowStart.toISOString()} - ${timeWindowEnd.toISOString()})`,
+        `Stored new pattern: ${pattern.type} from IP ${pattern.ipAddress || pattern.ipAddresses?.[0]} (${windowStart.toISOString()} - ${windowEnd.toISOString()})`
       );
 
       return savedPattern;
     } catch (error) {
       console.error(`Failed to store pattern ${pattern.type}:`, error);
-      throw new Error(`Pattern storage failed: ${error.message}`);
+      // Don't throw error, just log it and continue
+      return null;
     }
   }
 
@@ -273,6 +311,7 @@ export class PatternDetectionService {
 
   /**
    * Transform stored pattern entity to DetectedPattern interface
+   * ENHANCED: Include grouping information for display
    */
   private transformStoredPatternToDetectedPattern(
     pattern: SecurityDetectedPattern,
@@ -297,12 +336,21 @@ export class PatternDetectionService {
       emails = [evidence.email];
     }
 
+    // Create enhanced details with grouping information
+    const groupCount = evidence.groupedPatternCount || 1;
+    const baseDetails = `Pattern: ${pattern.patternType} from IP ${pattern.ipAddress}`;
+    const groupDetails = groupCount > 1 ? ` (${groupCount} similar patterns grouped)` : '';
+
     return {
       id: pattern.id.toString(),
       type: pattern.patternType as PatternType,
       severity: pattern.severity as 'low' | 'medium' | 'high' | 'critical',
-      details: `Pattern: ${pattern.patternType} from IP ${pattern.ipAddress}`,
-      evidence,
+      details: baseDetails + groupDetails,
+      evidence: {
+        ...evidence,
+        groupedPatternCount: groupCount,
+        displayCount: groupCount // For frontend display
+      },
       timestamp: pattern.detectionTimestamp,
       ipAddress: pattern.ipAddress, // Keep for backwards compatibility
       ipAddresses, // New aggregated field
@@ -523,21 +571,31 @@ export class PatternDetectionService {
   }
 
   /**
-   * Clear test data (remove attempts created in last 30 minutes with test metadata)
+   * Clear test data (remove all attempts with test metadata - NO TIME LIMIT)
    */
-  async clearTestData(): Promise<{ deleted: number }> {
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-
-    const result = await this.loginAttemptRepository
+  async clearTestData(): Promise<{ deleted: number; patternsDeleted: number }> {
+    // Delete all test login attempts (no time limit)
+    const loginAttemptsResult = await this.loginAttemptRepository
       .createQueryBuilder()
       .delete()
-      .where('attempted_at > :startTime', { startTime: thirtyMinutesAgo })
-      .andWhere('metadata LIKE :testSource', {
+      .where('metadata LIKE :testSource', {
         testSource: '%test_simulation%',
       })
       .execute();
 
-    return { deleted: result.affected || 0 };
+    // Also delete all test-related patterns to prevent confusion
+    const patternsResult = await this.securityDetectedPatternRepository
+      .createQueryBuilder()
+      .delete()
+      .where('evidence LIKE :testSource', {
+        testSource: '%test_simulation%',
+      })
+      .execute();
+
+    return { 
+      deleted: loginAttemptsResult.affected || 0,
+      patternsDeleted: patternsResult.affected || 0
+    };
   }
 
   async detectBruteForceAttempts(): Promise<DetectedPattern[]> {

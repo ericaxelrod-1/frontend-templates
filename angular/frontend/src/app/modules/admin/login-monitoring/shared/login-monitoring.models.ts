@@ -30,6 +30,7 @@ export interface Pattern {
   ipAddresses: string[];
   email?: string;
   expanded?: boolean;
+  evidence?: any; // NEW: Added for grouping counter and additional pattern data
 }
 
 export interface IPReputation {

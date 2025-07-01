@@ -247,22 +247,21 @@ export class LoginMonitoringController {
       | 'credential_stuffing'
       | 'account_switching',
   ) {
+    // Create test login attempts
     await this.patternDetectionService.createTestLoginAttempts(scenario);
 
-    // Wait a moment then run detection to see if patterns are found
-    setTimeout(async () => {
-      const detectedPatterns =
-        await this.patternDetectionService.detectRealTimePatterns();
-      console.log(
-        `Test scenario '${scenario}' created. Detected patterns:`,
-        detectedPatterns.length,
-      );
-    }, 1000);
+    // FIXED: Race condition - immediately run detection and storage synchronously
+    const detectedPatterns = await this.patternDetectionService.detectAndStorePatterns();
+    console.log(
+      `Test scenario '${scenario}' created. Detected and stored patterns:`,
+      detectedPatterns.length,
+    );
 
     return {
       success: true,
-      message: `Test ${scenario} scenario created successfully. Check patterns in a few seconds.`,
+      message: `Test ${scenario} scenario created successfully. ${detectedPatterns.length} patterns detected and stored.`,
       scenario: scenario,
+      patternsDetected: detectedPatterns.length,
     };
   }
 
@@ -276,8 +275,9 @@ export class LoginMonitoringController {
     const result = await this.patternDetectionService.clearTestData();
     return {
       success: true,
-      message: `Cleared ${result.deleted} test login attempts`,
+      message: `Cleared ${result.deleted} test login attempts and ${result.patternsDeleted} test patterns`,
       deletedCount: result.deleted,
+      patternsDeletedCount: result.patternsDeleted,
     };
   }
 

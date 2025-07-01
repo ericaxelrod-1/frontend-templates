@@ -248,15 +248,35 @@ export class LoginMonitoringComponent implements OnInit {
     }
   }
 
+  /**
+   * Get the number of grouped patterns for display
+   * NEW: Shows how many database records are grouped into one display item
+   */
+  getGroupCount(pattern: Pattern): number {
+    // Check if the pattern has grouping information in evidence
+    if (pattern.evidence && pattern.evidence.groupedPatternCount) {
+      return pattern.evidence.groupedPatternCount;
+    }
+    // Fallback to displayCount if available
+    if (pattern.evidence && pattern.evidence.displayCount) {
+      return pattern.evidence.displayCount;
+    }
+    // Default to 1 if no grouping information
+    return 1;
+  }
+
   // Test button methods for TASK-102.2 validation
   testBruteForcePattern(): void {
     if (!this.hasPermission) return;
     
     this.loginMonitoringService.createTestPattern('brute_force').subscribe({
       next: (response) => {
-        this.snackBar.open('Brute force test pattern created successfully', 'Close', { duration: 5000 });
-        // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(this.patternDetectionFilters), 2000);
+        const message = response.patternsDetected ? 
+          `Brute force test created: ${response.patternsDetected} patterns detected` :
+          'Brute force test pattern created successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately since backend handles race condition
+        this.loadPatterns(this.patternDetectionFilters);
       },
       error: (error) => {
         console.error('Error creating brute force test pattern:', error);
@@ -270,9 +290,12 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.createTestPattern('distributed_attack').subscribe({
       next: (response) => {
-        this.snackBar.open('Distributed attack test pattern created successfully', 'Close', { duration: 5000 });
-        // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(this.patternDetectionFilters), 2000);
+        const message = response.patternsDetected ? 
+          `Distributed attack test created: ${response.patternsDetected} patterns detected` :
+          'Distributed attack test pattern created successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately since backend handles race condition
+        this.loadPatterns(this.patternDetectionFilters);
       },
       error: (error) => {
         console.error('Error creating distributed attack test pattern:', error);
@@ -286,9 +309,12 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.createTestPattern('credential_stuffing').subscribe({
       next: (response) => {
-        this.snackBar.open('Credential stuffing test pattern created successfully', 'Close', { duration: 5000 });
-        // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(this.patternDetectionFilters), 2000);
+        const message = response.patternsDetected ? 
+          `Credential stuffing test created: ${response.patternsDetected} patterns detected` :
+          'Credential stuffing test pattern created successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately since backend handles race condition
+        this.loadPatterns(this.patternDetectionFilters);
       },
       error: (error) => {
         console.error('Error creating credential stuffing test pattern:', error);
@@ -302,9 +328,12 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.createTestPattern('account_switching').subscribe({
       next: (response) => {
-        this.snackBar.open('Account switching test pattern created successfully', 'Close', { duration: 5000 });
-        // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(this.patternDetectionFilters), 2000);
+        const message = response.patternsDetected ? 
+          `Account switching test created: ${response.patternsDetected} patterns detected` :
+          'Account switching test pattern created successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately since backend handles race condition
+        this.loadPatterns(this.patternDetectionFilters);
       },
       error: (error) => {
         console.error('Error creating account switching test pattern:', error);
@@ -334,12 +363,13 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.clearTestData().subscribe({
       next: (response) => {
-        this.snackBar.open('Test data cleared successfully', 'Close', { duration: 5000 });
-        // Refresh both patterns and alerts after clearing
-        setTimeout(() => {
-          this.loadPatterns();
-          this.loadSecurityAlerts();
-        }, 1000);
+        const message = response.patternsDeletedCount ? 
+          `Test data cleared: ${response.deletedCount} attempts, ${response.patternsDeletedCount} patterns` :
+          'Test data cleared successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately
+        this.loadPatterns();
+        this.loadSecurityAlerts();
       },
       error: (error) => {
         console.error('Error clearing test data:', error);

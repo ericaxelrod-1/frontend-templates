@@ -128,6 +128,12 @@
                       <mat-chip [class]="getSeverityClass(pattern.severity)">
                         {{ pattern.severity | uppercase }}
                       </mat-chip>
+                      <!-- NEW: Display grouping counter -->
+                      <mat-chip class="group-counter" *ngIf="getGroupCount(pattern) > 1" 
+                                matTooltip="Number of similar patterns grouped together">
+                        <mat-icon class="group-icon">group_work</mat-icon>
+                        {{ getGroupCount(pattern) }} grouped
+                      </mat-chip>
                     </div>
                     <div class="pattern-meta">
                       <span class="pattern-timestamp">{{ pattern.timestamp | date:'medium' }}</span>
