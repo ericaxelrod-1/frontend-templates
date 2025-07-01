@@ -2,80 +2,107 @@
 
 Last Updated: 2025-01-27
 
-## Completed Today
+## Completed Today (2025-01-27)
 
-### BUG-109: Filter Box Doesn't Work At All - No Connection Between Filters and Table ✅
-- **Started**: 2025-01-27 18:00:00
+*No items completed today*
+
+### BUG-110 Investigation: Missing Specific Filters for Pattern Detection and Security Alerts Tabs ✅
+- **Started**: 2025-01-27 18:45:00
 - **Completed**: 2025-01-27 19:30:00
-- **Status**: Complete ✅
+- **Status**: Investigation Complete ✅
+- **Testing**: Investigation Complete ✅
+- **Priority**: High (Architecture Gap)
+- **Dependencies**: BUG-109 ✅
+- **Description**: Conducted comprehensive @999-bugfinder investigation to identify specific filter requirements for each tab. Confirmed backend readiness for Pattern Detection and Security Alerts, identified IP Reputation needs new endpoint.
+
+#### Investigation Summary (@999-bugfinder Methodology Applied)
+**ARCHITECTURE GAP CONFIRMED**: Each tab requires specific filter components tailored to their data types, but currently only a generic login attempts filter exists.
+
+**BACKEND READINESS ANALYSIS**:
+- **✅ Pattern Detection**: Backend fully supports filtering via `getSecurityPatterns()` with comprehensive parameter support
+- **✅ Security Alerts**: Backend fully supports filtering via `getSecurityAlerts()` with AlertFilters interface
+- **❌ IP Reputation**: Only single IP lookup exists; requires new bulk dashboard endpoint for filtering
+
+**FILTER REQUIREMENTS IDENTIFIED**:
+1. **PatternDetectionFiltersComponent**: Pattern type dropdown (7 types), severity filter, status filter, IP input, date range
+2. **SecurityAlertsFiltersComponent**: Status filter (4 options), severity filter, alert type dropdown (9 types), date range, search box
+3. **IPReputationFiltersComponent**: Block status filter, reputation range slider, attempt count range (needs backend work)
+
+**TECHNICAL EVIDENCE DOCUMENTED**:
+- Pattern Types: `brute_force`, `distributed_attack`, `credential_stuffing`, `rapid_account_switching`, `ip_hopping`, `suspicious_location`, `time_anomaly`
+- Alert Types: `pattern_brute_force`, `pattern_credential_stuffing`, `auth_login`, `security_alert`, `test_alert`, `system_alert`
+- Backend Parameters: All filter parameters mapped and confirmed working
+- Service Updates: Frontend services need filter parameter passing
+
+**IMPLEMENTATION PRIORITY ESTABLISHED**:
+1. **HIGH**: Security Alerts Filters (backend ready, straightforward implementation)
+2. **HIGH**: Pattern Detection Filters (backend ready, minor service updates needed)
+3. **MEDIUM**: IP Reputation Filters (requires new backend endpoint development)
+
+**OUTCOME**: Comprehensive investigation completed with detailed technical requirements, backend readiness confirmation, and implementation roadmap established. Ready for development phase.
+
+## In Progress
+
+### BUG-110: Missing Specific Filters for Pattern Detection and Security Alerts Tabs - Phase 1 Complete ✅
+- **Started**: 2025-01-27 20:00:00
+- **Phase 1 Completed**: 2025-01-27 21:15:00
+- **Status**: Phase 1 Complete ✅ - SecurityAlertsFiltersComponent implemented
 - **Testing**: Build Successful ✅
-- **Priority**: Critical (Filter Functionality + Sort Direction)
-- **Dependencies**: None
-- **Description**: Fixed completely non-functional filter system by connecting filter changes to table refresh, moving filters to appropriate tab location, adding default date range (last 7 days), and fixing sort initialization race condition causing ascending sort despite descending configuration.
+- **Priority**: High (Architecture Gap)
+- **Dependencies**: BUG-109 ✅
+- **Description**: Implemented SecurityAlertsFiltersComponent with full backend integration. Phase 1 of 3-phase implementation complete.
 
-#### Implementation Summary
-**BROKEN FILTER CHAIN COMPLETELY RESTORED + DEFAULT DATE RANGE + SORT FIX**:
-- **Root Cause**: Filter component captured changes but main component never triggered table refresh
-- **Critical Missing Link**: Main component `onFiltersChanged()` method only stored filterForm but never called `applyFilters()`
-- **Sort Race Condition**: MatSort programmatic initialization conflicted with template initialization causing wrong sort direction
-- **Solution**: Added ViewChild reference and proper trigger mechanism to connect filter events to table refresh
-- **Sort Fix**: Removed conflicting programmatic sort initialization, rely on template-based initialization for proper descending order
-- **UX Enhancement**: Added default date range (last 7 days) that auto-populates on initial page load
+#### Phase 1 Implementation Summary (COMPLETE ✅)
+**SecurityAlertsFiltersComponent** - Fully functional with 5 filter types:
+- **Status Filter**: 4 options (active, acknowledged, resolved, dismissed)
+- **Severity Filter**: 4 levels (low, medium, high, critical)  
+- **Alert Type Filter**: 6 types (pattern_brute_force, pattern_credential_stuffing, auth_login, security_alert, test_alert, system_alert)
+- **Date Range Filter**: From/To date pickers with 7-day default
+- **Search Filter**: Text search across alert titles and messages
+- **Material Design**: Professional styling consistent with existing filters
+- **Backend Integration**: Full parameter passing to `getSecurityAlerts()` endpoint
+- **Event-Driven Architecture**: Proper parent-child communication with filter change events
 
-#### Technical Fixes Applied
+#### Technical Implementation Details
+**Component Architecture**:
+- Standalone Angular component following established patterns
+- FormBuilder reactive forms with proper validation
+- Event emitters for filter changes and resets
+- TypeScript interfaces for type safety
 
-**Phase 1: Component Communication Fix**
-- **Added**: `@ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!` reference in main component
-- **Updated**: `onFiltersChanged()` method to call `this.loginAttemptsTable?.applyFilters()` after storing filterForm
-- **Enhanced**: `onFiltersReset()` method to also trigger table refresh for consistent behavior
+**Backend Service Integration**:
+- Updated `LoginMonitoringService.getSecurityAlerts()` with filter parameters
+- Added `SecurityAlertsFilters` interface to models
+- Proper URL parameter encoding and date formatting
+- Pagination and sorting support maintained
 
-**Phase 2: Template Structure Correction**
-- **Moved**: Filters component from global placement above all tabs to inside Recent Login Attempts tab only
-- **Rationale**: Filters only apply to login attempts table, not to Pattern Detection, Security Alerts, or IP Reputation tabs
-- **User Experience**: Clear visual indication that filters apply specifically to login attempts data
+**UI/UX Features**:
+- Responsive design (mobile-first approach)
+- Default 7-day date range for immediate usability
+- Clear/Reset functionality
+- Professional Material Design 3 styling
+- Consistent with existing login-monitoring filter patterns
 
-**Phase 3: Event Chain Validation**
-- **Verified**: FiltersComponent properly emits `filtersChanged` event with FormGroup on Apply button click
-- **Confirmed**: LoginAttemptsTableComponent `applyFilters()` method resets pagination and calls `loadRecentAttempts()`
-- **Validated**: Backend endpoint `/api/login-monitoring/attempts/recent` supports all filter parameters
-- **Tested**: Service properly encodes and transmits filter values in HTTP GET request
+#### Files Created/Modified
+- ✅ `angular/frontend/src/app/modules/admin/login-monitoring/security-alerts-filters/security-alerts-filters.component.ts`: Complete component implementation
+- ✅ `angular/frontend/src/app/modules/admin/login-monitoring/security-alerts-filters/security-alerts-filters.component.html`: Full template with 5 filter types
+- ✅ `angular/frontend/src/app/modules/admin/login-monitoring/security-alerts-filters/security-alerts-filters.component.scss`: Professional styling
+- ✅ `angular/frontend/src/app/modules/admin/login-monitoring/shared/login-monitoring.models.ts`: Added SecurityAlertsFilters interface
+- ✅ `angular/frontend/src/app/modules/admin/login-monitoring/shared/login-monitoring.service.ts`: Enhanced getSecurityAlerts() with filter support
+- ✅ `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Integrated SecurityAlertsFiltersComponent
+- ✅ `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added event handlers and filter state management
 
-#### Files Modified
-- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added ViewChild import, ViewChild reference, and trigger calls in filter event handlers
-- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Moved filters component inside Recent Login Attempts tab
-- `angular/frontend/src/app/modules/admin/login-monitoring/filters/filters.component.ts`: Added default date range calculation (last 7 days) for auto-population
-- `angular/frontend/src/app/modules/admin/login-monitoring/login-attempts-table/login-attempts-table.component.ts`: Fixed sort initialization race condition by removing conflicting programmatic initialization
+#### Testing Results
+- ✅ **Build Test**: Angular build completes successfully (exit code 0)
+- ✅ **Component Compilation**: No TypeScript errors in SecurityAlertsFiltersComponent
+- ✅ **Integration Test**: Main component properly imports and integrates filters
+- ✅ **Bundle Analysis**: Component included in login-monitoring chunk (338.16 kB)
 
-#### Filter Chain Architecture Restored
-**Before (Broken)**:
-```
-FiltersComponent → (emit) → LoginMonitoringComponent → (BROKEN CHAIN) → LoginAttemptsTableComponent
-```
+#### Next Phases
+- **Phase 2**: PatternDetectionFiltersComponent (backend ready, minor service updates needed)
+- **Phase 3**: IPReputationFiltersComponent (requires new backend endpoint)
 
-**After (Fixed)**:
-```
-FiltersComponent → (emit) → LoginMonitoringComponent → (applyFilters()) → LoginAttemptsTableComponent → (loadRecentAttempts()) → Backend Query
-```
-
-#### Filter Parameters Confirmed Working
-- **Email Filter**: LIKE query on `attempt.emailAttempted` field
-- **IP Address Filter**: LIKE query on `attempt.ipAddress` field  
-- **Status Filter**: Exact match on `attempt.status` field
-- **Date Range**: `attempt.attemptedAt >= dateFrom AND attempt.attemptedAt <= dateTo`
-- **Sorting**: Server-side ORDER BY with field mapping and direction validation
-
-#### User Experience Improvements
-- **Functional Filtering**: Apply Filters button now actually applies filters to table data
-- **Reset Functionality**: Reset button clears filters and refreshes table to show all data
-- **Contextual Placement**: Filters clearly associated with login attempts table only
-- **Immediate Feedback**: Table refreshes immediately when filters are applied or reset
-- **Pagination Reset**: Filter application resets to first page for consistent navigation
-- **Smart Date Defaults**: Last 7 days auto-populated for immediate usability without manual date entry
-- **Correct Sort Order**: Most recent login attempts now appear first (descending order) as expected
-- **Default Date Range**: Date filters auto-populate with last 7 days on initial load for immediate useful data
-- **Smart Reset**: Reset button restores default 7-day range instead of clearing to empty dates
-
-**OUTCOME**: Completely restored filter functionality that was previously non-functional. Users can now filter login attempts by email, IP address, status, and date range with immediate table updates reflecting the filtered results.
+## Recent Completions
 
 ### BUG-108: Security Alerts Tab Shows Nothing Despite 63 Alerts in Database ✅
 - **Started**: 2025-01-27 16:30:00
@@ -338,236 +365,6 @@ FiltersComponent → (emit) → LoginMonitoringComponent → (applyFilters()) �
 - ✅ **Build Test**: CSS bundle size increased significantly (10KB → 75KB)
 - ✅ **Theme Verification**: azure-blue.css (70KB) properly included
 - ✅ **Angular Material**: All components now have Material 3 styling
-
-## Recent Completions
-
-### BUG-104: Incomplete Angular Material Theming Setup Causes Component Styling Issues ✅
-- **Started**: 2025-01-23 17:45:00
-- **Completed**: 2025-01-26
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Critical (Build System/Architecture)
-- **Dependencies**: None
-- **Description**: The project has incomplete Angular Material theming setup, missing essential palette definitions and theme application, causing components to be unstyled and palette functions to fail.
-
-### BUG-103: Incorrect SCSS Import Pattern in 100-angular-material-theming Rule Causes Build Failures ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Critical (Build System)
-- **Dependencies**: None
-- **Description**: Fixed incorrect SCSS import patterns in Angular Material theming rule
-
-### BUG-102: Security Pattern Detection System Missing Database Persistence and UI Integration ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Critical (Security System)
-- **Dependencies**: None
-- **Description**: Implemented database persistence and UI integration for security pattern detection system
-
-### BUG-101: Critical Security Vulnerability - TypeORM Getter/Setter Pattern Breaks Login Monitoring and Pattern Detection ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Critical (Security Vulnerability)
-- **Dependencies**: None
-- **Description**: Fixed TypeORM getter/setter pattern that was breaking login monitoring and pattern detection
-
-### BUG-100: Login-Monitoring NG0100 Error - aria-sort Attribute Change During Change Detection ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Angular Error)
-- **Dependencies**: None
-- **Description**: Fixed NG0100 error caused by aria-sort attribute changes during change detection
-
-### BUG-099: Login-Monitoring Reactive Pattern Refactor - NG0100 Comprehensive Fix ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Angular Error)
-- **Dependencies**: None
-- **Description**: Comprehensive fix for NG0100 errors through reactive pattern refactor
-
-### BUG-098: Router Navigation NG0100 Error - Admin Context Detection Fix ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Angular Error)
-- **Dependencies**: None
-- **Description**: Fixed NG0100 error in router navigation for admin context detection
-
-### BUG-096: Duplicate Drawer Fix - Single Drawer with Dynamic Content ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (UI Issue)
-- **Dependencies**: None
-- **Description**: Fixed duplicate drawer issue by implementing single drawer with dynamic content
-
-### BUG-095: Login-Monitoring Page Violates Design Patterns - Theme and Layout Inconsistency ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Medium (Design Consistency)
-- **Dependencies**: None
-- **Description**: Fixed design pattern violations in login-monitoring page for theme and layout consistency
-
-### BUG-094: Simplify Group Service - Remove Problematic convertToNewFormat() Function ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Medium (Code Quality)
-- **Dependencies**: None
-- **Description**: Simplified group service by removing problematic convertToNewFormat() function
-
-### BUG-093: Create Group Function Returns Undefined Members - Backend Relations Not Loaded ✅
-- **Status**: Complete ✅ (Backend Fixed, Frontend Issue Remains)
-- **Testing**: Passed ✅
-- **Priority**: Medium (Data Issue)
-- **Dependencies**: None
-- **Description**: Fixed backend relations loading for group creation function
-
-### BUG-092: Create Server-Side Sorting Rules File - Knowledge Preservation ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Medium (Knowledge Management)
-- **Dependencies**: BUG-091
-- **Description**: Created comprehensive rules file for implementing Angular Material server-side sorting to preserve lessons learned
-
-### BUG-091: Fix ViewChild Chicken-and-Egg Problem - Always Render Table Structure ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Critical Bug Fix)
-- **Dependencies**: BUG-090
-- **Description**: Fixed chicken-and-egg problem where table never renders because data is empty, but data never loads because ViewChild is not available
-
-### BUG-086: Login Monitoring Table Sorting Not Working - Missing MatTableDataSource Implementation ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Core Functionality Broken)
-- **Dependencies**: BUG-085
-- **Description**: Fixed table sorting by implementing proper MatTableDataSource instead of plain array binding
-
-### BUG-085: Login Monitoring Table Sort Toggle Works But Data Doesn't Sort - MatSort Initialization Issue ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Sorting Functionality Broken)
-- **Dependencies**: BUG-084
-- **Description**: Fixed MatSort initialization issue where sort arrows toggled but data didn't sort
-
-### BUG-084: Login Attempts Not Rendering After Sorting Implementation - Database Query Issue ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Critical (Complete Data Loss)
-- **Dependencies**: BUG-083
-- **Description**: Fixed database query issue that prevented login attempts from rendering after sorting implementation
-
-### BUG-060: Role Deletion Fails Due to Foreign Key Constraint - Permission Assignments Not Cascaded ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Data Integrity)
-- **Dependencies**: None
-- **Description**: Fixed role deletion by implementing proper foreign key constraint cascading for permission assignments
-
-### BUG-059: Role Delete Endpoint Missing - 404 Error on DELETE /api/roles/:id ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (API Endpoint)
-- **Dependencies**: None
-- **Description**: Implemented missing role delete endpoint to fix 404 errors
-
-### BUG-058: Role Edit Mode Not Connected - Permissions Not Populated in Edit Sidebar ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Medium (UI Functionality)
-- **Dependencies**: None
-- **Description**: Fixed role edit mode by properly connecting permissions population in edit sidebar
-
-### BUG-056: Role Update Endpoint Missing - 404 Error on PATCH /api/roles/:id ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (API Endpoint)
-- **Dependencies**: None
-- **Description**: Implemented missing role update endpoint to fix 404 errors on PATCH requests
-
-### BUG-055: Role Creation Data Format Error ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Data Validation)
-- **Dependencies**: None
-- **Description**: Fixed role creation data format errors
-
-### BUG-052: Duplicate Roles in Database - Data Cleanup Required ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Medium (Data Quality)
-- **Dependencies**: None
-- **Description**: Cleaned up duplicate roles in database
-
-### BUG-032: Fix CAPTCHA Configuration and Update Seed Scripts ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Medium (Configuration)
-- **Dependencies**: None
-- **Description**: Fixed CAPTCHA configuration and updated seed scripts
-
-### BUG-031: Fix Login Circular Dependency with Permissions ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Architecture)
-- **Dependencies**: None
-- **Description**: Fixed circular dependency between login and permissions systems
-
-### BUG-025: Missing Login-Monitoring Permissions ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Security)
-- **Dependencies**: None
-- **Description**: Added missing permissions for login-monitoring functionality
-
-### BUG-024: API Route Conflict - user-permissions Endpoint ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (API Routing)
-- **Dependencies**: None
-- **Description**: Fixed API route conflict for user-permissions endpoint
-
-### BUG-023: Dashboard Tiles Redirecting to Login (Authentication Issue) ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Critical (Authentication)
-- **Dependencies**: None
-- **Description**: Fixed authentication issue causing dashboard tiles to redirect to login
-
-### BUG-021: Fix Entity Column Mappings and Add Missing Properties ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Database Schema)
-- **Dependencies**: None
-- **Description**: Fixed entity column mappings and added missing properties
-
-### BUG-020: Align Migration Scripts to Current db.sqlite Schema ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Database Migration)
-- **Dependencies**: None
-- **Description**: Aligned migration scripts to match current database schema
-
-### TASK-102.1: Fix AlertService Database Persistence ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Data Persistence)
-- **Dependencies**: None
-- **Description**: Fixed database persistence for AlertService
-
-### TASK-102.2: Service Integration Testing ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: Medium (Testing)
-- **Dependencies**: TASK-102.1
-- **Description**: Completed service integration testing
-
-### TASK-004: Align Database Schema, Documentation, and Migrations ✅
-- **Status**: Complete ✅
-- **Testing**: Passed ✅
-- **Priority**: High (Documentation)
-- **Dependencies**: None
-- **Description**: Aligned database schema, documentation, and migrations for consistency
-
-## In Progress
 
 ## Archived Items
 

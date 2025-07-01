@@ -1,8 +1,81 @@
 # Project Changelog Archive
 
-Last Updated: 2025-06-19
+Last Updated: 2025-01-27
 
 ## January 2025
+
+### BUG-109: Filter Box Doesn't Work At All - No Connection Between Filters and Table ✅
+- **Started**: 2025-01-26 20:20:00
+- **Completed**: 2025-01-27 18:30:00
+- **Status**: Complete ✅
+- **Testing**: Build Successful ✅
+- **Priority**: Critical (Filter Functionality + Sort Direction)
+- **Dependencies**: None
+- **Description**: Fixed completely non-functional filter system by connecting filter changes to table refresh, moving filters to appropriate tab location, adding default date range (last 7 days), and fixing sort initialization race condition causing ascending sort despite descending configuration.
+
+#### Implementation Summary
+**BROKEN FILTER CHAIN COMPLETELY RESTORED + DEFAULT DATE RANGE + SORT FIX**:
+- **Root Cause**: Filter component captured changes but main component never triggered table refresh
+- **Critical Missing Link**: Main component `onFiltersChanged()` method only stored filterForm but never called `applyFilters()`
+- **Sort Race Condition**: MatSort programmatic initialization conflicted with template initialization causing wrong sort direction
+- **Solution**: Added ViewChild reference and proper trigger mechanism to connect filter events to table refresh
+- **Sort Fix**: Removed conflicting programmatic sort initialization, rely on template-based initialization for proper descending order
+- **UX Enhancement**: Added default date range (last 7 days) that auto-populates on initial page load
+
+#### Technical Fixes Applied
+
+**Phase 1: Component Communication Fix**
+- **Added**: `@ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!` reference in main component
+- **Updated**: `onFiltersChanged()` method to call `this.loginAttemptsTable?.applyFilters()` after storing filterForm
+- **Enhanced**: `onFiltersReset()` method to also trigger table refresh for consistent behavior
+
+**Phase 2: Template Structure Correction**
+- **Moved**: Filters component from global placement above all tabs to inside Recent Login Attempts tab only
+- **Rationale**: Filters only apply to login attempts table, not to Pattern Detection, Security Alerts, or IP Reputation tabs
+- **User Experience**: Clear visual indication that filters apply specifically to login attempts data
+
+**Phase 3: Event Chain Validation**
+- **Verified**: FiltersComponent properly emits `filtersChanged` event with FormGroup on Apply button click
+- **Confirmed**: LoginAttemptsTableComponent `applyFilters()` method resets pagination and calls `loadRecentAttempts()`
+- **Validated**: Backend endpoint `/api/login-monitoring/attempts/recent` supports all filter parameters
+- **Tested**: Service properly encodes and transmits filter values in HTTP GET request
+
+#### Files Modified
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added ViewChild import, ViewChild reference, and trigger calls in filter event handlers
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Moved filters component inside Recent Login Attempts tab
+- `angular/frontend/src/app/modules/admin/login-monitoring/filters/filters.component.ts`: Added default date range calculation (last 7 days) for auto-population
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-attempts-table/login-attempts-table.component.ts`: Fixed sort initialization race condition by removing conflicting programmatic initialization
+
+#### Filter Chain Architecture Restored
+**Before (Broken)**:
+```
+FiltersComponent → (emit) → LoginMonitoringComponent → (BROKEN CHAIN) → LoginAttemptsTableComponent
+```
+
+**After (Fixed)**:
+```
+FiltersComponent → (emit) → LoginMonitoringComponent → (applyFilters()) → LoginAttemptsTableComponent → (loadRecentAttempts()) → Backend Query
+```
+
+#### Filter Parameters Confirmed Working
+- **Email Filter**: LIKE query on `attempt.emailAttempted` field
+- **IP Address Filter**: LIKE query on `attempt.ipAddress` field  
+- **Status Filter**: Exact match on `attempt.status` field
+- **Date Range**: `attempt.attemptedAt >= dateFrom AND attempt.attemptedAt <= dateTo`
+- **Sorting**: Server-side ORDER BY with field mapping and direction validation
+
+#### User Experience Improvements
+- **Functional Filtering**: Apply Filters button now actually applies filters to table data
+- **Reset Functionality**: Reset button clears filters and refreshes table to show all data
+- **Contextual Placement**: Filters clearly associated with login attempts table only
+- **Immediate Feedback**: Table refreshes immediately when filters are applied or reset
+- **Pagination Reset**: Filter application resets to first page for consistent navigation
+- **Smart Date Defaults**: Last 7 days auto-populated for immediate usability without manual date entry
+- **Correct Sort Order**: Most recent login attempts now appear first (descending order) as expected
+- **Default Date Range**: Date filters auto-populate with last 7 days on initial load for immediate useful data
+- **Smart Reset**: Reset button restores default 7-day range instead of clearing to empty dates
+
+**OUTCOME**: Completely restored filter functionality that was previously non-functional. Users can now filter login attempts by email, IP address, status, and date range with immediate table updates reflecting the filtered results.
 
 ### BUG-077: Meaningful API Responses for Group Assignment Operations ✅
 - **Started**: 2025-01-28

@@ -150,6 +150,13 @@
       <!-- Security Alerts Tab -->
       <mat-tab label="Security Alerts">
         <div class="tab-content">
+          <!-- Security Alerts Filters Component -->
+          <app-security-alerts-filters 
+            [hasPermission]="hasPermission"
+            (filtersChanged)="onSecurityAlertsFiltersChanged($event)"
+            (filtersReset)="onSecurityAlertsFiltersReset()">
+          </app-security-alerts-filters>
+          
           <mat-card>
             <mat-card-header>
               <mat-card-title>Security Alerts</mat-card-title>

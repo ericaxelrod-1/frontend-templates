@@ -7,12 +7,14 @@ import { LoginMonitoringSharedModule } from './shared/login-monitoring-shared.mo
 import { StatisticsDashboardComponent } from './statistics-dashboard/statistics-dashboard.component';
 import { FiltersComponent } from './filters/filters.component';
 import { LoginAttemptsTableComponent } from './login-attempts-table/login-attempts-table.component';
+import { SecurityAlertsFiltersComponent } from './security-alerts-filters/security-alerts-filters.component';
 import { LoginMonitoringService } from './shared/login-monitoring.service';
 import { 
   LoginAttempt, 
   Statistics, 
   Pattern, 
   SecurityAlert, 
+  SecurityAlertsFilters,
   IPReputation 
 } from './shared/login-monitoring.models';
 
@@ -23,7 +25,8 @@ import {
     LoginMonitoringSharedModule,
     StatisticsDashboardComponent,
     FiltersComponent,
-    LoginAttemptsTableComponent
+    LoginAttemptsTableComponent,
+    SecurityAlertsFiltersComponent
   ],
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
@@ -34,6 +37,7 @@ export class LoginMonitoringComponent implements OnInit {
   
   // Component references
   filterForm: FormGroup | null = null;
+  securityAlertsFilters: SecurityAlertsFilters = {};
   
   // ViewChild reference to table component for filter triggering
   @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
@@ -106,6 +110,17 @@ export class LoginMonitoringComponent implements OnInit {
     this.getIPReputation(ipAddress);
   }
 
+  // Security Alerts Filters Event Handlers
+  onSecurityAlertsFiltersChanged(filters: SecurityAlertsFilters): void {
+    this.securityAlertsFilters = filters;
+    this.loadSecurityAlerts();
+  }
+
+  onSecurityAlertsFiltersReset(): void {
+    this.securityAlertsFilters = {};
+    this.loadSecurityAlerts();
+  }
+
   // Methods for tabs that aren't yet refactored
   loadPatterns(): void {
     if (!this.hasPermission) return;
@@ -131,9 +146,16 @@ export class LoginMonitoringComponent implements OnInit {
     if (!this.hasPermission) return;
     
     console.log('[DEBUG] loadSecurityAlerts called with permission:', this.hasPermission);
+    console.log('[DEBUG] Security alerts filters:', this.securityAlertsFilters);
     this.loading.alerts = true;
     
-    this.loginMonitoringService.getSecurityAlerts().subscribe({
+    this.loginMonitoringService.getSecurityAlerts(
+      this.securityAlertsFilters,
+      0, // page
+      50, // pageSize - show more alerts by default
+      'createdAt', // sortBy
+      'desc' // sortDirection - newest first
+    ).subscribe({
         next: (data) => {
           console.log('[DEBUG] Security alerts loaded successfully:', data);
           this.securityAlerts = data || [];

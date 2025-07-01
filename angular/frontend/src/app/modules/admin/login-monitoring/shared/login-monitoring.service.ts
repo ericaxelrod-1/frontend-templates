@@ -10,6 +10,7 @@ import {
   IPReputation, 
   SecurityAlert, 
   LoginMonitoringFilters,
+  SecurityAlertsFilters,
   PaginatedResponse 
 } from './login-monitoring.models';
 
@@ -105,8 +106,48 @@ export class LoginMonitoringService {
   }
 
   // Security Alerts API - Fixed to use correct endpoint and handle paginated response
-  getSecurityAlerts(): Observable<SecurityAlert[]> {
-    return this.http.get<{items: any[], total: number}>(`${environment.apiUrl}/security-alerts/alerts`)
+  getSecurityAlerts(
+    filters: SecurityAlertsFilters = {},
+    page: number = 0,
+    pageSize: number = 10,
+    sortBy: string = 'createdAt',
+    sortDirection: string = 'desc'
+  ): Observable<SecurityAlert[]> {
+    let url = `${environment.apiUrl}/security-alerts/alerts?limit=${pageSize}&offset=${page * pageSize}`;
+    
+    // Add sorting parameters
+    if (sortBy && sortDirection) {
+      url += `&sortBy=${sortBy}&sortDirection=${sortDirection}`;
+    }
+    
+    // Add filters based on backend investigation
+    if (filters.status) {
+      url += `&status=${encodeURIComponent(filters.status)}`;
+    }
+    
+    if (filters.severity) {
+      url += `&severity=${encodeURIComponent(filters.severity)}`;
+    }
+    
+    if (filters.alertType) {
+      url += `&alertType=${encodeURIComponent(filters.alertType)}`;
+    }
+    
+    if (filters.search) {
+      url += `&search=${encodeURIComponent(filters.search)}`;
+    }
+    
+    if (filters.dateFrom) {
+      const dateFrom = new Date(filters.dateFrom);
+      url += `&dateFrom=${dateFrom.toISOString()}`;
+    }
+    
+    if (filters.dateTo) {
+      const dateTo = new Date(filters.dateTo);
+      url += `&dateTo=${dateTo.toISOString()}`;
+    }
+
+    return this.http.get<{items: any[], total: number}>(url)
       .pipe(
         map(response => (response.items || []).map(alert => this.transformSecurityAlert(alert))),
         catchError(this.handleError)

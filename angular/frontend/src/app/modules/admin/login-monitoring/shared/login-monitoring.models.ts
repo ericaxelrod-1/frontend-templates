@@ -71,6 +71,15 @@ export interface LoginMonitoringFilters {
   dateTo?: Date;
 }
 
+export interface SecurityAlertsFilters {
+  status?: 'active' | 'acknowledged' | 'resolved' | 'dismissed' | '';
+  severity?: 'low' | 'medium' | 'high' | 'critical' | '';
+  alertType?: 'pattern_brute_force' | 'pattern_credential_stuffing' | 'auth_login' | 'security_alert' | 'test_alert' | 'system_alert' | '';
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
