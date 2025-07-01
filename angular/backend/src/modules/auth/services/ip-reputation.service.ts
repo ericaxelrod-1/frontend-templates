@@ -178,8 +178,12 @@ export class IPReputationService {
     // This requires a more complex query with TypeORM
     const captchaCount = await this.ipReputationRepository
       .createQueryBuilder('ip')
-      .where('ip.failed_login_attempts >= :captchaThreshold', { captchaThreshold: 3 })
-      .andWhere('ip.failed_login_attempts < :blockThreshold', { blockThreshold: 5 })
+      .where('ip.failed_login_attempts >= :captchaThreshold', {
+        captchaThreshold: 3,
+      })
+      .andWhere('ip.failed_login_attempts < :blockThreshold', {
+        blockThreshold: 5,
+      })
       .andWhere('ip.is_manually_blocked = :isBlocked', { isBlocked: false })
       .getCount();
 

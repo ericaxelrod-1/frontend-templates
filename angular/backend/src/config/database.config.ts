@@ -7,7 +7,9 @@ export default registerAs('database', () => {
   const dbTypeFromEnv = process.env.DB_TYPE?.toLowerCase();
 
   // Common settings
-  const commonEntities = [path.join(__dirname, '../modules/**/entities/*.entity{.ts,.js}')];
+  const commonEntities = [
+    path.join(__dirname, '../modules/**/entities/*.entity{.ts,.js}'),
+  ];
   const commonMigrations = [path.join(__dirname, '../migrations/*{.ts,.js}')];
 
   const sqliteConfig: TypeOrmModuleOptions = {
@@ -15,7 +17,10 @@ export default registerAs('database', () => {
     database: process.env.DATABASE_FILE || 'db.sqlite',
     entities: commonEntities,
     synchronize: false,
-    logging: nodeEnv === 'development' || nodeEnv === 'test' ? ['query', 'error', 'schema'] : ['error'],
+    logging:
+      nodeEnv === 'development' || nodeEnv === 'test'
+        ? ['query', 'error', 'schema']
+        : ['error'],
     autoLoadEntities: true,
     extra: { foreign_keys: true },
     migrationsRun: false,
@@ -32,7 +37,8 @@ export default registerAs('database', () => {
     schema: process.env.DB_SCHEMA || 'public',
     entities: commonEntities,
     synchronize: false,
-    logging: nodeEnv === 'development' ? ['query', 'error', 'schema'] : ['error'],
+    logging:
+      nodeEnv === 'development' ? ['query', 'error', 'schema'] : ['error'],
     autoLoadEntities: true,
     migrationsRun: false, // Typically false for app runtime, true for migration tool if needed
     migrations: commonMigrations,
@@ -65,8 +71,8 @@ export default registerAs('database', () => {
   // Determine config based on DB_TYPE, then NODE_ENV for default SQLite/Postgres
   // if (dbTypeFromEnv === 'snowflake') {
   //   console.log('[DB Config] Using Snowflake configuration (if type is corrected).');
-  //   chosenConfig = snowflakeConfig; 
-  // } else 
+  //   chosenConfig = snowflakeConfig;
+  // } else
   if (dbTypeFromEnv === 'postgres') {
     console.log('[DB Config] Using PostgreSQL configuration via DB_TYPE.');
     chosenConfig = postgresConfig;
@@ -76,16 +82,23 @@ export default registerAs('database', () => {
   } else {
     // Default to SQLite for development/test, Postgres for production if DB_TYPE is not set
     if (nodeEnv === 'development' || nodeEnv === 'test') {
-      console.log(`[DB Config] NODE_ENV is ${nodeEnv}. Defaulting to SQLite configuration.`);
+      console.log(
+        `[DB Config] NODE_ENV is ${nodeEnv}. Defaulting to SQLite configuration.`,
+      );
       chosenConfig = sqliteConfig;
-    } else { // Handles 'production' or any other NODE_ENV value
-      console.log(`[DB Config] NODE_ENV is ${nodeEnv}. Defaulting to PostgreSQL configuration.`);
+    } else {
+      // Handles 'production' or any other NODE_ENV value
+      console.log(
+        `[DB Config] NODE_ENV is ${nodeEnv}. Defaulting to PostgreSQL configuration.`,
+      );
       chosenConfig = postgresConfig;
     }
   }
-  
+
   // The logging is now defined within each specific config object (sqliteConfig, postgresConfig)
 
-  console.log(`[DB Config] Final config type: ${chosenConfig.type}, DB: ${typeof chosenConfig.database === 'string' ? chosenConfig.database : 'complex_object'}`);
+  console.log(
+    `[DB Config] Final config type: ${chosenConfig.type}, DB: ${typeof chosenConfig.database === 'string' ? chosenConfig.database : 'complex_object'}`,
+  );
   return chosenConfig;
-}); 
+});

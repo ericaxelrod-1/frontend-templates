@@ -17,16 +17,16 @@ interface SQLiteColumn {
 }
 
 // Get table info to check if columns exist
-db.all("PRAGMA table_info(roles)", [], (err, columns: SQLiteColumn[]) => {
+db.all('PRAGMA table_info(roles)', [], (err, columns: SQLiteColumn[]) => {
   if (err) {
-    console.error("Error checking roles table:", err);
+    console.error('Error checking roles table:', err);
     db.close();
     return;
   }
 
   // Extract column names
-  const columnNames = columns.map(col => col.name);
-  console.log("Existing columns:", columnNames);
+  const columnNames = columns.map((col) => col.name);
+  console.log('Existing columns:', columnNames);
 
   // Add missing columns if they don't exist
   const columnsToAdd = [
@@ -35,14 +35,14 @@ db.all("PRAGMA table_info(roles)", [], (err, columns: SQLiteColumn[]) => {
     { name: 'parent_id', definition: 'INTEGER' },
     { name: 'priority', definition: 'INTEGER' },
     { name: 'created_at', definition: 'DATETIME' },
-    { name: 'updated_at', definition: 'DATETIME' }
+    { name: 'updated_at', definition: 'DATETIME' },
   ];
 
   // Process each column
   let pendingQueries = columnsToAdd.length;
   let errorsOccurred = false;
 
-  columnsToAdd.forEach(column => {
+  columnsToAdd.forEach((column) => {
     if (!columnNames.includes(column.name)) {
       const query = `ALTER TABLE roles ADD COLUMN ${column.name} ${column.definition}`;
       console.log(`Executing: ${query}`);
@@ -55,12 +55,12 @@ db.all("PRAGMA table_info(roles)", [], (err, columns: SQLiteColumn[]) => {
           errorsOccurred = true;
         } else {
           console.log(`Successfully added column ${column.name}`);
-          
+
           // For timestamp columns, add a separate update to set the default value
           if (column.name === 'created_at' || column.name === 'updated_at') {
             const updateQuery = `UPDATE roles SET ${column.name} = CURRENT_TIMESTAMP WHERE ${column.name} IS NULL`;
             console.log(`Executing: ${updateQuery}`);
-            
+
             db.run(updateQuery, (updateErr) => {
               if (updateErr) {
                 console.error(`Error updating ${column.name}:`, updateErr);
@@ -74,14 +74,14 @@ db.all("PRAGMA table_info(roles)", [], (err, columns: SQLiteColumn[]) => {
         // Check if all queries are completed
         if (pendingQueries === 0) {
           if (errorsOccurred) {
-            console.error("Completed with errors");
+            console.error('Completed with errors');
           } else {
-            console.log("All columns added successfully");
+            console.log('All columns added successfully');
           }
           // Give time for the update queries to complete
           setTimeout(() => {
             db.close();
-            console.log("Database connection closed");
+            console.log('Database connection closed');
           }, 500);
         }
       });
@@ -91,9 +91,9 @@ db.all("PRAGMA table_info(roles)", [], (err, columns: SQLiteColumn[]) => {
 
       // Check if all queries are completed
       if (pendingQueries === 0) {
-        console.log("No columns needed to be added");
+        console.log('No columns needed to be added');
         db.close();
       }
     }
   });
-}); 
+});

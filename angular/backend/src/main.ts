@@ -19,7 +19,7 @@ import { dataSourceOptions } from './database/data-source'; // Import dataSource
 import { SqliteConnectionOptions } from 'typeorm/driver/sqlite/SqliteConnectionOptions';
 
 // Determine CWD (should be angular/backend when running npm start)
-const CWD = process.cwd(); 
+const CWD = process.cwd();
 
 // Ensure logs directory exists in CWD (angular/backend/logs)
 const logsDir = path.join(CWD, 'logs');
@@ -28,14 +28,23 @@ if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
     console.log(`[Bootstrap] Created logs directory: ${logsDir}`);
   } catch (e) {
-    console.error(`[Bootstrap] Failed to create logs directory (${logsDir}):`, e);
+    console.error(
+      `[Bootstrap] Failed to create logs directory (${logsDir}):`,
+      e,
+    );
   }
 }
 
 const BOOTSTRAP_LOG_FILE = path.join(logsDir, 'bootstrap-debug.log');
-console.log(`[Bootstrap] Bootstrap details will be logged to: ${BOOTSTRAP_LOG_FILE}`);
+console.log(
+  `[Bootstrap] Bootstrap details will be logged to: ${BOOTSTRAP_LOG_FILE}`,
+);
 // Clear previous log file for this session
-try { fs.writeFileSync(BOOTSTRAP_LOG_FILE, ''); } catch (e) { console.error('Failed to clear bootstrap log', e); } // Added error logging
+try {
+  fs.writeFileSync(BOOTSTRAP_LOG_FILE, '');
+} catch (e) {
+  console.error('Failed to clear bootstrap log', e);
+} // Added error logging
 
 function logBootstrap(message: string) {
   const timestamp = new Date().toISOString();
@@ -44,46 +53,80 @@ function logBootstrap(message: string) {
   try {
     fs.appendFileSync(BOOTSTRAP_LOG_FILE, logMessage);
   } catch (e) {
-    console.error(`[Bootstrap] Failed to write to bootstrap log file (${BOOTSTRAP_LOG_FILE}):`, e); // Added error logging
+    console.error(
+      `[Bootstrap] Failed to write to bootstrap log file (${BOOTSTRAP_LOG_FILE}):`,
+      e,
+    ); // Added error logging
   }
 }
 
 // Log versions and dependencies
-logBootstrap(`📦 NestJS Version: ${require('@nestjs/core/package.json').version}`);
+logBootstrap(
+  `📦 NestJS Version: ${require('@nestjs/core/package.json').version}`,
+);
 logBootstrap(`🔄 Node.js Version: ${process.version}`);
 logBootstrap(`🗄️ Trying to load AppModule...`);
 
 async function bootstrap() {
   logBootstrap('🔄 Starting bootstrap...');
-  logBootstrap(`[Bootstrap] Current __dirname (main.ts location): ${__dirname}`);
-  logBootstrap(`[Bootstrap] Current process.cwd() (should be angular/backend): ${process.cwd()}`);
+  logBootstrap(
+    `[Bootstrap] Current __dirname (main.ts location): ${__dirname}`,
+  );
+  logBootstrap(
+    `[Bootstrap] Current process.cwd() (should be angular/backend): ${process.cwd()}`,
+  );
 
   try {
     logBootstrap(`[Bootstrap] DataSource Type: ${dataSourceOptions.type}`);
-    
+
     if (dataSourceOptions.type === 'sqlite') {
       const sqliteOptions = dataSourceOptions as SqliteConnectionOptions;
       const dbPathFromEnv = process.env.DATABASE_FILE;
-      const defaultDbPathInOptions = typeof sqliteOptions.database === 'string' ? sqliteOptions.database : 'db.sqlite';
+      const defaultDbPathInOptions =
+        typeof sqliteOptions.database === 'string'
+          ? sqliteOptions.database
+          : 'db.sqlite';
       const dbPathToUse = dbPathFromEnv || defaultDbPathInOptions;
-      const resolvedDbPath = path.resolve(CWD, dbPathToUse); 
-      
-      logBootstrap(`[Bootstrap] process.env.DATABASE_FILE: ${dbPathFromEnv || 'Not set'}`);
-      logBootstrap(`[Bootstrap] Default DB Path from dataSourceOptions: ${defaultDbPathInOptions}`);
-      logBootstrap(`[Bootstrap] Effective DB Path for SQLite (resolved from CWD ${CWD}): ${dbPathToUse}`);
-      logBootstrap(`[Bootstrap] Resolved absolute DB Path for SQLite: ${resolvedDbPath}`);
-      
+      const resolvedDbPath = path.resolve(CWD, dbPathToUse);
+
+      logBootstrap(
+        `[Bootstrap] process.env.DATABASE_FILE: ${dbPathFromEnv || 'Not set'}`,
+      );
+      logBootstrap(
+        `[Bootstrap] Default DB Path from dataSourceOptions: ${defaultDbPathInOptions}`,
+      );
+      logBootstrap(
+        `[Bootstrap] Effective DB Path for SQLite (resolved from CWD ${CWD}): ${dbPathToUse}`,
+      );
+      logBootstrap(
+        `[Bootstrap] Resolved absolute DB Path for SQLite: ${resolvedDbPath}`,
+      );
+
       if (!fs.existsSync(resolvedDbPath)) {
-        logBootstrap(`[Bootstrap] ERROR: SQLite Database file NOT FOUND at resolved path: ${resolvedDbPath}`);
+        logBootstrap(
+          `[Bootstrap] ERROR: SQLite Database file NOT FOUND at resolved path: ${resolvedDbPath}`,
+        );
       } else {
-        logBootstrap(`[Bootstrap] SUCCESS: SQLite Database file FOUND at resolved path: ${resolvedDbPath}`);
+        logBootstrap(
+          `[Bootstrap] SUCCESS: SQLite Database file FOUND at resolved path: ${resolvedDbPath}`,
+        );
       }
     } else {
-      logBootstrap(`[Bootstrap] Host: ${(dataSourceOptions as any).host || 'N/A'}`);
-      logBootstrap(`[Bootstrap] Port: ${(dataSourceOptions as any).port || 'N/A'}`);
-      logBootstrap(`[Bootstrap] Username: ${(dataSourceOptions as any).username ? 'Set' : 'Not Set'}`);
-      logBootstrap(`[Bootstrap] Database Name: ${dataSourceOptions.database || 'N/A'}`);
-      logBootstrap(`[Bootstrap] Schema: ${(dataSourceOptions as any).schema || 'N/A'}`);
+      logBootstrap(
+        `[Bootstrap] Host: ${(dataSourceOptions as any).host || 'N/A'}`,
+      );
+      logBootstrap(
+        `[Bootstrap] Port: ${(dataSourceOptions as any).port || 'N/A'}`,
+      );
+      logBootstrap(
+        `[Bootstrap] Username: ${(dataSourceOptions as any).username ? 'Set' : 'Not Set'}`,
+      );
+      logBootstrap(
+        `[Bootstrap] Database Name: ${dataSourceOptions.database || 'N/A'}`,
+      );
+      logBootstrap(
+        `[Bootstrap] Schema: ${(dataSourceOptions as any).schema || 'N/A'}`,
+      );
     }
 
     const app = await NestFactory.create(AppModule, {
@@ -97,7 +140,6 @@ async function bootstrap() {
     const port = process.env.PORT || 3000;
     await app.listen(port);
     logBootstrap(`🚀 Server is running on: http://localhost:${port}`);
-
   } catch (error) {
     logBootstrap(`❌ Bootstrap failed: ${error?.message || error}`);
     if (error?.stack) {

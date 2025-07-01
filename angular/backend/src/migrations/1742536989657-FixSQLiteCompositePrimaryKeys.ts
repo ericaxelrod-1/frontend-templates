@@ -4,13 +4,21 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * This migration addresses SQLite compatibility issues with composite primary keys
  * by adding a single primary key column (id) to join tables that previously used composite primary keys
  */
-export class FixSQLiteCompositePrimaryKeys1742536989657 implements MigrationInterface {
+export class FixSQLiteCompositePrimaryKeys1742536989657
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Fix component_permissions table
-    const hasComponentPermissionsTable = await queryRunner.hasTable('component_permissions');
+    const hasComponentPermissionsTable = await queryRunner.hasTable(
+      'component_permissions',
+    );
     if (hasComponentPermissionsTable) {
       // Check if it already has an id column
-      const hasIdColumn = await this.hasColumn(queryRunner, 'component_permissions', 'id');
+      const hasIdColumn = await this.hasColumn(
+        queryRunner,
+        'component_permissions',
+        'id',
+      );
       if (!hasIdColumn) {
         // Create temporary table with id
         await queryRunner.query(`
@@ -32,7 +40,9 @@ export class FixSQLiteCompositePrimaryKeys1742536989657 implements MigrationInte
         await queryRunner.query(`DROP TABLE "component_permissions"`);
 
         // Rename temp table to original
-        await queryRunner.query(`ALTER TABLE "component_permissions_temp" RENAME TO "component_permissions"`);
+        await queryRunner.query(
+          `ALTER TABLE "component_permissions_temp" RENAME TO "component_permissions"`,
+        );
 
         // Re-add foreign key constraints
         await queryRunner.query(`
@@ -45,9 +55,15 @@ export class FixSQLiteCompositePrimaryKeys1742536989657 implements MigrationInte
     }
 
     // Fix api_endpoint_permissions table
-    const hasApiEndpointPermissionsTable = await queryRunner.hasTable('api_endpoint_permissions');
+    const hasApiEndpointPermissionsTable = await queryRunner.hasTable(
+      'api_endpoint_permissions',
+    );
     if (hasApiEndpointPermissionsTable) {
-      const hasIdColumn = await this.hasColumn(queryRunner, 'api_endpoint_permissions', 'id');
+      const hasIdColumn = await this.hasColumn(
+        queryRunner,
+        'api_endpoint_permissions',
+        'id',
+      );
       if (!hasIdColumn) {
         // Create temporary table with id
         await queryRunner.query(`
@@ -69,7 +85,9 @@ export class FixSQLiteCompositePrimaryKeys1742536989657 implements MigrationInte
         await queryRunner.query(`DROP TABLE "api_endpoint_permissions"`);
 
         // Rename temp table to original
-        await queryRunner.query(`ALTER TABLE "api_endpoint_permissions_temp" RENAME TO "api_endpoint_permissions"`);
+        await queryRunner.query(
+          `ALTER TABLE "api_endpoint_permissions_temp" RENAME TO "api_endpoint_permissions"`,
+        );
 
         // Re-add indexes
         await queryRunner.query(`
@@ -82,9 +100,15 @@ export class FixSQLiteCompositePrimaryKeys1742536989657 implements MigrationInte
     }
 
     // Fix frontend_route_permissions table
-    const hasFrontendRoutePermissionsTable = await queryRunner.hasTable('frontend_route_permissions');
+    const hasFrontendRoutePermissionsTable = await queryRunner.hasTable(
+      'frontend_route_permissions',
+    );
     if (hasFrontendRoutePermissionsTable) {
-      const hasIdColumn = await this.hasColumn(queryRunner, 'frontend_route_permissions', 'id');
+      const hasIdColumn = await this.hasColumn(
+        queryRunner,
+        'frontend_route_permissions',
+        'id',
+      );
       if (!hasIdColumn) {
         // Create temporary table with id
         await queryRunner.query(`
@@ -106,7 +130,9 @@ export class FixSQLiteCompositePrimaryKeys1742536989657 implements MigrationInte
         await queryRunner.query(`DROP TABLE "frontend_route_permissions"`);
 
         // Rename temp table to original
-        await queryRunner.query(`ALTER TABLE "frontend_route_permissions_temp" RENAME TO "frontend_route_permissions"`);
+        await queryRunner.query(
+          `ALTER TABLE "frontend_route_permissions_temp" RENAME TO "frontend_route_permissions"`,
+        );
 
         // Re-add indexes
         await queryRunner.query(`
@@ -125,9 +151,13 @@ export class FixSQLiteCompositePrimaryKeys1742536989657 implements MigrationInte
     console.log('Downgrade not implemented for this migration');
   }
 
-  private async hasColumn(queryRunner: QueryRunner, table: string, column: string): Promise<boolean> {
+  private async hasColumn(
+    queryRunner: QueryRunner,
+    table: string,
+    column: string,
+  ): Promise<boolean> {
     const query = `PRAGMA table_info(${table})`;
     const columns = await queryRunner.query(query);
     return columns.some((col) => col.name === column);
   }
-} 
+}

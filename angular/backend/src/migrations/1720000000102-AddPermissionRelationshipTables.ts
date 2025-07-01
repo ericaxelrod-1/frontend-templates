@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddPermissionRelationshipTables1720000000102 implements MigrationInterface {
+export class AddPermissionRelationshipTables1720000000102
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create components table if it doesn't exist
     const hasComponentsTable = await queryRunner.hasTable('components');
@@ -21,7 +23,9 @@ export class AddPermissionRelationshipTables1720000000102 implements MigrationIn
     }
 
     // Create component_permissions join table if it doesn't exist
-    const hasComponentPermissionsTable = await queryRunner.hasTable('component_permissions');
+    const hasComponentPermissionsTable = await queryRunner.hasTable(
+      'component_permissions',
+    );
     if (!hasComponentPermissionsTable) {
       await queryRunner.query(`
         CREATE TABLE "component_permissions" (
@@ -67,7 +71,9 @@ export class AddPermissionRelationshipTables1720000000102 implements MigrationIn
     }
 
     // Create api_endpoint_permissions join table if it doesn't exist
-    const hasApiEndpointPermissionsTable = await queryRunner.hasTable('api_endpoint_permissions');
+    const hasApiEndpointPermissionsTable = await queryRunner.hasTable(
+      'api_endpoint_permissions',
+    );
     if (!hasApiEndpointPermissionsTable) {
       await queryRunner.query(`
         CREATE TABLE "api_endpoint_permissions" (
@@ -91,7 +97,8 @@ export class AddPermissionRelationshipTables1720000000102 implements MigrationIn
     }
 
     // Create frontend_routes table if it doesn't exist
-    const hasFrontendRoutesTable = await queryRunner.hasTable('frontend_routes');
+    const hasFrontendRoutesTable =
+      await queryRunner.hasTable('frontend_routes');
     if (!hasFrontendRoutesTable) {
       await queryRunner.query(`
         CREATE TABLE "frontend_routes" (
@@ -113,7 +120,9 @@ export class AddPermissionRelationshipTables1720000000102 implements MigrationIn
     }
 
     // Create frontend_route_permissions join table if it doesn't exist
-    const hasFrontendRoutePermissionsTable = await queryRunner.hasTable('frontend_route_permissions');
+    const hasFrontendRoutePermissionsTable = await queryRunner.hasTable(
+      'frontend_route_permissions',
+    );
     if (!hasFrontendRoutePermissionsTable) {
       await queryRunner.query(`
         CREATE TABLE "frontend_route_permissions" (
@@ -139,23 +148,30 @@ export class AddPermissionRelationshipTables1720000000102 implements MigrationIn
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop the join tables first
-    const hasFrontendRoutePermissionsTable = await queryRunner.hasTable('frontend_route_permissions');
+    const hasFrontendRoutePermissionsTable = await queryRunner.hasTable(
+      'frontend_route_permissions',
+    );
     if (hasFrontendRoutePermissionsTable) {
       await queryRunner.query(`DROP TABLE "frontend_route_permissions"`);
     }
 
-    const hasApiEndpointPermissionsTable = await queryRunner.hasTable('api_endpoint_permissions');
+    const hasApiEndpointPermissionsTable = await queryRunner.hasTable(
+      'api_endpoint_permissions',
+    );
     if (hasApiEndpointPermissionsTable) {
       await queryRunner.query(`DROP TABLE "api_endpoint_permissions"`);
     }
 
-    const hasComponentPermissionsTable = await queryRunner.hasTable('component_permissions');
+    const hasComponentPermissionsTable = await queryRunner.hasTable(
+      'component_permissions',
+    );
     if (hasComponentPermissionsTable) {
       await queryRunner.query(`DROP TABLE "component_permissions"`);
     }
 
     // Then drop the main tables
-    const hasFrontendRoutesTable = await queryRunner.hasTable('frontend_routes');
+    const hasFrontendRoutesTable =
+      await queryRunner.hasTable('frontend_routes');
     if (hasFrontendRoutesTable) {
       await queryRunner.query(`DROP TABLE "frontend_routes"`);
     }
@@ -170,4 +186,4 @@ export class AddPermissionRelationshipTables1720000000102 implements MigrationIn
       await queryRunner.query(`DROP TABLE "components"`);
     }
   }
-} 
+}

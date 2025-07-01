@@ -27,7 +27,10 @@ export class ActionsController {
   @Post()
   @RequirePermission('actions:create')
   @ApiOperation({ summary: 'Create a new action' })
-  @ApiResponse({ status: 201, description: 'The action has been successfully created.' })
+  @ApiResponse({
+    status: 201,
+    description: 'The action has been successfully created.',
+  })
   @ApiResponse({ status: 400, description: 'Invalid input data.' })
   async create(@Body() createActionDto: CreateActionDto): Promise<Action> {
     return this.permissionsService.createAction(createActionDto);
@@ -53,7 +56,10 @@ export class ActionsController {
   @Put(':id')
   @RequirePermission('actions:update')
   @ApiOperation({ summary: 'Update an action' })
-  @ApiResponse({ status: 200, description: 'The action has been successfully updated.' })
+  @ApiResponse({
+    status: 200,
+    description: 'The action has been successfully updated.',
+  })
   @ApiResponse({ status: 400, description: 'Invalid input data.' })
   @ApiResponse({ status: 404, description: 'Action not found.' })
   async update(
@@ -66,9 +72,12 @@ export class ActionsController {
   @Delete(':id')
   @RequirePermission('actions:delete')
   @ApiOperation({ summary: 'Delete an action' })
-  @ApiResponse({ status: 200, description: 'The action has been successfully deleted.' })
+  @ApiResponse({
+    status: 200,
+    description: 'The action has been successfully deleted.',
+  })
   @ApiResponse({ status: 404, description: 'Action not found.' })
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return this.permissionsService.removeAction(id);
   }
-} 
+}

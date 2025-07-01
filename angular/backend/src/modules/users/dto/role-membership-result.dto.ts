@@ -4,7 +4,10 @@ export class RoleMembershipResultDto {
   @ApiProperty({ description: 'Whether the operation was successful' })
   success: boolean;
 
-  @ApiProperty({ description: 'Type of operation performed', enum: ['added', 'removed'] })
+  @ApiProperty({
+    description: 'Type of operation performed',
+    enum: ['added', 'removed'],
+  })
   operation: 'added' | 'removed';
 
   @ApiProperty({ description: 'User information' })
@@ -67,4 +70,4 @@ export interface RoleMembershipResult {
     memberSince?: Date;
     totalRoleMembers: number;
   };
-} 
+}

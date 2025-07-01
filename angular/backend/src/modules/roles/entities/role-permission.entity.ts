@@ -5,7 +5,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
-  PrimaryColumn
+  PrimaryColumn,
 } from 'typeorm';
 import { Role } from './role.entity';
 import { Permission } from '../../permissions/entities/permission.entity';

@@ -22,7 +22,12 @@ import { PasswordValidationService } from '../auth/password-validation.service';
     PermissionsSharedModule,
   ],
   controllers: [UsersController, RolesController, GroupsController],
-  providers: [UsersService, RolesService, GroupsService, PasswordValidationService],
+  providers: [
+    UsersService,
+    RolesService,
+    GroupsService,
+    PasswordValidationService,
+  ],
   exports: [UsersService, RolesService, GroupsService, TypeOrmModule],
 })
 export class UsersModule {}

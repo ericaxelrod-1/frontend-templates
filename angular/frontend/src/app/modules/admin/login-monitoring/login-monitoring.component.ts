@@ -8,6 +8,7 @@ import { StatisticsDashboardComponent } from './statistics-dashboard/statistics-
 import { FiltersComponent } from './filters/filters.component';
 import { LoginAttemptsTableComponent } from './login-attempts-table/login-attempts-table.component';
 import { SecurityAlertsFiltersComponent } from './security-alerts-filters/security-alerts-filters.component';
+import { PatternDetectionFiltersComponent } from './pattern-detection-filters/pattern-detection-filters.component';
 import { LoginMonitoringService } from './shared/login-monitoring.service';
 import { 
   LoginAttempt, 
@@ -15,6 +16,7 @@ import {
   Pattern, 
   SecurityAlert, 
   SecurityAlertsFilters,
+  PatternDetectionFilters,
   IPReputation 
 } from './shared/login-monitoring.models';
 
@@ -26,7 +28,8 @@ import {
     StatisticsDashboardComponent,
     FiltersComponent,
     LoginAttemptsTableComponent,
-    SecurityAlertsFiltersComponent
+    SecurityAlertsFiltersComponent,
+    PatternDetectionFiltersComponent
   ],
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
@@ -38,6 +41,7 @@ export class LoginMonitoringComponent implements OnInit {
   // Component references
   filterForm: FormGroup | null = null;
   securityAlertsFilters: SecurityAlertsFilters = {};
+  patternDetectionFilters: PatternDetectionFilters = {};
   
   // ViewChild reference to table component for filter triggering
   @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
@@ -121,14 +125,32 @@ export class LoginMonitoringComponent implements OnInit {
     this.loadSecurityAlerts();
   }
 
+  // Pattern Detection Filters Event Handlers
+  onPatternDetectionFiltersChanged(filters: PatternDetectionFilters): void {
+    this.patternDetectionFilters = filters;
+    this.loadPatterns(filters);
+  }
+
+  onPatternDetectionFiltersReset(): void {
+    this.patternDetectionFilters = {};
+    this.loadPatterns({});
+  }
+
   // Methods for tabs that aren't yet refactored
-  loadPatterns(): void {
+  // UNIFIED PATTERN LOADING: Single method for all pattern queries
+  loadPatterns(filters: PatternDetectionFilters = {}): void {
     if (!this.hasPermission) return;
     
-    console.log('[DEBUG] loadPatterns called with permission:', this.hasPermission);
+    console.log('[DEBUG] loadPatterns called with filters:', filters);
     this.loading.patterns = true;
     
-    this.loginMonitoringService.detectPatterns().subscribe({
+    this.loginMonitoringService.getPatterns(
+      filters,
+      0, // page
+      50, // pageSize - show more patterns by default
+      'detectionTimestamp', // sortBy
+      'desc' // sortDirection - newest first
+    ).subscribe({
         next: (data) => {
           console.log('[DEBUG] Patterns loaded successfully:', data);
           this.detectedPatterns = data || [];
@@ -140,6 +162,12 @@ export class LoginMonitoringComponent implements OnInit {
           this.loading.patterns = false;
         }
       });
+  }
+
+  // DEPRECATED METHOD - Kept for backward compatibility during transition
+  loadFilteredPatterns(): void {
+    // Redirect to unified method with current filters
+    this.loadPatterns(this.patternDetectionFilters);
   }
 
   loadSecurityAlerts(): void {
@@ -228,7 +256,7 @@ export class LoginMonitoringComponent implements OnInit {
       next: (response) => {
         this.snackBar.open('Brute force test pattern created successfully', 'Close', { duration: 5000 });
         // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(), 2000);
+        setTimeout(() => this.loadPatterns(this.patternDetectionFilters), 2000);
       },
       error: (error) => {
         console.error('Error creating brute force test pattern:', error);
@@ -244,7 +272,7 @@ export class LoginMonitoringComponent implements OnInit {
       next: (response) => {
         this.snackBar.open('Distributed attack test pattern created successfully', 'Close', { duration: 5000 });
         // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(), 2000);
+        setTimeout(() => this.loadPatterns(this.patternDetectionFilters), 2000);
       },
       error: (error) => {
         console.error('Error creating distributed attack test pattern:', error);
@@ -260,7 +288,7 @@ export class LoginMonitoringComponent implements OnInit {
       next: (response) => {
         this.snackBar.open('Credential stuffing test pattern created successfully', 'Close', { duration: 5000 });
         // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(), 2000);
+        setTimeout(() => this.loadPatterns(this.patternDetectionFilters), 2000);
       },
       error: (error) => {
         console.error('Error creating credential stuffing test pattern:', error);
@@ -276,7 +304,7 @@ export class LoginMonitoringComponent implements OnInit {
       next: (response) => {
         this.snackBar.open('Account switching test pattern created successfully', 'Close', { duration: 5000 });
         // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(), 2000);
+        setTimeout(() => this.loadPatterns(this.patternDetectionFilters), 2000);
       },
       error: (error) => {
         console.error('Error creating account switching test pattern:', error);

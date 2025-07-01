@@ -49,7 +49,10 @@ export class CacheSyncService {
    * @param entry The cache entry to update
    * @param permissions The permissions to add
    */
-  updateCacheEntryPermissions(entry: CacheEntryBase, permissions: string[]): void {
+  updateCacheEntryPermissions(
+    entry: CacheEntryBase,
+    permissions: string[],
+  ): void {
     entry.permissions = permissions;
   }
 
@@ -58,7 +61,10 @@ export class CacheSyncService {
    * @param resourceType - The type of resource
    * @param resourceId - The ID of the resource
    */
-  async syncPermissions(resourceType: string, resourceId: number): Promise<void> {
+  async syncPermissions(
+    resourceType: string,
+    resourceId: number,
+  ): Promise<void> {
     this.logger.debug(`Syncing permissions for ${resourceType}:${resourceId}`);
     // Implementation will be added later
   }
@@ -87,4 +93,4 @@ export class CacheSyncService {
     this.logger.debug('Clearing all permission caches');
     // Implementation will be added later
   }
-} 
+}

@@ -53,7 +53,7 @@ export class Action {
   /**
    * Reference to the permissions that use this action
    */
-  @OneToMany(() => Permission, permission => permission.actionEntity)
+  @OneToMany(() => Permission, (permission) => permission.actionEntity)
   permissions: Permission[];
 
   @CreateDateColumn({ name: 'created_at' })

@@ -17,7 +17,9 @@ export class RoleSeedService {
     this.logger.log('Starting role seed...');
 
     // Remove redundant roles (case-insensitive, ignoring spaces)
-    const canonicalNames = Object.values(SystemRoles).map(n => n.toLowerCase().replace(/\s+/g, ''));
+    const canonicalNames = Object.values(SystemRoles).map((n) =>
+      n.toLowerCase().replace(/\s+/g, ''),
+    );
     const redundantNames = ['user', 'admin', 'superuser', 'superadmin'];
     const roles = await this.roleRepository.find();
     for (const role of roles) {

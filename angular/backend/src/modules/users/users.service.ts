@@ -64,7 +64,7 @@ export class UsersService {
       roles = await this.roleRepository.find({
         where: { id: In(createUserDto.roleIds) },
       });
-      
+
       if (roles.length !== createUserDto.roleIds.length) {
         throw new BadRequestException('One or more role IDs are invalid');
       }
@@ -87,7 +87,7 @@ export class UsersService {
       groups = await this.groupRepository.find({
         where: { id: In(createUserDto.groupIds) },
       });
-      
+
       if (groups.length !== createUserDto.groupIds.length) {
         throw new BadRequestException('One or more group IDs are invalid');
       }
@@ -163,7 +163,8 @@ export class UsersService {
       try {
         const user = await this.userRepository.findOne({
           where: { email },
-          select: { // Explicitly select all User base fields needed for auth/subsequent ops
+          select: {
+            // Explicitly select all User base fields needed for auth/subsequent ops
             id: true,
             username: true,
             password: true, // Needed for password comparison
@@ -171,13 +172,13 @@ export class UsersService {
             isActive: true, // Crucial field
             isEmailVerified: true,
             lastLoginAt: true,
-            firstName: true, 
+            firstName: true,
             lastName: true,
-            preferences: true, 
+            preferences: true,
             emailVerifiedAt: true,
             registrationVerificationSentAt: true,
             userVerifiedAt: true,
-            isDeleted: true, 
+            isDeleted: true,
             deletedAt: true,
             createdAt: true,
             updatedAt: true,
@@ -211,17 +212,18 @@ export class UsersService {
       // Fallback: Try loading with just basic roles if full relations failed
       const basicUser = await this.userRepository.findOne({
         where: { email },
-        select: { // Explicit select for fallback too
-            id: true,
-            username: true,
-            password: true,
-            email: true,
-            isActive: true,
-            isEmailVerified: true,
-            firstName: true, 
-            lastName: true,
-            createdAt: true,
-            updatedAt: true,
+        select: {
+          // Explicit select for fallback too
+          id: true,
+          username: true,
+          password: true,
+          email: true,
+          isActive: true,
+          isEmailVerified: true,
+          firstName: true,
+          lastName: true,
+          createdAt: true,
+          updatedAt: true,
         },
         relations: ['roles'],
       });
@@ -264,14 +266,19 @@ export class UsersService {
       });
 
       if (user) {
-        console.log(`User lookup success for username ${username} with ID ${user.id}`);
+        console.log(
+          `User lookup success for username ${username} with ID ${user.id}`,
+        );
       } else {
         console.log(`User not found for username: ${username}`);
       }
 
       return user;
     } catch (error) {
-      console.error(`Critical error finding user by username ${username}:`, error);
+      console.error(
+        `Critical error finding user by username ${username}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -290,16 +297,18 @@ export class UsersService {
       const roles = await this.roleRepository.find({
         where: { id: In(updateUserDto.roleIds) },
       });
-      
+
       if (roles.length !== updateUserDto.roleIds.length) {
         console.error('Role validation failed:', {
           requestedRoleIds: updateUserDto.roleIds,
-          foundRoles: roles.map(r => r.id),
-          missingRoleIds: updateUserDto.roleIds.filter(id => !roles.some(r => r.id === id))
+          foundRoles: roles.map((r) => r.id),
+          missingRoleIds: updateUserDto.roleIds.filter(
+            (id) => !roles.some((r) => r.id === id),
+          ),
         });
         throw new BadRequestException('One or more role IDs are invalid');
       }
-      
+
       user.roles = roles;
       delete updateUserDto.roleIds; // Remove from DTO to prevent TypeORM issues
     }
@@ -309,62 +318,70 @@ export class UsersService {
       console.log('Processing group update for user:', {
         userId: id,
         requestedGroupIds: updateUserDto.groupIds,
-        currentUserGroups: user.groups?.map(g => g.id) || []
+        currentUserGroups: user.groups?.map((g) => g.id) || [],
       });
 
       // Validate that all group IDs are valid numbers
-      const validGroupIds = updateUserDto.groupIds.filter(id => 
-        typeof id === 'number' && id > 0 && Number.isInteger(id)
+      const validGroupIds = updateUserDto.groupIds.filter(
+        (id) => typeof id === 'number' && id > 0 && Number.isInteger(id),
       );
 
       if (validGroupIds.length !== updateUserDto.groupIds.length) {
         console.error('Invalid group IDs detected:', {
           originalIds: updateUserDto.groupIds,
           validIds: validGroupIds,
-          invalidIds: updateUserDto.groupIds.filter(id => 
-            !(typeof id === 'number' && id > 0 && Number.isInteger(id))
-          )
+          invalidIds: updateUserDto.groupIds.filter(
+            (id) => !(typeof id === 'number' && id > 0 && Number.isInteger(id)),
+          ),
         });
-        throw new BadRequestException('One or more group IDs are invalid (not valid numbers)');
+        throw new BadRequestException(
+          'One or more group IDs are invalid (not valid numbers)',
+        );
       }
 
       // Remove duplicates
       const uniqueGroupIds = [...new Set(validGroupIds)];
-      
+
       if (uniqueGroupIds.length !== validGroupIds.length) {
         console.warn('Duplicate group IDs detected and removed:', {
           originalIds: validGroupIds,
-          uniqueIds: uniqueGroupIds
+          uniqueIds: uniqueGroupIds,
         });
       }
 
       const groups = await this.groupRepository.find({
         where: { id: In(uniqueGroupIds) },
       });
-      
+
       if (groups.length !== uniqueGroupIds.length) {
-        const foundGroupIds = groups.map(g => g.id);
-        const missingGroupIds = uniqueGroupIds.filter(id => !foundGroupIds.includes(id));
-        
+        const foundGroupIds = groups.map((g) => g.id);
+        const missingGroupIds = uniqueGroupIds.filter(
+          (id) => !foundGroupIds.includes(id),
+        );
+
         console.error('Group validation failed:', {
           requestedGroupIds: uniqueGroupIds,
           foundGroups: foundGroupIds,
           missingGroupIds: missingGroupIds,
-          allGroupsInDb: await this.groupRepository.find({ select: ['id', 'name'] })
+          allGroupsInDb: await this.groupRepository.find({
+            select: ['id', 'name'],
+          }),
         });
-        
-        throw new BadRequestException(`One or more group IDs are invalid: ${missingGroupIds.join(', ')}`);
+
+        throw new BadRequestException(
+          `One or more group IDs are invalid: ${missingGroupIds.join(', ')}`,
+        );
       }
-      
+
       // Update user groups using pure many-to-many relationship
       user.groups = groups;
-      
+
       console.log('Successfully updated user groups:', {
         userId: id,
-        newGroupIds: groups.map(g => g.id),
-        groupNames: groups.map(g => g.name)
+        newGroupIds: groups.map((g) => g.id),
+        groupNames: groups.map((g) => g.name),
       });
-      
+
       delete updateUserDto.groupIds; // Remove from DTO to prevent TypeORM issues
     }
 
@@ -475,7 +492,10 @@ export class UsersService {
   /**
    * Add a user to a role with meaningful response
    */
-  async addUserToRole(userId: number, roleId: number): Promise<RoleMembershipResult> {
+  async addUserToRole(
+    userId: number,
+    roleId: number,
+  ): Promise<RoleMembershipResult> {
     // Load user and role with relations
     const [user, role] = await Promise.all([
       this.userRepository.findOne({
@@ -497,7 +517,7 @@ export class UsersService {
     }
 
     // Check if user already has this role
-    const hasRole = user.roles?.some(r => r.id === role.id);
+    const hasRole = user.roles?.some((r) => r.id === role.id);
     if (hasRole) {
       return {
         success: false,
@@ -506,22 +526,22 @@ export class UsersService {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
-          lastName: user.lastName
+          lastName: user.lastName,
         },
         role: {
           id: role.id,
           name: role.name,
-          description: role.description
+          description: role.description,
         },
         timestamp: new Date(),
         message: `User is already a member of role ${role.name}`,
         previousState: {
-          wasAlreadyMember: true
+          wasAlreadyMember: true,
         },
         currentState: {
           isMember: true,
-          totalRoleMembers: role.users?.length || 0
-        }
+          totalRoleMembers: role.users?.length || 0,
+        },
       };
     }
 
@@ -547,30 +567,33 @@ export class UsersService {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
+        lastName: user.lastName,
       },
       role: {
         id: role.id,
         name: role.name,
-        description: role.description
+        description: role.description,
       },
       timestamp: new Date(),
       message: `User successfully added to role ${role.name}`,
       previousState: {
-        wasAlreadyMember: false
+        wasAlreadyMember: false,
       },
       currentState: {
         isMember: true,
         memberSince: new Date(),
-        totalRoleMembers: updatedRole?.users?.length || 0
-      }
+        totalRoleMembers: updatedRole?.users?.length || 0,
+      },
     };
   }
 
   /**
    * Remove a user from a role with meaningful response
    */
-  async removeUserFromRole(userId: number, roleId: number): Promise<RoleMembershipResult> {
+  async removeUserFromRole(
+    userId: number,
+    roleId: number,
+  ): Promise<RoleMembershipResult> {
     // Load user and role with relations
     const [user, role] = await Promise.all([
       this.userRepository.findOne({
@@ -592,7 +615,7 @@ export class UsersService {
     }
 
     // Check if user actually has this role
-    const hasRole = user.roles?.some(r => r.id === role.id);
+    const hasRole = user.roles?.some((r) => r.id === role.id);
     if (!hasRole) {
       return {
         success: false,
@@ -601,27 +624,27 @@ export class UsersService {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
-          lastName: user.lastName
+          lastName: user.lastName,
         },
         role: {
           id: role.id,
           name: role.name,
-          description: role.description
+          description: role.description,
         },
         timestamp: new Date(),
         message: `User is not a member of role ${role.name}`,
         previousState: {
-          wasAlreadyMember: false
+          wasAlreadyMember: false,
         },
         currentState: {
           isMember: false,
-          totalRoleMembers: role.users?.length || 0
-        }
+          totalRoleMembers: role.users?.length || 0,
+        },
       };
     }
 
     // Remove user from role
-    user.roles = user.roles.filter(r => r.id !== role.id);
+    user.roles = user.roles.filter((r) => r.id !== role.id);
 
     // Save the user
     await this.userRepository.save(user);
@@ -639,22 +662,22 @@ export class UsersService {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
+        lastName: user.lastName,
       },
       role: {
         id: role.id,
         name: role.name,
-        description: role.description
+        description: role.description,
       },
       timestamp: new Date(),
       message: `User successfully removed from role ${role.name}`,
       previousState: {
-        wasAlreadyMember: true
+        wasAlreadyMember: true,
       },
       currentState: {
         isMember: false,
-        totalRoleMembers: updatedRole?.users?.length || 0
-      }
+        totalRoleMembers: updatedRole?.users?.length || 0,
+      },
     };
   }
 

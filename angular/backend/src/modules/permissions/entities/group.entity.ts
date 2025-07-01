@@ -7,7 +7,7 @@ import {
   OneToMany,
   ManyToMany,
   ManyToOne,
-  JoinColumn
+  JoinColumn,
 } from 'typeorm';
 import { GroupPermission } from './group-permission.entity';
 import { User } from '../../users/entities/user.entity';
@@ -37,14 +37,9 @@ export class Group {
   /**
    * Relationships with GroupPermission join entity
    */
-  @OneToMany(
-    () => GroupPermission,
-    (groupPermission) => groupPermission.group,
-  )
+  @OneToMany(() => GroupPermission, (groupPermission) => groupPermission.group)
   groupPermissions: GroupPermission[];
-  
 
-  
   /**
    * Flag to indicate if this is a system-managed group that shouldn't be modified
    */
@@ -67,6 +62,6 @@ export class Group {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToMany(() => User, user => user.groups)
+  @ManyToMany(() => User, (user) => user.groups)
   users: User[];
-} 
+}

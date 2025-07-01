@@ -196,7 +196,9 @@ export class CreatePermissionEntities1658012345678
     await queryRunner.query(`DROP TABLE IF EXISTS "user_groups"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "user_roles"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "api_endpoint_permissions"`);
-    await queryRunner.query(`DROP TABLE IF EXISTS "frontend_route_permissions"`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS "frontend_route_permissions"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "ui_component_permissions"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "group_permissions"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "role_permissions"`);

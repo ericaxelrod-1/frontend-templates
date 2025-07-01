@@ -2,12 +2,42 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 // First create actions that will be referenced by permissions
 const actionSeedData = [
-  { name: 'View', actionCode: 'view', description: 'View resource', category: 'read' },
-  { name: 'Create', actionCode: 'create', description: 'Create new resource', category: 'write' },
-  { name: 'Edit', actionCode: 'edit', description: 'Edit existing resource', category: 'write' },
-  { name: 'Delete', actionCode: 'delete', description: 'Delete resource', category: 'write' },
-  { name: 'Refresh', actionCode: 'refresh', description: 'Refresh resource', category: 'action' },
-  { name: 'Test', actionCode: 'test', description: 'Test resource', category: 'action' },
+  {
+    name: 'View',
+    actionCode: 'view',
+    description: 'View resource',
+    category: 'read',
+  },
+  {
+    name: 'Create',
+    actionCode: 'create',
+    description: 'Create new resource',
+    category: 'write',
+  },
+  {
+    name: 'Edit',
+    actionCode: 'edit',
+    description: 'Edit existing resource',
+    category: 'write',
+  },
+  {
+    name: 'Delete',
+    actionCode: 'delete',
+    description: 'Delete resource',
+    category: 'write',
+  },
+  {
+    name: 'Refresh',
+    actionCode: 'refresh',
+    description: 'Refresh resource',
+    category: 'action',
+  },
+  {
+    name: 'Test',
+    actionCode: 'test',
+    description: 'Test resource',
+    category: 'action',
+  },
 ];
 
 const permissionSeedData = [
@@ -150,7 +180,7 @@ export class SeedPermissionsData1690000000001 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create actions first (required for permissions)
     const actionMap = new Map<string, number>();
-    
+
     for (const action of actionSeedData) {
       // Check if action already exists
       const existingAction = await queryRunner.query(

@@ -53,6 +53,13 @@
       <!-- Pattern Detection Tab -->
       <mat-tab label="Pattern Detection">
         <div class="tab-content">
+          <!-- Pattern Detection Filters Component -->
+          <app-pattern-detection-filters 
+            [hasPermission]="hasPermission"
+            (filtersChanged)="onPatternDetectionFiltersChanged($event)"
+            (filtersReset)="onPatternDetectionFiltersReset()">
+          </app-pattern-detection-filters>
+          
           <mat-card>
             <mat-card-header>
               <mat-card-title>Detected Security Patterns</mat-card-title>

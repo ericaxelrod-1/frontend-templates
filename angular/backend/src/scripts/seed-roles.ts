@@ -56,16 +56,66 @@ class SeedLogger extends Logger {
 }
 
 const actionsToSeed = [
-  { name: 'Create', actionCode: 'create', description: 'Create new resource', category: 'write' },
-  { name: 'Read', actionCode: 'read', description: 'View resource details', category: 'read' },
-  { name: 'Update', actionCode: 'update', description: 'Update resource details', category: 'write' },
-  { name: 'Delete', actionCode: 'delete', description: 'Delete resource', category: 'write' },
-  { name: 'List', actionCode: 'list', description: 'List all resources', category: 'read' },
-  { name: 'Assign', actionCode: 'assign', description: 'Assign resource to users', category: 'action' },
-  { name: 'Export', actionCode: 'export', description: 'Export resource data', category: 'action' },
-  { name: 'Config', actionCode: 'config', description: 'Configure resource', category: 'action' },
-  { name: 'Audit', actionCode: 'audit', description: 'View resource audit logs', category: 'read' },
-  { name: 'Backup', actionCode: 'backup', description: 'Manage resource backups', category: 'action' },
+  {
+    name: 'Create',
+    actionCode: 'create',
+    description: 'Create new resource',
+    category: 'write',
+  },
+  {
+    name: 'Read',
+    actionCode: 'read',
+    description: 'View resource details',
+    category: 'read',
+  },
+  {
+    name: 'Update',
+    actionCode: 'update',
+    description: 'Update resource details',
+    category: 'write',
+  },
+  {
+    name: 'Delete',
+    actionCode: 'delete',
+    description: 'Delete resource',
+    category: 'write',
+  },
+  {
+    name: 'List',
+    actionCode: 'list',
+    description: 'List all resources',
+    category: 'read',
+  },
+  {
+    name: 'Assign',
+    actionCode: 'assign',
+    description: 'Assign resource to users',
+    category: 'action',
+  },
+  {
+    name: 'Export',
+    actionCode: 'export',
+    description: 'Export resource data',
+    category: 'action',
+  },
+  {
+    name: 'Config',
+    actionCode: 'config',
+    description: 'Configure resource',
+    category: 'action',
+  },
+  {
+    name: 'Audit',
+    actionCode: 'audit',
+    description: 'View resource audit logs',
+    category: 'read',
+  },
+  {
+    name: 'Backup',
+    actionCode: 'backup',
+    description: 'Manage resource backups',
+    category: 'action',
+  },
 ];
 
 const permissionsToSeed = [
@@ -412,7 +462,9 @@ class RoleSeedService {
         if (!permission) {
           const actionId = actionMap.get(permissionData.actionCode);
           if (!actionId) {
-            throw new Error(`Action not found for permission: ${permissionData.name}`);
+            throw new Error(
+              `Action not found for permission: ${permissionData.name}`,
+            );
           }
 
           permission = this.permissionRepository.create({

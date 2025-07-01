@@ -47,7 +47,13 @@ async function runSchemaAudit() {
     type: 'sqlite',
     database: dbPath,
     // Include Permission and ALL related entities it imports/references
-    entities: [Permission, Action, UiComponent, FrontendRoute, ApiEndpoint /*, User, ... other entities */],
+    entities: [
+      Permission,
+      Action,
+      UiComponent,
+      FrontendRoute,
+      ApiEndpoint /*, User, ... other entities */,
+    ],
     synchronize: false, // Crucial: Never synchronize in audit script!
     logging: false,
   });
@@ -61,41 +67,63 @@ async function runSchemaAudit() {
     for (const entity of entitiesToAudit) {
       const entityMetadata = AppDataSource.getMetadata(entity);
       const tableName = entityMetadata.tableName;
-      console.log(`\nAuditing Table: ${tableName} (Entity: ${entityMetadata.name})`);
+      console.log(
+        `\nAuditing Table: ${tableName} (Entity: ${entityMetadata.name})`,
+      );
 
       // 1. Get Database Schema Info
       const dbColumns: DbColumnInfo[] = await new Promise((resolve, reject) => {
-        db.all(`PRAGMA table_info(${tableName})`, (err, rows: DbColumnInfo[]) => {
-          if (err) {
-            console.error(`Error getting DB schema for ${tableName}:`, err.message);
-            reject(err);
-          }
-           else if (!rows || rows.length === 0){
-             console.warn(`Table ${tableName} not found or has no columns in the database.`);
-             resolve([]);
-           }
-          else {
-            resolve(rows);
-          }
-        });
+        db.all(
+          `PRAGMA table_info(${tableName})`,
+          (err, rows: DbColumnInfo[]) => {
+            if (err) {
+              console.error(
+                `Error getting DB schema for ${tableName}:`,
+                err.message,
+              );
+              reject(err);
+            } else if (!rows || rows.length === 0) {
+              console.warn(
+                `Table ${tableName} not found or has no columns in the database.`,
+              );
+              resolve([]);
+            } else {
+              resolve(rows);
+            }
+          },
+        );
       });
 
-      if (dbColumns.length === 0 && (!await AppDataSource.query(`SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`))) {
-          continue; // Skip if table doesn't exist
+      if (
+        dbColumns.length === 0 &&
+        !(await AppDataSource.query(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`,
+        ))
+      ) {
+        continue; // Skip if table doesn't exist
       }
 
-      const dbColumnMap = new Map<string, DbColumnInfo>(dbColumns.map(c => [c.name, c]));
+      const dbColumnMap = new Map<string, DbColumnInfo>(
+        dbColumns.map((c) => [c.name, c]),
+      );
 
       // 2. Get Entity Metadata Info
-      const entityColumns: EntityColumnInfo[] = entityMetadata.columns.map(col => ({
-        databaseName: col.databaseName,
-        propertyName: col.propertyName,
-        type: typeof col.type === 'string' ? col.type : (col.type as Function)?.name,
-        isNullable: col.isNullable,
-        isPrimary: col.isPrimary,
-        length: col.length ? parseInt(col.length, 10) : undefined, // Ensure length is number
-      }));
-      const entityColumnMap = new Map<string, EntityColumnInfo>(entityColumns.map(c => [c.databaseName, c]));
+      const entityColumns: EntityColumnInfo[] = entityMetadata.columns.map(
+        (col) => ({
+          databaseName: col.databaseName,
+          propertyName: col.propertyName,
+          type:
+            typeof col.type === 'string'
+              ? col.type
+              : (col.type as Function)?.name,
+          isNullable: col.isNullable,
+          isPrimary: col.isPrimary,
+          length: col.length ? parseInt(col.length, 10) : undefined, // Ensure length is number
+        }),
+      );
+      const entityColumnMap = new Map<string, EntityColumnInfo>(
+        entityColumns.map((c) => [c.databaseName, c]),
+      );
 
       // 3. Compare Schemas (Database as Source of Truth)
       let mismatchesFound = false;
@@ -104,7 +132,9 @@ async function runSchemaAudit() {
       // Check columns present in DB but not in Entity
       for (const [dbColName, dbColInfo] of dbColumnMap.entries()) {
         if (!entityColumnMap.has(dbColName)) {
-          console.warn(`  [DB->ENTITY MISMATCH] DB column "${dbColName}" exists in DB but not mapped in Entity "${entityMetadata.name}".`);
+          console.warn(
+            `  [DB->ENTITY MISMATCH] DB column "${dbColName}" exists in DB but not mapped in Entity "${entityMetadata.name}".`,
+          );
           mismatchesFound = true;
         }
       }
@@ -117,12 +147,21 @@ async function runSchemaAudit() {
           // Exception: Ignore join columns automatically created by TypeORM for relations if they don't exist explicitly in DB schema
           // This happens with ManyToMany if the junction table is implicitly managed.
           // A more robust check would verify the junction table itself.
-          const relation = entityMetadata.relations.find(r => r.joinColumns.some(jc => jc.databaseName === entityDbName));
-          if (relation && (relation.isManyToMany || relation.isOneToMany || relation.isManyToOne)) {
-              // console.log(`  [INFO] Ignoring join column "${entityDbName}" for relation "${entityColInfo.propertyName}" as it might be implicitly handled.`);
+          const relation = entityMetadata.relations.find((r) =>
+            r.joinColumns.some((jc) => jc.databaseName === entityDbName),
+          );
+          if (
+            relation &&
+            (relation.isManyToMany ||
+              relation.isOneToMany ||
+              relation.isManyToOne)
+          ) {
+            // console.log(`  [INFO] Ignoring join column "${entityDbName}" for relation "${entityColInfo.propertyName}" as it might be implicitly handled.`);
           } else {
-              console.warn(`  [ENTITY->DB MISMATCH] Entity column "${entityColInfo.propertyName}" (DB: "${entityDbName}") mapped in Entity but NOT FOUND in DB table "${tableName}".`);
-              mismatchesFound = true;
+            console.warn(
+              `  [ENTITY->DB MISMATCH] Entity column "${entityColInfo.propertyName}" (DB: "${entityDbName}") mapped in Entity but NOT FOUND in DB table "${tableName}".`,
+            );
+            mismatchesFound = true;
           }
           continue; // Skip further checks for this column if not found or it's a relation column
         }
@@ -130,25 +169,32 @@ async function runSchemaAudit() {
         // Compare Nullability (DB is source of truth)
         const dbIsNullable = dbColInfo.notnull === 0;
         if (dbIsNullable !== entityColInfo.isNullable) {
-          console.warn(`  [NULLABILITY MISMATCH] For "${entityDbName}": DB is ${dbIsNullable ? 'NULLABLE' : 'NOT NULL'}, Entity has nullable: ${entityColInfo.isNullable}. (Entity should match DB)`);
+          console.warn(
+            `  [NULLABILITY MISMATCH] For "${entityDbName}": DB is ${dbIsNullable ? 'NULLABLE' : 'NOT NULL'}, Entity has nullable: ${entityColInfo.isNullable}. (Entity should match DB)`,
+          );
           mismatchesFound = true;
         }
 
         // Compare Primary Key Status (DB is source of truth)
         const dbIsPrimary = dbColInfo.pk > 0;
         if (dbIsPrimary !== entityColInfo.isPrimary) {
-          console.warn(`  [PRIMARY KEY MISMATCH] For "${entityDbName}": DB is ${dbIsPrimary ? 'PRIMARY KEY' : 'NOT PK'}, Entity has isPrimary: ${entityColInfo.isPrimary}. (Entity should match DB)`);
+          console.warn(
+            `  [PRIMARY KEY MISMATCH] For "${entityDbName}": DB is ${dbIsPrimary ? 'PRIMARY KEY' : 'NOT PK'}, Entity has isPrimary: ${entityColInfo.isPrimary}. (Entity should match DB)`,
+          );
           mismatchesFound = true;
         }
       }
 
       if (!mismatchesFound) {
-        console.log(`  ✅ Schema for table "${tableName}" and entity "${entityMetadata.name}" seems aligned (checked name, nullability, PK).`);
+        console.log(
+          `  ✅ Schema for table "${tableName}" and entity "${entityMetadata.name}" seems aligned (checked name, nullability, PK).`,
+        );
       } else {
-        console.log(`\nFound one or more mismatches for ${tableName}. Please review warnings.`);
+        console.log(
+          `\nFound one or more mismatches for ${tableName}. Please review warnings.`,
+        );
       }
     }
-
   } catch (error) {
     console.error('Error during schema audit:', error);
   } finally {
@@ -164,4 +210,4 @@ async function runSchemaAudit() {
   }
 }
 
-runSchemaAudit(); 
+runSchemaAudit();

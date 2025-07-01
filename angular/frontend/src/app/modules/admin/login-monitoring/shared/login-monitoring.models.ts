@@ -80,6 +80,16 @@ export interface SecurityAlertsFilters {
   search?: string;
 }
 
+export interface PatternDetectionFilters {
+  status?: 'active' | 'resolved' | 'dismissed' | '';
+  patternType?: 'brute_force' | 'distributed_attack' | 'credential_stuffing' | 'rapid_account_switching' | 'ip_hopping' | 'suspicious_location' | 'time_anomaly' | '';
+  severity?: 'low' | 'medium' | 'high' | 'critical' | '';
+  ipAddress?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;

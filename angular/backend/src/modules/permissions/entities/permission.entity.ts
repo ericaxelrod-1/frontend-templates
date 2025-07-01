@@ -9,7 +9,7 @@ import {
   JoinColumn,
   ManyToMany,
   Unique,
-  JoinTable
+  JoinTable,
 } from 'typeorm';
 import { RolePermission } from '../../roles/entities/role-permission.entity';
 import { GroupPermission } from './group-permission.entity';
@@ -79,30 +79,44 @@ export class Permission {
   /**
    * Relationships with RolePermission join entity
    */
-  @OneToMany(() => RolePermission, rolePermission => rolePermission.permission)
+  @OneToMany(
+    () => RolePermission,
+    (rolePermission) => rolePermission.permission,
+  )
   rolePermissions: RolePermission[];
 
   /**
    * Relationships with GroupPermission join entity
    */
-  @OneToMany(() => GroupPermission, groupPermission => groupPermission.permission)
+  @OneToMany(
+    () => GroupPermission,
+    (groupPermission) => groupPermission.permission,
+  )
   groupPermissions: GroupPermission[];
 
   /**
    * Relationships with UserPermission join entity
    */
-  @OneToMany(() => UserPermission, userPermission => userPermission.permission)
+  @OneToMany(
+    () => UserPermission,
+    (userPermission) => userPermission.permission,
+  )
   userPermissions: UserPermission[];
 
   /**
    * Relationships with routes
    * Used in permission-based routing
    */
-  @ManyToMany(() => FrontendRoute, (route) => route.requiredPermissions, { eager: false })
+  @ManyToMany(() => FrontendRoute, (route) => route.requiredPermissions, {
+    eager: false,
+  })
   @JoinTable({
     name: 'frontend_route_permissions',
     joinColumn: { name: 'permission_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'frontend_route_id', referencedColumnName: 'id' },
+    inverseJoinColumn: {
+      name: 'frontend_route_id',
+      referencedColumnName: 'id',
+    },
   })
   routes: FrontendRoute[];
 

@@ -161,7 +161,7 @@ export class AuthService {
 
       // DEVELOPMENT MODE: Skip CAPTCHA validation if environment is development
       const skipCaptcha = process.env.NODE_ENV === 'development' || true; // Set to true for now until we fix CAPTCHA issues
-      
+
       // Check if CAPTCHA is required
       const recentAttempts =
         await this.loginAttemptService.getRecentFailedAttempts(ipAddress, 30);
@@ -210,7 +210,7 @@ export class AuthService {
           status: 'failed',
           failureReason: 'Invalid credentials',
         });
-        
+
         throw new UnauthorizedException('Invalid credentials');
       }
 
@@ -375,7 +375,7 @@ export class AuthService {
 
     // Generate username from email (before @ symbol) with fallback
     let username = email.split('@')[0];
-    
+
     // Check if username already exists and make it unique if needed
     let usernameExists = await this.usersService.findByUsername(username);
     let counter = 1;

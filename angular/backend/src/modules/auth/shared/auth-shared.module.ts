@@ -10,4 +10,4 @@ import { Global } from '@nestjs/common';
   providers: [],
   exports: [],
 })
-export class AuthSharedModule {} 
+export class AuthSharedModule {}

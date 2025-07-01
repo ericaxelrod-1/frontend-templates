@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableColumn } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableColumn,
+} from 'typeorm';
 
 export class CreateActionsTable1742536989655 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -58,7 +64,7 @@ export class CreateActionsTable1742536989655 implements MigrationInterface {
       // Add action_id column to permissions table if it doesn't exist
       const permissionsTable = await queryRunner.getTable('permissions');
       const hasActionIdColumn = permissionsTable.findColumnByName('action_id');
-      
+
       if (!hasActionIdColumn) {
         await queryRunner.addColumn(
           'permissions',
@@ -104,4 +110,4 @@ export class CreateActionsTable1742536989655 implements MigrationInterface {
     // Drop the actions table if it exists
     await queryRunner.dropTable('actions', true);
   }
-} 
+}

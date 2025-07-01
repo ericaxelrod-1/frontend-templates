@@ -47,17 +47,41 @@ export class PermissionSeedsService {
       // Users permissions
       {
         resource: 'users',
-        actions: ['create', 'view', 'update', 'delete', 'list', 'manage', 'admin'],
+        actions: [
+          'create',
+          'view',
+          'update',
+          'delete',
+          'list',
+          'manage',
+          'admin',
+        ],
       },
       // Roles permissions
       {
         resource: 'roles',
-        actions: ['create', 'view', 'update', 'delete', 'list', 'manage', 'admin'],
+        actions: [
+          'create',
+          'view',
+          'update',
+          'delete',
+          'list',
+          'manage',
+          'admin',
+        ],
       },
       // Groups permissions
       {
         resource: 'groups',
-        actions: ['create', 'view', 'update', 'delete', 'list', 'manage', 'admin'],
+        actions: [
+          'create',
+          'view',
+          'update',
+          'delete',
+          'list',
+          'manage',
+          'admin',
+        ],
       },
       // Group members permissions
       {
@@ -72,7 +96,15 @@ export class PermissionSeedsService {
       // Permissions management
       {
         resource: 'permissions',
-        actions: ['create', 'view', 'update', 'delete', 'list', 'manage', 'admin'],
+        actions: [
+          'create',
+          'view',
+          'update',
+          'delete',
+          'list',
+          'manage',
+          'admin',
+        ],
       },
       // Self profile permissions
       {
@@ -93,7 +125,9 @@ export class PermissionSeedsService {
 
     // Get all existing actions
     const actions = await actionRepository.find();
-    const actionMap = new Map(actions.map(action => [action.actionCode, action]));
+    const actionMap = new Map(
+      actions.map((action) => [action.actionCode, action]),
+    );
 
     // Create permissions for each valid combination
     for (const combination of validCombinations) {
@@ -118,12 +152,14 @@ export class PermissionSeedsService {
           permission.resourceName = combination.resource;
           permission.actionId = action.id;
           permission.description = `Permission to ${action.description?.toLowerCase() || actionCode} ${combination.resource}`;
-          
+
           try {
             await permissionRepository.save(permission);
             this.logger.log(`Created permission: ${permissionName}`);
           } catch (error) {
-            this.logger.error(`Failed to create permission ${permissionName}: ${error.message}`);
+            this.logger.error(
+              `Failed to create permission ${permissionName}: ${error.message}`,
+            );
           }
         }
       }
@@ -140,7 +176,7 @@ export class PermissionSeedsService {
         'users:view',
         'dashboard:view',
         'self:profile:read',
-        'self:profile:update'
+        'self:profile:update',
       ],
 
       // Admin permissions
@@ -158,40 +194,72 @@ export class PermissionSeedsService {
         'roles:list',
         'permissions:view',
         'permissions:list',
-        'system:manage'
+        'system:manage',
       ],
 
       // Super Administrator permissions
       superadmin: [
         // User management
-        'users:create', 'users:view', 'users:update', 'users:delete', 'users:list', 'users:manage', 'users:admin',
-        
+        'users:create',
+        'users:view',
+        'users:update',
+        'users:delete',
+        'users:list',
+        'users:manage',
+        'users:admin',
+
         // Role management
-        'roles:create', 'roles:view', 'roles:update', 'roles:delete', 'roles:list', 'roles:manage', 'roles:admin',
-        
+        'roles:create',
+        'roles:view',
+        'roles:update',
+        'roles:delete',
+        'roles:list',
+        'roles:manage',
+        'roles:admin',
+
         // Group management
-        'groups:create', 'groups:view', 'groups:update', 'groups:delete', 'groups:list', 'groups:manage', 'groups:admin',
-        'groups:members:add', 'groups:members:remove', 'groups:members:update', 'groups:members:view',
+        'groups:create',
+        'groups:view',
+        'groups:update',
+        'groups:delete',
+        'groups:list',
+        'groups:manage',
+        'groups:admin',
+        'groups:members:add',
+        'groups:members:remove',
+        'groups:members:update',
+        'groups:members:view',
         'groups:settings:update',
-        
+
         // Permission management
-        'permissions:create', 'permissions:view', 'permissions:update', 'permissions:delete', 'permissions:list', 'permissions:manage', 'permissions:admin',
-        
+        'permissions:create',
+        'permissions:view',
+        'permissions:update',
+        'permissions:delete',
+        'permissions:list',
+        'permissions:manage',
+        'permissions:admin',
+
         // Profile management
-        'self:profile:read', 'self:profile:update',
-        
+        'self:profile:read',
+        'self:profile:update',
+
         // System management
-        'system:admin', 'system:manage',
-        
+        'system:admin',
+        'system:manage',
+
         // Login monitoring
-        'login-monitoring:view', 'login-monitoring:manage'
-      ]
+        'login-monitoring:view',
+        'login-monitoring:manage',
+      ],
     };
 
     // Create roles and assign permissions
     for (const [roleName, permissions] of Object.entries(rolePermissionMap)) {
-      let role = await this.roleRepository.findOne({ where: { name: roleName } });
-      
+      let role = await this.roleRepository.findOne({
+        where: { name: roleName },
+      });
+
       if (!role) {
         role = await this.roleRepository.save({
           name: roleName,
@@ -203,26 +271,29 @@ export class PermissionSeedsService {
       // Get all permission entities for this role
       const permissionEntities = await this.permissionRepository.find({
         where: {
-          name: In(permissions)
-        }
+          name: In(permissions),
+        },
       });
 
       // Create role-permission associations
       for (const permission of permissionEntities) {
-        const existingRolePermission = await this.rolePermissionRepository.findOne({
-          where: {
-            roleId: role.id,
-            permissionId: permission.id
-          }
-        });
+        const existingRolePermission =
+          await this.rolePermissionRepository.findOne({
+            where: {
+              roleId: role.id,
+              permissionId: permission.id,
+            },
+          });
 
         if (!existingRolePermission) {
           await this.rolePermissionRepository.save({
             roleId: role.id,
             permissionId: permission.id,
-            isGranted: true
+            isGranted: true,
           });
-          this.logger.log(`Assigned permission ${permission.name} to role ${roleName}`);
+          this.logger.log(
+            `Assigned permission ${permission.name} to role ${roleName}`,
+          );
         }
       }
     }

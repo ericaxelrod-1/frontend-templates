@@ -18,10 +18,10 @@ import { CacheModule } from '../../cache/cache.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      Permission, 
+      Permission,
       UiComponent,
       FrontendRoute,
-      ApiEndpoint
+      ApiEndpoint,
     ]),
     CacheModule,
     ConfigModule,
@@ -40,4 +40,4 @@ import { CacheModule } from '../../cache/cache.module';
     ManifestService,
   ],
 })
-export class ScannersModule {} 
+export class ScannersModule {}

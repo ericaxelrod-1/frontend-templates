@@ -7,7 +7,13 @@ import { CacheSyncService } from '../../cache/cache-sync.service';
 import { ComponentScannerService } from '../scanners/component-scanner.service';
 import { RouteScannerService } from '../scanners/route-scanner.service';
 import { EndpointScannerService } from '../scanners/endpoint-scanner.service';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiBody,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @ApiTags('cache-sync')
 @ApiBearerAuth()

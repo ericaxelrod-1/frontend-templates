@@ -19,9 +19,11 @@ async function runMigrationsInOrder() {
     // Run the migrations in a specific order
     // First run the SQLite-specific fix
     logger.log('Running SQLite Composite Primary Keys fix...');
-    
+
     // Run the specific SQLite fix migration manually
-    const migration = await import('../migrations/1742536989657-FixSQLiteCompositePrimaryKeys');
+    const migration = await import(
+      '../migrations/1742536989657-FixSQLiteCompositePrimaryKeys'
+    );
     const instance = new migration.FixSQLiteCompositePrimaryKeys1742536989657();
     await instance.up(dataSource.createQueryRunner());
     logger.log('SQLite fix migration completed');
@@ -29,7 +31,7 @@ async function runMigrationsInOrder() {
     // Run base entity setup migrations with IF NOT EXISTS patterns
     logger.log('Running base entity creation migrations...');
     await dataSource.runMigrations({
-      transaction: 'each'
+      transaction: 'each',
     });
 
     logger.log('All migrations completed successfully');
@@ -46,7 +48,7 @@ async function runMigrationsInOrder() {
 }
 
 // Run the migration process
-runMigrationsInOrder().catch(error => {
+runMigrationsInOrder().catch((error) => {
   console.error('Migration failed:', error);
   process.exit(1);
-}); 
+});

@@ -22,4 +22,4 @@ export interface IPermissionChecker {
    * @returns An array of permission strings in the format "resource:action"
    */
   getUserPermissions(userId: number): Promise<string[]>;
-} 
+}

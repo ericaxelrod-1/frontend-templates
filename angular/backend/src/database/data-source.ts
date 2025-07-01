@@ -39,7 +39,7 @@ export const dataSourceOptions: DataSourceOptions = {
     Resource,
     LoginAttempt,
     IPReputation,
-    Captcha
+    Captcha,
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false, // Disable synchronize as we're handling schema manually

@@ -21,6 +21,7 @@ import { IPReputationService } from '../services/ip-reputation.service';
 import { CaptchaService } from '../services/captcha.service';
 import { PatternDetectionService } from '../services/pattern-detection.service';
 import { AlertService, AlertSeverity } from '../services/alert.service';
+import { SecurityAlertService } from '../services/security-alert.service';
 import { PermissionGuard } from '../../permissions/guards/permission.guard';
 import { RequirePermission } from '../../permissions/decorators/require-permission.decorator';
 
@@ -33,14 +34,20 @@ export class LoginMonitoringController {
     private readonly captchaService: CaptchaService,
     private readonly patternDetectionService: PatternDetectionService,
     private readonly alertService: AlertService,
+    private readonly securityAlertService: SecurityAlertService,
   ) {}
 
   @Get('attempts/recent')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('login-monitoring:read')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get recent login attempts with server-side sorting' })
-  @ApiResponse({ status: 200, description: 'List of recent login attempts sorted by SQL ORDER BY' })
+  @ApiOperation({
+    summary: 'Get recent login attempts with server-side sorting',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of recent login attempts sorted by SQL ORDER BY',
+  })
   async getRecentAttempts(
     @Query('limit') limit: number = 50,
     @Query('offset') offset: number = 0,
@@ -61,13 +68,14 @@ export class LoginMonitoringController {
       sortBy: sortBy || 'createdAt',
       sortDirection: sortDirection || 'desc',
     };
-    
-    const attempts = await this.loginAttemptService.getRecentAttemptsForDashboard(
-      limit, 
-      offset, 
-      filters
-    );
-    
+
+    const attempts =
+      await this.loginAttemptService.getRecentAttemptsForDashboard(
+        limit,
+        offset,
+        filters,
+      );
+
     // Get total count for pagination
     const total = await this.loginAttemptService.getTotalAttemptsCount({
       email,
@@ -76,40 +84,86 @@ export class LoginMonitoringController {
       dateFrom: dateFrom ? new Date(dateFrom) : undefined,
       dateTo: dateTo ? new Date(dateTo) : undefined,
     });
-    
+
     return {
       items: attempts,
-      total: total
+      total: total,
     };
+  }
+
+  @Get('patterns')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('login-monitoring:read')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Get security patterns with unified data source and optional filtering',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Security patterns with pagination and filtering',
+  })
+  async getPatterns(
+    @Query('limit') limit: number = 50,
+    @Query('offset') offset: number = 0,
+    @Query('status') status?: string,
+    @Query('patternType') patternType?: string,
+    @Query('severity') severity?: string,
+    @Query('ipAddress') ipAddress?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDirection') sortDirection?: 'asc' | 'desc',
+    @Query('search') search?: string,
+  ) {
+    const filters = {
+      status,
+      patternType,
+      severity,
+      ipAddress,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+      sortBy: sortBy || 'detectionTimestamp',
+      sortDirection: sortDirection || 'desc',
+      search,
+    };
+
+    return await this.patternDetectionService.getPatterns(
+      limit,
+      offset,
+      filters,
+    );
   }
 
   @Get('patterns/detect')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('login-monitoring:read')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get both real-time and historical security patterns' })
-  @ApiResponse({ status: 200, description: 'Combined pattern detection results (real-time + historical)' })
+  @ApiOperation({
+    summary:
+      'DEPRECATED: Use /patterns instead. Get both real-time and historical security patterns',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Combined pattern detection results (real-time + historical)',
+  })
   async detectPatterns() {
-    // Use enhanced detection that returns both real-time and historical patterns
-    const patterns = await this.patternDetectionService.detectPatternsEnhanced();
-
-    // Send alerts for any new real-time patterns detected
-    const realTimePatterns = patterns.filter(p => !p.isHistorical);
-    if (realTimePatterns.length > 0) {
-      for (const pattern of realTimePatterns) {
-        await this.alertService.sendPatternAlert(pattern);
-      }
-    }
-
-    return patterns;
+    // Redirect to unified endpoint logic
+    const result = await this.patternDetectionService.getPatterns(50, 0, {});
+    return result.items; // Return items only for backward compatibility
   }
 
   @Get('patterns/real-time')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('login-monitoring:read')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get only real-time security patterns (active threats)' })
-  @ApiResponse({ status: 200, description: 'Real-time pattern detection results' })
+  @ApiOperation({
+    summary: 'Get only real-time security patterns (active threats)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Real-time pattern detection results',
+  })
   async detectRealTimePatterns() {
     return await this.patternDetectionService.detectRealTimePatterns();
   }
@@ -119,32 +173,96 @@ export class LoginMonitoringController {
   @RequirePermission('login-monitoring:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get historical security patterns from database' })
-  @ApiResponse({ status: 200, description: 'Historical patterns from database' })
+  @ApiResponse({
+    status: 200,
+    description: 'Historical patterns from database',
+  })
   async getHistoricalPatterns(@Query('limit') limit?: number) {
-    return await this.patternDetectionService.getHistoricalPatterns(limit || 50);
+    return await this.patternDetectionService.getHistoricalPatterns(
+      limit || 50,
+    );
+  }
+
+  @Get('patterns/filtered')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('login-monitoring:read')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'DEPRECATED: Use /patterns instead. Get filtered security patterns with pagination and sorting',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Filtered patterns with pagination',
+  })
+  async getFilteredPatterns(
+    @Query('limit') limit: number = 50,
+    @Query('offset') offset: number = 0,
+    @Query('status') status?: string,
+    @Query('patternType') patternType?: string,
+    @Query('severity') severity?: string,
+    @Query('ipAddress') ipAddress?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDirection') sortDirection?: 'asc' | 'desc',
+    @Query('search') search?: string,
+  ) {
+    const filters = {
+      status,
+      patternType,
+      severity,
+      ipAddress,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+      sortBy: sortBy || 'detectionTimestamp',
+      sortDirection: sortDirection || 'desc',
+      search,
+    };
+
+    // Redirect to unified endpoint
+    return await this.patternDetectionService.getPatterns(
+      limit,
+      offset,
+      filters,
+    );
   }
 
   @Post('patterns/test/:scenario')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('login-monitoring:manage')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create test login attempts to simulate attack patterns' })
-  @ApiResponse({ status: 200, description: 'Test login attempts created successfully' })
+  @ApiOperation({
+    summary: 'Create test login attempts to simulate attack patterns',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Test login attempts created successfully',
+  })
   async createTestPattern(
-    @Param('scenario') scenario: 'brute_force' | 'distributed_attack' | 'credential_stuffing' | 'account_switching',
+    @Param('scenario')
+    scenario:
+      | 'brute_force'
+      | 'distributed_attack'
+      | 'credential_stuffing'
+      | 'account_switching',
   ) {
     await this.patternDetectionService.createTestLoginAttempts(scenario);
-    
+
     // Wait a moment then run detection to see if patterns are found
     setTimeout(async () => {
-      const detectedPatterns = await this.patternDetectionService.detectRealTimePatterns();
-      console.log(`Test scenario '${scenario}' created. Detected patterns:`, detectedPatterns.length);
+      const detectedPatterns =
+        await this.patternDetectionService.detectRealTimePatterns();
+      console.log(
+        `Test scenario '${scenario}' created. Detected patterns:`,
+        detectedPatterns.length,
+      );
     }, 1000);
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       message: `Test ${scenario} scenario created successfully. Check patterns in a few seconds.`,
-      scenario: scenario
+      scenario: scenario,
     };
   }
 
@@ -156,10 +274,10 @@ export class LoginMonitoringController {
   @ApiResponse({ status: 200, description: 'Test data cleared successfully' })
   async clearTestData() {
     const result = await this.patternDetectionService.clearTestData();
-    return { 
-      success: true, 
+    return {
+      success: true,
       message: `Cleared ${result.deleted} test login attempts`,
-      deletedCount: result.deleted
+      deletedCount: result.deleted,
     };
   }
 
@@ -167,23 +285,39 @@ export class LoginMonitoringController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('login-monitoring:read')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get IP reputation and history with aggregated data' })
-  @ApiResponse({ status: 200, description: 'IP reputation data with aggregated statistics' })
+  @ApiOperation({
+    summary: 'Get IP reputation and history with aggregated data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'IP reputation data with aggregated statistics',
+  })
   async getIPReputation(@Param('ipAddress') ipAddress: string) {
     const reputation = await this.ipReputationService.getOrCreate(ipAddress);
-    const recentAttempts = await this.loginAttemptService.getRecentAttempts(ipAddress);
+    const recentAttempts =
+      await this.loginAttemptService.getRecentAttempts(ipAddress);
 
     // Get aggregated statistics for this IP
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const aggregatedStats = await this.loginAttemptService.getAggregatedStatsForIP(ipAddress, last24Hours);
+    const aggregatedStats =
+      await this.loginAttemptService.getAggregatedStatsForIP(
+        ipAddress,
+        last24Hours,
+      );
 
     // Calculate reputation score based on recent activity
-    const reputationScore = Math.max(0, 100 - (reputation.failedLoginAttempts * 10));
+    const reputationScore = Math.max(
+      0,
+      100 - reputation.failedLoginAttempts * 10,
+    );
 
     // Find the most recent failed attempt for lastFailedAttempt
     const lastFailedAttempt = recentAttempts
-      .filter(attempt => attempt.status === 'failed')
-      .sort((a, b) => new Date(b.attemptedAt).getTime() - new Date(a.attemptedAt).getTime())[0];
+      .filter((attempt) => attempt.status === 'failed')
+      .sort(
+        (a, b) =>
+          new Date(b.attemptedAt).getTime() - new Date(a.attemptedAt).getTime(),
+      )[0];
 
     return {
       ipAddress: reputation.ipAddress,

@@ -27,7 +27,6 @@ async function runMigration() {
     console.log(`Running migration: ${migration.name}`);
     await migration.up(dataSource.createQueryRunner());
     console.log('Migration completed successfully!');
-
   } catch (error) {
     console.error('Error during migration:', error);
   } finally {
@@ -38,4 +37,4 @@ async function runMigration() {
   }
 }
 
-runMigration().catch(error => console.error('Unhandled error:', error)); 
+runMigration().catch((error) => console.error('Unhandled error:', error));

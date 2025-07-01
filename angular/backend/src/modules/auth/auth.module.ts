@@ -35,10 +35,10 @@ import { User } from '../users/entities/user.entity';
     forwardRef(() => PermissionsModule),
     PassportModule,
     TypeOrmModule.forFeature([
-      Role, 
-      LoginAttempt, 
-      IPReputation, 
-      Captcha, 
+      Role,
+      LoginAttempt,
+      IPReputation,
+      Captcha,
       User,
       SecurityAlert,
       SecurityDetectedPattern,
@@ -56,7 +56,11 @@ import { User } from '../users/entities/user.entity';
     }),
     ScheduleModule.forRoot(),
   ],
-  controllers: [AuthController, LoginMonitoringController, SecurityAlertController],
+  controllers: [
+    AuthController,
+    LoginMonitoringController,
+    SecurityAlertController,
+  ],
   providers: [
     AuthService,
     LocalStrategy,

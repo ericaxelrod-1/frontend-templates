@@ -54,12 +54,42 @@ export class PermissionSeedService {
 
     // Create default actions first (required for permissions)
     const actions = [
-      { name: 'View', actionCode: 'view', description: 'View resource', category: 'read' },
-      { name: 'Create', actionCode: 'create', description: 'Create new resource', category: 'write' },
-      { name: 'Edit', actionCode: 'edit', description: 'Edit existing resource', category: 'write' },
-      { name: 'Delete', actionCode: 'delete', description: 'Delete resource', category: 'write' },
-      { name: 'Refresh', actionCode: 'refresh', description: 'Refresh resource', category: 'action' },
-      { name: 'Test', actionCode: 'test', description: 'Test resource', category: 'action' },
+      {
+        name: 'View',
+        actionCode: 'view',
+        description: 'View resource',
+        category: 'read',
+      },
+      {
+        name: 'Create',
+        actionCode: 'create',
+        description: 'Create new resource',
+        category: 'write',
+      },
+      {
+        name: 'Edit',
+        actionCode: 'edit',
+        description: 'Edit existing resource',
+        category: 'write',
+      },
+      {
+        name: 'Delete',
+        actionCode: 'delete',
+        description: 'Delete resource',
+        category: 'write',
+      },
+      {
+        name: 'Refresh',
+        actionCode: 'refresh',
+        description: 'Refresh resource',
+        category: 'action',
+      },
+      {
+        name: 'Test',
+        actionCode: 'test',
+        description: 'Test resource',
+        category: 'action',
+      },
     ];
 
     const actionMap = new Map<string, number>();

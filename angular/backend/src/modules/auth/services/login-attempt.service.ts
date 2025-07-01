@@ -147,16 +147,21 @@ export class LoginAttemptService {
       sortDirection?: 'asc' | 'desc';
     },
   ): Promise<any[]> {
-    const query = this.loginAttemptRepository.createQueryBuilder('attempt')
+    const query = this.loginAttemptRepository
+      .createQueryBuilder('attempt')
       .limit(limit)
       .offset(offset);
 
     if (filters?.email) {
-      query.andWhere('attempt.emailAttempted LIKE :email', { email: `%${filters.email}%` });
+      query.andWhere('attempt.emailAttempted LIKE :email', {
+        email: `%${filters.email}%`,
+      });
     }
 
     if (filters?.ipAddress) {
-      query.andWhere('attempt.ipAddress LIKE :ipAddress', { ipAddress: `%${filters.ipAddress}%` });
+      query.andWhere('attempt.ipAddress LIKE :ipAddress', {
+        ipAddress: `%${filters.ipAddress}%`,
+      });
     }
 
     if (filters?.status) {
@@ -164,44 +169,49 @@ export class LoginAttemptService {
     }
 
     if (filters?.dateFrom) {
-      query.andWhere('attempt.attemptedAt >= :dateFrom', { dateFrom: filters.dateFrom });
+      query.andWhere('attempt.attemptedAt >= :dateFrom', {
+        dateFrom: filters.dateFrom,
+      });
     }
 
     if (filters?.dateTo) {
-      query.andWhere('attempt.attemptedAt <= :dateTo', { dateTo: filters.dateTo });
+      query.andWhere('attempt.attemptedAt <= :dateTo', {
+        dateTo: filters.dateTo,
+      });
     }
 
     // Handle sorting - Enhanced server-side sorting with comprehensive field mapping
-    const sortBy = filters?.sortBy || 'createdAt';      // Changed default from 'attemptedAt' to 'createdAt' to match frontend
+    const sortBy = filters?.sortBy || 'createdAt'; // Changed default from 'attemptedAt' to 'createdAt' to match frontend
     const sortDirection = filters?.sortDirection || 'desc'; // Ensure descending is default (newest first)
-    
+
     // Comprehensive mapping from frontend field names to database field names
     const fieldMapping: { [key: string]: string } = {
-      'id': 'attempt.id',
-      'createdAt': 'attempt.attemptedAt',        // Frontend 'createdAt' maps to database 'attemptedAt'
-      'timestamp': 'attempt.attemptedAt',        // Alternative name for timestamp column
-      'attemptedAt': 'attempt.attemptedAt',      // Direct mapping for backwards compatibility
-      'email': 'attempt.emailAttempted',
-      'emailAttempted': 'attempt.emailAttempted',
-      'ipAddress': 'attempt.ipAddress',
-      'status': 'attempt.status',
-      'failureReason': 'attempt.failureReason',
-      'userAgent': 'attempt.userAgent',
+      id: 'attempt.id',
+      createdAt: 'attempt.attemptedAt', // Frontend 'createdAt' maps to database 'attemptedAt'
+      timestamp: 'attempt.attemptedAt', // Alternative name for timestamp column
+      attemptedAt: 'attempt.attemptedAt', // Direct mapping for backwards compatibility
+      email: 'attempt.emailAttempted',
+      emailAttempted: 'attempt.emailAttempted',
+      ipAddress: 'attempt.ipAddress',
+      status: 'attempt.status',
+      failureReason: 'attempt.failureReason',
+      userAgent: 'attempt.userAgent',
     };
-    
+
     // Validate sort field and use safe default
     const dbField = fieldMapping[sortBy] || 'attempt.attemptedAt';
-    
+
     // Validate sort direction - ENSURE DESCENDING BY DEFAULT (newest first)
-    const validDirection = (sortDirection?.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
-    
+    const validDirection =
+      sortDirection?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
     // Apply ORDER BY clause - this generates SQL like: ORDER BY attempt.attemptedAt DESC
     query.orderBy(dbField, validDirection);
 
     const attempts = await query.getMany();
-    
+
     // Transform the data to include the fields the frontend expects
-    const transformed = attempts.map(attempt => ({
+    const transformed = attempts.map((attempt) => ({
       id: attempt.id,
       ipAddress: attempt.ipAddress,
       userAgent: attempt.userAgent,
@@ -213,7 +223,7 @@ export class LoginAttemptService {
       emailAttempted: attempt.emailAttempted,
       attemptedAt: attempt.attemptedAt,
     }));
-    
+
     return transformed;
   }
 
@@ -227,11 +237,15 @@ export class LoginAttemptService {
     const query = this.loginAttemptRepository.createQueryBuilder('attempt');
 
     if (filters?.email) {
-      query.andWhere('attempt.emailAttempted LIKE :email', { email: `%${filters.email}%` });
+      query.andWhere('attempt.emailAttempted LIKE :email', {
+        email: `%${filters.email}%`,
+      });
     }
 
     if (filters?.ipAddress) {
-      query.andWhere('attempt.ipAddress LIKE :ipAddress', { ipAddress: `%${filters.ipAddress}%` });
+      query.andWhere('attempt.ipAddress LIKE :ipAddress', {
+        ipAddress: `%${filters.ipAddress}%`,
+      });
     }
 
     if (filters?.status) {
@@ -239,11 +253,15 @@ export class LoginAttemptService {
     }
 
     if (filters?.dateFrom) {
-      query.andWhere('attempt.attemptedAt >= :dateFrom', { dateFrom: filters.dateFrom });
+      query.andWhere('attempt.attemptedAt >= :dateFrom', {
+        dateFrom: filters.dateFrom,
+      });
     }
 
     if (filters?.dateTo) {
-      query.andWhere('attempt.attemptedAt <= :dateTo', { dateTo: filters.dateTo });
+      query.andWhere('attempt.attemptedAt <= :dateTo', {
+        dateTo: filters.dateTo,
+      });
     }
 
     return query.getCount();
@@ -252,7 +270,10 @@ export class LoginAttemptService {
   /**
    * Get aggregated statistics for a specific IP address with SQL GROUP BY
    */
-  async getAggregatedStatsForIP(ipAddress: string, since: Date): Promise<{
+  async getAggregatedStatsForIP(
+    ipAddress: string,
+    since: Date,
+  ): Promise<{
     totalAttempts: number;
     successfulAttempts: number;
     failedAttempts: number;
@@ -272,7 +293,7 @@ export class LoginAttemptService {
         'SUM(CASE WHEN attempt.status = "blocked" THEN 1 ELSE 0 END) as blockedAttempts',
         'COUNT(DISTINCT attempt.emailAttempted) as uniqueEmailsAttempted',
         'MIN(attempt.attemptedAt) as firstAttempt',
-        'MAX(attempt.attemptedAt) as lastAttempt'
+        'MAX(attempt.attemptedAt) as lastAttempt',
       ])
       .where('attempt.ipAddress = :ipAddress', { ipAddress })
       .andWhere('attempt.attemptedAt >= :since', { since })
@@ -287,7 +308,9 @@ export class LoginAttemptService {
       .andWhere('attempt.emailAttempted IS NOT NULL')
       .getRawMany();
 
-    const emailsAttempted = emailsResult.map(row => row.email).filter(Boolean);
+    const emailsAttempted = emailsResult
+      .map((row) => row.email)
+      .filter(Boolean);
 
     return {
       totalAttempts: parseInt(stats.totalAttempts) || 0,

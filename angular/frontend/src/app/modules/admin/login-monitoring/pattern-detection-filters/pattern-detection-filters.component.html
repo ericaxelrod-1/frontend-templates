@@ -1,0 +1,106 @@
+<mat-card class="filters-card">
+  <mat-card-header>
+    <mat-card-title>
+      <mat-icon>filter_list</mat-icon>
+      Pattern Detection Filters
+    </mat-card-title>
+  </mat-card-header>
+  
+  <mat-card-content>
+    <form [formGroup]="filterForm" class="filters-form">
+      <div class="filters-row">
+        <!-- Status Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Status</mat-label>
+          <mat-select formControlName="status" [disabled]="!hasPermission">
+            <mat-option *ngFor="let option of statusOptions" [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matSuffix>assignment</mat-icon>
+        </mat-form-field>
+
+        <!-- Pattern Type Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Pattern Type</mat-label>
+          <mat-select formControlName="patternType" [disabled]="!hasPermission">
+            <mat-option *ngFor="let option of patternTypeOptions" [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matSuffix>category</mat-icon>
+        </mat-form-field>
+
+        <!-- Severity Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Severity</mat-label>
+          <mat-select formControlName="severity" [disabled]="!hasPermission">
+            <mat-option *ngFor="let option of severityOptions" [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matSuffix>warning</mat-icon>
+        </mat-form-field>
+      </div>
+
+      <div class="filters-row">
+        <!-- IP Address Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>IP Address</mat-label>
+          <input matInput formControlName="ipAddress" [disabled]="!hasPermission" 
+                 placeholder="e.g., 192.168.1.1">
+          <mat-icon matSuffix>computer</mat-icon>
+        </mat-form-field>
+
+        <!-- Date From Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>From Date</mat-label>
+          <input matInput [matDatepicker]="dateFromPicker" formControlName="dateFrom" 
+                 [disabled]="!hasPermission">
+          <mat-datepicker-toggle matSuffix [for]="dateFromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #dateFromPicker></mat-datepicker>
+        </mat-form-field>
+
+        <!-- Date To Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>To Date</mat-label>
+          <input matInput [matDatepicker]="dateToPicker" formControlName="dateTo" 
+                 [disabled]="!hasPermission">
+          <mat-datepicker-toggle matSuffix [for]="dateToPicker"></mat-datepicker-toggle>
+          <mat-datepicker #dateToPicker></mat-datepicker>
+        </mat-form-field>
+      </div>
+
+      <div class="filters-row">
+        <!-- Search Filter -->
+        <mat-form-field appearance="outline" class="filter-field search-field">
+          <mat-label>Search</mat-label>
+          <input matInput formControlName="search" [disabled]="!hasPermission" 
+                 placeholder="Search pattern type, IP address, or evidence...">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+        <!-- Action Buttons -->
+        <div class="filter-actions">
+          <button mat-raised-button color="primary" type="button" 
+                  (click)="onFiltersChanged()" [disabled]="!hasPermission">
+            <mat-icon>filter_list</mat-icon>
+            Apply Filters
+          </button>
+          
+          <button mat-stroked-button type="button" 
+                  (click)="onReset()" [disabled]="!hasPermission">
+            <mat-icon>refresh</mat-icon>
+            Reset to Default
+          </button>
+          
+          <button mat-stroked-button type="button" 
+                  (click)="onClear()" [disabled]="!hasPermission">
+            <mat-icon>clear</mat-icon>
+            Clear All
+          </button>
+        </div>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card> 

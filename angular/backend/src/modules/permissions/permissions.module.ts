@@ -54,6 +54,11 @@ import { PermissionSeedsService } from '../../../src/database/seeds/permission-s
     },
     PermissionSeedsService,
   ],
-  exports: [PermissionsService, PermissionCheckerService, TypeOrmModule, PermissionSeedsService],
+  exports: [
+    PermissionsService,
+    PermissionCheckerService,
+    TypeOrmModule,
+    PermissionSeedsService,
+  ],
 })
 export class PermissionsModule {}

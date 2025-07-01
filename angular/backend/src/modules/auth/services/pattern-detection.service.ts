@@ -27,7 +27,7 @@ export interface DetectedPattern {
   userId?: number;
   ipAddress?: string; // Keep for backwards compatibility
   ipAddresses: string[]; // New: Array of all affected IP addresses
-  email?: string; // Keep for backwards compatibility  
+  email?: string; // Keep for backwards compatibility
   emails: string[]; // New: Array of all affected emails
   isHistorical?: boolean;
   status?: string;
@@ -71,7 +71,7 @@ export class PatternDetectionService {
 
     // Get real-time patterns (current active threats)
     const realTimePatterns = await this.detectRealTimePatterns();
-    
+
     // Get historical patterns (stored in database)
     const historicalPatterns = await this.getHistoricalPatterns();
 
@@ -79,6 +79,238 @@ export class PatternDetectionService {
     patterns.push(...realTimePatterns, ...historicalPatterns);
 
     return patterns;
+  }
+
+  /**
+   * UNIFIED PATTERN DETECTION: Detect patterns and automatically store them in database
+   * This method replaces the dual data source approach with a single unified approach
+   */
+  async detectAndStorePatterns(): Promise<DetectedPattern[]> {
+    // Detect real-time patterns
+    const realTimePatterns = await this.detectRealTimePatterns();
+
+    // Store any new patterns to database
+    for (const pattern of realTimePatterns) {
+      await this.storePattern(pattern);
+    }
+
+    // Return all patterns from database (now includes newly stored ones)
+    return this.getStoredPatterns();
+  }
+
+  /**
+   * UNIFIED PATTERN RETRIEVAL: Get all patterns from single data source with optional filtering
+   * This method serves as the single source of truth for all pattern queries
+   */
+  async getPatterns(
+    limit: number = 50,
+    offset: number = 0,
+    filters: any = {},
+  ): Promise<{ items: DetectedPattern[]; total: number }> {
+    // First ensure we have the latest patterns stored
+    await this.detectAndStorePatterns();
+
+    // Then retrieve with filtering
+    const query = this.securityDetectedPatternRepository
+      .createQueryBuilder('pattern')
+      .leftJoinAndSelect('pattern.resolvedBy', 'resolvedBy')
+      .leftJoinAndSelect('pattern.alerts', 'alerts');
+
+    // Apply filters
+    if (filters.status) {
+      query.andWhere('pattern.status = :status', { status: filters.status });
+    }
+
+    if (filters.patternType) {
+      query.andWhere('pattern.patternType = :patternType', {
+        patternType: filters.patternType,
+      });
+    }
+
+    if (filters.severity) {
+      query.andWhere('pattern.severity = :severity', {
+        severity: filters.severity,
+      });
+    }
+
+    if (filters.ipAddress) {
+      query.andWhere('pattern.ipAddress = :ipAddress', {
+        ipAddress: filters.ipAddress,
+      });
+    }
+
+    if (filters.dateFrom) {
+      query.andWhere('pattern.detectionTimestamp >= :dateFrom', {
+        dateFrom: filters.dateFrom,
+      });
+    }
+
+    if (filters.dateTo) {
+      query.andWhere('pattern.detectionTimestamp <= :dateTo', {
+        dateTo: filters.dateTo,
+      });
+    }
+
+    // Apply search filter
+    if (filters.search) {
+      query.andWhere(
+        '(pattern.patternType LIKE :search OR pattern.ipAddress LIKE :search OR pattern.evidence LIKE :search)',
+        { search: `%${filters.search}%` },
+      );
+    }
+
+    // Apply sorting
+    const sortBy = filters.sortBy || 'detectionTimestamp';
+    const sortDirection = filters.sortDirection || 'desc';
+    query.orderBy(
+      `pattern.${sortBy}`,
+      sortDirection.toUpperCase() as 'ASC' | 'DESC',
+    );
+
+    // Get total count
+    const total = await query.getCount();
+
+    // Apply pagination
+    query.skip(offset).take(limit);
+
+    const items = await query.getMany();
+
+    // Transform to DetectedPattern format
+    const patterns = items.map((pattern) =>
+      this.transformStoredPatternToDetectedPattern(pattern),
+    );
+
+    return { items: patterns, total };
+  }
+
+  /**
+   * Store a detected pattern to the database if it doesn't already exist
+   */
+  private async storePattern(
+    pattern: DetectedPattern,
+  ): Promise<SecurityDetectedPattern | null> {
+    try {
+      // Check if this pattern already exists (avoid duplicates)
+      const existingPattern =
+        await this.securityDetectedPatternRepository.findOne({
+          where: {
+            patternType: pattern.type,
+            ipAddress: pattern.ipAddress || pattern.ipAddresses?.[0],
+            detectionTimestamp: pattern.timestamp,
+          },
+        });
+
+      if (existingPattern) {
+        return existingPattern; // Pattern already exists
+      }
+
+      // Calculate time window based on pattern type
+      const timeWindow = this.calculateTimeWindow(pattern.type);
+      const detectionTime = new Date(pattern.timestamp);
+      const timeWindowStart = new Date(detectionTime.getTime() - timeWindow.lookback);
+      const timeWindowEnd = new Date(detectionTime.getTime() + timeWindow.lookahead);
+
+      // Create new stored pattern with all required fields
+      const storedPattern = this.securityDetectedPatternRepository.create({
+        patternType: pattern.type,
+        severity: pattern.severity,
+        ipAddress: pattern.ipAddress || pattern.ipAddresses?.[0] || 'unknown',
+        detectionTimestamp: pattern.timestamp,
+        timeWindowStart,
+        timeWindowEnd,
+        evidence: JSON.stringify(pattern.evidence),
+        status: 'active', // New patterns are active by default
+        attemptCount: pattern.evidence?.attemptCount || 0,
+        uniqueEmailCount:
+          pattern.evidence?.uniqueEmailCount || pattern.emails?.length || 0,
+      });
+
+      const savedPattern =
+        await this.securityDetectedPatternRepository.save(storedPattern);
+      console.log(
+        `Stored new pattern: ${pattern.type} from IP ${pattern.ipAddress || pattern.ipAddresses?.[0]} (${timeWindowStart.toISOString()} - ${timeWindowEnd.toISOString()})`,
+      );
+
+      return savedPattern;
+    } catch (error) {
+      console.error(`Failed to store pattern ${pattern.type}:`, error);
+      throw new Error(`Pattern storage failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Calculate time window for pattern based on pattern type
+   */
+  private calculateTimeWindow(patternType: PatternType): { lookback: number; lookahead: number } {
+    const timeWindows = {
+      [PatternType.BRUTE_FORCE]: { lookback: 30 * 60 * 1000, lookahead: 10 * 60 * 1000 }, // 30min back, 10min ahead
+      [PatternType.DISTRIBUTED_ATTACK]: { lookback: 60 * 60 * 1000, lookahead: 15 * 60 * 1000 }, // 1hr back, 15min ahead
+      [PatternType.CREDENTIAL_STUFFING]: { lookback: 60 * 60 * 1000, lookahead: 15 * 60 * 1000 }, // 1hr back, 15min ahead
+      [PatternType.RAPID_ACCOUNT_SWITCHING]: { lookback: 15 * 60 * 1000, lookahead: 5 * 60 * 1000 }, // 15min back, 5min ahead
+      [PatternType.IP_HOPPING]: { lookback: 10 * 60 * 1000, lookahead: 5 * 60 * 1000 }, // 10min back, 5min ahead
+      [PatternType.SUSPICIOUS_LOCATION]: { lookback: 24 * 60 * 60 * 1000, lookahead: 60 * 60 * 1000 }, // 24hr back, 1hr ahead
+      [PatternType.TIME_ANOMALY]: { lookback: 60 * 60 * 1000, lookahead: 30 * 60 * 1000 }, // 1hr back, 30min ahead
+    };
+
+    return timeWindows[patternType] || { lookback: 30 * 60 * 1000, lookahead: 10 * 60 * 1000 };
+  }
+
+  /**
+   * Get stored patterns from database (used internally)
+   */
+  private async getStoredPatterns(
+    limit: number = 50,
+  ): Promise<DetectedPattern[]> {
+    const storedPatterns = await this.securityDetectedPatternRepository.find({
+      order: { detectionTimestamp: 'DESC' },
+      take: limit,
+    });
+
+    return storedPatterns.map((pattern) =>
+      this.transformStoredPatternToDetectedPattern(pattern),
+    );
+  }
+
+  /**
+   * Transform stored pattern entity to DetectedPattern interface
+   */
+  private transformStoredPatternToDetectedPattern(
+    pattern: SecurityDetectedPattern,
+  ): DetectedPattern {
+    const evidence = JSON.parse(pattern.evidence || '{}');
+
+    // Extract IP addresses from evidence
+    let ipAddresses: string[] = [];
+    if (evidence.ips && Array.isArray(evidence.ips)) {
+      ipAddresses = evidence.ips;
+    } else if (evidence.ipAddress) {
+      ipAddresses = [evidence.ipAddress];
+    } else if (pattern.ipAddress) {
+      ipAddresses = [pattern.ipAddress];
+    }
+
+    // Extract emails from evidence
+    let emails: string[] = [];
+    if (evidence.emails && Array.isArray(evidence.emails)) {
+      emails = evidence.emails;
+    } else if (evidence.email) {
+      emails = [evidence.email];
+    }
+
+    return {
+      id: pattern.id.toString(),
+      type: pattern.patternType as PatternType,
+      severity: pattern.severity as 'low' | 'medium' | 'high' | 'critical',
+      details: `Pattern: ${pattern.patternType} from IP ${pattern.ipAddress}`,
+      evidence,
+      timestamp: pattern.detectionTimestamp,
+      ipAddress: pattern.ipAddress, // Keep for backwards compatibility
+      ipAddresses, // New aggregated field
+      email: evidence.email, // Keep for backwards compatibility
+      emails, // New aggregated field
+      isHistorical: true, // All stored patterns are considered historical
+      status: pattern.status,
+    };
   }
 
   /**
@@ -113,7 +345,7 @@ export class PatternDetectionService {
     );
 
     // Mark as real-time patterns
-    patterns.forEach(pattern => {
+    patterns.forEach((pattern) => {
       pattern.isHistorical = false;
     });
 
@@ -129,9 +361,9 @@ export class PatternDetectionService {
       take: limit,
     });
 
-    return storedPatterns.map(pattern => {
+    return storedPatterns.map((pattern) => {
       const evidence = JSON.parse(pattern.evidence || '{}');
-      
+
       // Extract IP addresses from evidence
       let ipAddresses: string[] = [];
       if (evidence.ips && Array.isArray(evidence.ips)) {
@@ -141,7 +373,7 @@ export class PatternDetectionService {
       } else if (pattern.ipAddress) {
         ipAddresses = [pattern.ipAddress];
       }
-      
+
       // Extract emails from evidence
       let emails: string[] = [];
       if (evidence.emails && Array.isArray(evidence.emails)) {
@@ -149,7 +381,7 @@ export class PatternDetectionService {
       } else if (evidence.email) {
         emails = [evidence.email];
       }
-      
+
       return {
         id: pattern.id.toString(),
         type: pattern.patternType as PatternType,
@@ -170,14 +402,20 @@ export class PatternDetectionService {
   /**
    * Create simulated login attempts for testing real-time pattern detection
    */
-  async createTestLoginAttempts(scenarioType: 'brute_force' | 'distributed_attack' | 'credential_stuffing' | 'account_switching'): Promise<void> {
+  async createTestLoginAttempts(
+    scenarioType:
+      | 'brute_force'
+      | 'distributed_attack'
+      | 'credential_stuffing'
+      | 'account_switching',
+  ): Promise<void> {
     const now = new Date();
-    
+
     switch (scenarioType) {
       case 'brute_force':
         // Create 8 failed attempts from same IP in last 10 minutes
         for (let i = 0; i < 8; i++) {
-          const attemptTime = new Date(now.getTime() - (i * 60000)); // 1 minute apart
+          const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
           await this.createTestAttempt({
             ipAddress: '192.168.100.50',
             emailAttempted: `test${i % 3}@example.com`, // Rotate between 3 emails
@@ -194,14 +432,15 @@ export class PatternDetectionService {
         const targetEmail = 'admin@example.com';
         const ips = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
         for (let i = 0; i < ips.length; i++) {
-          const attemptTime = new Date(now.getTime() - (i * 300000)); // 5 minutes apart
+          const attemptTime = new Date(now.getTime() - i * 300000); // 5 minutes apart
           await this.createTestAttempt({
             ipAddress: ips[i],
             emailAttempted: targetEmail,
             status: Math.random() > 0.5 ? 'failed' : 'success',
             attemptedAt: attemptTime,
             userAgent: `Mozilla/5.0 (Test Browser ${i})`,
-            failureReason: Math.random() > 0.5 ? 'invalid_credentials' : undefined,
+            failureReason:
+              Math.random() > 0.5 ? 'invalid_credentials' : undefined,
           });
         }
         break;
@@ -210,12 +449,21 @@ export class PatternDetectionService {
         // Create attempts with many different emails from same IP
         const stuffingIP = '172.16.0.100';
         const emails = [
-          'admin@test.com', 'user@test.com', 'manager@test.com', 'support@test.com',
-          'info@test.com', 'sales@test.com', 'contact@test.com', 'help@test.com',
-          'service@test.com', 'team@test.com', 'office@test.com', 'staff@test.com'
+          'admin@test.com',
+          'user@test.com',
+          'manager@test.com',
+          'support@test.com',
+          'info@test.com',
+          'sales@test.com',
+          'contact@test.com',
+          'help@test.com',
+          'service@test.com',
+          'team@test.com',
+          'office@test.com',
+          'staff@test.com',
         ];
         for (let i = 0; i < emails.length; i++) {
-          const attemptTime = new Date(now.getTime() - (i * 30000)); // 30 seconds apart
+          const attemptTime = new Date(now.getTime() - i * 30000); // 30 seconds apart
           await this.createTestAttempt({
             ipAddress: stuffingIP,
             emailAttempted: emails[i],
@@ -230,16 +478,22 @@ export class PatternDetectionService {
       case 'account_switching':
         // Create attempts with multiple different emails from same IP
         const switchingIP = '203.0.113.10';
-        const switchEmails = ['alice@corp.com', 'bob@corp.com', 'charlie@corp.com', 'diana@corp.com'];
+        const switchEmails = [
+          'alice@corp.com',
+          'bob@corp.com',
+          'charlie@corp.com',
+          'diana@corp.com',
+        ];
         for (let i = 0; i < switchEmails.length; i++) {
-          const attemptTime = new Date(now.getTime() - (i * 120000)); // 2 minutes apart
+          const attemptTime = new Date(now.getTime() - i * 120000); // 2 minutes apart
           await this.createTestAttempt({
             ipAddress: switchingIP,
             emailAttempted: switchEmails[i],
             status: Math.random() > 0.3 ? 'failed' : 'success',
             attemptedAt: attemptTime,
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            failureReason: Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+            failureReason:
+              Math.random() > 0.7 ? 'invalid_credentials' : undefined,
           });
         }
         break;
@@ -249,7 +503,9 @@ export class PatternDetectionService {
   /**
    * Helper method to create a test login attempt
    */
-  private async createTestAttempt(attemptData: Partial<LoginAttempt>): Promise<LoginAttempt> {
+  private async createTestAttempt(
+    attemptData: Partial<LoginAttempt>,
+  ): Promise<LoginAttempt> {
     const attempt = this.loginAttemptRepository.create({
       ipAddress: attemptData.ipAddress,
       emailAttempted: attemptData.emailAttempted,
@@ -257,7 +513,10 @@ export class PatternDetectionService {
       attemptedAt: attemptData.attemptedAt || new Date(),
       userAgent: attemptData.userAgent || 'Test User Agent',
       failureReason: attemptData.failureReason,
-      metadata: JSON.stringify({ source: 'test_simulation', timestamp: new Date() }),
+      metadata: JSON.stringify({
+        source: 'test_simulation',
+        timestamp: new Date(),
+      }),
     });
 
     return this.loginAttemptRepository.save(attempt);
@@ -268,12 +527,14 @@ export class PatternDetectionService {
    */
   async clearTestData(): Promise<{ deleted: number }> {
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-    
+
     const result = await this.loginAttemptRepository
       .createQueryBuilder()
       .delete()
       .where('attempted_at > :startTime', { startTime: thirtyMinutesAgo })
-      .andWhere('metadata LIKE :testSource', { testSource: '%test_simulation%' })
+      .andWhere('metadata LIKE :testSource', {
+        testSource: '%test_simulation%',
+      })
       .execute();
 
     return { deleted: result.affected || 0 };
@@ -289,11 +550,11 @@ export class PatternDetectionService {
     // Find IPs with multiple failed attempts in the time window
     const result = await this.loginAttemptRepository
       .createQueryBuilder('attempt')
-      .select('attempt.ip_address')
+      .select('attempt.ipAddress')
       .addSelect('COUNT(*)', 'count')
       .where('attempt.status = :status', { status: 'failed' })
-      .andWhere('attempt.attempted_at > :startTime', { startTime })
-      .groupBy('attempt.ip_address')
+      .andWhere('attempt.attemptedAt > :startTime', { startTime })
+      .groupBy('attempt.ipAddress')
       .having('COUNT(*) >= :threshold', {
         threshold: this.thresholds.bruteForceAttempts,
       })
@@ -302,7 +563,7 @@ export class PatternDetectionService {
     for (const item of result) {
       const attempts = await this.loginAttemptRepository.find({
         where: {
-          ipAddress: item.ip_address,
+          ipAddress: item.attempt_ipAddress,
           status: 'failed',
           attemptedAt: MoreThan(startTime),
         },
@@ -317,9 +578,9 @@ export class PatternDetectionService {
       patterns.push({
         type: PatternType.BRUTE_FORCE,
         severity: attempts.length > 10 ? 'high' : 'medium',
-        details: `${attempts.length} failed login attempts from IP ${item.ip_address} in the last ${this.thresholds.bruteForceTimeWindowMinutes} minutes`,
+        details: `${attempts.length} failed login attempts from IP ${item.attempt_ipAddress} in the last ${this.thresholds.bruteForceTimeWindowMinutes} minutes`,
         evidence: {
-          ipAddress: item.ip_address,
+          ipAddress: item.attempt_ipAddress,
           attemptCount: attempts.length,
           timeWindow: `${this.thresholds.bruteForceTimeWindowMinutes} minutes`,
           uniqueEmailCount: uniqueEmails.length,
@@ -331,8 +592,8 @@ export class PatternDetectionService {
           })),
         },
         timestamp: new Date(),
-        ipAddress: item.ip_address,
-        ipAddresses: [item.ip_address],
+        ipAddress: item.attempt_ipAddress,
+        ipAddresses: [item.attempt_ipAddress],
         emails: uniqueEmails,
       });
     }
@@ -350,12 +611,12 @@ export class PatternDetectionService {
     // Find emails with login attempts from multiple IPs
     const result = await this.loginAttemptRepository
       .createQueryBuilder('attempt')
-      .select('attempt.email_attempted', 'emailAttempted')
-      .addSelect('COUNT(DISTINCT attempt.ip_address)', 'ipCount')
-      .where('attempt.email_attempted IS NOT NULL')
-      .andWhere('attempt.attempted_at > :startTime', { startTime })
-      .groupBy('attempt.email_attempted')
-      .having('COUNT(DISTINCT attempt.ip_address) >= :threshold', {
+      .select('attempt.emailAttempted', 'emailAttempted')
+      .addSelect('COUNT(DISTINCT attempt.ipAddress)', 'ipCount')
+      .where('attempt.emailAttempted IS NOT NULL')
+      .andWhere('attempt.attemptedAt > :startTime', { startTime })
+      .groupBy('attempt.emailAttempted')
+      .having('COUNT(DISTINCT attempt.ipAddress) >= :threshold', {
         threshold: this.thresholds.distributedAttackMinIPs,
       })
       .getRawMany();
@@ -370,7 +631,9 @@ export class PatternDetectionService {
         order: { attemptedAt: 'DESC' },
       });
 
-      const uniqueIPs = [...new Set(attempts.map((a) => a.ipAddress))] as string[];
+      const uniqueIPs = [
+        ...new Set(attempts.map((a) => a.ipAddress)),
+      ] as string[];
 
       patterns.push({
         type: PatternType.DISTRIBUTED_ATTACK,
@@ -417,12 +680,12 @@ export class PatternDetectionService {
     // Find IPs that tried to log in with multiple different emails
     const result = await this.loginAttemptRepository
       .createQueryBuilder('attempt')
-      .select('attempt.ip_address')
-      .addSelect('COUNT(DISTINCT attempt.email_attempted)', 'emailCount')
-      .where('attempt.email_attempted IS NOT NULL')
-      .andWhere('attempt.attempted_at > :startTime', { startTime })
-      .groupBy('attempt.ip_address')
-      .having('COUNT(DISTINCT attempt.email_attempted) >= :threshold', {
+      .select('attempt.ipAddress')
+      .addSelect('COUNT(DISTINCT attempt.emailAttempted)', 'emailCount')
+      .where('attempt.emailAttempted IS NOT NULL')
+      .andWhere('attempt.attemptedAt > :startTime', { startTime })
+      .groupBy('attempt.ipAddress')
+      .having('COUNT(DISTINCT attempt.emailAttempted) >= :threshold', {
         threshold: this.thresholds.accountSwitchingThreshold,
       })
       .getRawMany();
@@ -430,7 +693,7 @@ export class PatternDetectionService {
     for (const item of result) {
       const attempts = await this.loginAttemptRepository.find({
         where: {
-          ipAddress: item.ip_address,
+          ipAddress: item.attempt_ipAddress,
           attemptedAt: MoreThan(startTime),
         },
         relations: ['user'],
@@ -444,9 +707,9 @@ export class PatternDetectionService {
       patterns.push({
         type: PatternType.RAPID_ACCOUNT_SWITCHING,
         severity: uniqueEmails.length > 5 ? 'high' : 'medium',
-        details: `IP ${item.ip_address} attempted to log in with ${uniqueEmails.length} different email addresses in the last hour`,
+        details: `IP ${item.attempt_ipAddress} attempted to log in with ${uniqueEmails.length} different email addresses in the last hour`,
         evidence: {
-          ipAddress: item.ip_address,
+          ipAddress: item.attempt_ipAddress,
           emailCount: uniqueEmails.length,
           emails: uniqueEmails,
           attempts: attempts.map((a) => ({
@@ -456,8 +719,8 @@ export class PatternDetectionService {
           })),
         },
         timestamp: new Date(),
-        ipAddress: item.ip_address,
-        ipAddresses: [item.ip_address],
+        ipAddress: item.attempt_ipAddress,
+        ipAddresses: [item.attempt_ipAddress],
         emails: uniqueEmails,
       });
     }
@@ -473,13 +736,15 @@ export class PatternDetectionService {
     );
 
     // Find users/emails with login attempts from different IPs in a short time
+    // Use entity property names in TypeORM query builder, not database column names
     const users = await this.loginAttemptRepository
       .createQueryBuilder('attempt')
-      .select('attempt.user_id', 'userId')
-      .addSelect('attempt.email_attempted', 'emailAttempted')
-      .where('attempt.attempted_at > :startTime', { startTime })
-      .andWhere('attempt.user_id IS NOT NULL OR attempt.email_attempted IS NOT NULL')
-      .groupBy('attempt.user_id, attempt.email_attempted')
+      .leftJoin('attempt.user', 'user')
+      .select('user.id', 'userId')
+      .addSelect('attempt.emailAttempted', 'emailAttempted')
+      .where('attempt.attemptedAt > :startTime', { startTime })
+      .andWhere('user.id IS NOT NULL OR attempt.emailAttempted IS NOT NULL')
+      .groupBy('user.id, attempt.emailAttempted')
       .getRawMany();
 
     for (const user of users) {
@@ -504,7 +769,9 @@ export class PatternDetectionService {
         });
       }
 
-      const uniqueIPs = [...new Set(attempts.map((a) => a.ipAddress))] as string[];
+      const uniqueIPs = [
+        ...new Set(attempts.map((a) => a.ipAddress)),
+      ] as string[];
 
       if (uniqueIPs.length > 1) {
         // Check time between attempts from different IPs

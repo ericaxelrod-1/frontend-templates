@@ -5,7 +5,7 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  PrimaryColumn
+  PrimaryColumn,
 } from 'typeorm';
 import { Permission } from './permission.entity';
 import { Group } from './group.entity';

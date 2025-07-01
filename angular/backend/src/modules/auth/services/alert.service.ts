@@ -263,30 +263,31 @@ export class AlertService {
         message: alert.message,
         source: 'system',
         ipAddress: alert.ipAddress || null,
-        user: alert.userId ? { id: alert.userId } as any : null,
+        user: alert.userId ? ({ id: alert.userId } as any) : null,
         status: 'active',
         alertData: alert.data ? JSON.stringify(alert.data) : null,
         expiresAt: null, // Could be configured based on severity
       };
 
-      const savedAlert = await this.securityAlertService.createAlert(securityAlertData);
-      
+      const savedAlert =
+        await this.securityAlertService.createAlert(securityAlertData);
+
       this.logger.log(
-        `[DATABASE ALERT] Successfully stored alert in database: ${alert.title} (ID: ${savedAlert.id})`
+        `[DATABASE ALERT] Successfully stored alert in database: ${alert.title} (ID: ${savedAlert.id})`,
       );
-      
+
       return true;
     } catch (error) {
       this.logger.error(
         `[DATABASE ALERT] Failed to store alert in database: ${error.message}`,
-        error.stack
+        error.stack,
       );
-      
+
       // Fallback to console logging if database fails
       this.logger.warn(
-        `[DATABASE ALERT] Falling back to console logging: ${alert.title}`
+        `[DATABASE ALERT] Falling back to console logging: ${alert.title}`,
       );
-      
+
       return false;
     }
   }
@@ -304,7 +305,7 @@ export class AlertService {
         return 'security_pattern';
       }
     }
-    
+
     // Check title for common alert types
     if (alert.title.toLowerCase().includes('brute force')) {
       return 'pattern_brute_force';
@@ -330,7 +331,7 @@ export class AlertService {
     if (alert.title.toLowerCase().includes('test')) {
       return 'test_alert';
     }
-    
+
     // Default alert type
     return 'system_alert';
   }

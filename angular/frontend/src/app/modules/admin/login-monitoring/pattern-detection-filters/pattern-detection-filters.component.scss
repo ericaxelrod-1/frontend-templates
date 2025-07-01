@@ -1,0 +1,180 @@
+@use '@angular/material' as mat;
+@use '../../../../../styles/abstracts' as *;
+
+.filters-card {
+  margin-bottom: 2rem;
+  
+  .mat-mdc-card-header {
+    .mat-mdc-card-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--mat-sys-primary, #6750a4);
+      
+      mat-icon {
+        font-size: 1.25rem;
+      }
+    }
+  }
+}
+
+.filters-form {
+  .filters-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+  }
+  
+  .filter-field {
+    flex: 1;
+    min-width: 200px;
+    
+    @media (max-width: 768px) {
+      min-width: auto;
+      width: 100%;
+    }
+    
+    &.search-field {
+      flex: 2;
+      min-width: 300px;
+      
+      @media (max-width: 768px) {
+        min-width: auto;
+        width: 100%;
+      }
+    }
+  }
+  
+  .filter-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    
+    @media (max-width: 768px) {
+      width: 100%;
+      justify-content: space-between;
+      
+      button {
+        flex: 1;
+        min-width: 120px;
+      }
+    }
+    
+    button {
+      .mat-icon {
+        margin-right: 0.25rem;
+      }
+    }
+  }
+}
+
+// Disabled state styling
+.filters-form {
+  &.ng-invalid {
+    .filter-field {
+      .mat-mdc-form-field {
+        opacity: 0.6;
+      }
+    }
+  }
+}
+
+// Focus and hover states
+.filter-field {
+  .mat-mdc-form-field {
+    &:hover:not(.mat-form-field-disabled) {
+      .mat-mdc-form-field-outline {
+        opacity: 0.8;
+      }
+    }
+    
+    &.mat-focused {
+      .mat-mdc-form-field-outline {
+        border-color: var(--mat-sys-primary, #6750a4);
+      }
+    }
+  }
+}
+
+// Button styling
+.filter-actions {
+  button {
+    &[color="primary"] {
+      background-color: var(--mat-sys-primary, #6750a4);
+      color: white;
+      
+      &:hover:not(:disabled) {
+        background-color: var(--mat-sys-primary-dark, #5a4594);
+      }
+    }
+    
+    &[mat-stroked-button] {
+      border-color: var(--mat-sys-primary, #6750a4);
+      color: var(--mat-sys-primary, #6750a4);
+      
+      &:hover:not(:disabled) {
+        background-color: var(--mat-sys-primary-container, rgba(103, 80, 164, 0.1));
+      }
+    }
+    
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 1200px) {
+  .filters-row {
+    .filter-field {
+      min-width: 180px;
+    }
+  }
+}
+
+@media (max-width: 992px) {
+  .filters-row {
+    .filter-field {
+      min-width: 160px;
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .filters-card {
+    margin-bottom: 1rem;
+    
+    .mat-mdc-card-content {
+      padding: 1rem;
+    }
+  }
+  
+  .filters-form {
+    .filters-row {
+      margin-bottom: 0.5rem;
+    }
+    
+    .filter-actions {
+      flex-direction: column;
+      
+      button {
+        width: 100%;
+        margin-bottom: 0.5rem;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+} 

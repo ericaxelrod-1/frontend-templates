@@ -55,4 +55,4 @@ export class CreateCacheTables20250517000000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "cache_routes"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "cache_components"`);
   }
-} 
+}

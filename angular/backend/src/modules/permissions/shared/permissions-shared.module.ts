@@ -40,4 +40,4 @@ export const PERMISSION_CHECKER = 'PERMISSION_CHECKER';
   ],
   exports: [PERMISSION_CHECKER, TypeOrmModule],
 })
-export class PermissionsSharedModule {} 
+export class PermissionsSharedModule {}

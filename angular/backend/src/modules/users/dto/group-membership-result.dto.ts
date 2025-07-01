@@ -50,4 +50,4 @@ export class GroupMembershipResultDto implements GroupMembershipResult {
     memberSince?: Date;
     totalGroupMembers: number;
   };
-} 
+}

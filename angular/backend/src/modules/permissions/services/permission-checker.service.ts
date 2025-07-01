@@ -18,19 +18,19 @@ export class PermissionCheckerService implements IPermissionChecker {
   constructor(
     @Inject(forwardRef(() => PermissionsService))
     private readonly permissionsService: PermissionsService,
-    
+
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    
+
     @InjectRepository(Permission)
     private readonly permissionRepository: Repository<Permission>,
-    
+
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepository: Repository<RolePermission>,
-    
+
     @InjectRepository(UserPermission)
     private readonly userPermissionRepository: Repository<UserPermission>,
-    
+
     @InjectRepository(GroupPermission)
     private readonly groupPermissionRepository: Repository<GroupPermission>,
   ) {}
@@ -96,7 +96,10 @@ export class PermissionCheckerService implements IPermissionChecker {
       for (const role of user.roles || []) {
         if (role.rolePermissions) {
           for (const rolePermission of role.rolePermissions) {
-            if (rolePermission.permission && rolePermission.isGranted !== false) {
+            if (
+              rolePermission.permission &&
+              rolePermission.isGranted !== false
+            ) {
               const permission = rolePermission.permission;
               const permString = `${permission.resourceName}:${permission.actionName}`;
               if (!permissions.includes(permString)) {
@@ -111,7 +114,10 @@ export class PermissionCheckerService implements IPermissionChecker {
       for (const group of user.groups || []) {
         if (group.groupPermissions) {
           for (const groupPermission of group.groupPermissions) {
-            if (groupPermission.permission && groupPermission.isGranted !== false) {
+            if (
+              groupPermission.permission &&
+              groupPermission.isGranted !== false
+            ) {
               const permission = groupPermission.permission;
               const permString = `${permission.resourceName}:${permission.actionName}`;
               if (!permissions.includes(permString)) {
@@ -136,4 +142,4 @@ export class PermissionCheckerService implements IPermissionChecker {
       return permissions;
     }
   }
-} 
+}
