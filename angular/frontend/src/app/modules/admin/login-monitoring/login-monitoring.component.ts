@@ -51,6 +51,16 @@ export class LoginMonitoringComponent implements OnInit {
   securityAlerts: SecurityAlert[] = [];
   selectedIpReputation: IPReputation | null = null;
   
+  // Pattern Detection Table Properties - Following login-attempts-table pattern
+  patternDisplayedColumns: string[] = [
+    'timestamp', 'type', 'severity', 'ipAddresses', 'details', 'groupCount', 'actions'
+  ];
+  
+  // Pattern Pagination Properties - Following login-attempts-table pattern
+  patternTotalCount = 0;
+  patternPageSize = 10;
+  patternCurrentPage = 0;
+  
   // Loading states for non-refactored sections
   loading = {
     patterns: false,
@@ -146,14 +156,16 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.getPatterns(
       filters,
-      0, // page
-      50, // pageSize - show more patterns by default
+      this.patternCurrentPage, // Use pagination properties
+      this.patternPageSize, // Use pagination properties
       'detectionTimestamp', // sortBy
       'desc' // sortDirection - newest first
     ).subscribe({
         next: (data) => {
           console.log('[DEBUG] Patterns loaded successfully:', data);
-          this.detectedPatterns = data || [];
+          // Handle PaginatedResponse<Pattern> properly - following login-attempts-table pattern
+          this.detectedPatterns = data.items || [];
+          this.patternTotalCount = data.total || 0;
           this.loading.patterns = false;
         },
         error: (error) => {
@@ -162,6 +174,13 @@ export class LoginMonitoringComponent implements OnInit {
           this.loading.patterns = false;
         }
       });
+  }
+
+  // Pattern Pagination Handler - Following login-attempts-table pattern
+  onPatternPageChange(event: any): void {
+    this.patternCurrentPage = event.pageIndex;
+    this.patternPageSize = event.pageSize;
+    this.loadPatterns(this.patternDetectionFilters);
   }
 
   // DEPRECATED METHOD - Kept for backward compatibility during transition

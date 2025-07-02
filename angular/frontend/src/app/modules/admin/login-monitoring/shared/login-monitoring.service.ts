@@ -71,18 +71,21 @@ export class LoginMonitoringService {
       .pipe(catchError(this.handleError));
   }
 
-  // Pattern Detection API - UNIFIED APPROACH
+  // Pattern Detection API - UNIFIED APPROACH with Pagination Support
   getPatterns(
     filters: PatternDetectionFilters = {},
     page: number = 0,
     pageSize: number = 10,
     sortBy: string = 'detectionTimestamp',
     sortDirection: string = 'desc'
-  ): Observable<Pattern[]> {
+  ): Observable<PaginatedResponse<Pattern>> {
     let url = `${this.apiUrl}/patterns?limit=${pageSize}&offset=${page * pageSize}`;
     
     // Add sorting parameters
     url += `&sortBy=${sortBy}&sortDirection=${sortDirection}`;
+    
+    console.log('[DEBUG] Pattern service URL before filters:', url);
+    console.log('[DEBUG] Pattern service parameters:', { page, pageSize, sortBy, sortDirection, filters });
     
     // Add filter parameters
     if (filters.status) {
@@ -107,27 +110,41 @@ export class LoginMonitoringService {
       url += `&search=${encodeURIComponent(filters.search)}`;
     }
     
+    console.log('[DEBUG] Final patterns URL:', url);
+    console.log('[DEBUG] Making HTTP request for patterns...');
+    
     return this.http.get<{items: any[], total: number}>(url)
       .pipe(
-        map(response => (response.items || []).map(pattern => this.transformDetectedPattern(pattern))),
+        map(response => ({
+          items: (response.items || []).map(pattern => this.transformDetectedPattern(pattern)),
+          total: response.total || 0,
+          page: page,
+          pageSize: pageSize
+        })),
         catchError(this.handleError)
       );
   }
 
   // DEPRECATED METHODS - Kept for backward compatibility during transition
   detectPatterns(): Observable<Pattern[]> {
-    // Redirect to unified method
-    return this.getPatterns({}, 0, 50);
+    // Redirect to unified method and extract items only
+    return this.getPatterns({}, 0, 50).pipe(
+      map(response => response.items)
+    );
   }
 
   loadRealTimePatterns(): Observable<Pattern[]> {
-    // Redirect to unified method with active status filter
-    return this.getPatterns({ status: 'active' }, 0, 50);
+    // Redirect to unified method with active status filter and extract items only
+    return this.getPatterns({ status: 'active' }, 0, 50).pipe(
+      map(response => response.items)
+    );
   }
 
   loadHistoricalPatterns(): Observable<Pattern[]> {
-    // Redirect to unified method
-    return this.getPatterns({}, 0, 50);
+    // Redirect to unified method and extract items only
+    return this.getPatterns({}, 0, 50).pipe(
+      map(response => response.items)
+    );
   }
 
   createTestPattern(patternType: string): Observable<any> {
@@ -148,8 +165,10 @@ export class LoginMonitoringService {
     sortBy: string = 'detectionTimestamp',
     sortDirection: string = 'desc'
   ): Observable<Pattern[]> {
-    // Redirect to unified method
-    return this.getPatterns(filters, page, pageSize, sortBy, sortDirection);
+    // Redirect to unified method and extract items only
+    return this.getPatterns(filters, page, pageSize, sortBy, sortDirection).pipe(
+      map(response => response.items)
+    );
   }
 
   // Security Alerts API - Fixed to use correct endpoint and handle paginated response
@@ -314,7 +333,8 @@ export class LoginMonitoringService {
       timestamp: new Date(backendPattern.timestamp),
       ipAddresses: ipAddresses, // Always an array
       email: emails.length > 0 ? emails[0] : undefined, // First email for backwards compatibility
-      expanded: backendPattern.expanded || false
+      expanded: backendPattern.expanded || false,
+      evidence: backendPattern.evidence // CRITICAL FIX: Include evidence property for grouping and metadata
     };
   }
 

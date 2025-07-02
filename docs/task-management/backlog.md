@@ -1,59 +1,8 @@
 # Project Backlog
 
-Last Updated: 2025-07-01 21:30:00
+Last Updated: 2025-07-02 14:48:19
 
 ## Critical Priority
-
-### BUG-112: Pattern Detection Dual Data Source Architecture Causes Filter Inconsistency
-- **Status**: Complete ✅
-- **Testing**: Build Successful ✅
-- **Dependencies**: BUG-113 ✅
-- **Added**: 2025-01-27 12:52:00
-- **Completed**: 2025-01-27 13:45:00
-- **Description**: Pattern Detection tab uses two different data sources causing inconsistent behavior - initial load shows real-time patterns while filtered load shows stored patterns, resulting in "disappearing data" when filters are applied. **RESOLVED**: Implemented unified pattern detection architecture with automatic storage and single data source.
-
-#### Investigation Results (@999-bugfinder - Completed 2025-01-27)
-**ROOT CAUSE IDENTIFIED**: Architectural flaw with dual data source pattern where initial load and filtered load use completely different backend endpoints and data sources.
-
-**TECHNICAL EVIDENCE**:
-- **Initial Load**: `loadPatterns()` → `detectPatterns()` → `/patterns/detect` → Real-time pattern detection (transient)
-- **Filtered Load**: `loadFilteredPatterns()` → `getFilteredPatterns()` → `/patterns/filtered` → Database query (persistent)
-- **Data Mismatch**: Real-time detection finds today's test patterns, but database only contains old June 2025 pattern
-- **User Experience**: Patterns visible initially, disappear when any filter is applied (even with correct date ranges)
-
-**BACKEND ANALYSIS**:
-- Real-time detection working correctly: Finds 8 failed attempts from `192.168.100.50` (brute force pattern)
-- Pattern storage mechanism failing: Real-time patterns not being persisted to `security_detected_patterns` table
-- Database contains only 1 historical pattern from 2025-06-21 (outside current date range context)
-- Test button creation works: Creates login attempts and triggers detection, but patterns remain transient
-
-**ARCHITECTURAL PROBLEMS**:
-1. **Inconsistent Data Sources**: Two endpoints serve different data for same UI functionality
-2. **Pattern Persistence Gap**: Real-time patterns not automatically stored in database
-3. **Filter Logic Mismatch**: Filters only work on stored patterns, ignore real-time detection
-4. **State Management Issue**: No unified pattern lifecycle (detection → storage → retrieval)
-
-#### Implementation Requirements
-**UNIFIED ARCHITECTURE PATTERN NEEDED**:
-1. **Single Data Source**: All pattern queries must use `security_detected_patterns` table
-2. **Automatic Storage**: Real-time detection must immediately persist patterns to database
-3. **Pattern Lifecycle**: Implement status-based pattern management (active/resolved/dismissed/expired)
-4. **Unified Endpoints**: Replace dual endpoints with single `/patterns` endpoint supporting optional filters
-5. **Background Detection**: Continuous pattern detection with automatic storage via cron jobs
-6. **State Management**: Pattern resolution workflow with admin actions tracking
-
-**BACKEND CHANGES**:
-- Enhance `PatternDetectionService.detectAndStorePatterns()` to immediately persist all detected patterns
-- Replace `/patterns/detect` and `/patterns/filtered` with unified `/patterns` endpoint
-- Implement pattern lifecycle management (active → resolved/dismissed/expired)
-- Add background cron job for continuous detection and storage
-- Add pattern resolution workflow with user tracking
-
-**FRONTEND CHANGES**:
-- Replace `detectPatterns()` and `getFilteredPatterns()` with unified `getPatterns()` method
-- Update `LoginMonitoringComponent` to use single data loading method
-- Remove dual loading logic (`loadPatterns()` vs `loadFilteredPatterns()`)
-- Implement consistent filter behavior across all pattern queries
 
 ### BUG-111: IP Reputation Tab Shows "No IP Selected" with No Selection Interface
 - **Status**: Not Started
@@ -75,49 +24,155 @@ Last Updated: 2025-07-01 21:30:00
 - Design IP ranking algorithm based on recent attempts
 - Add filtering for IP reputation dashboard
 
-### BUG-110: Missing Specific Filters for Pattern Detection and Security Alerts Tabs
-- **Status**: Phase 2 Complete ✅ - PatternDetectionFiltersComponent implemented
-- **Testing**: Build Successful ✅ (Frontend & Backend)
-- **Dependencies**: BUG-109 ✅
-- **Added**: 2025-01-26 19:25:00
-- **Phase 1 Completed**: 2025-01-27 21:15:00
-- **Phase 2 Completed**: 2025-01-27 22:30:00
-- **Description**: Pattern Detection and Security Alerts tabs lack appropriate filtering capabilities. **Phase 1 & 2 COMPLETE**: SecurityAlertsFiltersComponent (5 filters) and PatternDetectionFiltersComponent (7 filters) fully implemented with complete backend integration. **Phase 3 NEEDED**: IPReputationFiltersComponent (requires new backend endpoint).
+## High Priority
 
-#### Investigation Results (@999-bugfinder - Completed 2025-01-27)
-**ROOT CAUSE IDENTIFIED**: Architecture gap where each tab requires specific filter components tailored to their data types, but currently only a generic login attempts filter exists.
-
-**BACKEND ANALYSIS**:
-- **✅ Pattern Detection**: Backend fully supports filtering via `getSecurityPatterns()` with parameters: `status`, `patternType`, `severity`, `ipAddress`, `sortBy`, `sortDirection`
-- **✅ Security Alerts**: Backend fully supports filtering via `getSecurityAlerts()` with parameters: `status`, `severity`, `alertType`, `dateFrom`, `dateTo`, `search`, `sortBy`, `sortDirection`
-- **❌ IP Reputation**: Only single IP lookup exists; no bulk dashboard endpoint for filtering
-
-**FRONTEND GAPS**:
-- **Missing**: PatternDetectionFiltersComponent with pattern-specific filters
-- **Missing**: SecurityAlertsFiltersComponent with alert-specific filters
-- **Missing**: IPReputationFiltersComponent with IP-specific filters
-- **Service Updates Needed**: Frontend services don't pass filter parameters to backend
-
-**TECHNICAL EVIDENCE**:
-- Pattern Types Available: `brute_force`, `distributed_attack`, `credential_stuffing`, `rapid_account_switching`, `ip_hopping`, `suspicious_location`, `time_anomaly`
-- Alert Types Available: `pattern_brute_force`, `pattern_credential_stuffing`, `auth_login`, `security_alert`, `test_alert`, `system_alert`
-- Severity Options: `low`, `medium`, `high`, `critical`
-- Status Options: Pattern (`active`, `resolved`), Alert (`active`, `acknowledged`, `resolved`, `dismissed`)
-
-**COMPONENT REQUIREMENTS**:
-1. **PatternDetectionFiltersComponent**: Pattern type dropdown, severity filter, status filter, IP input, date range
-2. **SecurityAlertsFiltersComponent**: Status filter, severity filter, alert type dropdown, date range, search box
-3. **IPReputationFiltersComponent**: Block status filter, reputation range, attempt count range (requires new backend endpoint)
+### FEAT-121: Pattern Type Summary Dashboard Tiles
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: FEAT-120 ✅, BUG-112 ✅
+- **Added**: 2025-07-01 17:05:10
+- **Description**: Add summary tiles for each of the 7 detected pattern types with click-to-filter navigation to Pattern Detection tab. Follow existing design patterns from statistics cards.
 
 #### Implementation Requirements
-- Create PatternDetectionFiltersComponent with pattern-specific filters
-- Create SecurityAlertsFiltersComponent with alert-specific filters  
-- Create IPReputationFiltersComponent with IP-specific filters
-- Update backend services to support new filter parameters
-- Implement tab-specific filter logic in main component
-- **Priority Order**: Security Alerts (backend ready) → Pattern Detection (backend ready) → IP Reputation (needs backend work)
+**Pattern Types to Display** (7 total):
+1. `brute_force` - Brute Force Attacks
+2. `distributed_attack` - Distributed Attacks  
+3. `credential_stuffing` - Credential Stuffing
+4. `rapid_account_switching` - Account Switching
+5. `ip_hopping` - IP Hopping
+6. `suspicious_location` - Suspicious Locations
+7. `time_anomaly` - Time Anomalies
 
-## High Priority
+**Backend Requirements**:
+- Create new endpoint `/api/login-monitoring/patterns/summary` returning pattern type counts
+- Support time filter parameter for summary data (separate from tab-specific filters)
+- Return format: `{ patternType: string, count: number, severity: 'high' | 'medium' | 'low', lastDetected: Date }[]`
+- Implement efficient aggregation queries with proper time filtering
+
+**Frontend Requirements**:
+- Follow existing statistics card design pattern from login monitoring dashboard
+- Create summary tiles grid similar to "Total Attempts", "Successful", "Failed", etc.
+- Implement click handler to navigate to Pattern Detection tab with pre-applied filter
+- Use consistent styling and layout with existing dashboard elements
+- Add loading states and error handling for summary data
+
+**Navigation Behavior**:
+- Click tile → Navigate to Pattern Detection tab
+- Auto-apply filter for selected pattern type
+- Maintain other active filters (time range, severity, etc.)
+- Update URL to reflect filtered state for bookmarking/sharing
+
+**Design Pattern Reference**:
+- Follow existing `.stats-grid` layout and `.stat-card` styling
+- Use pattern-specific icons and colors for visual distinction
+- Include severity-based color coding (red/orange/yellow)
+- Show count, pattern type name, and last detected timestamp
+
+**Files to Create/Modify**:
+- `angular/backend/src/modules/auth/controllers/login-monitoring.controller.ts`: Add summary endpoint
+- `angular/backend/src/modules/auth/services/pattern-detection.service.ts`: Add getPatternSummary() method
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Add summary tiles section
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Add summary data loading and click handlers
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.scss`: Add tile-specific styling
+
+### FEAT-122: Global Time Filter for Summary Tiles
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: FEAT-121
+- **Added**: 2025-07-01 17:05:10
+- **Description**: Add time filter component for summary tiles that operates independently from tab-specific filters. Follow existing design patterns from filter components.
+
+#### Implementation Requirements
+**Time Filter Options**:
+- Last 24 Hours
+- Last 7 Days  
+- Last 30 Days
+- Last 90 Days
+- Custom Date Range
+- All Time
+
+**Design Pattern Reference**:
+- Follow existing filter component patterns from PatternDetectionFiltersComponent and SecurityAlertsFiltersComponent
+- Use mat-select for predefined time ranges and mat-date-range-picker for custom ranges
+- Position above summary tiles grid, separate from tab-specific filters
+- Include clear visual separation from tab content
+
+**Backend Integration**:
+- Pass time filter parameters to `/api/login-monitoring/patterns/summary` endpoint
+- Support both predefined ranges and custom date ranges
+- Implement efficient time-based queries with proper indexing considerations
+- Return empty results gracefully for periods with no data
+
+**Frontend Requirements**:
+- Create reusable time filter component following existing patterns
+- Implement proper form validation for custom date ranges
+- Add loading states during filter changes
+- Persist selected time filter in component state (not URL since it's global)
+- Auto-refresh summary data when time filter changes
+
+**User Experience**:
+- Default to "Last 30 Days" for reasonable initial view
+- Provide immediate visual feedback when changing filters
+- Show "No data for selected period" message when appropriate
+- Maintain filter selection during tab navigation
+
+**Files to Create/Modify**:
+- `angular/frontend/src/app/modules/admin/login-monitoring/components/time-filter/time-filter.component.ts`: Create reusable time filter component
+- `angular/frontend/src/app/modules/admin/login-monitoring/components/time-filter/time-filter.component.html`: Time filter template
+- `angular/frontend/src/app/modules/admin/login-monitoring/components/time-filter/time-filter.component.scss`: Time filter styling
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Integrate time filter above summary tiles
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Handle time filter events and data refresh
+- `angular/backend/src/modules/auth/services/pattern-detection.service.ts`: Update getPatternSummary() to support time filtering
+
+### FEAT-123: Severity Indicator Color Coding for Pattern Detection Results
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: FEAT-120 ✅
+- **Added**: 2025-07-01 17:05:10
+- **Description**: Add color coding to severity indicators in Pattern Detection results table following existing design patterns. Implement yellow/orange/red color scheme for low/medium/high severity levels.
+
+#### Implementation Requirements
+**Color Scheme** (following existing patterns):
+- **Low Severity**: Yellow (`$warning-color` or `--mat-sys-warning`)
+- **Medium Severity**: Orange (`$warning-color` darker variant)
+- **High Severity**: Red (`--mat-sys-error`)
+- **Critical Severity**: Dark Red (`--mat-sys-error` darker variant)
+
+**Design Pattern Reference**:
+- Follow existing severity styling from `.severity-high`, `.severity-medium`, `.severity-low` classes
+- Use consistent color variables from `abstracts/_colors.scss`
+- Apply to mat-chip components in pattern results table
+- Ensure accessibility compliance with sufficient contrast ratios
+
+**Implementation Approach**:
+- Extend existing `getSeverityClass()` method to handle all severity levels
+- Update severity chip styling in pattern results table
+- Add hover effects and proper focus states for accessibility
+- Include severity color coding in summary tiles as well
+
+**Template Updates**:
+```html
+<mat-chip [class]="getSeverityClass(pattern.severity)">
+  {{ pattern.severity | uppercase }}
+</mat-chip>
+```
+
+**SCSS Requirements**:
+- Extend existing severity classes to include critical level
+- Use CSS custom properties for theme consistency
+- Add transition effects for smooth color changes
+- Ensure proper contrast for text readability
+
+**Files to Modify**:
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.scss`: Add/update severity color classes
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Update getSeverityClass() method if needed
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Ensure proper class application to severity indicators
+
+**Testing Requirements**:
+- Verify color coding works for all severity levels (low, medium, high, critical)
+- Test accessibility with screen readers and high contrast modes
+- Validate color consistency across different browsers
+- Ensure color coding appears in both pattern results table and summary tiles
 
 ## Medium Priority
 
