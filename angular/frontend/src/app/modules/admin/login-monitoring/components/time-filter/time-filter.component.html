@@ -1,0 +1,36 @@
+<div class="time-filter-container">
+  <form [formGroup]="timeFilterForm" class="time-filter-form">
+    <div class="filter-row">
+      <mat-form-field appearance="outline" class="time-range-field">
+        <mat-label>Time Range</mat-label>
+        <mat-select formControlName="timeRange">
+          <mat-option *ngFor="let range of predefinedRanges" [value]="range.value">
+            {{ range.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="custom-date-range" *ngIf="isCustomRangeSelected()">
+        <mat-form-field appearance="outline" class="date-field">
+          <mat-label>From Date</mat-label>
+          <input matInput [matDatepicker]="fromPicker" formControlName="dateFrom">
+          <mat-datepicker-toggle matSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="date-field">
+          <mat-label>To Date</mat-label>
+          <input matInput [matDatepicker]="toPicker" formControlName="dateTo">
+          <mat-datepicker-toggle matSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div class="filter-validation" *ngIf="isCustomRangeSelected() && !isCustomRangeValid()">
+      <mat-error>
+        Please select both start and end dates. End date must be after start date.
+      </mat-error>
+    </div>
+  </form>
+</div> 

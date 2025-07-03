@@ -28,8 +28,66 @@
       (statsLoaded)="onStatsLoaded($event)">
     </app-statistics-dashboard>
 
+    <!-- Pattern Type Summary Dashboard Tiles -->
+    <div class="pattern-summary-section">
+      <div class="section-header">
+        <h2>
+          <mat-icon>analytics</mat-icon>
+          Pattern Type Summary
+        </h2>
+        <p class="section-description">Overview of detected security patterns by type</p>
+      </div>
+
+      <!-- Time Filter Component -->
+      <app-time-filter 
+        [hasPermission]="hasPermission"
+        (timeFilterChange)="onTimeFilterChange($event)">
+      </app-time-filter>
+
+      <!-- Loading State -->
+      <div *ngIf="loading.patternSummary" class="loading-container">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Loading pattern summary...</p>
+      </div>
+
+      <!-- Pattern Summary Tiles Grid -->
+      <div *ngIf="!loading.patternSummary" class="pattern-tiles-grid">
+        <mat-card 
+          *ngFor="let summary of patternSummary" 
+          class="pattern-tile"
+          [class]="'pattern-tile-' + summary.severity"
+          (click)="onPatternTileClick(summary.patternType)"
+          matRipple>
+          
+          <mat-card-content>
+            <div class="tile-header">
+              <mat-icon class="pattern-icon">{{ getPatternIcon(summary.patternType) }}</mat-icon>
+              <div class="severity-indicator" [class]="getSeverityColor(summary.severity)"
+                   [title]="summary.severity | titlecase"></div>
+            </div>
+            
+            <div class="tile-content">
+              <div class="pattern-count">{{ summary.count }}</div>
+              <div class="pattern-name">{{ getPatternDisplayName(summary.patternType) }}</div>
+              <div class="pattern-meta">
+                <span class="last-detected">Last: {{ summary.lastDetected | date:'short' }}</span>
+                <span class="percentage" *ngIf="summary.percentage">{{ summary.percentage }}%</span>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="!loading.patternSummary && patternSummary.length === 0" class="empty-pattern-summary">
+        <mat-icon class="info-icon">info</mat-icon>
+        <h3>No Pattern Data</h3>
+        <p>No security patterns detected in the selected time period.</p>
+      </div>
+    </div>
+
     <!-- Tabbed Content -->
-    <mat-tab-group class="monitoring-tabs">
+    <mat-tab-group class="monitoring-tabs" #tabGroup>
       
       <!-- Login Attempts Tab -->
       <mat-tab label="Recent Login Attempts">
@@ -55,6 +113,7 @@
         <div class="tab-content">
           <!-- Pattern Detection Filters Component -->
           <app-pattern-detection-filters 
+            #patternFiltersComponent
             [hasPermission]="hasPermission"
             (filtersChanged)="onPatternDetectionFiltersChanged($event)"
             (filtersReset)="onPatternDetectionFiltersReset()">

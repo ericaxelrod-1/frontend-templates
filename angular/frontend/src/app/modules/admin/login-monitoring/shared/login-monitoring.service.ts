@@ -14,6 +14,7 @@ import {
   PatternDetectionFilters,
   PaginatedResponse 
 } from './login-monitoring.models';
+import { PatternSummary, PatternSummaryResponse, TimeFilter } from '../../../../models/pattern-summary.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -155,6 +156,34 @@ export class LoginMonitoringService {
   clearTestData(): Observable<any> {
     return this.http.delete(`${this.apiUrl}/patterns/test-data`)
       .pipe(catchError(this.handleError));
+  }
+
+  // Pattern Summary API for Dashboard Tiles
+  getPatternSummary(timeFilter?: TimeFilter): Observable<PatternSummary[]> {
+    let url = `${this.apiUrl}/patterns/summary`;
+    const params: string[] = [];
+
+    if (timeFilter) {
+      if (timeFilter.timeRange) {
+        params.push(`timeRange=${timeFilter.timeRange}`);
+      } else if (timeFilter.dateFrom && timeFilter.dateTo) {
+        params.push(`dateFrom=${timeFilter.dateFrom.toISOString()}`);
+        params.push(`dateTo=${timeFilter.dateTo.toISOString()}`);
+      }
+    }
+
+    if (params.length > 0) {
+      url += `?${params.join('&')}`;
+    }
+
+    return this.http.get<PatternSummaryResponse[]>(url)
+      .pipe(
+        map(response => response.map(item => ({
+          ...item,
+          lastDetected: new Date(item.lastDetected)
+        }))),
+        catchError(this.handleError)
+      );
   }
 
   // DEPRECATED METHOD - Replaced by unified getPatterns method

@@ -335,4 +335,155 @@
   mat-divider {
     margin-top: 16px;
   }
+}
+
+// Pattern Summary Dashboard Tiles Styling
+.pattern-summary-section {
+  margin: 30px 0;
+  
+  .section-header {
+    margin-bottom: 20px;
+    
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 8px 0;
+      color: var(--mat-sys-on-surface);
+      font-size: 1.5rem;
+      font-weight: 500;
+    }
+    
+    .section-description {
+      margin: 0;
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.875rem;
+    }
+  }
+}
+
+.pattern-tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.pattern-tile {
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border-radius: 12px;
+  overflow: hidden;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  // Severity-based border styling
+  &.pattern-tile-critical {
+    border-left: 4px solid #b71c1c;
+  }
+  
+  &.pattern-tile-high {
+    border-left: 4px solid #c62828;
+  }
+  
+  &.pattern-tile-medium {
+    border-left: 4px solid #e65100;
+  }
+  
+  &.pattern-tile-low {
+    border-left: 4px solid #1b5e20;
+  }
+  
+  mat-card-content {
+    padding: 20px;
+  }
+  
+  .tile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    
+    .pattern-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+      color: var(--mat-sys-primary);
+    }
+    
+    .severity-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+  }
+  
+  .tile-content {
+    text-align: center;
+    
+    .pattern-count {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--mat-sys-on-surface);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    
+    .pattern-name {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--mat-sys-on-surface);
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+    
+    .pattern-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      color: var(--mat-sys-on-surface-variant);
+      
+      .last-detected {
+        flex: 1;
+        text-align: left;
+      }
+      
+      .percentage {
+        font-weight: 600;
+        color: var(--mat-sys-primary);
+      }
+    }
+  }
+}
+
+.empty-pattern-summary {
+  text-align: center;
+  padding: 40px;
+  color: var(--mat-sys-on-surface-variant);
+  
+  .info-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: $info-color;
+  }
+  
+  h3 {
+    margin: 0 0 8px 0;
+    color: var(--mat-sys-on-surface);
+  }
+  
+  p {
+    margin: 0;
+    font-size: 0.875rem;
+  }
 } 
