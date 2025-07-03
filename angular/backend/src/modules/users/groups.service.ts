@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -11,20 +16,20 @@ export class GroupsService {
 
   constructor(
     @InjectRepository(User) private userRepository: Repository<User>,
-    @InjectRepository(Group) private groupRepository: Repository<Group>
+    @InjectRepository(Group) private groupRepository: Repository<Group>,
   ) {}
 
   async findAll(): Promise<Group[]> {
     return this.groupRepository.find({
       relations: ['users'],
-      order: { name: 'ASC' }
+      order: { name: 'ASC' },
     });
   }
 
   async findOne(id: number): Promise<Group> {
     const group = await this.groupRepository.findOne({
       where: { id },
-      relations: ['users', 'owner']
+      relations: ['users', 'owner'],
     });
 
     if (!group) {
@@ -34,30 +39,41 @@ export class GroupsService {
     return group;
   }
 
-  async create(name: string, description?: string, currentUser?: User): Promise<Group> {
+  async create(
+    name: string,
+    description?: string,
+    currentUser?: User,
+  ): Promise<Group> {
     const group = this.groupRepository.create({
       name,
       description,
-      ownerId: currentUser?.id
+      ownerId: currentUser?.id,
     });
 
     const savedGroup = await this.groupRepository.save(group);
-    
+
     // Load relations for consistency with other endpoints (findAll, findOne)
     return this.groupRepository.findOne({
       where: { id: savedGroup.id },
-      relations: ['users', 'owner']
+      relations: ['users', 'owner'],
     });
   }
 
-  async update(id: number, name?: string, description?: string, currentUser?: User): Promise<Group> {
+  async update(
+    id: number,
+    name?: string,
+    description?: string,
+    currentUser?: User,
+  ): Promise<Group> {
     const group = await this.findOne(id);
-    
+
     // Basic permission check - only owner or system admin can update
     if (currentUser && group.ownerId !== currentUser.id) {
-      const isAdmin = currentUser.roles?.some(role => role.name === 'admin');
+      const isAdmin = currentUser.roles?.some((role) => role.name === 'admin');
       if (!isAdmin) {
-        throw new NotFoundException('Only the group owner or admin can update this group');
+        throw new NotFoundException(
+          'Only the group owner or admin can update this group',
+        );
       }
     }
 
@@ -69,12 +85,14 @@ export class GroupsService {
 
   async delete(id: number, currentUser?: User): Promise<void> {
     const group = await this.findOne(id);
-    
+
     // Basic permission check - only owner or system admin can delete
     if (currentUser && group.ownerId !== currentUser.id) {
-      const isAdmin = currentUser.roles?.some(role => role.name === 'admin');
+      const isAdmin = currentUser.roles?.some((role) => role.name === 'admin');
       if (!isAdmin) {
-        throw new NotFoundException('Only the group owner or admin can delete this group');
+        throw new NotFoundException(
+          'Only the group owner or admin can delete this group',
+        );
       }
     }
 
@@ -89,7 +107,7 @@ export class GroupsService {
   async getMembers(groupId: number): Promise<User[]> {
     const group = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['users']
+      relations: ['users'],
     });
 
     if (!group) {
@@ -99,13 +117,16 @@ export class GroupsService {
     return group.users || [];
   }
 
-  async addMember(groupId: number, userId: number): Promise<GroupMembershipResult> {
+  async addMember(
+    groupId: number,
+    userId: number,
+  ): Promise<GroupMembershipResult> {
     this.logger.debug(`Adding user ${userId} to group ${groupId}`);
-    
+
     // Fetch user with current groups
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['groups']
+      relations: ['groups'],
     });
 
     if (!user) {
@@ -115,7 +136,7 @@ export class GroupsService {
     // Fetch group
     const group = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['users']
+      relations: ['users'],
     });
 
     if (!group) {
@@ -123,10 +144,13 @@ export class GroupsService {
     }
 
     // Check if user is already a member
-    const wasAlreadyMember = user.groups?.some(g => g.id === groupId) || false;
-    
+    const wasAlreadyMember =
+      user.groups?.some((g) => g.id === groupId) || false;
+
     if (wasAlreadyMember) {
-      this.logger.warn(`User ${userId} is already a member of group ${groupId}`);
+      this.logger.warn(
+        `User ${userId} is already a member of group ${groupId}`,
+      );
       return {
         success: false,
         operation: 'added',
@@ -134,24 +158,24 @@ export class GroupsService {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
-          lastName: user.lastName
+          lastName: user.lastName,
         },
         group: {
           id: group.id,
           name: group.name,
-          description: group.description
+          description: group.description,
         },
         timestamp: new Date(),
         message: `User is already a member of group ${group.name}`,
         previousState: {
           wasAlreadyMember: true,
-          memberSince: undefined // Could be enhanced to track join dates
+          memberSince: undefined, // Could be enhanced to track join dates
         },
         currentState: {
           isMember: true,
           memberSince: undefined,
-          totalGroupMembers: group.users?.length || 0
-        }
+          totalGroupMembers: group.users?.length || 0,
+        },
       };
     }
 
@@ -167,7 +191,7 @@ export class GroupsService {
     // Get updated group member count
     const updatedGroup = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['users']
+      relations: ['users'],
     });
 
     this.logger.log(`Successfully added user ${userId} to group ${groupId}`);
@@ -179,33 +203,36 @@ export class GroupsService {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
+        lastName: user.lastName,
       },
       group: {
         id: group.id,
         name: group.name,
-        description: group.description
+        description: group.description,
       },
       timestamp: new Date(),
       message: `User successfully added to group ${group.name}`,
       previousState: {
-        wasAlreadyMember: false
+        wasAlreadyMember: false,
       },
       currentState: {
         isMember: true,
         memberSince: new Date(),
-        totalGroupMembers: updatedGroup?.users?.length || 0
-      }
+        totalGroupMembers: updatedGroup?.users?.length || 0,
+      },
     };
   }
 
-  async removeMember(groupId: number, userId: number): Promise<GroupMembershipResult> {
+  async removeMember(
+    groupId: number,
+    userId: number,
+  ): Promise<GroupMembershipResult> {
     this.logger.debug(`Removing user ${userId} from group ${groupId}`);
-    
+
     // Fetch user with current groups
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['groups']
+      relations: ['groups'],
     });
 
     if (!user) {
@@ -215,7 +242,7 @@ export class GroupsService {
     // Fetch group
     const group = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['users']
+      relations: ['users'],
     });
 
     if (!group) {
@@ -223,8 +250,9 @@ export class GroupsService {
     }
 
     // Check if user is a member
-    const wasAlreadyMember = user.groups?.some(g => g.id === groupId) || false;
-    
+    const wasAlreadyMember =
+      user.groups?.some((g) => g.id === groupId) || false;
+
     if (!wasAlreadyMember) {
       this.logger.warn(`User ${userId} is not a member of group ${groupId}`);
       return {
@@ -234,28 +262,28 @@ export class GroupsService {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
-          lastName: user.lastName
+          lastName: user.lastName,
         },
         group: {
           id: group.id,
           name: group.name,
-          description: group.description
+          description: group.description,
         },
         timestamp: new Date(),
         message: `User is not a member of group ${group.name}`,
         previousState: {
-          wasAlreadyMember: false
+          wasAlreadyMember: false,
         },
         currentState: {
           isMember: false,
           memberSince: undefined,
-          totalGroupMembers: group.users?.length || 0
-        }
+          totalGroupMembers: group.users?.length || 0,
+        },
       };
     }
 
     // Remove user from group
-    user.groups = user.groups?.filter(g => g.id !== groupId) || [];
+    user.groups = user.groups?.filter((g) => g.id !== groupId) || [];
 
     // Save the updated user
     await this.userRepository.save(user);
@@ -263,10 +291,12 @@ export class GroupsService {
     // Get updated group member count
     const updatedGroup = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['users']
+      relations: ['users'],
     });
 
-    this.logger.log(`Successfully removed user ${userId} from group ${groupId}`);
+    this.logger.log(
+      `Successfully removed user ${userId} from group ${groupId}`,
+    );
 
     return {
       success: true,
@@ -275,34 +305,40 @@ export class GroupsService {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
+        lastName: user.lastName,
       },
       group: {
         id: group.id,
         name: group.name,
-        description: group.description
+        description: group.description,
       },
       timestamp: new Date(),
       message: `User successfully removed from group ${group.name}`,
       previousState: {
-        wasAlreadyMember: true
+        wasAlreadyMember: true,
       },
       currentState: {
         isMember: false,
         memberSince: undefined,
-        totalGroupMembers: updatedGroup?.users?.length || 0
-      }
+        totalGroupMembers: updatedGroup?.users?.length || 0,
+      },
     };
   }
 
-  async updateSettings(id: number, settings: any, currentUser?: User): Promise<Group> {
+  async updateSettings(
+    id: number,
+    settings: any,
+    currentUser?: User,
+  ): Promise<Group> {
     const group = await this.findOne(id);
-    
+
     // Basic permission check - only owner or system admin can update settings
     if (currentUser && group.ownerId !== currentUser.id) {
-      const isAdmin = currentUser.roles?.some(role => role.name === 'admin');
+      const isAdmin = currentUser.roles?.some((role) => role.name === 'admin');
       if (!isAdmin) {
-        throw new NotFoundException('Only the group owner or admin can update group settings');
+        throw new NotFoundException(
+          'Only the group owner or admin can update group settings',
+        );
       }
     }
 

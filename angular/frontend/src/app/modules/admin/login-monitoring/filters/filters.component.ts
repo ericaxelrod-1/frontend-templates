@@ -17,17 +17,22 @@ export class FiltersComponent implements OnInit {
   filterForm: FormGroup;
 
   constructor(private fb: FormBuilder) {
+    // BUG-109 ENHANCEMENT: Calculate default date range (last 7 days)
+    const defaultDateTo = new Date();
+    const defaultDateFrom = new Date();
+    defaultDateFrom.setDate(defaultDateFrom.getDate() - 7);
+    
     this.filterForm = this.fb.group({
       email: [''],
       ipAddress: [''],
       status: [''],
-      dateFrom: [null],
-      dateTo: [null]
+      dateFrom: [defaultDateFrom], // Default to 7 days ago
+      dateTo: [defaultDateTo]      // Default to today
     });
   }
 
   ngOnInit(): void {
-    // Emit initial form state
+    // Emit initial form state with default date range
     this.filtersChanged.emit(this.filterForm);
   }
 
@@ -39,12 +44,17 @@ export class FiltersComponent implements OnInit {
 
   onResetFilters(): void {
     if (this.hasPermission) {
+      // Reset to default date range (last 7 days), not null
+      const defaultDateTo = new Date();
+      const defaultDateFrom = new Date();
+      defaultDateFrom.setDate(defaultDateFrom.getDate() - 7);
+      
       this.filterForm.reset({
         email: '',
         ipAddress: '',
         status: '',
-        dateFrom: null,
-        dateTo: null
+        dateFrom: defaultDateFrom,
+        dateTo: defaultDateTo
       });
       this.filtersReset.emit();
       this.filtersChanged.emit(this.filterForm);

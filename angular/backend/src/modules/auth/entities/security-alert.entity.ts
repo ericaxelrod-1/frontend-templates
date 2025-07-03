@@ -30,7 +30,9 @@ export class SecurityAlert {
   @Column({ length: 50, default: 'system' })
   source: string;
 
-  @ManyToOne(() => SecurityDetectedPattern, pattern => pattern.alerts, { nullable: true })
+  @ManyToOne(() => SecurityDetectedPattern, (pattern) => pattern.alerts, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'pattern_id' })
   pattern: SecurityDetectedPattern;
 
@@ -72,4 +74,4 @@ export class SecurityAlert {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-} 
+}

@@ -19,4 +19,4 @@ export const USER_REPOSITORY = 'USER_REPOSITORY';
   providers: [],
   exports: [TypeOrmModule],
 })
-export class UsersSharedModule {} 
+export class UsersSharedModule {}

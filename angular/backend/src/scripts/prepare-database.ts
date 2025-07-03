@@ -28,11 +28,13 @@ async function prepareDatabase() {
 
     // Manage migrations_history table (TypeORM uses a different one, usually 'migrations')
     const migrationsHistoryTableExists = await get(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name='migrations_history'`
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='migrations_history'`,
     );
 
     if (!migrationsHistoryTableExists) {
-      console.log('Creating migrations_history table (custom for this script)...');
+      console.log(
+        'Creating migrations_history table (custom for this script)...',
+      );
       await run(`
         CREATE TABLE migrations_history (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +47,10 @@ async function prepareDatabase() {
     // These are migrations this script assumes are foundational or handles directly by defining schema.
     // Recording them here is for this script's own tracking, might not affect TypeORM's view.
     const foundationalMigrationsToRecord = [
-      { timestamp: 1658012345678, name: 'CreatePermissionEntities1658012345678' },
+      {
+        timestamp: 1658012345678,
+        name: 'CreatePermissionEntities1658012345678',
+      },
       // { timestamp: 1658012445678, name: 'SeedInitialPermissions1658012445678' }, // Seeding should happen via TypeORM migrations after schema is correct
       // { timestamp: 1742536989657, name: 'FixSQLiteCompositePrimaryKeys1742536989657' }
     ];
@@ -53,14 +58,16 @@ async function prepareDatabase() {
     for (const migration of foundationalMigrationsToRecord) {
       const exists = await get(
         `SELECT * FROM migrations_history WHERE name = ?`,
-        migration.name
+        migration.name,
       );
       if (!exists) {
-        console.log(`Recording foundational migration ${migration.name} in custom migrations_history...`);
+        console.log(
+          `Recording foundational migration ${migration.name} in custom migrations_history...`,
+        );
         await run(
           `INSERT INTO migrations_history (timestamp, name) VALUES (?, ?)`,
           migration.timestamp,
-          migration.name
+          migration.name,
         );
       }
     }
@@ -81,7 +88,7 @@ async function prepareDatabase() {
             "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE("resourceName", "actionName")
           )
-        `
+        `,
       },
       {
         name: 'roles',
@@ -93,7 +100,7 @@ async function prepareDatabase() {
             "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
           )
-        `
+        `,
       },
       {
         name: 'role_permissions', // Depends on roles and permissions
@@ -106,7 +113,7 @@ async function prepareDatabase() {
             FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE,
             FOREIGN KEY ("permission_id") REFERENCES "permissions"("id") ON DELETE CASCADE
           )
-        `
+        `,
       },
       // Add 'users' table definition as 'groups' depends on it for FOREIGN KEY
       {
@@ -122,7 +129,7 @@ async function prepareDatabase() {
             "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
           )
-        `
+        `,
       },
       {
         name: 'groups', // Depends on users
@@ -136,8 +143,8 @@ async function prepareDatabase() {
             "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY ("ownerId") REFERENCES "users"("id") ON DELETE CASCADE
           )
-        `
-      }
+        `,
+      },
       // Add other critical tables here if needed
     ];
 
@@ -151,23 +158,26 @@ async function prepareDatabase() {
     for (const table of criticalTablesToRecreate) {
       const tableExists = await get(
         `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
-        table.name
+        table.name,
       );
       if (tableExists) {
-        console.log(`Dropping existing table ${table.name} to ensure correct schema...`);
+        console.log(
+          `Dropping existing table ${table.name} to ensure correct schema...`,
+        );
         await run(`DROP TABLE ${table.name}`);
       }
       console.log(`Creating table ${table.name} with correct schema...`);
       await run(table.sql);
     }
-    
+
     // Commit the transaction
     await run('COMMIT');
     console.log('Database preparation completed successfully.');
-
   } catch (error) {
     // Rollback on error
-    console.error('Error detected during database preparation, attempting rollback...');
+    console.error(
+      'Error detected during database preparation, attempting rollback...',
+    );
     try {
       await run('ROLLBACK');
       console.log('Rollback successful.');
@@ -189,8 +199,11 @@ async function prepareDatabase() {
 }
 
 // Run the preparation
-prepareDatabase().catch(err => {
+prepareDatabase().catch((err) => {
   // This catch might be redundant if prepareDatabase handles its own errors and exits
-  console.error('Unhandled error during database preparation script execution:', err);
+  console.error(
+    'Unhandled error during database preparation script execution:',
+    err,
+  );
   process.exit(1);
-}); 
+});

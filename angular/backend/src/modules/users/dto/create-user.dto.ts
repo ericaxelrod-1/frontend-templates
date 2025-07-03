@@ -68,7 +68,8 @@ export class CreateUserDto {
 
   @ApiPropertyOptional({
     example: true,
-    description: 'Whether the user should be required to change password on first login',
+    description:
+      'Whether the user should be required to change password on first login',
   })
   @IsBoolean()
   @IsOptional()

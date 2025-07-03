@@ -52,6 +52,6 @@ export class RequestContext {
    * @param defaultValue The default value to return if the key is not found
    */
   get<T>(key: string, defaultValue?: T): T | undefined {
-    return this.data?.[key] as T ?? defaultValue;
+    return (this.data?.[key] as T) ?? defaultValue;
   }
-} 
+}

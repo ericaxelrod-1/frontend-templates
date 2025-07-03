@@ -143,6 +143,34 @@
   margin-bottom: 8px;
 }
 
+.pattern-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.pattern-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Group counter chip styling */
+.group-counter {
+  background-color: var(--mat-sys-tertiary-container) !important;
+  color: var(--mat-sys-on-tertiary-container) !important;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  
+  .group-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+  }
+}
+
 .pattern-type,
 .alert-type {
   font-weight: 500;
@@ -167,37 +195,49 @@
   color: var(--mat-sys-on-surface-variant, #{$text-secondary});
 }
 
-/* Severity classes */
-.severity-high {
-  background-color: var(--mat-sys-error);
-  color: var(--mat-sys-on-error);
+/* Severity cell styling - Combined indicator and text */
+.severity-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.severity-medium {
-  background-color: $warning-color;
-  color: white;
+.severity-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  
+  &.critical {
+    background-color: #b71c1c; /* Dark red for critical */
+  }
+  
+  &.high {
+    background-color: #c62828; /* Red for high */
+  }
+  
+  &.medium {
+    background-color: #e65100; /* Orange for medium */
+  }
+  
+  &.low {
+    background-color: #1b5e20; /* Green for low */
+  }
+  
+  &.default {
+    background-color: #424242; /* Gray for default */
+  }
 }
 
-.severity-low {
-  background-color: $success-color;
-  color: white;
+.severity-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--mat-sys-on-surface);
 }
 
-.severity-default {
-  background-color: $text-disabled;
-  color: white;
-}
-
-/* Status classes */
-.status-success {
-  background-color: $success-color;
-  color: white;
-}
-
-.status-failed {
-  background-color: var(--mat-sys-error);
-  color: var(--mat-sys-on-error);
-}
+// Keep group-counter chips styled properly
+// No global chip styling needed since severity indicators now use spans
 
 // Responsive design
 @media (max-width: 768px) {

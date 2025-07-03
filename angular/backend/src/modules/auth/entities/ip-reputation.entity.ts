@@ -56,7 +56,10 @@ export class IPReputation {
    * Returns true if manually blocked or auto-blocked (has blockedUntilAuto date in future)
    */
   get isBlocked(): boolean {
-    return this.isManuallyBlocked || (this.blockedUntilAuto && this.blockedUntilAuto > new Date());
+    return (
+      this.isManuallyBlocked ||
+      (this.blockedUntilAuto && this.blockedUntilAuto > new Date())
+    );
   }
 
   /**

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
@@ -7,12 +7,16 @@ import { LoginMonitoringSharedModule } from './shared/login-monitoring-shared.mo
 import { StatisticsDashboardComponent } from './statistics-dashboard/statistics-dashboard.component';
 import { FiltersComponent } from './filters/filters.component';
 import { LoginAttemptsTableComponent } from './login-attempts-table/login-attempts-table.component';
+import { SecurityAlertsFiltersComponent } from './security-alerts-filters/security-alerts-filters.component';
+import { PatternDetectionFiltersComponent } from './pattern-detection-filters/pattern-detection-filters.component';
 import { LoginMonitoringService } from './shared/login-monitoring.service';
 import { 
   LoginAttempt, 
   Statistics, 
   Pattern, 
   SecurityAlert, 
+  SecurityAlertsFilters,
+  PatternDetectionFilters,
   IPReputation 
 } from './shared/login-monitoring.models';
 
@@ -23,7 +27,9 @@ import {
     LoginMonitoringSharedModule,
     StatisticsDashboardComponent,
     FiltersComponent,
-    LoginAttemptsTableComponent
+    LoginAttemptsTableComponent,
+    SecurityAlertsFiltersComponent,
+    PatternDetectionFiltersComponent
   ],
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
@@ -34,11 +40,26 @@ export class LoginMonitoringComponent implements OnInit {
   
   // Component references
   filterForm: FormGroup | null = null;
+  securityAlertsFilters: SecurityAlertsFilters = {};
+  patternDetectionFilters: PatternDetectionFilters = {};
+  
+  // ViewChild reference to table component for filter triggering
+  @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
   
   // Data for tabs that aren't yet refactored
   detectedPatterns: Pattern[] = [];
   securityAlerts: SecurityAlert[] = [];
   selectedIpReputation: IPReputation | null = null;
+  
+  // Pattern Detection Table Properties - Following login-attempts-table pattern
+  patternDisplayedColumns: string[] = [
+    'timestamp', 'type', 'severity', 'ipAddresses', 'details', 'groupCount', 'actions'
+  ];
+  
+  // Pattern Pagination Properties - Following login-attempts-table pattern
+  patternTotalCount = 0;
+  patternPageSize = 10;
+  patternCurrentPage = 0;
   
   // Loading states for non-refactored sections
   loading = {
@@ -72,10 +93,20 @@ export class LoginMonitoringComponent implements OnInit {
   // Event handlers for child components
   onFiltersChanged(filterForm: FormGroup): void {
     this.filterForm = filterForm;
+    
+    // BUG-109 FIX: Trigger table refresh when filters change
+    if (this.loginAttemptsTable) {
+      this.loginAttemptsTable.applyFilters();
+    }
   }
 
   onFiltersReset(): void {
     // Reset handled by filters component
+    
+    // BUG-109 FIX: Trigger table refresh when filters are reset
+    if (this.loginAttemptsTable) {
+      this.loginAttemptsTable.applyFilters();
+    }
   }
 
   onStatsLoaded(stats: Statistics): void {
@@ -93,17 +124,48 @@ export class LoginMonitoringComponent implements OnInit {
     this.getIPReputation(ipAddress);
   }
 
+  // Security Alerts Filters Event Handlers
+  onSecurityAlertsFiltersChanged(filters: SecurityAlertsFilters): void {
+    this.securityAlertsFilters = filters;
+    this.loadSecurityAlerts();
+  }
+
+  onSecurityAlertsFiltersReset(): void {
+    this.securityAlertsFilters = {};
+    this.loadSecurityAlerts();
+  }
+
+  // Pattern Detection Filters Event Handlers
+  onPatternDetectionFiltersChanged(filters: PatternDetectionFilters): void {
+    this.patternDetectionFilters = filters;
+    this.loadPatterns(filters);
+  }
+
+  onPatternDetectionFiltersReset(): void {
+    this.patternDetectionFilters = {};
+    this.loadPatterns({});
+  }
+
   // Methods for tabs that aren't yet refactored
-  loadPatterns(): void {
+  // UNIFIED PATTERN LOADING: Single method for all pattern queries
+  loadPatterns(filters: PatternDetectionFilters = {}): void {
     if (!this.hasPermission) return;
     
-    console.log('[DEBUG] loadPatterns called with permission:', this.hasPermission);
+    console.log('[DEBUG] loadPatterns called with filters:', filters);
     this.loading.patterns = true;
     
-    this.loginMonitoringService.detectPatterns().subscribe({
+    this.loginMonitoringService.getPatterns(
+      filters,
+      this.patternCurrentPage, // Use pagination properties
+      this.patternPageSize, // Use pagination properties
+      'detectionTimestamp', // sortBy
+      'desc' // sortDirection - newest first
+    ).subscribe({
         next: (data) => {
           console.log('[DEBUG] Patterns loaded successfully:', data);
-          this.detectedPatterns = data || [];
+          // Handle PaginatedResponse<Pattern> properly - following login-attempts-table pattern
+          this.detectedPatterns = data.items || [];
+          this.patternTotalCount = data.total || 0;
           this.loading.patterns = false;
         },
         error: (error) => {
@@ -114,13 +176,33 @@ export class LoginMonitoringComponent implements OnInit {
       });
   }
 
+  // Pattern Pagination Handler - Following login-attempts-table pattern
+  onPatternPageChange(event: any): void {
+    this.patternCurrentPage = event.pageIndex;
+    this.patternPageSize = event.pageSize;
+    this.loadPatterns(this.patternDetectionFilters);
+  }
+
+  // DEPRECATED METHOD - Kept for backward compatibility during transition
+  loadFilteredPatterns(): void {
+    // Redirect to unified method with current filters
+    this.loadPatterns(this.patternDetectionFilters);
+  }
+
   loadSecurityAlerts(): void {
     if (!this.hasPermission) return;
     
     console.log('[DEBUG] loadSecurityAlerts called with permission:', this.hasPermission);
+    console.log('[DEBUG] Security alerts filters:', this.securityAlertsFilters);
     this.loading.alerts = true;
     
-    this.loginMonitoringService.getSecurityAlerts().subscribe({
+    this.loginMonitoringService.getSecurityAlerts(
+      this.securityAlertsFilters,
+      0, // page
+      50, // pageSize - show more alerts by default
+      'createdAt', // sortBy
+      'desc' // sortDirection - newest first
+    ).subscribe({
         next: (data) => {
           console.log('[DEBUG] Security alerts loaded successfully:', data);
           this.securityAlerts = data || [];
@@ -172,17 +254,36 @@ export class LoginMonitoringComponent implements OnInit {
     }
   }
 
-  getSeverityClass(severity: string): string {
+  getSeverityColor(severity: string): string {
     switch (severity.toLowerCase()) {
+      case 'critical':
+        return 'critical';
       case 'high':
-        return 'severity-high';
+        return 'high';
       case 'medium':
-        return 'severity-medium';
+        return 'medium';
       case 'low':
-        return 'severity-low';
+        return 'low';
       default:
-        return 'severity-default';
+        return 'default';
     }
+  }
+
+  /**
+   * Get the number of grouped patterns for display
+   * NEW: Shows how many database records are grouped into one display item
+   */
+  getGroupCount(pattern: Pattern): number {
+    // Check if the pattern has grouping information in evidence
+    if (pattern.evidence && pattern.evidence.groupedPatternCount) {
+      return pattern.evidence.groupedPatternCount;
+    }
+    // Fallback to displayCount if available
+    if (pattern.evidence && pattern.evidence.displayCount) {
+      return pattern.evidence.displayCount;
+    }
+    // Default to 1 if no grouping information
+    return 1;
   }
 
   // Test button methods for TASK-102.2 validation
@@ -191,9 +292,12 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.createTestPattern('brute_force').subscribe({
       next: (response) => {
-        this.snackBar.open('Brute force test pattern created successfully', 'Close', { duration: 5000 });
-        // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(), 2000);
+        const message = response.patternsDetected ? 
+          `Brute force test created: ${response.patternsDetected} patterns detected` :
+          'Brute force test pattern created successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately since backend handles race condition
+        this.loadPatterns(this.patternDetectionFilters);
       },
       error: (error) => {
         console.error('Error creating brute force test pattern:', error);
@@ -207,9 +311,12 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.createTestPattern('distributed_attack').subscribe({
       next: (response) => {
-        this.snackBar.open('Distributed attack test pattern created successfully', 'Close', { duration: 5000 });
-        // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(), 2000);
+        const message = response.patternsDetected ? 
+          `Distributed attack test created: ${response.patternsDetected} patterns detected` :
+          'Distributed attack test pattern created successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately since backend handles race condition
+        this.loadPatterns(this.patternDetectionFilters);
       },
       error: (error) => {
         console.error('Error creating distributed attack test pattern:', error);
@@ -223,9 +330,12 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.createTestPattern('credential_stuffing').subscribe({
       next: (response) => {
-        this.snackBar.open('Credential stuffing test pattern created successfully', 'Close', { duration: 5000 });
-        // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(), 2000);
+        const message = response.patternsDetected ? 
+          `Credential stuffing test created: ${response.patternsDetected} patterns detected` :
+          'Credential stuffing test pattern created successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately since backend handles race condition
+        this.loadPatterns(this.patternDetectionFilters);
       },
       error: (error) => {
         console.error('Error creating credential stuffing test pattern:', error);
@@ -239,9 +349,12 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.createTestPattern('account_switching').subscribe({
       next: (response) => {
-        this.snackBar.open('Account switching test pattern created successfully', 'Close', { duration: 5000 });
-        // Refresh patterns after test creation
-        setTimeout(() => this.loadPatterns(), 2000);
+        const message = response.patternsDetected ? 
+          `Account switching test created: ${response.patternsDetected} patterns detected` :
+          'Account switching test pattern created successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately since backend handles race condition
+        this.loadPatterns(this.patternDetectionFilters);
       },
       error: (error) => {
         console.error('Error creating account switching test pattern:', error);
@@ -271,12 +384,13 @@ export class LoginMonitoringComponent implements OnInit {
     
     this.loginMonitoringService.clearTestData().subscribe({
       next: (response) => {
-        this.snackBar.open('Test data cleared successfully', 'Close', { duration: 5000 });
-        // Refresh both patterns and alerts after clearing
-        setTimeout(() => {
-          this.loadPatterns();
-          this.loadSecurityAlerts();
-        }, 1000);
+        const message = response.patternsDeletedCount ? 
+          `Test data cleared: ${response.deletedCount} attempts, ${response.patternsDeletedCount} patterns` :
+          'Test data cleared successfully';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        // FIXED: No setTimeout needed - refresh immediately
+        this.loadPatterns();
+        this.loadSecurityAlerts();
       },
       error: (error) => {
         console.error('Error clearing test data:', error);

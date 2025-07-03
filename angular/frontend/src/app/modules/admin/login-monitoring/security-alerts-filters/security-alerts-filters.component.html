@@ -1,0 +1,105 @@
+<mat-card class="filters-card">
+  <mat-card-header>
+    <mat-card-title>
+      <mat-icon>filter_list</mat-icon>
+      Security Alerts Filters
+    </mat-card-title>
+  </mat-card-header>
+  
+  <mat-card-content>
+    <form [formGroup]="filterForm" class="filters-form">
+      <div class="filters-row">
+        <!-- Status Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Status</mat-label>
+          <mat-select formControlName="status" [disabled]="!hasPermission">
+            <mat-option *ngFor="let option of statusOptions" [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matSuffix>assignment_turned_in</mat-icon>
+        </mat-form-field>
+
+        <!-- Severity Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Severity</mat-label>
+          <mat-select formControlName="severity" [disabled]="!hasPermission">
+            <mat-option *ngFor="let option of severityOptions" [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matSuffix>priority_high</mat-icon>
+        </mat-form-field>
+
+        <!-- Alert Type Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Alert Type</mat-label>
+          <mat-select formControlName="alertType" [disabled]="!hasPermission">
+            <mat-option *ngFor="let option of alertTypeOptions" [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          </mat-select>
+          <mat-icon matSuffix>notification_important</mat-icon>
+        </mat-form-field>
+      </div>
+
+      <div class="filters-row">
+        <!-- Search Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Search</mat-label>
+          <input matInput 
+                 formControlName="search"
+                 placeholder="Search alerts by title or message"
+                 [disabled]="!hasPermission">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+        <!-- Date From Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>From Date</mat-label>
+          <input matInput 
+                 [matDatepicker]="fromPicker"
+                 formControlName="dateFrom"
+                 placeholder="Select start date"
+                 [disabled]="!hasPermission">
+          <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
+
+        <!-- Date To Filter -->
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>To Date</mat-label>
+          <input matInput 
+                 [matDatepicker]="toPicker"
+                 formControlName="dateTo"
+                 placeholder="Select end date"
+                 [disabled]="!hasPermission">
+          <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
+      </div>
+
+      <div class="filters-row">
+        <!-- Action Buttons -->
+        <div class="filter-actions">
+          <button mat-raised-button 
+                  color="primary" 
+                  (click)="onApplyFilters()"
+                  [disabled]="!hasPermission"
+                  class="apply-btn">
+            <mat-icon>search</mat-icon>
+            Apply Filters
+          </button>
+          
+          <button mat-button 
+                  (click)="onResetFilters()"
+                  [disabled]="!hasPermission"
+                  class="reset-btn">
+            <mat-icon>clear</mat-icon>
+            Reset
+          </button>
+        </div>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card> 

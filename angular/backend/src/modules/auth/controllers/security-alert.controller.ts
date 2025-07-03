@@ -46,7 +46,9 @@ export class SecurityAlertController {
 
   @Get('alerts')
   @RequirePermission('login-monitoring:read')
-  @ApiOperation({ summary: 'Get security alerts with filtering and pagination' })
+  @ApiOperation({
+    summary: 'Get security alerts with filtering and pagination',
+  })
   @ApiResponse({ status: 200, description: 'List of security alerts' })
   async getSecurityAlerts(
     @Query('limit') limit?: number,
@@ -86,7 +88,10 @@ export class SecurityAlertController {
     @Body() acknowledgeDto: AcknowledgeAlertDto,
     @Request() req,
   ) {
-    const alert = await this.securityAlertService.acknowledgeAlert(alertId, req.user.id);
+    const alert = await this.securityAlertService.acknowledgeAlert(
+      alertId,
+      req.user.id,
+    );
     return { success: true, message: 'Alert acknowledged successfully', alert };
   }
 
@@ -100,7 +105,11 @@ export class SecurityAlertController {
     @Body() resolveDto: ResolveAlertDto,
     @Request() req,
   ) {
-    const alert = await this.securityAlertService.resolveAlert(alertId, req.user.id, resolveDto.notes);
+    const alert = await this.securityAlertService.resolveAlert(
+      alertId,
+      req.user.id,
+      resolveDto.notes,
+    );
     return { success: true, message: 'Alert resolved successfully', alert };
   }
 
@@ -113,7 +122,10 @@ export class SecurityAlertController {
     @Param('id', ParseIntPipe) alertId: number,
     @Request() req,
   ) {
-    const alert = await this.securityAlertService.dismissAlert(alertId, req.user.id);
+    const alert = await this.securityAlertService.dismissAlert(
+      alertId,
+      req.user.id,
+    );
     return { success: true, message: 'Alert dismissed successfully', alert };
   }
 
@@ -132,9 +144,10 @@ export class SecurityAlertController {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
 
-    const blockedUntil = blockDto.durationHours && blockDto.durationHours > 0
-      ? new Date(Date.now() + blockDto.durationHours * 60 * 60 * 1000)
-      : null;
+    const blockedUntil =
+      blockDto.durationHours && blockDto.durationHours > 0
+        ? new Date(Date.now() + blockDto.durationHours * 60 * 60 * 1000)
+        : null;
 
     await this.usersService.blockUser(userId, {
       reason: blockDto.reason,
@@ -150,10 +163,7 @@ export class SecurityAlertController {
   @ApiOperation({ summary: 'Unblock a user account' })
   @ApiResponse({ status: 200, description: 'User unblocked successfully' })
   @ApiParam({ name: 'id', type: Number })
-  async unblockUser(
-    @Param('id', ParseIntPipe) userId: number,
-    @Request() req,
-  ) {
+  async unblockUser(@Param('id', ParseIntPipe) userId: number, @Request() req) {
     const user = await this.usersService.findOne(userId);
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);

@@ -102,7 +102,9 @@ export class PermissionsService {
       const [resourceName, actionName] = permissionString.split(':');
 
       if (!resourceName || !actionName) {
-        this.logger.warn(`Invalid permission string format: ${permissionString}`);
+        this.logger.warn(
+          `Invalid permission string format: ${permissionString}`,
+        );
         continue;
       }
 
@@ -208,7 +210,10 @@ export class PermissionsService {
     for (const group of user.groups || []) {
       if (group.groupPermissions) {
         for (const groupPermission of group.groupPermissions) {
-          if (groupPermission.permission && groupPermission.isGranted !== false) {
+          if (
+            groupPermission.permission &&
+            groupPermission.isGranted !== false
+          ) {
             const permission = groupPermission.permission;
             const permString = `${permission.resourceName}:${permission.actionName}`;
             if (!permissions.includes(permString)) {
@@ -712,11 +717,11 @@ export class PermissionsService {
       JOIN actions a ON p.action_id = a.id
       WHERE p.resource_name = ?
     `;
-    
+
     const permissions = await this.entityManager.query(query, [resourceName]);
-    
+
     // Map raw results to Permission entities
-    const mappedPermissions = permissions.map(p => {
+    const mappedPermissions = permissions.map((p) => {
       const permission = new Permission();
       permission.id = p.id;
       permission.name = p.name;
@@ -756,11 +761,11 @@ export class PermissionsService {
       JOIN actions a ON p.action_id = a.id
       WHERE a.name = ?
     `;
-    
+
     const permissions = await this.entityManager.query(query, [actionName]);
-    
+
     // Map raw results to Permission entities
-    const mappedPermissions = permissions.map(p => {
+    const mappedPermissions = permissions.map((p) => {
       const permission = new Permission();
       permission.id = p.id;
       permission.name = p.name;
@@ -885,7 +890,9 @@ export class PermissionsService {
     });
 
     if (!permission) {
-      this.logger.log(`Permission ${resourceName}:${actionName} not found, creating it`);
+      this.logger.log(
+        `Permission ${resourceName}:${actionName} not found, creating it`,
+      );
       permission = this.permissionRepository.create({
         resourceName,
         actionId: action.id,
@@ -1244,7 +1251,7 @@ export class PermissionsService {
     // If not in cache, fetch from database
     this.logger.debug(`Cache miss for ${cacheKey}, fetching from database`);
     const resources = await this.resourceRepository.find();
-    const resourceNames = resources.map(r => r.name);
+    const resourceNames = resources.map((r) => r.name);
 
     // Store in cache
     this.cacheService.set(cacheKey, resourceNames, this.CACHE_TTL);
@@ -1259,7 +1266,9 @@ export class PermissionsService {
     try {
       return await this.getUserPermissions(userId);
     } catch (error) {
-      this.logger.warn(`Failed to get permissions for user ${userId}: ${error.message}`);
+      this.logger.warn(
+        `Failed to get permissions for user ${userId}: ${error.message}`,
+      );
       return [];
     }
   }
@@ -1269,7 +1278,7 @@ export class PermissionsService {
    */
   async seedDefaultPermissions(): Promise<void> {
     this.logger.log('Seeding default permissions...');
-    
+
     // Define default permissions
     const defaultPermissions = [
       { resource: 'users', action: 'read' },
@@ -1303,12 +1312,15 @@ export class PermissionsService {
   /**
    * Update an action
    */
-  async updateAction(id: number, updateActionDto: UpdateActionDto): Promise<Action> {
+  async updateAction(
+    id: number,
+    updateActionDto: UpdateActionDto,
+  ): Promise<Action> {
     const action = await this.actionRepository.findOne({ where: { id } });
     if (!action) {
       throw new NotFoundException(`Action with ID ${id} not found`);
     }
-    
+
     Object.assign(action, updateActionDto);
     return await this.actionRepository.save(action);
   }
@@ -1334,7 +1346,9 @@ export class PermissionsService {
   /**
    * Create a new resource
    */
-  async createResource(createResourceDto: UpdateResourceDto): Promise<Resource> {
+  async createResource(
+    createResourceDto: UpdateResourceDto,
+  ): Promise<Resource> {
     const resource = this.resourceRepository.create(createResourceDto);
     return await this.resourceRepository.save(resource);
   }
@@ -1342,12 +1356,15 @@ export class PermissionsService {
   /**
    * Update a resource
    */
-  async updateResource(id: number, updateResourceDto: UpdateResourceDto): Promise<Resource> {
+  async updateResource(
+    id: number,
+    updateResourceDto: UpdateResourceDto,
+  ): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${id} not found`);
     }
-    
+
     Object.assign(resource, updateResourceDto);
     return await this.resourceRepository.save(resource);
   }
@@ -1395,11 +1412,11 @@ export class PermissionsService {
       where: { id: userId },
       relations: ['roles'],
     });
-    
+
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
-    
+
     return user.roles || [];
   }
 
@@ -1451,7 +1468,11 @@ export class PermissionsService {
   async findByRole(roleId: number): Promise<Permission[]> {
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
-      relations: ['rolePermissions', 'rolePermissions.permission', 'rolePermissions.permission.actionEntity'],
+      relations: [
+        'rolePermissions',
+        'rolePermissions.permission',
+        'rolePermissions.permission.actionEntity',
+      ],
     });
 
     if (!role) {
@@ -1459,8 +1480,8 @@ export class PermissionsService {
     }
 
     return role.rolePermissions
-      .filter(rp => rp.isGranted)
-      .map(rp => rp.permission);
+      .filter((rp) => rp.isGranted)
+      .map((rp) => rp.permission);
   }
 
   /**
@@ -1469,7 +1490,11 @@ export class PermissionsService {
   async findByGroup(groupId: number): Promise<Permission[]> {
     const group = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['groupPermissions', 'groupPermissions.permission', 'groupPermissions.permission.actionEntity'],
+      relations: [
+        'groupPermissions',
+        'groupPermissions.permission',
+        'groupPermissions.permission.actionEntity',
+      ],
     });
 
     if (!group) {
@@ -1477,7 +1502,7 @@ export class PermissionsService {
     }
 
     return group.groupPermissions
-      .filter(gp => gp.isGranted)
-      .map(gp => gp.permission);
+      .filter((gp) => gp.isGranted)
+      .map((gp) => gp.permission);
   }
 }

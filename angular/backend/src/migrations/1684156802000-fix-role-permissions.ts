@@ -22,7 +22,10 @@ export class FixRolePermissions1684156802000 implements MigrationInterface {
     } else {
       // Check if role_id column is already the right type (INT)
       const roleIdColumn = rolePermissionsTable.findColumnByName('role_id');
-      if (roleIdColumn && (roleIdColumn.type === 'varchar' || roleIdColumn.type === 'uuid')) {
+      if (
+        roleIdColumn &&
+        (roleIdColumn.type === 'varchar' || roleIdColumn.type === 'uuid')
+      ) {
         // First, drop foreign keys if they exist
         const foreignKeys = rolePermissionsTable.foreignKeys;
         for (const foreignKey of foreignKeys) {
@@ -118,13 +121,13 @@ export class FixRolePermissions1684156802000 implements MigrationInterface {
     const rolesTable = await queryRunner.getTable('roles');
     if (rolesTable) {
       // Remove parent_id foreign key and column
-      const parentForeignKey = rolesTable.foreignKeys.find(
-        (fk) => fk.columnNames.includes('parent_id'),
+      const parentForeignKey = rolesTable.foreignKeys.find((fk) =>
+        fk.columnNames.includes('parent_id'),
       );
       if (parentForeignKey) {
         await queryRunner.dropForeignKey('roles', parentForeignKey);
       }
-      
+
       if (rolesTable.findColumnByName('parent_id')) {
         await queryRunner.dropColumn('roles', 'parent_id');
       }
@@ -140,4 +143,4 @@ export class FixRolePermissions1684156802000 implements MigrationInterface {
       }
     }
   }
-} 
+}

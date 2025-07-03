@@ -7,7 +7,7 @@ export class FixSqliteTimestampIssues1690000000003
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // This migration is deprecated.
-    // Its primary goal of converting TIMESTAMP columns to datetime is unlikely to be effective 
+    // Its primary goal of converting TIMESTAMP columns to datetime is unlikely to be effective
     // due to how SQLite reports column types from PRAGMA table_info.
     // The revised 1658012345678-CreatePermissionEntities.ts migration will establish correct datetime types.
     // The temporary table DDL in this migration also assumes VARCHAR PKs for tables that will be changed to INTEGER PKs,

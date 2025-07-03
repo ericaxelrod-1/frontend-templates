@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsEnum, IsNumber, IsDateString } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsNumber,
+  IsDateString,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AcknowledgeAlertDto {
@@ -20,7 +26,10 @@ export class CreateAlertDto {
   @IsString()
   alertType: string;
 
-  @ApiProperty({ description: 'Alert severity', enum: ['low', 'medium', 'high', 'critical'] })
+  @ApiProperty({
+    description: 'Alert severity',
+    enum: ['low', 'medium', 'high', 'critical'],
+  })
   @IsEnum(['low', 'medium', 'high', 'critical'])
   severity: string;
 
@@ -37,22 +46,34 @@ export class CreateAlertDto {
   @IsString()
   source?: string;
 
-  @ApiProperty({ description: 'IP address associated with alert', required: false })
+  @ApiProperty({
+    description: 'IP address associated with alert',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   ipAddress?: string;
 
-  @ApiProperty({ description: 'User ID associated with alert', required: false })
+  @ApiProperty({
+    description: 'User ID associated with alert',
+    required: false,
+  })
   @IsOptional()
   @IsNumber()
   userId?: number;
 
-  @ApiProperty({ description: 'Pattern ID associated with alert', required: false })
+  @ApiProperty({
+    description: 'Pattern ID associated with alert',
+    required: false,
+  })
   @IsOptional()
   @IsNumber()
   patternId?: number;
 
-  @ApiProperty({ description: 'Additional alert data as JSON string', required: false })
+  @ApiProperty({
+    description: 'Additional alert data as JSON string',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   alertData?: string;
@@ -94,7 +115,11 @@ export class AlertFiltersDto {
   @IsString()
   sortBy?: string;
 
-  @ApiProperty({ description: 'Sort direction', enum: ['asc', 'desc'], required: false })
+  @ApiProperty({
+    description: 'Sort direction',
+    enum: ['asc', 'desc'],
+    required: false,
+  })
   @IsOptional()
   @IsEnum(['asc', 'desc'])
   sortDirection?: 'asc' | 'desc';
@@ -115,8 +140,11 @@ export class BlockUserDto {
   @IsString()
   reason: string;
 
-  @ApiProperty({ description: 'Block duration in hours (optional, 0 = permanent)', required: false })
+  @ApiProperty({
+    description: 'Block duration in hours (optional, 0 = permanent)',
+    required: false,
+  })
   @IsOptional()
   @IsNumber()
   durationHours?: number;
-} 
+}

@@ -35,9 +35,10 @@ export class SecurityAlertService {
   async getSecurityAlerts(
     limit: number = 50,
     offset: number = 0,
-    filters: AlertFilters = {}
+    filters: AlertFilters = {},
   ): Promise<{ items: SecurityAlert[]; total: number }> {
-    const query = this.securityAlertRepository.createQueryBuilder('alert')
+    const query = this.securityAlertRepository
+      .createQueryBuilder('alert')
       .leftJoinAndSelect('alert.pattern', 'pattern')
       .leftJoinAndSelect('alert.user', 'user')
       .leftJoinAndSelect('alert.acknowledgedBy', 'acknowledgedBy')
@@ -49,15 +50,21 @@ export class SecurityAlertService {
     }
 
     if (filters.severity) {
-      query.andWhere('alert.severity = :severity', { severity: filters.severity });
+      query.andWhere('alert.severity = :severity', {
+        severity: filters.severity,
+      });
     }
 
     if (filters.alertType) {
-      query.andWhere('alert.alertType = :alertType', { alertType: filters.alertType });
+      query.andWhere('alert.alertType = :alertType', {
+        alertType: filters.alertType,
+      });
     }
 
     if (filters.dateFrom) {
-      query.andWhere('alert.createdAt >= :dateFrom', { dateFrom: filters.dateFrom });
+      query.andWhere('alert.createdAt >= :dateFrom', {
+        dateFrom: filters.dateFrom,
+      });
     }
 
     if (filters.dateTo) {
@@ -68,14 +75,17 @@ export class SecurityAlertService {
     if (filters.search) {
       query.andWhere(
         '(alert.title LIKE :search OR alert.message LIKE :search OR alert.alertType LIKE :search)',
-        { search: `%${filters.search}%` }
+        { search: `%${filters.search}%` },
       );
     }
 
     // Apply sorting
     const sortBy = filters.sortBy || 'createdAt';
     const sortDirection = filters.sortDirection || 'desc';
-    query.orderBy(`alert.${sortBy}`, sortDirection.toUpperCase() as 'ASC' | 'DESC');
+    query.orderBy(
+      `alert.${sortBy}`,
+      sortDirection.toUpperCase() as 'ASC' | 'DESC',
+    );
 
     // Get total count
     const total = await query.getCount();
@@ -101,7 +111,10 @@ export class SecurityAlertService {
   /**
    * Acknowledge a security alert
    */
-  async acknowledgeAlert(alertId: number, userId: number): Promise<SecurityAlert> {
+  async acknowledgeAlert(
+    alertId: number,
+    userId: number,
+  ): Promise<SecurityAlert> {
     const alert = await this.getSecurityAlertById(alertId);
     if (!alert) {
       throw new Error(`Alert with ID ${alertId} not found`);
@@ -112,7 +125,7 @@ export class SecurityAlertService {
     alert.acknowledgedBy = { id: userId } as any; // TypeORM will handle the relation
 
     await this.securityAlertRepository.save(alert);
-    
+
     this.logger.log(`Alert ${alertId} acknowledged by user ${userId}`);
     return this.getSecurityAlertById(alertId);
   }
@@ -120,7 +133,11 @@ export class SecurityAlertService {
   /**
    * Resolve a security alert
    */
-  async resolveAlert(alertId: number, userId: number, notes?: string): Promise<SecurityAlert> {
+  async resolveAlert(
+    alertId: number,
+    userId: number,
+    notes?: string,
+  ): Promise<SecurityAlert> {
     const alert = await this.getSecurityAlertById(alertId);
     if (!alert) {
       throw new Error(`Alert with ID ${alertId} not found`);
@@ -134,7 +151,7 @@ export class SecurityAlertService {
     }
 
     await this.securityAlertRepository.save(alert);
-    
+
     this.logger.log(`Alert ${alertId} resolved by user ${userId}`);
     return this.getSecurityAlertById(alertId);
   }
@@ -153,7 +170,7 @@ export class SecurityAlertService {
     alert.resolvedBy = { id: userId } as any; // TypeORM will handle the relation
 
     await this.securityAlertRepository.save(alert);
-    
+
     this.logger.log(`Alert ${alertId} dismissed by user ${userId}`);
     return this.getSecurityAlertById(alertId);
   }
@@ -164,7 +181,7 @@ export class SecurityAlertService {
   async createAlert(alertData: Partial<SecurityAlert>): Promise<SecurityAlert> {
     const alert = this.securityAlertRepository.create(alertData);
     const savedAlert = await this.securityAlertRepository.save(alert);
-    
+
     this.logger.log(`New security alert created: ${savedAlert.title}`);
     return this.getSecurityAlertById(savedAlert.id);
   }
@@ -175,9 +192,10 @@ export class SecurityAlertService {
   async getSecurityPatterns(
     limit: number = 50,
     offset: number = 0,
-    filters: any = {}
+    filters: any = {},
   ): Promise<{ items: SecurityDetectedPattern[]; total: number }> {
-    const query = this.securityDetectedPatternRepository.createQueryBuilder('pattern')
+    const query = this.securityDetectedPatternRepository
+      .createQueryBuilder('pattern')
       .leftJoinAndSelect('pattern.resolvedBy', 'resolvedBy')
       .leftJoinAndSelect('pattern.alerts', 'alerts');
 
@@ -187,21 +205,50 @@ export class SecurityAlertService {
     }
 
     if (filters.patternType) {
-      query.andWhere('pattern.patternType = :patternType', { patternType: filters.patternType });
+      query.andWhere('pattern.patternType = :patternType', {
+        patternType: filters.patternType,
+      });
     }
 
     if (filters.severity) {
-      query.andWhere('pattern.severity = :severity', { severity: filters.severity });
+      query.andWhere('pattern.severity = :severity', {
+        severity: filters.severity,
+      });
     }
 
     if (filters.ipAddress) {
-      query.andWhere('pattern.ipAddress = :ipAddress', { ipAddress: filters.ipAddress });
+      query.andWhere('pattern.ipAddress = :ipAddress', {
+        ipAddress: filters.ipAddress,
+      });
+    }
+
+    if (filters.dateFrom) {
+      query.andWhere('pattern.detectionTimestamp >= :dateFrom', {
+        dateFrom: filters.dateFrom,
+      });
+    }
+
+    if (filters.dateTo) {
+      query.andWhere('pattern.detectionTimestamp <= :dateTo', {
+        dateTo: filters.dateTo,
+      });
+    }
+
+    // Apply search filter
+    if (filters.search) {
+      query.andWhere(
+        '(pattern.patternType LIKE :search OR pattern.ipAddress LIKE :search OR pattern.evidence LIKE :search)',
+        { search: `%${filters.search}%` },
+      );
     }
 
     // Apply sorting
     const sortBy = filters.sortBy || 'detectionTimestamp';
     const sortDirection = filters.sortDirection || 'desc';
-    query.orderBy(`pattern.${sortBy}`, sortDirection.toUpperCase() as 'ASC' | 'DESC');
+    query.orderBy(
+      `pattern.${sortBy}`,
+      sortDirection.toUpperCase() as 'ASC' | 'DESC',
+    );
 
     // Get total count
     const total = await query.getCount();
@@ -223,7 +270,7 @@ export class SecurityAlertService {
       relations: ['loginAttempt'],
     });
 
-    return patternAttempts.map(pa => ({
+    return patternAttempts.map((pa) => ({
       ...pa.loginAttempt,
       isPrimaryEvidence: pa.isPrimaryEvidence,
     }));

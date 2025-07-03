@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class UpdatePermissionActionField1742536989656 implements MigrationInterface {
+export class UpdatePermissionActionField1742536989656
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Check if the permissions table exists
     const permissionsTable = await queryRunner.hasTable('permissions');
@@ -10,12 +12,14 @@ export class UpdatePermissionActionField1742536989656 implements MigrationInterf
 
     try {
       // Create a backup table for permissions
-      await queryRunner.query(`CREATE TABLE IF NOT EXISTS permissions_backup AS SELECT * FROM permissions`);
-      
+      await queryRunner.query(
+        `CREATE TABLE IF NOT EXISTS permissions_backup AS SELECT * FROM permissions`,
+      );
+
       // Check if the action_name column already exists
       const table = await queryRunner.getTable('permissions');
       const actionNameColumn = table.findColumnByName('action_name');
-      
+
       if (!actionNameColumn) {
         // Add action_name column if it doesn't exist
         await queryRunner.addColumn(
@@ -26,7 +30,7 @@ export class UpdatePermissionActionField1742536989656 implements MigrationInterf
             isNullable: true,
           }),
         );
-        
+
         // Copy action values to action_name for backward compatibility
         await queryRunner.query(`
           UPDATE permissions 
@@ -58,35 +62,38 @@ export class UpdatePermissionActionField1742536989656 implements MigrationInterf
         )
         WHERE action_id IS NULL AND action IS NOT NULL
       `);
-
     } catch (error) {
       console.error('Migration failed:', error);
       // Roll back using the backup table
       await queryRunner.query(`DROP TABLE IF EXISTS permissions`);
-      await queryRunner.query(`ALTER TABLE permissions_backup RENAME TO permissions`);
+      await queryRunner.query(
+        `ALTER TABLE permissions_backup RENAME TO permissions`,
+      );
       throw error;
     }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     const table = await queryRunner.getTable('permissions');
-    
+
     // Check if the table exists
     if (!table) {
       return;
     }
-    
+
     // Check if the action_name column exists
     const actionNameColumn = table.findColumnByName('action_name');
     if (actionNameColumn) {
       await queryRunner.dropColumn('permissions', 'action_name');
     }
-    
+
     // Restore from backup if it exists
     const backupExists = await queryRunner.hasTable('permissions_backup');
     if (backupExists) {
       await queryRunner.query(`DROP TABLE IF EXISTS permissions`);
-      await queryRunner.query(`ALTER TABLE permissions_backup RENAME TO permissions`);
+      await queryRunner.query(
+        `ALTER TABLE permissions_backup RENAME TO permissions`,
+      );
     }
   }
-} 
+}

@@ -35,7 +35,8 @@ import { AuthSharedModule } from './modules/auth/shared/auth-shared.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => configService.get('database'),
+      useFactory: (configService: ConfigService) =>
+        configService.get('database'),
     }),
     ScheduleModule.forRoot(),
     LoggerModule,

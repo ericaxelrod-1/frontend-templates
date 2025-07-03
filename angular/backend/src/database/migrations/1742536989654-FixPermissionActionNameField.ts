@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FixPermissionActionNameField1742536989654 implements MigrationInterface {
+export class FixPermissionActionNameField1742536989654
+  implements MigrationInterface
+{
   name = 'FixPermissionActionNameField1742536989654';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -16,10 +18,16 @@ export class FixPermissionActionNameField1742536989654 implements MigrationInter
     }
 
     // Check if action column exists
-    const hasActionColumn = await queryRunner.hasColumn('permissions', 'action');
-    
+    const hasActionColumn = await queryRunner.hasColumn(
+      'permissions',
+      'action',
+    );
+
     // Check if action_name column exists
-    const hasActionNameColumn = await queryRunner.hasColumn('permissions', 'action_name');
+    const hasActionNameColumn = await queryRunner.hasColumn(
+      'permissions',
+      'action_name',
+    );
 
     if (!hasActionColumn && !hasActionNameColumn) {
       // If neither column exists, add action column
@@ -32,15 +40,19 @@ export class FixPermissionActionNameField1742536989654 implements MigrationInter
       // If only action_name exists, rename it to action
       if (isSQLite) {
         // SQLite doesn't support direct column rename, need to create a new table
-        console.log('SQLite detected, creating temporary table for column rename');
-        
+        console.log(
+          'SQLite detected, creating temporary table for column rename',
+        );
+
         // Get all column info to recreate table
         const tableColumns = await queryRunner.getTable('permissions');
         if (!tableColumns) {
-          console.log('Could not get permissions table structure, skipping migration');
+          console.log(
+            'Could not get permissions table structure, skipping migration',
+          );
           return;
         }
-        
+
         // Create temporary table with new structure
         await queryRunner.query(`
           CREATE TABLE "permissions_temp" AS 
@@ -54,11 +66,13 @@ export class FixPermissionActionNameField1742536989654 implements MigrationInter
             updated_at
           FROM "permissions"
         `);
-        
+
         // Drop old table and rename new one
         await queryRunner.query(`DROP TABLE "permissions"`);
-        await queryRunner.query(`ALTER TABLE "permissions_temp" RENAME TO "permissions"`);
-        
+        await queryRunner.query(
+          `ALTER TABLE "permissions_temp" RENAME TO "permissions"`,
+        );
+
         // Recreate indices and constraints
         await queryRunner.query(`
           CREATE UNIQUE INDEX IF NOT EXISTS "IDX_permissions_name" ON "permissions" ("name")
@@ -78,17 +92,22 @@ export class FixPermissionActionNameField1742536989654 implements MigrationInter
         SET "action" = "action_name"
         WHERE "action" IS NULL OR "action" = ''
       `);
-      
+
       // Drop action_name column
       await queryRunner.query(`
         ALTER TABLE "permissions" 
         DROP COLUMN "action_name"
       `);
-      console.log('Copied data from action_name to action and dropped action_name column');
+      console.log(
+        'Copied data from action_name to action and dropped action_name column',
+      );
     }
-    
+
     // Add action_id column if it doesn't exist
-    const hasActionIdColumn = await queryRunner.hasColumn('permissions', 'action_id');
+    const hasActionIdColumn = await queryRunner.hasColumn(
+      'permissions',
+      'action_id',
+    );
     if (!hasActionIdColumn) {
       if (isSQLite) {
         await queryRunner.query(`
@@ -109,33 +128,43 @@ export class FixPermissionActionNameField1742536989654 implements MigrationInter
     // Check database type to use appropriate SQL syntax
     const dbType = queryRunner.connection.options.type;
     const isSQLite = dbType === 'sqlite' || dbType === 'better-sqlite3';
-    
+
     // Check if the permission table exists
     const permissionTableExists = await queryRunner.hasTable('permissions');
     if (!permissionTableExists) {
       console.log('Permissions table does not exist, skipping rollback');
       return;
     }
-    
+
     // Check if action column exists
-    const hasActionColumn = await queryRunner.hasColumn('permissions', 'action');
-    
+    const hasActionColumn = await queryRunner.hasColumn(
+      'permissions',
+      'action',
+    );
+
     // Check if action_name column exists
-    const hasActionNameColumn = await queryRunner.hasColumn('permissions', 'action_name');
-    
+    const hasActionNameColumn = await queryRunner.hasColumn(
+      'permissions',
+      'action_name',
+    );
+
     if (hasActionColumn && !hasActionNameColumn) {
       // If only action exists, rename it back to action_name
       if (isSQLite) {
         // SQLite doesn't support direct column rename, need to create a new table
-        console.log('SQLite detected, creating temporary table for column rename');
-        
+        console.log(
+          'SQLite detected, creating temporary table for column rename',
+        );
+
         // Get all column info to recreate table
         const tableColumns = await queryRunner.getTable('permissions');
         if (!tableColumns) {
-          console.log('Could not get permissions table structure, skipping rollback');
+          console.log(
+            'Could not get permissions table structure, skipping rollback',
+          );
           return;
         }
-        
+
         // Create temporary table with original structure
         await queryRunner.query(`
           CREATE TABLE "permissions_temp" AS 
@@ -150,11 +179,13 @@ export class FixPermissionActionNameField1742536989654 implements MigrationInter
             action_id
           FROM "permissions"
         `);
-        
+
         // Drop old table and rename new one
         await queryRunner.query(`DROP TABLE "permissions"`);
-        await queryRunner.query(`ALTER TABLE "permissions_temp" RENAME TO "permissions"`);
-        
+        await queryRunner.query(
+          `ALTER TABLE "permissions_temp" RENAME TO "permissions"`,
+        );
+
         // Recreate indices and constraints
         await queryRunner.query(`
           CREATE UNIQUE INDEX IF NOT EXISTS "IDX_permissions_name" ON "permissions" ("name")
@@ -168,9 +199,12 @@ export class FixPermissionActionNameField1742536989654 implements MigrationInter
       }
       console.log('Renamed action column back to action_name');
     }
-    
+
     // Remove action_id column if it exists
-    const hasActionIdColumn = await queryRunner.hasColumn('permissions', 'action_id');
+    const hasActionIdColumn = await queryRunner.hasColumn(
+      'permissions',
+      'action_id',
+    );
     if (hasActionIdColumn) {
       await queryRunner.query(`
         ALTER TABLE "permissions" 
@@ -179,4 +213,4 @@ export class FixPermissionActionNameField1742536989654 implements MigrationInter
       console.log('Removed action_id column from permissions table');
     }
   }
-} 
+}

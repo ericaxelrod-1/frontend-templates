@@ -7,7 +7,7 @@ export class SeedPermissionsData1690000000001 implements MigrationInterface {
     // This migration is deprecated.
     // Its seeding logic for permissions, roles, and role_permissions used PostgreSQL-specific syntax (UUIDs)
     // and targeted table names that were inconsistent with the standardized plural names.
-    // The corrected and SQLite-compatible seeding logic for these entities has been merged into 
+    // The corrected and SQLite-compatible seeding logic for these entities has been merged into
     // the revised 1658012445678-SeedInitialPermissions.ts migration.
     // Making this a no-op to preserve migration history.
   }

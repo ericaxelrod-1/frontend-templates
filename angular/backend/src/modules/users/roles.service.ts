@@ -231,7 +231,9 @@ export class RolesService {
       relations: ['rolePermissions', 'rolePermissions.permission'],
     });
 
-    return completeRole ? this.transformRoleForFrontend(completeRole) : savedRole;
+    return completeRole
+      ? this.transformRoleForFrontend(completeRole)
+      : savedRole;
   }
 
   /**
@@ -242,9 +244,9 @@ export class RolesService {
     if (role.rolePermissions) {
       // Transform rolePermissions to permissions array
       const permissions = role.rolePermissions
-        .filter(rp => rp.isGranted && rp.permission) // Only include granted permissions
-        .map(rp => rp.permission);
-      
+        .filter((rp) => rp.isGranted && rp.permission) // Only include granted permissions
+        .map((rp) => rp.permission);
+
       // Create a new role object with permissions instead of rolePermissions
       return {
         ...role,
@@ -259,13 +261,13 @@ export class RolesService {
     const roles = await this.rolesRepository.find({
       relations: ['rolePermissions', 'rolePermissions.permission'],
     });
-    
+
     // Transform roles to match frontend expectations
-    return roles.map(role => this.transformRoleForFrontend(role));
+    return roles.map((role) => this.transformRoleForFrontend(role));
   }
 
   async findOne(id: number): Promise<Role> {
-    const role = await this.rolesRepository.findOne({ 
+    const role = await this.rolesRepository.findOne({
       where: { id },
       relations: ['rolePermissions', 'rolePermissions.permission'],
     });
@@ -275,7 +277,11 @@ export class RolesService {
     return this.transformRoleForFrontend(role);
   }
 
-  async update(id: number, updateRoleDto: any, currentUser: User): Promise<Role> {
+  async update(
+    id: number,
+    updateRoleDto: any,
+    currentUser: User,
+  ): Promise<Role> {
     // Check if current user has permission to update roles
     const hasPermission = await this.hasPermission(
       currentUser.id,
@@ -328,10 +334,7 @@ export class RolesService {
           updateRoleDto.permissions,
         );
       } catch (error) {
-        console.error(
-          `Error updating permissions for role:`,
-          error.message,
-        );
+        console.error(`Error updating permissions for role:`, error.message);
       }
     }
 
@@ -478,7 +481,8 @@ export class RolesService {
     }
 
     // Start transaction to ensure atomicity
-    const queryRunner = this.rolesRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.rolesRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -486,23 +490,18 @@ export class RolesService {
       // First, delete all role permissions (cascade deletion)
       await queryRunner.manager.query(
         'DELETE FROM role_permissions WHERE role_id = ?',
-        [id]
+        [id],
       );
 
       // Then delete the role itself using SQL query
-      await queryRunner.manager.query(
-        'DELETE FROM roles WHERE id = ?',
-        [id]
-      );
+      await queryRunner.manager.query('DELETE FROM roles WHERE id = ?', [id]);
 
       // Commit the transaction
       await queryRunner.commitTransaction();
     } catch (error) {
       // Rollback the transaction on error
       await queryRunner.rollbackTransaction();
-      throw new BadRequestException(
-        `Failed to delete role: ${error.message}`
-      );
+      throw new BadRequestException(`Failed to delete role: ${error.message}`);
     } finally {
       // Release the query runner
       await queryRunner.release();

@@ -109,7 +109,7 @@ async function addUserToGroupIfNotExists(
   }
 
   // Check if user is already in the group
-  const isAlreadyMember = userWithGroups.groups.some(g => g.id === group.id);
+  const isAlreadyMember = userWithGroups.groups.some((g) => g.id === group.id);
 
   if (!isAlreadyMember) {
     // Add group to user's groups

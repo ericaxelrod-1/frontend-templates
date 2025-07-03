@@ -26,7 +26,11 @@ export class SecurityDetectedPattern {
   @Column({ name: 'ip_address', type: 'text' })
   ipAddress: string;
 
-  @Column({ name: 'detection_timestamp', type: 'datetime', default: () => 'datetime(\'now\')' })
+  @Column({
+    name: 'detection_timestamp',
+    type: 'datetime',
+    default: () => "datetime('now')",
+  })
   detectionTimestamp: Date;
 
   @Column({ name: 'time_window_start', type: 'datetime' })
@@ -67,9 +71,12 @@ export class SecurityDetectedPattern {
   updatedAt: Date;
 
   // Relations
-  @OneToMany(() => SecurityAlert, alert => alert.pattern)
+  @OneToMany(() => SecurityAlert, (alert) => alert.pattern)
   alerts: SecurityAlert[];
 
-  @OneToMany(() => PatternLoginAttempt, patternAttempt => patternAttempt.pattern)
+  @OneToMany(
+    () => PatternLoginAttempt,
+    (patternAttempt) => patternAttempt.pattern,
+  )
   patternLoginAttempts: PatternLoginAttempt[];
 }

@@ -28,19 +28,19 @@
       (statsLoaded)="onStatsLoaded($event)">
     </app-statistics-dashboard>
 
-    <!-- Filters Component -->
-    <app-login-monitoring-filters 
-      [hasPermission]="hasPermission"
-      (filtersChanged)="onFiltersChanged($event)"
-      (filtersReset)="onFiltersReset()">
-    </app-login-monitoring-filters>
-
     <!-- Tabbed Content -->
     <mat-tab-group class="monitoring-tabs">
       
       <!-- Login Attempts Tab -->
       <mat-tab label="Recent Login Attempts">
         <div class="tab-content">
+          <!-- Filters Component - BUG-109 FIX: Moved inside Recent Login Attempts tab -->
+          <app-login-monitoring-filters 
+            [hasPermission]="hasPermission"
+            (filtersChanged)="onFiltersChanged($event)"
+            (filtersReset)="onFiltersReset()">
+          </app-login-monitoring-filters>
+          
           <app-login-attempts-table 
             [hasPermission]="hasPermission"
             [filterForm]="filterForm!"
@@ -53,6 +53,13 @@
       <!-- Pattern Detection Tab -->
       <mat-tab label="Pattern Detection">
         <div class="tab-content">
+          <!-- Pattern Detection Filters Component -->
+          <app-pattern-detection-filters 
+            [hasPermission]="hasPermission"
+            (filtersChanged)="onPatternDetectionFiltersChanged($event)"
+            (filtersReset)="onPatternDetectionFiltersReset()">
+          </app-pattern-detection-filters>
+          
           <mat-card>
             <mat-card-header>
               <mat-card-title>Detected Security Patterns</mat-card-title>
@@ -106,42 +113,128 @@
               <!-- Loading spinner for patterns -->
               <div *ngIf="loading.patterns" class="loading-container">
                 <mat-spinner diameter="40"></mat-spinner>
-                <p>Detecting patterns...</p>
+                <p>Loading patterns...</p>
               </div>
 
-              <!-- Patterns list -->
-              <div *ngIf="!loading.patterns && detectedPatterns.length > 0" class="patterns-list">
-                <div *ngFor="let pattern of detectedPatterns" 
-                     class="pattern-item"
-                     [class]="getPatternTypeClass(pattern)">
-                  
-                  <div class="pattern-header" (click)="togglePatternExpansion(pattern)">
-                    <div class="pattern-info">
-                      <span class="pattern-type">{{ pattern.type | titlecase }}</span>
-                      <mat-chip [class]="getSeverityClass(pattern.severity)">
-                        {{ pattern.severity | uppercase }}
-                      </mat-chip>
+              <!-- Patterns Table with Server-Side Pagination -->
+              <!-- Loading indicator - following login-attempts-table pattern exactly -->
+              <div *ngIf="loading.patterns" class="loading-placeholder">
+                <mat-spinner diameter="40"></mat-spinner>
+                <span>Loading patterns...</span>
+              </div>
+
+              <!-- Always render table structure - following login-attempts-table pattern exactly -->
+              <mat-table [dataSource]="detectedPatterns" matSort #patternSort="matSort"
+                         matSortActive="detectionTimestamp" 
+                         matSortDirection="desc"
+                         class="patterns-table">
+                
+                <!-- Timestamp Column -->
+                <ng-container matColumnDef="timestamp">
+                  <mat-header-cell *matHeaderCellDef mat-sort-header="detectionTimestamp">
+                    Timestamp
+                  </mat-header-cell>
+                  <mat-cell *matCellDef="let pattern">
+                    {{ pattern.timestamp | date:'medium' }}
+                  </mat-cell>
+                </ng-container>
+
+                <!-- Pattern Type Column -->
+                <ng-container matColumnDef="type">
+                  <mat-header-cell *matHeaderCellDef mat-sort-header="patternType">
+                    Pattern Type
+                  </mat-header-cell>
+                  <mat-cell *matCellDef="let pattern">
+                    <span class="pattern-type" [class]="getPatternTypeClass(pattern)">
+                      {{ pattern.type | titlecase }}
+                    </span>
+                  </mat-cell>
+                </ng-container>
+
+                <!-- Severity Column (Combined Indicator + Level) -->
+                <ng-container matColumnDef="severity">
+                  <mat-header-cell *matHeaderCellDef mat-sort-header="severity">
+                    Severity
+                  </mat-header-cell>
+                  <mat-cell *matCellDef="let pattern">
+                    <div class="severity-cell">
+                      <div class="severity-indicator" [class]="getSeverityColor(pattern.severity)"
+                           [title]="pattern.severity | titlecase"></div>
+                      <span class="severity-text">{{ pattern.severity | uppercase }}</span>
                     </div>
-                    <div class="pattern-meta">
-                      <span class="pattern-timestamp">{{ pattern.timestamp | date:'medium' }}</span>
+                  </mat-cell>
+                </ng-container>
+
+                <!-- IP Addresses Column -->
+                <ng-container matColumnDef="ipAddresses">
+                  <mat-header-cell *matHeaderCellDef mat-sort-header="ipAddress">
+                    IP Addresses
+                  </mat-header-cell>
+                  <mat-cell *matCellDef="let pattern">
+                    {{ pattern.ipAddresses.join(', ') }}
+                  </mat-cell>
+                </ng-container>
+
+                <!-- Details Column -->
+                <ng-container matColumnDef="details">
+                  <mat-header-cell *matHeaderCellDef>
+                    Details
+                  </mat-header-cell>
+                  <mat-cell *matCellDef="let pattern">
+                    <span class="pattern-details-text">{{ pattern.details }}</span>
+                  </mat-cell>
+                </ng-container>
+
+                <!-- Group Count Column -->
+                <ng-container matColumnDef="groupCount">
+                  <mat-header-cell *matHeaderCellDef>
+                    Grouped
+                  </mat-header-cell>
+                  <mat-cell *matCellDef="let pattern">
+                    <mat-chip class="group-counter" *ngIf="getGroupCount(pattern) > 1" 
+                              matTooltip="Number of similar patterns grouped together">
+                      <mat-icon class="group-icon">group_work</mat-icon>
+                      {{ getGroupCount(pattern) }}
+                    </mat-chip>
+                    <span *ngIf="getGroupCount(pattern) <= 1">-</span>
+                  </mat-cell>
+                </ng-container>
+
+                <!-- Actions Column -->
+                <ng-container matColumnDef="actions">
+                  <mat-header-cell *matHeaderCellDef>
+                    Actions
+                  </mat-header-cell>
+                  <mat-cell *matCellDef="let pattern">
+                    <button mat-icon-button matTooltip="View Details" 
+                            (click)="togglePatternExpansion(pattern)">
                       <mat-icon>{{ pattern.expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
-                    </div>
-                  </div>
+                    </button>
+                  </mat-cell>
+                </ng-container>
 
-                  <div *ngIf="pattern.expanded" class="pattern-details">
-                    <p><strong>Details:</strong> {{ pattern.details }}</p>
-                    <p><strong>Affected IPs:</strong> {{ pattern.ipAddresses.join(', ') }}</p>
-                    <p *ngIf="pattern.email"><strong>Email:</strong> {{ pattern.email }}</p>
-                  </div>
+                <!-- Header and Row Definitions -->
+                <mat-header-row *matHeaderRowDef="patternDisplayedColumns"></mat-header-row>
+                <mat-row *matRowDef="let row; columns: patternDisplayedColumns;"></mat-row>
+
+                <!-- Empty state inside table - following login-attempts-table pattern exactly -->
+                <div *ngIf="!loading.patterns && detectedPatterns.length === 0" class="empty-state-in-table">
+                  <mat-icon class="empty-icon">inbox</mat-icon>
+                  <p>No patterns detected</p>
+                  <span>No suspicious patterns have been detected in recent login attempts.</span>
                 </div>
-              </div>
+              </mat-table>
 
-              <!-- No patterns message -->
-              <div *ngIf="!loading.patterns && detectedPatterns.length === 0" class="no-patterns">
-                <mat-icon class="info-icon">info</mat-icon>
-                <h3>No Patterns Detected</h3>
-                <p>No suspicious patterns have been detected in recent login attempts.</p>
-              </div>
+              <!-- Pagination - FIXED: Direct event binding following login-attempts-table pattern exactly -->
+              <mat-paginator
+                *ngIf="!loading.patterns && patternTotalCount > 0"
+                [length]="patternTotalCount"
+                [pageSize]="patternPageSize"
+                [pageSizeOptions]="[5, 10, 25, 50]"
+                [pageIndex]="patternCurrentPage"
+                (page)="onPatternPageChange($event)"
+                showFirstLastButtons>
+              </mat-paginator>
             </mat-card-content>
           </mat-card>
         </div>
@@ -150,6 +243,13 @@
       <!-- Security Alerts Tab -->
       <mat-tab label="Security Alerts">
         <div class="tab-content">
+          <!-- Security Alerts Filters Component -->
+          <app-security-alerts-filters 
+            [hasPermission]="hasPermission"
+            (filtersChanged)="onSecurityAlertsFiltersChanged($event)"
+            (filtersReset)="onSecurityAlertsFiltersReset()">
+          </app-security-alerts-filters>
+          
           <mat-card>
             <mat-card-header>
               <mat-card-title>Security Alerts</mat-card-title>
@@ -181,15 +281,18 @@
               <!-- Alerts list -->
               <div *ngIf="!loading.alerts && securityAlerts.length > 0" class="alerts-list">
                 <div *ngFor="let alert of securityAlerts" 
-                     class="alert-item"
-                     [class]="getSeverityClass(alert.severity)">
+                     class="alert-item">
                   
                   <div class="alert-content">
                     <div class="alert-header">
                       <span class="alert-type">{{ alert.type | titlecase }}</span>
-                      <mat-chip [class]="getSeverityClass(alert.severity)">
-                        {{ alert.severity | uppercase }}
-                      </mat-chip>
+                      <div class="severity-cell">
+                        <div class="severity-indicator" [class]="getSeverityColor(alert.severity)"
+                             [title]="alert.severity | titlecase"></div>
+                        <span class="severity-text">
+                          {{ alert.severity | uppercase }}
+                        </span>
+                      </div>
                       <span class="alert-status">{{ alert.status | titlecase }}</span>
                     </div>
                     <p class="alert-message">{{ alert.message }}</p>
@@ -243,7 +346,7 @@
                   <h3>{{ selectedIpReputation.ipAddress }}</h3>
                   <div class="reputation-score">
                     <span>Reputation Score: </span>
-                    <mat-chip [class]="selectedIpReputation.reputation > 70 ? 'good' : selectedIpReputation.reputation > 40 ? 'warning' : 'danger'">
+                    <mat-chip>
                       {{ selectedIpReputation.reputation }}/100
                     </mat-chip>
                   </div>
@@ -252,7 +355,7 @@
                 <div class="ip-stats">
                   <p><strong>Failed Attempts:</strong> {{ selectedIpReputation.failedAttempts }}</p>
                   <p><strong>Status:</strong> 
-                    <mat-chip [class]="selectedIpReputation.isBlocked ? 'blocked' : 'allowed'">
+                    <mat-chip>
                       {{ selectedIpReputation.isBlocked ? 'Blocked' : 'Allowed' }}
                     </mat-chip>
                   </p>

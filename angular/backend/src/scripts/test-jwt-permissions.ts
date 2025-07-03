@@ -19,7 +19,7 @@ async function testJwtPermissions() {
       'admin@example.com',
       'Admin123!',
       '127.0.0.1',
-      'test-user-agent'
+      'test-user-agent',
     );
 
     logger.log('Login successful, access token generated');
@@ -27,22 +27,23 @@ async function testJwtPermissions() {
     // Decode the access token to see what's inside
     logger.log('Decoding access token...');
     const decoded = jwtService.decode(loginResult.accessToken) as any;
-    
+
     logger.log('JWT Token payload:');
     logger.log('Email:', decoded.email);
     logger.log('User ID:', decoded.sub);
     logger.log('Permissions count:', decoded.permissions?.length || 0);
-    
+
     if (decoded.permissions) {
-      const loginMonitoringPerms = decoded.permissions.filter((p: string) => p.includes('login-monitoring'));
+      const loginMonitoringPerms = decoded.permissions.filter((p: string) =>
+        p.includes('login-monitoring'),
+      );
       logger.log('Login monitoring permissions in JWT:', loginMonitoringPerms);
-      
+
       logger.log('All permissions in JWT:');
       logger.log(decoded.permissions);
     } else {
       logger.error('No permissions found in JWT token!');
     }
-
   } catch (error) {
     logger.error('Error during JWT test:', error);
   } finally {
@@ -58,4 +59,4 @@ testJwtPermissions()
   .catch((error) => {
     console.error('JWT test failed:', error);
     process.exit(1);
-  }); 
+  });

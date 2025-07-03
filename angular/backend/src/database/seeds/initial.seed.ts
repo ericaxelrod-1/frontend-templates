@@ -5,7 +5,9 @@ export async function seedDatabase(dataSource: DataSource) {
   const roleRepository = dataSource.getRepository(Role);
 
   // Remove redundant roles (case-insensitive, ignoring spaces)
-  const canonicalNames = Object.values(SystemRoles).map(n => n.toLowerCase().replace(/\s+/g, ''));
+  const canonicalNames = Object.values(SystemRoles).map((n) =>
+    n.toLowerCase().replace(/\s+/g, ''),
+  );
   const redundantNames = ['user', 'admin', 'superuser', 'superadmin'];
   const allRoles = await roleRepository.find();
   for (const role of allRoles) {

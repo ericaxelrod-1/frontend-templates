@@ -88,7 +88,9 @@ export class RolesController {
     type: [Permission],
   })
   @ApiResponse({ status: 404, description: 'Role not found' })
-  getRolePermissions(@Param('id', ParseIntPipe) id: number): Promise<Permission[]> {
+  getRolePermissions(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<Permission[]> {
     return this.rolesService.getRolePermissions(id);
   }
 }

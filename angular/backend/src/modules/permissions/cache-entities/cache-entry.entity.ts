@@ -89,4 +89,4 @@ export class CacheEntryBase {
     onUpdate: 'CURRENT_TIMESTAMP',
   })
   updatedAt: Date;
-} 
+}

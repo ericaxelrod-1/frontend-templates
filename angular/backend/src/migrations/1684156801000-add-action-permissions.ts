@@ -1,4 +1,9 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+} from 'typeorm';
 
 export class AddActionPermissions1684156801000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -56,8 +61,10 @@ export class AddActionPermissions1684156801000 implements MigrationInterface {
     // Add action_id column to permissions table if it doesn't exist
     const permissionsTable = await queryRunner.getTable('permissions');
     if (permissionsTable && !permissionsTable.findColumnByName('action_id')) {
-      await queryRunner.query(`ALTER TABLE permissions ADD COLUMN action_id INT NULL`);
-      
+      await queryRunner.query(
+        `ALTER TABLE permissions ADD COLUMN action_id INT NULL`,
+      );
+
       // Add foreign key for action_id
       await queryRunner.createForeignKey(
         'permissions',
@@ -99,11 +106,13 @@ export class AddActionPermissions1684156801000 implements MigrationInterface {
 
       // Remove action_id column from permissions table
       if (permissionsTable.findColumnByName('action_id')) {
-        await queryRunner.query(`ALTER TABLE permissions DROP COLUMN action_id`);
+        await queryRunner.query(
+          `ALTER TABLE permissions DROP COLUMN action_id`,
+        );
       }
     }
 
     // Drop actions table
     await queryRunner.dropTable('actions', true);
   }
-} 
+}

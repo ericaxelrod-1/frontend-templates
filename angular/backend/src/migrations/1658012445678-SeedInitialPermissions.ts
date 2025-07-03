@@ -5,13 +5,27 @@ export class SeedInitialPermissions1658012445678 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Get action IDs for permission creation
-    const createActionResult = await queryRunner.query(`SELECT id FROM actions WHERE action_code = 'CREATE'`);
-    const readActionResult = await queryRunner.query(`SELECT id FROM actions WHERE action_code = 'READ'`);
-    const updateActionResult = await queryRunner.query(`SELECT id FROM actions WHERE action_code = 'UPDATE'`);
-    const deleteActionResult = await queryRunner.query(`SELECT id FROM actions WHERE action_code = 'DELETE'`);
-    const manageActionResult = await queryRunner.query(`SELECT id FROM actions WHERE action_code = 'MANAGE'`);
-    const viewActionResult = await queryRunner.query(`SELECT id FROM actions WHERE action_code = 'VIEW'`);
-    const editActionResult = await queryRunner.query(`SELECT id FROM actions WHERE action_code = 'EDIT'`);
+    const createActionResult = await queryRunner.query(
+      `SELECT id FROM actions WHERE action_code = 'CREATE'`,
+    );
+    const readActionResult = await queryRunner.query(
+      `SELECT id FROM actions WHERE action_code = 'READ'`,
+    );
+    const updateActionResult = await queryRunner.query(
+      `SELECT id FROM actions WHERE action_code = 'UPDATE'`,
+    );
+    const deleteActionResult = await queryRunner.query(
+      `SELECT id FROM actions WHERE action_code = 'DELETE'`,
+    );
+    const manageActionResult = await queryRunner.query(
+      `SELECT id FROM actions WHERE action_code = 'MANAGE'`,
+    );
+    const viewActionResult = await queryRunner.query(
+      `SELECT id FROM actions WHERE action_code = 'VIEW'`,
+    );
+    const editActionResult = await queryRunner.query(
+      `SELECT id FROM actions WHERE action_code = 'EDIT'`,
+    );
 
     const createActionId = createActionResult[0]?.id;
     const readActionId = readActionResult[0]?.id;
@@ -64,16 +78,34 @@ export class SeedInitialPermissions1658012445678 implements MigrationInterface {
         `);
 
     // Log permissions table content for debugging
-    const currentPermissions = await queryRunner.query(`SELECT * FROM permissions`);
-    console.log('Current permissions in DB after seeding:', currentPermissions.length, 'permissions');
+    const currentPermissions = await queryRunner.query(
+      `SELECT * FROM permissions`,
+    );
+    console.log(
+      'Current permissions in DB after seeding:',
+      currentPermissions.length,
+      'permissions',
+    );
 
     // Get role IDs (these should exist from the main migration)
-    const userRoleResult = await queryRunner.query(`SELECT id FROM roles WHERE name = 'User'`);
-    const adminRoleResult = await queryRunner.query(`SELECT id FROM roles WHERE name = 'Administrator'`);
-    const superadminRoleResult = await queryRunner.query(`SELECT id FROM roles WHERE name = 'Super Administrator'`);
+    const userRoleResult = await queryRunner.query(
+      `SELECT id FROM roles WHERE name = 'User'`,
+    );
+    const adminRoleResult = await queryRunner.query(
+      `SELECT id FROM roles WHERE name = 'Administrator'`,
+    );
+    const superadminRoleResult = await queryRunner.query(
+      `SELECT id FROM roles WHERE name = 'Super Administrator'`,
+    );
 
-    if (userRoleResult.length === 0 || adminRoleResult.length === 0 || superadminRoleResult.length === 0) {
-      console.warn('Some roles not found. Skipping role-permission assignments.');
+    if (
+      userRoleResult.length === 0 ||
+      adminRoleResult.length === 0 ||
+      superadminRoleResult.length === 0
+    ) {
+      console.warn(
+        'Some roles not found. Skipping role-permission assignments.',
+      );
       return;
     }
 
@@ -83,50 +115,54 @@ export class SeedInitialPermissions1658012445678 implements MigrationInterface {
 
     // Create permission map for easy lookup
     const permissionsMap: Map<string, number> = new Map();
-    const allSeededPermissions = await queryRunner.query(`SELECT id, name FROM permissions`);
-    allSeededPermissions.forEach(p => permissionsMap.set(p.name, p.id));
+    const allSeededPermissions = await queryRunner.query(
+      `SELECT id, name FROM permissions`,
+    );
+    allSeededPermissions.forEach((p) => permissionsMap.set(p.name, p.id));
 
     const rolePermissions = [
-        // USER role permissions
-        { roleId: userRoleId, permissionName: 'dashboard:view' },
-        { roleId: userRoleId, permissionName: 'users:view' },
-        
-        // ADMIN role permissions
-        { roleId: adminRoleId, permissionName: 'dashboard:view' },
-        { roleId: adminRoleId, permissionName: 'users:view' },
-        { roleId: adminRoleId, permissionName: 'users:create' },
-        { roleId: adminRoleId, permissionName: 'users:update' },
-        { roleId: adminRoleId, permissionName: 'users:delete' },
-        { roleId: adminRoleId, permissionName: 'roles:view' },
-        { roleId: adminRoleId, permissionName: 'roles:create' },
-        { roleId: adminRoleId, permissionName: 'roles:update' },
-        { roleId: adminRoleId, permissionName: 'permissions:view' },
-        { roleId: adminRoleId, permissionName: 'groups:view' },
-        { roleId: adminRoleId, permissionName: 'groups:create' },
-        { roleId: adminRoleId, permissionName: 'groups:update' },
+      // USER role permissions
+      { roleId: userRoleId, permissionName: 'dashboard:view' },
+      { roleId: userRoleId, permissionName: 'users:view' },
+
+      // ADMIN role permissions
+      { roleId: adminRoleId, permissionName: 'dashboard:view' },
+      { roleId: adminRoleId, permissionName: 'users:view' },
+      { roleId: adminRoleId, permissionName: 'users:create' },
+      { roleId: adminRoleId, permissionName: 'users:update' },
+      { roleId: adminRoleId, permissionName: 'users:delete' },
+      { roleId: adminRoleId, permissionName: 'roles:view' },
+      { roleId: adminRoleId, permissionName: 'roles:create' },
+      { roleId: adminRoleId, permissionName: 'roles:update' },
+      { roleId: adminRoleId, permissionName: 'permissions:view' },
+      { roleId: adminRoleId, permissionName: 'groups:view' },
+      { roleId: adminRoleId, permissionName: 'groups:create' },
+      { roleId: adminRoleId, permissionName: 'groups:update' },
     ];
 
     // Assign specific permissions to roles
     for (const rp of rolePermissions) {
-        const permissionId = permissionsMap.get(rp.permissionName);
-        if (rp.roleId && permissionId) {
-            await queryRunner.query(
-                `INSERT OR IGNORE INTO "role_permissions" (role_id, permission_id, is_granted) VALUES (?, ?, 1)`, 
-                [rp.roleId, permissionId]
-            );
-        } else {
-            console.warn(`Could not assign permission ${rp.permissionName} to role ID ${rp.roleId}. Role or Permission ID not found.`);
-        }
+      const permissionId = permissionsMap.get(rp.permissionName);
+      if (rp.roleId && permissionId) {
+        await queryRunner.query(
+          `INSERT OR IGNORE INTO "role_permissions" (role_id, permission_id, is_granted) VALUES (?, ?, 1)`,
+          [rp.roleId, permissionId],
+        );
+      } else {
+        console.warn(
+          `Could not assign permission ${rp.permissionName} to role ID ${rp.roleId}. Role or Permission ID not found.`,
+        );
+      }
     }
 
     // Assign all permissions to SUPERADMIN
     if (superadminRoleId) {
-        for (const [permissionName, permissionId] of permissionsMap.entries()) {
-            await queryRunner.query(
-                `INSERT OR IGNORE INTO "role_permissions" (role_id, permission_id, is_granted) VALUES (?, ?, 1)`, 
-                [superadminRoleId, permissionId]
-            );
-        }
+      for (const [permissionName, permissionId] of permissionsMap.entries()) {
+        await queryRunner.query(
+          `INSERT OR IGNORE INTO "role_permissions" (role_id, permission_id, is_granted) VALUES (?, ?, 1)`,
+          [superadminRoleId, permissionId],
+        );
+      }
     }
 
     // Register public routes (homepage, login, register) using correct column names
@@ -157,57 +193,58 @@ export class SeedInitialPermissions1658012445678 implements MigrationInterface {
     const usersManagePermissionId = permissionsMap.get('users:manage');
     const rolesManagePermissionId = permissionsMap.get('roles:manage');
     const groupsManagePermissionId = permissionsMap.get('groups:manage');
-    const permissionsManagePermissionId = permissionsMap.get('permissions:manage');
+    const permissionsManagePermissionId =
+      permissionsMap.get('permissions:manage');
     const settingsEditPermissionId = permissionsMap.get('settings:edit');
 
     // Associate routes with permissions
     if (dashboardPermissionId) {
-        await queryRunner.query(
-            `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
-            ['/dashboard', dashboardPermissionId]
-        );
+      await queryRunner.query(
+        `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
+        ['/dashboard', dashboardPermissionId],
+      );
     }
 
     if (usersViewPermissionId) {
-        await queryRunner.query(
-            `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
-            ['/profile', usersViewPermissionId]
-        );
+      await queryRunner.query(
+        `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
+        ['/profile', usersViewPermissionId],
+      );
     }
 
     if (usersManagePermissionId) {
-        await queryRunner.query(
-            `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
-            ['/admin/users', usersManagePermissionId]
-        );
+      await queryRunner.query(
+        `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
+        ['/admin/users', usersManagePermissionId],
+      );
     }
 
     if (rolesManagePermissionId) {
-        await queryRunner.query(
-            `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
-            ['/admin/roles', rolesManagePermissionId]
-        );
+      await queryRunner.query(
+        `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
+        ['/admin/roles', rolesManagePermissionId],
+      );
     }
 
     if (groupsManagePermissionId) {
-        await queryRunner.query(
-            `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
-            ['/admin/groups', groupsManagePermissionId]
-        );
+      await queryRunner.query(
+        `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
+        ['/admin/groups', groupsManagePermissionId],
+      );
     }
 
     if (permissionsManagePermissionId) {
-        await queryRunner.query(
-            `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
-            ['/admin/permissions', permissionsManagePermissionId]
-        );
+      await queryRunner.query(
+        `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
+        ['/admin/permissions', permissionsManagePermissionId],
+      );
     }
 
     if (settingsEditPermissionId) {
-        await queryRunner.query(
-            `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
-            ['/admin/settings', settingsEditPermissionId]
-        );
+      await queryRunner.query(
+        `INSERT OR IGNORE INTO "frontend_route_permissions" (frontend_route_id, permission_id) VALUES (?, ?)`,
+        ['/admin/settings', settingsEditPermissionId],
+      );
     }
 
     console.log('Successfully seeded permissions, roles, and routes');

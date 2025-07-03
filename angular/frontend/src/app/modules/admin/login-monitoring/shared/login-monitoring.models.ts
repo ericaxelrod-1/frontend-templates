@@ -30,6 +30,7 @@ export interface Pattern {
   ipAddresses: string[];
   email?: string;
   expanded?: boolean;
+  evidence?: any; // NEW: Added for grouping counter and additional pattern data
 }
 
 export interface IPReputation {
@@ -42,13 +43,25 @@ export interface IPReputation {
 }
 
 export interface SecurityAlert {
-  id: string;
-  type: string;
+  id: number;
+  alertType: string;
   severity: string;
+  title: string;
   message: string;
-  timestamp: Date;
-  status: 'new' | 'acknowledged' | 'resolved' | 'dismissed';
-  details?: any;
+  source: string;
+  ipAddress?: string;
+  status: 'active' | 'acknowledged' | 'resolved' | 'dismissed';
+  acknowledgedAt?: Date;
+  resolvedAt?: Date;
+  resolutionNotes?: string;
+  alertData?: string;
+  expiresAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  // Legacy support for template compatibility
+  type?: string; // Maps to alertType
+  timestamp?: Date; // Maps to createdAt
+  details?: any; // Maps to alertData
 }
 
 export interface LoginMonitoringFilters {
@@ -57,6 +70,25 @@ export interface LoginMonitoringFilters {
   status?: string;
   dateFrom?: Date;
   dateTo?: Date;
+}
+
+export interface SecurityAlertsFilters {
+  status?: 'active' | 'acknowledged' | 'resolved' | 'dismissed' | '';
+  severity?: 'low' | 'medium' | 'high' | 'critical' | '';
+  alertType?: 'pattern_brute_force' | 'pattern_credential_stuffing' | 'auth_login' | 'security_alert' | 'test_alert' | 'system_alert' | '';
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+}
+
+export interface PatternDetectionFilters {
+  status?: 'active' | 'resolved' | 'dismissed' | '';
+  patternType?: 'brute_force' | 'distributed_attack' | 'credential_stuffing' | 'rapid_account_switching' | 'ip_hopping' | 'suspicious_location' | 'time_anomaly' | '';
+  severity?: 'low' | 'medium' | 'high' | 'critical' | '';
+  ipAddress?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
 }
 
 export interface PaginatedResponse<T> {

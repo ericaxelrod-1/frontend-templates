@@ -1,0 +1,67 @@
+@use '@angular/material' as mat;
+@use '../../../../../styles/abstracts' as *;
+
+.filters-card {
+  margin-bottom: 2rem;
+  
+  .mat-mdc-card-header {
+    .mat-mdc-card-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: $primary-color;
+      
+      mat-icon {
+        font-size: 1.25rem;
+      }
+    }
+  }
+}
+
+.filters-form {
+  .filters-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+  }
+  
+  .filter-field {
+    flex: 1;
+    min-width: 200px;
+    
+    @media (max-width: 768px) {
+      min-width: unset;
+      width: 100%;
+    }
+  }
+  
+  .filter-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-left: auto; // Push buttons to the right
+    
+    @media (max-width: 768px) {
+      justify-content: center;
+      margin-left: unset;
+      margin-top: 1rem;
+      width: 100%;
+    }
+    
+    .apply-btn {
+      min-width: 140px;
+    }
+    
+    .reset-btn {
+      min-width: 100px;
+    }
+  }
+} 

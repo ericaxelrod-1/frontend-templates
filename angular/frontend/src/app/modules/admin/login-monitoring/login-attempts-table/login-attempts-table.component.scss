@@ -73,27 +73,45 @@
   white-space: nowrap;
 }
 
-// Status chips
-.mat-mdc-chip {
-  &.status-success {
-    background-color: $success-color;
-    color: white;
+/* Status cell styling - Combined indicator and text */
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  
+  &.critical {
+    background-color: #b71c1c; /* Dark red for critical */
   }
   
-  &.status-failed {
-    background-color: $error-color;
-    color: white;
+  &.high {
+    background-color: #c62828; /* Red for high */
   }
   
-  &.status-blocked {
-    background-color: $warning-color;
-    color: white;
+  &.medium {
+    background-color: #e65100; /* Orange for medium */
   }
   
-  &.status-captcha_required {
-    background-color: $info-color;
-    color: white;
+  &.low {
+    background-color: #1b5e20; /* Green for low */
   }
+  
+  &.default {
+    background-color: #424242; /* Gray for default */
+  }
+}
+
+.status-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--mat-sys-on-surface);
 }
 
 .details {

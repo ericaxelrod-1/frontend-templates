@@ -10,6 +10,8 @@ import {
   IPReputation, 
   SecurityAlert, 
   LoginMonitoringFilters,
+  SecurityAlertsFilters,
+  PatternDetectionFilters,
   PaginatedResponse 
 } from './login-monitoring.models';
 
@@ -69,29 +71,80 @@ export class LoginMonitoringService {
       .pipe(catchError(this.handleError));
   }
 
-  // Pattern Detection API
-  detectPatterns(): Observable<Pattern[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/patterns/detect`)
+  // Pattern Detection API - UNIFIED APPROACH with Pagination Support
+  getPatterns(
+    filters: PatternDetectionFilters = {},
+    page: number = 0,
+    pageSize: number = 10,
+    sortBy: string = 'detectionTimestamp',
+    sortDirection: string = 'desc'
+  ): Observable<PaginatedResponse<Pattern>> {
+    let url = `${this.apiUrl}/patterns?limit=${pageSize}&offset=${page * pageSize}`;
+    
+    // Add sorting parameters
+    url += `&sortBy=${sortBy}&sortDirection=${sortDirection}`;
+    
+    console.log('[DEBUG] Pattern service URL before filters:', url);
+    console.log('[DEBUG] Pattern service parameters:', { page, pageSize, sortBy, sortDirection, filters });
+    
+    // Add filter parameters
+    if (filters.status) {
+      url += `&status=${encodeURIComponent(filters.status)}`;
+    }
+    if (filters.patternType) {
+      url += `&patternType=${encodeURIComponent(filters.patternType)}`;
+    }
+    if (filters.severity) {
+      url += `&severity=${encodeURIComponent(filters.severity)}`;
+    }
+    if (filters.ipAddress) {
+      url += `&ipAddress=${encodeURIComponent(filters.ipAddress)}`;
+    }
+    if (filters.dateFrom) {
+      url += `&dateFrom=${filters.dateFrom.toISOString()}`;
+    }
+    if (filters.dateTo) {
+      url += `&dateTo=${filters.dateTo.toISOString()}`;
+    }
+    if (filters.search) {
+      url += `&search=${encodeURIComponent(filters.search)}`;
+    }
+    
+    console.log('[DEBUG] Final patterns URL:', url);
+    console.log('[DEBUG] Making HTTP request for patterns...');
+    
+    return this.http.get<{items: any[], total: number}>(url)
       .pipe(
-        map(patterns => patterns.map(pattern => this.transformDetectedPattern(pattern))),
+        map(response => ({
+          items: (response.items || []).map(pattern => this.transformDetectedPattern(pattern)),
+          total: response.total || 0,
+          page: page,
+          pageSize: pageSize
+        })),
         catchError(this.handleError)
       );
+  }
+
+  // DEPRECATED METHODS - Kept for backward compatibility during transition
+  detectPatterns(): Observable<Pattern[]> {
+    // Redirect to unified method and extract items only
+    return this.getPatterns({}, 0, 50).pipe(
+      map(response => response.items)
+    );
   }
 
   loadRealTimePatterns(): Observable<Pattern[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/patterns/real-time`)
-      .pipe(
-        map(patterns => patterns.map(pattern => this.transformDetectedPattern(pattern))),
-        catchError(this.handleError)
-      );
+    // Redirect to unified method with active status filter and extract items only
+    return this.getPatterns({ status: 'active' }, 0, 50).pipe(
+      map(response => response.items)
+    );
   }
 
   loadHistoricalPatterns(): Observable<Pattern[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/patterns/historical`)
-      .pipe(
-        map(patterns => patterns.map(pattern => this.transformDetectedPattern(pattern))),
-        catchError(this.handleError)
-      );
+    // Redirect to unified method and extract items only
+    return this.getPatterns({}, 0, 50).pipe(
+      map(response => response.items)
+    );
   }
 
   createTestPattern(patternType: string): Observable<any> {
@@ -104,10 +157,67 @@ export class LoginMonitoringService {
       .pipe(catchError(this.handleError));
   }
 
-  // Security Alerts API - Fixed to use correct endpoint
-  getSecurityAlerts(): Observable<SecurityAlert[]> {
-    return this.http.get<SecurityAlert[]>(`${environment.apiUrl}/security-alerts/alerts`)
-      .pipe(catchError(this.handleError));
+  // DEPRECATED METHOD - Replaced by unified getPatterns method
+  getFilteredPatterns(
+    filters: PatternDetectionFilters = {},
+    page: number = 0,
+    pageSize: number = 10,
+    sortBy: string = 'detectionTimestamp',
+    sortDirection: string = 'desc'
+  ): Observable<Pattern[]> {
+    // Redirect to unified method and extract items only
+    return this.getPatterns(filters, page, pageSize, sortBy, sortDirection).pipe(
+      map(response => response.items)
+    );
+  }
+
+  // Security Alerts API - Fixed to use correct endpoint and handle paginated response
+  getSecurityAlerts(
+    filters: SecurityAlertsFilters = {},
+    page: number = 0,
+    pageSize: number = 10,
+    sortBy: string = 'createdAt',
+    sortDirection: string = 'desc'
+  ): Observable<SecurityAlert[]> {
+    let url = `${environment.apiUrl}/security-alerts/alerts?limit=${pageSize}&offset=${page * pageSize}`;
+    
+    // Add sorting parameters
+    if (sortBy && sortDirection) {
+      url += `&sortBy=${sortBy}&sortDirection=${sortDirection}`;
+    }
+    
+    // Add filters based on backend investigation
+    if (filters.status) {
+      url += `&status=${encodeURIComponent(filters.status)}`;
+    }
+    
+    if (filters.severity) {
+      url += `&severity=${encodeURIComponent(filters.severity)}`;
+    }
+    
+    if (filters.alertType) {
+      url += `&alertType=${encodeURIComponent(filters.alertType)}`;
+    }
+    
+    if (filters.search) {
+      url += `&search=${encodeURIComponent(filters.search)}`;
+    }
+    
+    if (filters.dateFrom) {
+      const dateFrom = new Date(filters.dateFrom);
+      url += `&dateFrom=${dateFrom.toISOString()}`;
+    }
+    
+    if (filters.dateTo) {
+      const dateTo = new Date(filters.dateTo);
+      url += `&dateTo=${dateTo.toISOString()}`;
+    }
+
+    return this.http.get<{items: any[], total: number}>(url)
+      .pipe(
+        map(response => (response.items || []).map(alert => this.transformSecurityAlert(alert))),
+        catchError(this.handleError)
+      );
   }
 
   acknowledgeAlert(alertId: string): Observable<SecurityAlert> {
@@ -147,6 +257,26 @@ export class LoginMonitoringService {
   unblockIP(ipAddress: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/ip/${encodeURIComponent(ipAddress)}/unblock`, {})
       .pipe(catchError(this.handleError));
+  }
+
+  /**
+   * Transform backend SecurityAlert to frontend SecurityAlert interface
+   * Adds legacy field mappings for template compatibility
+   */
+  private transformSecurityAlert(backendAlert: any): SecurityAlert {
+    return {
+      ...backendAlert,
+      // Legacy field mappings for template compatibility
+      type: backendAlert.alertType,
+      timestamp: backendAlert.createdAt ? new Date(backendAlert.createdAt) : new Date(),
+      details: backendAlert.alertData ? JSON.parse(backendAlert.alertData) : null,
+      // Ensure dates are Date objects
+      createdAt: new Date(backendAlert.createdAt),
+      updatedAt: new Date(backendAlert.updatedAt),
+      acknowledgedAt: backendAlert.acknowledgedAt ? new Date(backendAlert.acknowledgedAt) : undefined,
+      resolvedAt: backendAlert.resolvedAt ? new Date(backendAlert.resolvedAt) : undefined,
+      expiresAt: backendAlert.expiresAt ? new Date(backendAlert.expiresAt) : undefined,
+    };
   }
 
   /**
@@ -203,7 +333,8 @@ export class LoginMonitoringService {
       timestamp: new Date(backendPattern.timestamp),
       ipAddresses: ipAddresses, // Always an array
       email: emails.length > 0 ? emails[0] : undefined, // First email for backwards compatibility
-      expanded: backendPattern.expanded || false
+      expanded: backendPattern.expanded || false,
+      evidence: backendPattern.evidence // CRITICAL FIX: Include evidence property for grouping and metadata
     };
   }
 

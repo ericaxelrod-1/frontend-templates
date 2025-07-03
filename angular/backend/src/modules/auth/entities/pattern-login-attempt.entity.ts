@@ -16,7 +16,10 @@ export class PatternLoginAttempt {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => SecurityDetectedPattern, pattern => pattern.patternLoginAttempts)
+  @ManyToOne(
+    () => SecurityDetectedPattern,
+    (pattern) => pattern.patternLoginAttempts,
+  )
   @JoinColumn({ name: 'pattern_id' })
   pattern: SecurityDetectedPattern;
 
@@ -29,4 +32,4 @@ export class PatternLoginAttempt {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
-} 
+}

@@ -145,7 +145,7 @@ export class User {
   @Column({ name: 'blocked_reason', type: 'text', nullable: true })
   blockedReason: string;
 
-  @ManyToMany(() => Role, role => role.users)
+  @ManyToMany(() => Role, (role) => role.users)
   @JoinTable({
     name: 'user_roles',
     joinColumn: {
@@ -159,7 +159,7 @@ export class User {
   })
   roles: Role[];
 
-  @ManyToMany(() => Group, group => group.users)
+  @ManyToMany(() => Group, (group) => group.users)
   @JoinTable({
     name: 'user_groups',
     joinColumn: {
@@ -173,10 +173,8 @@ export class User {
   })
   groups: Group[];
 
-  @OneToMany(() => UserPermission, userPermission => userPermission.user)
+  @OneToMany(() => UserPermission, (userPermission) => userPermission.user)
   userPermissions: UserPermission[];
-
-
 
   @ManyToMany(() => Permission)
   @JoinTable({
