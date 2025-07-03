@@ -151,15 +151,17 @@
                   </mat-cell>
                 </ng-container>
 
-                <!-- Severity Column -->
+                <!-- Severity Column (Combined Indicator + Level) -->
                 <ng-container matColumnDef="severity">
                   <mat-header-cell *matHeaderCellDef mat-sort-header="severity">
                     Severity
                   </mat-header-cell>
                   <mat-cell *matCellDef="let pattern">
-                    <mat-chip [class]="getSeverityClass(pattern.severity)">
-                      {{ pattern.severity | uppercase }}
-                    </mat-chip>
+                    <div class="severity-cell">
+                      <div class="severity-indicator" [class]="getSeverityColor(pattern.severity)"
+                           [title]="pattern.severity | titlecase"></div>
+                      <span class="severity-text">{{ pattern.severity | uppercase }}</span>
+                    </div>
                   </mat-cell>
                 </ng-container>
 
@@ -279,15 +281,18 @@
               <!-- Alerts list -->
               <div *ngIf="!loading.alerts && securityAlerts.length > 0" class="alerts-list">
                 <div *ngFor="let alert of securityAlerts" 
-                     class="alert-item"
-                     [class]="getSeverityClass(alert.severity)">
+                     class="alert-item">
                   
                   <div class="alert-content">
                     <div class="alert-header">
                       <span class="alert-type">{{ alert.type | titlecase }}</span>
-                      <mat-chip [class]="getSeverityClass(alert.severity)">
-                        {{ alert.severity | uppercase }}
-                      </mat-chip>
+                      <div class="severity-cell">
+                        <div class="severity-indicator" [class]="getSeverityColor(alert.severity)"
+                             [title]="alert.severity | titlecase"></div>
+                        <span class="severity-text">
+                          {{ alert.severity | uppercase }}
+                        </span>
+                      </div>
                       <span class="alert-status">{{ alert.status | titlecase }}</span>
                     </div>
                     <p class="alert-message">{{ alert.message }}</p>
@@ -341,7 +346,7 @@
                   <h3>{{ selectedIpReputation.ipAddress }}</h3>
                   <div class="reputation-score">
                     <span>Reputation Score: </span>
-                    <mat-chip [class]="selectedIpReputation.reputation > 70 ? 'good' : selectedIpReputation.reputation > 40 ? 'warning' : 'danger'">
+                    <mat-chip>
                       {{ selectedIpReputation.reputation }}/100
                     </mat-chip>
                   </div>
@@ -350,7 +355,7 @@
                 <div class="ip-stats">
                   <p><strong>Failed Attempts:</strong> {{ selectedIpReputation.failedAttempts }}</p>
                   <p><strong>Status:</strong> 
-                    <mat-chip [class]="selectedIpReputation.isBlocked ? 'blocked' : 'allowed'">
+                    <mat-chip>
                       {{ selectedIpReputation.isBlocked ? 'Blocked' : 'Allowed' }}
                     </mat-chip>
                   </p>

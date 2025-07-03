@@ -254,16 +254,18 @@ export class LoginMonitoringComponent implements OnInit {
     }
   }
 
-  getSeverityClass(severity: string): string {
+  getSeverityColor(severity: string): string {
     switch (severity.toLowerCase()) {
+      case 'critical':
+        return 'critical';
       case 'high':
-        return 'severity-high';
+        return 'high';
       case 'medium':
-        return 'severity-medium';
+        return 'medium';
       case 'low':
-        return 'severity-low';
+        return 'low';
       default:
-        return 'severity-default';
+        return 'default';
     }
   }
 

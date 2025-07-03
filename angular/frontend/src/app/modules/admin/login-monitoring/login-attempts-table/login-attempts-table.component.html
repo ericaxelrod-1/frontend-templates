@@ -60,9 +60,13 @@
   <ng-container matColumnDef="status">
     <mat-header-cell *matHeaderCellDef mat-sort-header>Status</mat-header-cell>
     <mat-cell *matCellDef="let attempt">
-      <mat-chip [class]="'status-' + attempt.status.toLowerCase()">
-        {{ attempt.status }}
-      </mat-chip>
+      <div class="status-cell">
+        <div class="status-indicator" [class]="getStatusSeverityColor(attempt.status)"
+             [title]="getStatusSeverityLevel(attempt.status) | titlecase"></div>
+        <span class="status-text">
+          {{ attempt.status }}
+        </span>
+      </div>
     </mat-cell>
   </ng-container>
 

@@ -195,4 +195,39 @@ export class LoginAttemptsTableComponent implements OnInit, AfterViewInit {
     this.currentPage = 0; // Reset to first page
     this.loadRecentAttempts();
   }
+
+  // Status severity mapping methods - following FEAT-123 pattern
+  getStatusSeverityColor(status: string): string {
+    switch (status.toLowerCase()) {
+      case 'success':
+        return 'low';           // Green for successful logins
+      case 'failed':
+        return 'medium';        // Orange for failed attempts
+      case 'blocked':
+        return 'high';          // Red for blocked attempts
+      case 'captcha_required':
+        return 'medium';        // Orange for CAPTCHA required
+      case 'captcha_failed':
+        return 'high';          // Red for CAPTCHA failures
+      default:
+        return 'default';       // Gray for unknown status
+    }
+  }
+
+  getStatusSeverityLevel(status: string): string {
+    switch (status.toLowerCase()) {
+      case 'success':
+        return 'low';
+      case 'failed':
+        return 'medium';
+      case 'blocked':
+        return 'high';
+      case 'captcha_required':
+        return 'medium';
+      case 'captcha_failed':
+        return 'high';
+      default:
+        return 'default';
+    }
+  }
 } 
