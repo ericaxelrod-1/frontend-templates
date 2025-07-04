@@ -1,0 +1,103 @@
+.time-filter-container {
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.time-filter-form {
+  .filter-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+      gap: 12px;
+    }
+  }
+
+  .time-range-field {
+    min-width: 200px;
+    flex-shrink: 0;
+
+    @media (max-width: 768px) {
+      min-width: 100%;
+    }
+  }
+
+  .custom-date-range {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .date-field {
+      min-width: 160px;
+
+      @media (max-width: 768px) {
+        min-width: 100%;
+      }
+    }
+  }
+
+  .filter-validation {
+    margin-top: 8px;
+    
+    mat-error {
+      font-size: 0.875rem;
+      color: #f44336;
+    }
+  }
+}
+
+// Material Design form field customizations
+.time-filter-container {
+  ::ng-deep {
+    .mat-mdc-form-field {
+      .mat-mdc-text-field-wrapper {
+        .mat-mdc-form-field-flex {
+          .mat-mdc-floating-label {
+            color: rgba(0, 0, 0, 0.6);
+          }
+        }
+      }
+
+      &.mat-focused {
+        .mat-mdc-floating-label {
+          color: #1976d2;
+        }
+      }
+    }
+
+    .mat-mdc-select-panel {
+      max-height: 300px;
+    }
+
+    .mat-datepicker-toggle {
+      color: rgba(0, 0, 0, 0.54);
+    }
+  }
+}
+
+// Loading state (for future use)
+.time-filter-container.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+// Responsive design
+@media (max-width: 480px) {
+  .time-filter-container {
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+} 
