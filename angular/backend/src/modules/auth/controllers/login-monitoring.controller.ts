@@ -24,6 +24,8 @@ import { AlertService, AlertSeverity } from '../services/alert.service';
 import { SecurityAlertService } from '../services/security-alert.service';
 import { PermissionGuard } from '../../permissions/guards/permission.guard';
 import { RequirePermission } from '../../permissions/decorators/require-permission.decorator';
+import { PatternSummaryDto } from '../dto/pattern-summary.dto';
+import { PatternSummaryQueryDto } from '../dto/pattern-summary-query.dto';
 
 @ApiTags('login-monitoring')
 @Controller('login-monitoring')
@@ -181,6 +183,40 @@ export class LoginMonitoringController {
     return await this.patternDetectionService.getHistoricalPatterns(
       limit || 50,
     );
+  }
+
+  @Get('patterns/summary')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('login-monitoring:read')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get pattern type summary for dashboard tiles',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Pattern type summary with counts and severity distribution',
+    type: [PatternSummaryDto],
+  })
+  async getPatternSummary(@Query() query: PatternSummaryQueryDto): Promise<PatternSummaryDto[]> {
+    const { dateFrom, dateTo, timeRange } = query;
+    
+    const startDate = dateFrom ? new Date(dateFrom) : undefined;
+    const endDate = dateTo ? new Date(dateTo) : undefined;
+    
+    const summary = await this.patternDetectionService.getPatternSummary(
+      startDate,
+      endDate,
+      timeRange,
+    );
+    
+    return summary.map(item => ({
+      patternType: item.patternType,
+      displayName: item.displayName,
+      count: item.count,
+      severity: item.severity,
+      lastDetected: item.lastDetected,
+      percentage: item.percentage,
+    }));
   }
 
   @Get('patterns/filtered')

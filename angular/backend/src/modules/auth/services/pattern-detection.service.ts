@@ -874,4 +874,138 @@ export class PatternDetectionService {
 
     return patterns;
   }
+
+  /**
+   * Get pattern summary for dashboard tiles
+   * Returns aggregated pattern counts by type with severity distribution
+   */
+  async getPatternSummary(
+    dateFrom?: Date,
+    dateTo?: Date,
+    timeRange?: '24h' | '7d' | '30d' | '90d' | 'all',
+  ): Promise<{
+    patternType: string;
+    displayName: string;
+    count: number;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    lastDetected: Date;
+    percentage?: number;
+  }[]> {
+    // Calculate time range if predefined range is provided
+    let startDate: Date | undefined = dateFrom;
+    let endDate: Date | undefined = dateTo;
+
+    if (timeRange && timeRange !== 'all') {
+      endDate = new Date();
+      startDate = new Date();
+      
+      switch (timeRange) {
+        case '24h':
+          startDate.setHours(startDate.getHours() - 24);
+          break;
+        case '7d':
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(startDate.getDate() - 30);
+          break;
+        case '90d':
+          startDate.setDate(startDate.getDate() - 90);
+          break;
+      }
+    }
+
+    // Build query for pattern aggregation
+    const query = this.securityDetectedPatternRepository
+      .createQueryBuilder('pattern')
+      .select('pattern.patternType', 'patternType')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('MAX(pattern.detectionTimestamp)', 'lastDetected')
+      .addSelect('pattern.severity', 'severity')
+      .addSelect('COUNT(CASE WHEN pattern.severity = \'critical\' THEN 1 END)', 'criticalCount')
+      .addSelect('COUNT(CASE WHEN pattern.severity = \'high\' THEN 1 END)', 'highCount')
+      .addSelect('COUNT(CASE WHEN pattern.severity = \'medium\' THEN 1 END)', 'mediumCount')
+      .addSelect('COUNT(CASE WHEN pattern.severity = \'low\' THEN 1 END)', 'lowCount');
+
+    // Apply time filters
+    if (startDate) {
+      query.andWhere('pattern.detectionTimestamp >= :startDate', { startDate });
+    }
+    if (endDate) {
+      query.andWhere('pattern.detectionTimestamp <= :endDate', { endDate });
+    }
+
+    // Group by pattern type
+    query.groupBy('pattern.patternType');
+
+    const results = await query.getRawMany();
+
+    // Calculate total count for percentages
+    const totalCount = results.reduce((sum, item) => sum + parseInt(item.count), 0);
+
+    // Pattern type display names mapping
+    const displayNames = {
+      'brute_force': 'Brute Force Attacks',
+      'distributed_attack': 'Distributed Attacks',
+      'credential_stuffing': 'Credential Stuffing',
+      'rapid_account_switching': 'Account Switching',
+      'ip_hopping': 'IP Hopping',
+      'suspicious_location': 'Suspicious Locations',
+      'time_anomaly': 'Time Anomalies',
+    };
+
+    // Process results and determine predominant severity
+    const summaries = results.map(item => {
+      const count = parseInt(item.count);
+      const criticalCount = parseInt(item.criticalCount) || 0;
+      const highCount = parseInt(item.highCount) || 0;
+      const mediumCount = parseInt(item.mediumCount) || 0;
+      const lowCount = parseInt(item.lowCount) || 0;
+
+      // Determine predominant severity
+      let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
+      if (criticalCount > 0) {
+        severity = 'critical';
+      } else if (highCount > 0) {
+        severity = 'high';
+      } else if (mediumCount > 0) {
+        severity = 'medium';
+      }
+
+      return {
+        patternType: item.patternType,
+        displayName: displayNames[item.patternType] || item.patternType,
+        count,
+        severity,
+        lastDetected: new Date(item.lastDetected),
+        percentage: totalCount > 0 ? Math.round((count / totalCount) * 100) : 0,
+      };
+    });
+
+    // Ensure all pattern types are represented, even with 0 count
+    const allPatternTypes = Object.keys(displayNames);
+    const existingTypes = summaries.map(s => s.patternType);
+    
+    for (const patternType of allPatternTypes) {
+      if (!existingTypes.includes(patternType)) {
+        summaries.push({
+          patternType,
+          displayName: displayNames[patternType],
+          count: 0,
+          severity: 'low',
+          lastDetected: new Date(0), // Epoch time for never detected
+          percentage: 0,
+        });
+      }
+    }
+
+    // Sort by count descending, then by severity
+    return summaries.sort((a, b) => {
+      if (a.count !== b.count) {
+        return b.count - a.count;
+      }
+      const severityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
+      return severityOrder[b.severity] - severityOrder[a.severity];
+    });
+  }
 }

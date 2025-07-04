@@ -1,15 +1,18 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { FormGroup } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTabGroup } from '@angular/material/tabs';
+
 import { PermissionService } from '../../../core/services/permission.service';
+import { LoginMonitoringService } from './shared/login-monitoring.service';
 import { LoginMonitoringSharedModule } from './shared/login-monitoring-shared.module';
 import { StatisticsDashboardComponent } from './statistics-dashboard/statistics-dashboard.component';
 import { FiltersComponent } from './filters/filters.component';
 import { LoginAttemptsTableComponent } from './login-attempts-table/login-attempts-table.component';
 import { SecurityAlertsFiltersComponent } from './security-alerts-filters/security-alerts-filters.component';
 import { PatternDetectionFiltersComponent } from './pattern-detection-filters/pattern-detection-filters.component';
-import { LoginMonitoringService } from './shared/login-monitoring.service';
+import { TimeFilterComponent } from './components/time-filter/time-filter.component';
 import { 
   LoginAttempt, 
   Statistics, 
@@ -19,6 +22,7 @@ import {
   PatternDetectionFilters,
   IPReputation 
 } from './shared/login-monitoring.models';
+import { PatternSummary, TimeFilter } from '../../../models/pattern-summary.interface';
 
 @Component({
   selector: 'app-login-monitoring',
@@ -29,7 +33,8 @@ import {
     FiltersComponent,
     LoginAttemptsTableComponent,
     SecurityAlertsFiltersComponent,
-    PatternDetectionFiltersComponent
+    PatternDetectionFiltersComponent,
+    TimeFilterComponent
   ],
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
@@ -46,10 +51,18 @@ export class LoginMonitoringComponent implements OnInit {
   // ViewChild reference to table component for filter triggering
   @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
   
+  // ViewChild references for pattern tile navigation and filtering
+  @ViewChild(MatTabGroup) tabGroup!: MatTabGroup;
+  @ViewChild(PatternDetectionFiltersComponent) patternFiltersComponent!: PatternDetectionFiltersComponent;
+  
   // Data for tabs that aren't yet refactored
   detectedPatterns: Pattern[] = [];
   securityAlerts: SecurityAlert[] = [];
   selectedIpReputation: IPReputation | null = null;
+  
+  // Pattern Summary Dashboard Properties
+  patternSummary: PatternSummary[] = [];
+  currentTimeFilter: TimeFilter = { timeRange: '30d' }; // Default to last 30 days
   
   // Pattern Detection Table Properties - Following login-attempts-table pattern
   patternDisplayedColumns: string[] = [
@@ -65,7 +78,8 @@ export class LoginMonitoringComponent implements OnInit {
   loading = {
     patterns: false,
     alerts: false,
-    ipReputation: false
+    ipReputation: false,
+    patternSummary: false
   };
 
   constructor(
@@ -83,6 +97,7 @@ export class LoginMonitoringComponent implements OnInit {
       if (hasPermission) {
         this.loadPatterns();
         this.loadSecurityAlerts();
+        this.loadPatternSummary();
       } else {
         this.snackBar.open('You do not have permission to view this page.', 'Close', { duration: 5000 });
         this.router.navigate(['/app/dashboard']);
@@ -397,5 +412,89 @@ export class LoginMonitoringComponent implements OnInit {
         this.snackBar.open('Failed to clear test data', 'Close', { duration: 5000 });
       }
     });
+  }
+
+  // Pattern Summary Dashboard Methods
+  loadPatternSummary(): void {
+    if (!this.hasPermission) return;
+    
+    console.log('[DEBUG] loadPatternSummary called with timeFilter:', this.currentTimeFilter);
+    this.loading.patternSummary = true;
+    
+    this.loginMonitoringService.getPatternSummary(this.currentTimeFilter).subscribe({
+      next: (data) => {
+        console.log('[DEBUG] Pattern summary loaded successfully:', data);
+        this.patternSummary = data;
+        this.loading.patternSummary = false;
+      },
+      error: (error) => {
+        console.error('[DEBUG] Error loading pattern summary:', error);
+        this.snackBar.open('Failed to load pattern summary', 'Close', { duration: 5000 });
+        this.loading.patternSummary = false;
+      }
+    });
+  }
+
+  onTimeFilterChange(timeFilter: TimeFilter): void {
+    console.log('[DEBUG] Time filter changed:', timeFilter);
+    this.currentTimeFilter = timeFilter;
+    this.loadPatternSummary();
+  }
+
+  onPatternTileClick(patternType: string): void {
+    console.log('[DEBUG] Pattern tile clicked:', patternType);
+    
+    // Navigate to Pattern Detection tab (index 1)
+    if (this.tabGroup) {
+      this.tabGroup.selectedIndex = 1;
+    }
+    
+    // Apply pattern type filter
+    if (this.patternFiltersComponent && this.patternFiltersComponent.filterForm) {
+      // Set the pattern type filter
+      this.patternFiltersComponent.filterForm.patchValue({
+        patternType: patternType
+      });
+      
+      // Trigger the filter change manually
+      this.patternFiltersComponent.onFiltersChanged();
+    } else {
+      // Fallback: Set filters directly and load patterns
+      this.patternDetectionFilters = {
+        ...this.patternDetectionFilters,
+        patternType: patternType as 'brute_force' | 'distributed_attack' | 'credential_stuffing' | 'rapid_account_switching' | 'ip_hopping' | 'suspicious_location' | 'time_anomaly'
+      };
+      this.loadPatterns(this.patternDetectionFilters);
+    }
+    
+    // Show user feedback
+    const displayName = this.getPatternDisplayName(patternType);
+    this.snackBar.open(`Filtering by ${displayName} patterns`, 'Close', { duration: 3000 });
+  }
+
+  getPatternIcon(patternType: string): string {
+    const iconMap: { [key: string]: string } = {
+      'brute_force': 'security',
+      'distributed_attack': 'network_check',
+      'credential_stuffing': 'vpn_key',
+      'rapid_account_switching': 'swap_horiz',
+      'ip_hopping': 'location_on',
+      'suspicious_location': 'place',
+      'time_anomaly': 'schedule'
+    };
+    return iconMap[patternType] || 'warning';
+  }
+
+  getPatternDisplayName(patternType: string): string {
+    const nameMap: { [key: string]: string } = {
+      'brute_force': 'Brute Force',
+      'distributed_attack': 'Distributed Attack',
+      'credential_stuffing': 'Credential Stuffing',
+      'rapid_account_switching': 'Account Switching',
+      'ip_hopping': 'IP Hopping',
+      'suspicious_location': 'Suspicious Location',
+      'time_anomaly': 'Time Anomaly'
+    };
+    return nameMap[patternType] || patternType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
 } 
