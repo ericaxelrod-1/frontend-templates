@@ -12,7 +12,7 @@
         <!-- Status Filter -->
         <mat-form-field appearance="outline" class="filter-field">
           <mat-label>Status</mat-label>
-          <mat-select formControlName="status" [disabled]="!hasPermission">
+          <mat-select formControlName="status">
             <mat-option *ngFor="let option of statusOptions" [value]="option.value">
               {{ option.label }}
             </mat-option>
@@ -23,7 +23,7 @@
         <!-- Severity Filter -->
         <mat-form-field appearance="outline" class="filter-field">
           <mat-label>Severity</mat-label>
-          <mat-select formControlName="severity" [disabled]="!hasPermission">
+          <mat-select formControlName="severity">
             <mat-option *ngFor="let option of severityOptions" [value]="option.value">
               {{ option.label }}
             </mat-option>
@@ -34,7 +34,7 @@
         <!-- Alert Type Filter -->
         <mat-form-field appearance="outline" class="filter-field">
           <mat-label>Alert Type</mat-label>
-          <mat-select formControlName="alertType" [disabled]="!hasPermission">
+          <mat-select formControlName="alertType">
             <mat-option *ngFor="let option of alertTypeOptions" [value]="option.value">
               {{ option.label }}
             </mat-option>
@@ -49,8 +49,7 @@
           <mat-label>Search</mat-label>
           <input matInput 
                  formControlName="search"
-                 placeholder="Search alerts by title or message"
-                 [disabled]="!hasPermission">
+                 placeholder="Search alerts by title or message">
           <mat-icon matSuffix>search</mat-icon>
         </mat-form-field>
 
@@ -60,8 +59,7 @@
           <input matInput 
                  [matDatepicker]="fromPicker"
                  formControlName="dateFrom"
-                 placeholder="Select start date"
-                 [disabled]="!hasPermission">
+                 placeholder="Select start date">
           <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
           <mat-datepicker #fromPicker></mat-datepicker>
         </mat-form-field>
@@ -72,8 +70,7 @@
           <input matInput 
                  [matDatepicker]="toPicker"
                  formControlName="dateTo"
-                 placeholder="Select end date"
-                 [disabled]="!hasPermission">
+                 placeholder="Select end date">
           <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
           <mat-datepicker #toPicker></mat-datepicker>
         </mat-form-field>
@@ -85,7 +82,7 @@
           <button mat-raised-button 
                   color="primary" 
                   (click)="onApplyFilters()"
-                  [disabled]="!hasPermission"
+                  [class.disabled]="!hasPermission"
                   class="apply-btn">
             <mat-icon>search</mat-icon>
             Apply Filters
@@ -93,7 +90,7 @@
           
           <button mat-button 
                   (click)="onResetFilters()"
-                  [disabled]="!hasPermission"
+                  [class.disabled]="!hasPermission"
                   class="reset-btn">
             <mat-icon>clear</mat-icon>
             Reset

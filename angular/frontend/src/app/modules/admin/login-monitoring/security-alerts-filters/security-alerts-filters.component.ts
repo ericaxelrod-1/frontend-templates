@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { LoginMonitoringSharedModule } from '../shared/login-monitoring-shared.module';
 import { SecurityAlertsFilters } from '../shared/login-monitoring.models';
@@ -10,7 +10,7 @@ import { SecurityAlertsFilters } from '../shared/login-monitoring.models';
   templateUrl: './security-alerts-filters.component.html',
   styleUrls: ['./security-alerts-filters.component.scss']
 })
-export class SecurityAlertsFiltersComponent implements OnInit {
+export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   @Input() hasPermission = false;
   @Output() filtersChanged = new EventEmitter<SecurityAlertsFilters>();
   @Output() filtersReset = new EventEmitter<void>();
@@ -45,24 +45,45 @@ export class SecurityAlertsFiltersComponent implements OnInit {
   ];
 
   constructor(private fb: FormBuilder) {
+    this.filterForm = this.createFilterForm();
+  }
+
+  ngOnInit(): void {
+    // Set initial disabled state
+    this.updateFormDisabledState();
+    // Emit initial form state with default date range
+    this.emitFilters();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Update form disabled state when hasPermission changes
+    if (changes['hasPermission'] && this.filterForm) {
+      this.updateFormDisabledState();
+    }
+  }
+
+  private createFilterForm(): FormGroup {
     // Default date range (last 7 days) for consistency with login attempts filters
     const defaultDateTo = new Date();
     const defaultDateFrom = new Date();
     defaultDateFrom.setDate(defaultDateFrom.getDate() - 7);
     
-    this.filterForm = this.fb.group({
-      status: [''],
-      severity: [''],
-      alertType: [''],
-      dateFrom: [defaultDateFrom],
-      dateTo: [defaultDateTo],
-      search: ['']
+    return this.fb.group({
+      status: [{ value: '', disabled: !this.hasPermission }],
+      severity: [{ value: '', disabled: !this.hasPermission }],
+      alertType: [{ value: '', disabled: !this.hasPermission }],
+      dateFrom: [{ value: defaultDateFrom, disabled: !this.hasPermission }],
+      dateTo: [{ value: defaultDateTo, disabled: !this.hasPermission }],
+      search: [{ value: '', disabled: !this.hasPermission }]
     });
   }
 
-  ngOnInit(): void {
-    // Emit initial form state with default date range
-    this.emitFilters();
+  private updateFormDisabledState(): void {
+    if (this.hasPermission) {
+      this.filterForm.enable();
+    } else {
+      this.filterForm.disable();
+    }
   }
 
   onApplyFilters(): void {

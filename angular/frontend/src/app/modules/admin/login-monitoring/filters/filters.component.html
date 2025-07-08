@@ -14,8 +14,7 @@
           <mat-label>Email</mat-label>
           <input matInput 
                  formControlName="email"
-                 placeholder="Enter email address"
-                 [disabled]="!hasPermission">
+                 placeholder="Enter email address">
           <mat-icon matSuffix>email</mat-icon>
         </mat-form-field>
 
@@ -24,15 +23,14 @@
           <mat-label>IP Address</mat-label>
           <input matInput 
                  formControlName="ipAddress"
-                 placeholder="Enter IP address"
-                 [disabled]="!hasPermission">
+                 placeholder="Enter IP address">
           <mat-icon matSuffix>computer</mat-icon>
         </mat-form-field>
 
         <!-- Status Filter -->
         <mat-form-field appearance="outline" class="filter-field">
           <mat-label>Status</mat-label>
-          <mat-select formControlName="status" [disabled]="!hasPermission">
+          <mat-select formControlName="status">
             <mat-option value="">All Statuses</mat-option>
             <mat-option value="success">Success</mat-option>
             <mat-option value="failed">Failed</mat-option>
@@ -50,8 +48,7 @@
           <input matInput 
                  [matDatepicker]="fromPicker"
                  formControlName="dateFrom"
-                 placeholder="Select start date"
-                 [disabled]="!hasPermission">
+                 placeholder="Select start date">
           <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
           <mat-datepicker #fromPicker></mat-datepicker>
         </mat-form-field>
@@ -62,8 +59,7 @@
           <input matInput 
                  [matDatepicker]="toPicker"
                  formControlName="dateTo"
-                 placeholder="Select end date"
-                 [disabled]="!hasPermission">
+                 placeholder="Select end date">
           <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
           <mat-datepicker #toPicker></mat-datepicker>
         </mat-form-field>
@@ -73,7 +69,7 @@
           <button mat-raised-button 
                   color="primary" 
                   (click)="onApplyFilters()"
-                  [disabled]="!hasPermission"
+                  [class.disabled]="!hasPermission"
                   class="apply-btn">
             <mat-icon>search</mat-icon>
             Apply Filters
@@ -81,7 +77,7 @@
           
           <button mat-button 
                   (click)="onResetFilters()"
-                  [disabled]="!hasPermission"
+                  [class.disabled]="!hasPermission"
                   class="reset-btn">
             <mat-icon>clear</mat-icon>
             Reset

@@ -195,24 +195,8 @@
   }
 }
 
-// Responsive breakpoint mixins
-@mixin respond-to($breakpoint) {
-  @if $breakpoint == 'xs' {
-    @media (max-width: #{vars.$breakpoint-sm - 1px}) { @content; }
-  }
-  @else if $breakpoint == 'sm' {
-    @media (min-width: #{vars.$breakpoint-sm}) { @content; }
-  }
-  @else if $breakpoint == 'md' {
-    @media (min-width: #{vars.$breakpoint-md}) { @content; }
-  }
-  @else if $breakpoint == 'lg' {
-    @media (min-width: #{vars.$breakpoint-lg}) { @content; }
-  }
-  @else if $breakpoint == 'xl' {
-    @media (min-width: #{vars.$breakpoint-xl}) { @content; }
-  }
-}
+// Responsive breakpoint mixins moved to _variables.scss
+// Using the enhanced modern breakpoint system from _variables.scss
 
 // Accessibility mixins
 @mixin sr-only {

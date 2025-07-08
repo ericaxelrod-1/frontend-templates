@@ -59,12 +59,13 @@ export class TasksComponent {
     }
   ];
   
-  getStatusColor(status: string): string {
+  getStatusClass(status: string): string {
     switch(status) {
-      case 'Completed': return 'primary';
-      case 'In Progress': return 'accent';
-      case 'Pending': return 'warn';
-      default: return '';
+      case 'Completed': return 'status-completed';
+      case 'In Progress': return 'status-in-progress';
+      case 'Pending': return 'status-pending';
+      case 'Not Started': return 'status-not-started';
+      default: return 'status-default';
     }
   }
 }

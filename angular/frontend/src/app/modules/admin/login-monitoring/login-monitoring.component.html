@@ -8,19 +8,22 @@
   </div>
 
   <!-- Permission Check -->
-  <div *ngIf="!hasPermission" class="no-permission">
-    <mat-card>
-      <mat-card-content>
-        <mat-icon class="warning-icon">warning</mat-icon>
-        <h2>Access Denied</h2>
-        <p>You do not have permission to view this page.</p>
-        <p>Use the navigation sidebar to return to the dashboard.</p>
-      </mat-card-content>
-    </mat-card>
-  </div>
+  @if (!hasPermission) {
+    <div class="no-permission">
+      <mat-card>
+        <mat-card-content>
+          <mat-icon class="warning-icon">warning</mat-icon>
+          <h2>Access Denied</h2>
+          <p>You do not have permission to view this page.</p>
+          <p>Use the navigation sidebar to return to the dashboard.</p>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  }
 
   <!-- Main Content -->
-  <div *ngIf="hasPermission" class="main-content">
+  @if (hasPermission) {
+    <div class="main-content" [ngClass]="getResponsiveSpacingClass()">
     
     <!-- Statistics Dashboard Component -->
     <app-statistics-dashboard 
@@ -45,45 +48,57 @@
       </app-time-filter>
 
       <!-- Loading State -->
-      <div *ngIf="loading.patternSummary" class="loading-container">
-        <mat-spinner diameter="40"></mat-spinner>
-        <p>Loading pattern summary...</p>
-      </div>
+      @if (loading.patternSummary) {
+        <div class="loading-container">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p>Loading pattern summary...</p>
+        </div>
+      }
 
       <!-- Pattern Summary Tiles Grid -->
-      <div *ngIf="!loading.patternSummary" class="pattern-tiles-grid">
-        <mat-card 
-          *ngFor="let summary of patternSummary" 
-          class="pattern-tile"
-          [class]="'pattern-tile-' + summary.severity"
-          (click)="onPatternTileClick(summary.patternType)"
-          matRipple>
-          
-          <mat-card-content>
-            <div class="tile-header">
-              <mat-icon class="pattern-icon">{{ getPatternIcon(summary.patternType) }}</mat-icon>
-              <div class="severity-indicator" [class]="getSeverityColor(summary.severity)"
-                   [title]="summary.severity | titlecase"></div>
-            </div>
-            
-            <div class="tile-content">
-              <div class="pattern-count">{{ summary.count }}</div>
-              <div class="pattern-name">{{ getPatternDisplayName(summary.patternType) }}</div>
-              <div class="pattern-meta">
-                <span class="last-detected">Last: {{ summary.lastDetected | date:'short' }}</span>
-                <span class="percentage" *ngIf="summary.percentage">{{ summary.percentage }}%</span>
-              </div>
-            </div>
-          </mat-card-content>
-        </mat-card>
-      </div>
+      @if (!loading.patternSummary) {
+        <div class="pattern-tiles-grid"
+             [style.grid-template-columns]="'repeat(' + getPatternTilesColumns() + ', 1fr)'"
+             [ngClass]="getResponsiveSpacingClass()">
+          @for (summary of patternSummary; track summary.patternType) {
+            <mat-card 
+              class="pattern-tile"
+              [class]="getSeverityClass(summary.severity)"
+              (click)="onPatternTileClick(summary.patternType)"
+              matRipple>
+              
+              <mat-card-content>
+                <div class="tile-header">
+                  <mat-icon class="pattern-icon" 
+                           [style.font-size]="getResponsiveIconSize()">{{ getPatternIcon(summary.patternType) }}</mat-icon>
+                  <div class="severity-indicator" [class]="getSeverityColor(summary.severity)"
+                       [title]="summary.severity | titlecase"></div>
+                </div>
+                
+                <div class="tile-content">
+                  <div class="pattern-count">{{ formatPatternCount(summary.count) }}</div>
+                  <div class="pattern-name">{{ getPatternDisplayName(summary.patternType) }}</div>
+                  <div class="pattern-meta">
+                    <span class="last-detected">Last: {{ summary.lastDetected | date:'short' }}</span>
+                    @if (summary.percentage) {
+                      <span class="percentage">{{ summary.percentage }}%</span>
+                    }
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          }
+        </div>
+      }
 
       <!-- Empty State -->
-      <div *ngIf="!loading.patternSummary && patternSummary.length === 0" class="empty-pattern-summary">
-        <mat-icon class="info-icon">info</mat-icon>
-        <h3>No Pattern Data</h3>
-        <p>No security patterns detected in the selected time period.</p>
-      </div>
+      @if (!loading.patternSummary && patternSummary.length === 0) {
+        <div class="empty-pattern-summary">
+          <mat-icon class="info-icon">info</mat-icon>
+          <h3>No Pattern Data</h3>
+          <p>No security patterns detected in the selected time period.</p>
+        </div>
+      }
     </div>
 
     <!-- Tabbed Content -->
@@ -127,70 +142,76 @@
             <mat-card-content>
               
               <!-- Test Buttons Section -->
-              <div class="test-buttons-section" *ngIf="hasPermission">
-                <h4>Pattern Testing</h4>
-                <p class="test-description">Create test patterns to validate detection algorithms and database integration</p>
-                <div class="test-buttons-grid">
-                  <button mat-raised-button color="accent" 
-                          (click)="testBruteForcePattern()"
-                          [disabled]="loading.patterns">
-                    <mat-icon>security</mat-icon>
-                    Test Brute Force Attack
-                  </button>
-                  
-                  <button mat-raised-button color="accent" 
-                          (click)="testDistributedAttackPattern()"
-                          [disabled]="loading.patterns">
-                    <mat-icon>network_check</mat-icon>
-                    Test Distributed Attack
-                  </button>
-                  
-                  <button mat-raised-button color="accent" 
-                          (click)="testCredentialStuffingPattern()"
-                          [disabled]="loading.patterns">
-                    <mat-icon>vpn_key</mat-icon>
-                    Test Credential Stuffing
-                  </button>
-                  
-                  <button mat-raised-button color="accent" 
-                          (click)="testAccountSwitchingPattern()"
-                          [disabled]="loading.patterns">
-                    <mat-icon>swap_horiz</mat-icon>
-                    Test Account Switching
-                  </button>
-                  
-                  <button mat-raised-button color="warn" 
-                          (click)="clearTestData()"
-                          [disabled]="loading.patterns">
-                    <mat-icon>clear_all</mat-icon>
-                    Clear Test Data
-                  </button>
+              @if (hasPermission) {
+                <div class="test-buttons-section">
+                  <h4>Pattern Testing</h4>
+                  <p class="test-description">Create test patterns to validate detection algorithms and database integration</p>
+                  <div class="test-buttons-grid">
+                    <button mat-raised-button color="accent" 
+                            (click)="testBruteForcePattern()"
+                            [class.disabled]="loading.patterns">
+                      <mat-icon>security</mat-icon>
+                      Test Brute Force Attack
+                    </button>
+                    
+                    <button mat-raised-button color="accent" 
+                            (click)="testDistributedAttackPattern()"
+                            [class.disabled]="loading.patterns">
+                      <mat-icon>network_check</mat-icon>
+                      Test Distributed Attack
+                    </button>
+                    
+                    <button mat-raised-button color="accent" 
+                            (click)="testCredentialStuffingPattern()"
+                            [class.disabled]="loading.patterns">
+                      <mat-icon>vpn_key</mat-icon>
+                      Test Credential Stuffing
+                    </button>
+                    
+                    <button mat-raised-button color="accent" 
+                            (click)="testAccountSwitchingPattern()"
+                            [class.disabled]="loading.patterns">
+                      <mat-icon>swap_horiz</mat-icon>
+                      Test Account Switching
+                    </button>
+                    
+                    <button mat-raised-button color="warn" 
+                            (click)="clearTestData()"
+                            [class.disabled]="loading.patterns">
+                      <mat-icon>clear_all</mat-icon>
+                      Clear Test Data
+                    </button>
+                  </div>
+                  <mat-divider></mat-divider>
                 </div>
-                <mat-divider></mat-divider>
-              </div>
+              }
 
               <!-- Loading spinner for patterns -->
-              <div *ngIf="loading.patterns" class="loading-container">
-                <mat-spinner diameter="40"></mat-spinner>
-                <p>Loading patterns...</p>
-              </div>
+              @if (loading.patterns) {
+                <div class="loading-container">
+                  <mat-spinner diameter="40"></mat-spinner>
+                  <p>Loading patterns...</p>
+                </div>
+              }
 
               <!-- Patterns Table with Server-Side Pagination -->
               <!-- Loading indicator - following login-attempts-table pattern exactly -->
-              <div *ngIf="loading.patterns" class="loading-placeholder">
-                <mat-spinner diameter="40"></mat-spinner>
-                <span>Loading patterns...</span>
-              </div>
+              @if (loading.patterns) {
+                <div class="loading-placeholder">
+                  <mat-spinner diameter="40"></mat-spinner>
+                  <span>Loading patterns...</span>
+                </div>
+              }
 
               <!-- Always render table structure - following login-attempts-table pattern exactly -->
               <mat-table [dataSource]="detectedPatterns" matSort #patternSort="matSort"
-                         matSortActive="detectionTimestamp" 
+                         matSortActive="timestamp" 
                          matSortDirection="desc"
                          class="patterns-table">
                 
                 <!-- Timestamp Column -->
                 <ng-container matColumnDef="timestamp">
-                  <mat-header-cell *matHeaderCellDef mat-sort-header="detectionTimestamp">
+                  <mat-header-cell *matHeaderCellDef mat-sort-header="timestamp">
                     Timestamp
                   </mat-header-cell>
                   <mat-cell *matCellDef="let pattern">
@@ -200,7 +221,7 @@
 
                 <!-- Pattern Type Column -->
                 <ng-container matColumnDef="type">
-                  <mat-header-cell *matHeaderCellDef mat-sort-header="patternType">
+                  <mat-header-cell *matHeaderCellDef mat-sort-header="type">
                     Pattern Type
                   </mat-header-cell>
                   <mat-cell *matCellDef="let pattern">
@@ -226,11 +247,11 @@
 
                 <!-- IP Addresses Column -->
                 <ng-container matColumnDef="ipAddresses">
-                  <mat-header-cell *matHeaderCellDef mat-sort-header="ipAddress">
+                  <mat-header-cell *matHeaderCellDef mat-sort-header="ipAddresses">
                     IP Addresses
                   </mat-header-cell>
                   <mat-cell *matCellDef="let pattern">
-                    {{ pattern.ipAddresses.join(', ') }}
+                    {{ pattern.ipAddresses?.join(', ') || 'N/A' }}
                   </mat-cell>
                 </ng-container>
 
@@ -250,12 +271,15 @@
                     Grouped
                   </mat-header-cell>
                   <mat-cell *matCellDef="let pattern">
-                    <mat-chip class="group-counter" *ngIf="getGroupCount(pattern) > 1" 
-                              matTooltip="Number of similar patterns grouped together">
-                      <mat-icon class="group-icon">group_work</mat-icon>
-                      {{ getGroupCount(pattern) }}
-                    </mat-chip>
-                    <span *ngIf="getGroupCount(pattern) <= 1">-</span>
+                    @if (getGroupCount(pattern) > 1) {
+                      <mat-chip class="group-counter" 
+                                matTooltip="Number of similar patterns grouped together">
+                        <mat-icon class="group-icon">group_work</mat-icon>
+                        {{ getGroupCount(pattern) }}
+                      </mat-chip>
+                    } @else {
+                      <span>-</span>
+                    }
                   </mat-cell>
                 </ng-container>
 
@@ -277,23 +301,26 @@
                 <mat-row *matRowDef="let row; columns: patternDisplayedColumns;"></mat-row>
 
                 <!-- Empty state inside table - following login-attempts-table pattern exactly -->
-                <div *ngIf="!loading.patterns && detectedPatterns.length === 0" class="empty-state-in-table">
-                  <mat-icon class="empty-icon">inbox</mat-icon>
-                  <p>No patterns detected</p>
-                  <span>No suspicious patterns have been detected in recent login attempts.</span>
-                </div>
+                @if (!loading.patterns && detectedPatterns.length === 0) {
+                  <div class="empty-state-in-table">
+                    <mat-icon class="empty-icon">inbox</mat-icon>
+                    <p>No patterns detected</p>
+                    <span>No suspicious patterns have been detected in recent login attempts.</span>
+                  </div>
+                }
               </mat-table>
 
               <!-- Pagination - FIXED: Direct event binding following login-attempts-table pattern exactly -->
-              <mat-paginator
-                *ngIf="!loading.patterns && patternTotalCount > 0"
-                [length]="patternTotalCount"
-                [pageSize]="patternPageSize"
-                [pageSizeOptions]="[5, 10, 25, 50]"
-                [pageIndex]="patternCurrentPage"
-                (page)="onPatternPageChange($event)"
-                showFirstLastButtons>
-              </mat-paginator>
+              @if (!loading.patterns && patternTotalCount > 0) {
+                <mat-paginator
+                  [length]="patternTotalCount"
+                  [pageSize]="patternPageSize"
+                  [pageSizeOptions]="[5, 10, 25, 50]"
+                  [pageIndex]="patternCurrentPage"
+                  (page)="onPatternPageChange($event)"
+                  showFirstLastButtons>
+                </mat-paginator>
+              }
             </mat-card-content>
           </mat-card>
         </div>
@@ -317,67 +344,76 @@
             <mat-card-content>
               
               <!-- Test Buttons Section -->
-              <div class="test-buttons-section" *ngIf="hasPermission">
-                <h4>Alert Testing</h4>
-                <p class="test-description">Create test alerts to validate alert system and database persistence</p>
-                <div class="test-buttons-grid">
-                  <button mat-raised-button color="accent" 
-                          (click)="sendTestAlert()"
-                          [disabled]="loading.alerts">
-                    <mat-icon>notification_add</mat-icon>
-                    Test Alert
-                  </button>
+              @if (hasPermission) {
+                <div class="test-buttons-section">
+                  <h4>Alert Testing</h4>
+                  <p class="test-description">Create test alerts to validate alert system and database persistence</p>
+                  <div class="test-buttons-grid">
+                    <button mat-raised-button color="accent" 
+                            (click)="sendTestAlert()"
+                            [class.disabled]="loading.alerts">
+                      <mat-icon>notification_add</mat-icon>
+                      Test Alert
+                    </button>
+                  </div>
+                  <mat-divider></mat-divider>
                 </div>
-                <mat-divider></mat-divider>
-              </div>
+              }
 
               <!-- Loading spinner for alerts -->
-              <div *ngIf="loading.alerts" class="loading-container">
-                <mat-spinner diameter="40"></mat-spinner>
-                <p>Loading security alerts...</p>
-              </div>
+              @if (loading.alerts) {
+                <div class="loading-container">
+                  <mat-spinner diameter="40"></mat-spinner>
+                  <p>Loading security alerts...</p>
+                </div>
+              }
 
               <!-- Alerts list -->
-              <div *ngIf="!loading.alerts && securityAlerts.length > 0" class="alerts-list">
-                <div *ngFor="let alert of securityAlerts" 
-                     class="alert-item">
-                  
-                  <div class="alert-content">
-                    <div class="alert-header">
-                      <span class="alert-type">{{ alert.type | titlecase }}</span>
-                      <div class="severity-cell">
-                        <div class="severity-indicator" [class]="getSeverityColor(alert.severity)"
-                             [title]="alert.severity | titlecase"></div>
-                        <span class="severity-text">
-                          {{ alert.severity | uppercase }}
-                        </span>
+              @if (!loading.alerts && securityAlerts.length > 0) {
+                <div class="alerts-list">
+                  @for (alert of securityAlerts; track alert.id) {
+                    <div class="alert-item">
+                      
+                      <div class="alert-content">
+                        <div class="alert-header">
+                          <span class="alert-type">{{ alert.type | titlecase }}</span>
+                          <div class="severity-cell">
+                            <div class="severity-indicator" [class]="getSeverityColor(alert.severity)"
+                                 [title]="alert.severity | titlecase"></div>
+                            <span class="severity-text">
+                              {{ alert.severity | uppercase }}
+                            </span>
+                          </div>
+                          <span class="alert-status">{{ alert.status | titlecase }}</span>
+                        </div>
+                        <p class="alert-message">{{ alert.message }}</p>
+                        <span class="alert-timestamp">{{ alert.timestamp | date:'medium' }}</span>
                       </div>
-                      <span class="alert-status">{{ alert.status | titlecase }}</span>
-                    </div>
-                    <p class="alert-message">{{ alert.message }}</p>
-                    <span class="alert-timestamp">{{ alert.timestamp | date:'medium' }}</span>
-                  </div>
 
-                  <div class="alert-actions">
-                    <button mat-icon-button matTooltip="Acknowledge">
-                      <mat-icon>check</mat-icon>
-                    </button>
-                    <button mat-icon-button matTooltip="Resolve">
-                      <mat-icon>done_all</mat-icon>
-                    </button>
-                    <button mat-icon-button matTooltip="Dismiss">
-                      <mat-icon>close</mat-icon>
-                    </button>
-                  </div>
+                      <div class="alert-actions">
+                        <button mat-icon-button matTooltip="Acknowledge">
+                          <mat-icon>check</mat-icon>
+                        </button>
+                        <button mat-icon-button matTooltip="Resolve">
+                          <mat-icon>done_all</mat-icon>
+                        </button>
+                        <button mat-icon-button matTooltip="Dismiss">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  }
                 </div>
-              </div>
+              }
 
               <!-- No alerts message -->
-              <div *ngIf="!loading.alerts && securityAlerts.length === 0" class="no-alerts">
-                <mat-icon class="success-icon">check_circle</mat-icon>
-                <h3>No Active Alerts</h3>
-                <p>All security alerts have been resolved or there are no current threats.</p>
-              </div>
+              @if (!loading.alerts && securityAlerts.length === 0) {
+                <div class="no-alerts">
+                  <mat-icon class="success-icon">check_circle</mat-icon>
+                  <h3>No Active Alerts</h3>
+                  <p>All security alerts have been resolved or there are no current threats.</p>
+                </div>
+              }
             </mat-card-content>
           </mat-card>
         </div>
@@ -394,45 +430,55 @@
             <mat-card-content>
               
               <!-- Loading spinner for IP reputation -->
-              <div *ngIf="loading.ipReputation" class="loading-container">
-                <mat-spinner diameter="40"></mat-spinner>
-                <p>Loading IP reputation...</p>
-              </div>
+              @if (loading.ipReputation) {
+                <div class="loading-container">
+                  <mat-spinner diameter="40"></mat-spinner>
+                  <p>Loading IP reputation...</p>
+                </div>
+              }
 
               <!-- IP Reputation details -->
-              <div *ngIf="!loading.ipReputation && selectedIpReputation" class="ip-reputation">
-                <div class="ip-info">
-                  <h3>{{ selectedIpReputation.ipAddress }}</h3>
-                  <div class="reputation-score">
-                    <span>Reputation Score: </span>
-                    <mat-chip>
-                      {{ selectedIpReputation.reputation }}/100
-                    </mat-chip>
+              @if (!loading.ipReputation && selectedIpReputation) {
+                <div class="ip-reputation">
+                  <div class="ip-info">
+                    <h3>{{ selectedIpReputation.ipAddress }}</h3>
+                    <div class="reputation-score">
+                      <span>Reputation Score: </span>
+                      <mat-chip>
+                        {{ selectedIpReputation.reputation }}/100
+                      </mat-chip>
+                    </div>
+                  </div>
+
+                  <div class="ip-stats">
+                    <p><strong>Failed Attempts:</strong> {{ selectedIpReputation.failedAttempts }}</p>
+                    <p><strong>Status:</strong> 
+                      <mat-chip>
+                        {{ selectedIpReputation.isBlocked ? 'Blocked' : 'Allowed' }}
+                      </mat-chip>
+                    </p>
+                    @if (selectedIpReputation.blockedUntil) {
+                      <p>
+                        <strong>Blocked Until:</strong> {{ selectedIpReputation.blockedUntil | date:'medium' }}
+                      </p>
+                    }
+                    @if (selectedIpReputation.lastFailedAttempt) {
+                      <p>
+                        <strong>Last Failed Attempt:</strong> {{ selectedIpReputation.lastFailedAttempt | date:'medium' }}
+                      </p>
+                    }
                   </div>
                 </div>
-
-                <div class="ip-stats">
-                  <p><strong>Failed Attempts:</strong> {{ selectedIpReputation.failedAttempts }}</p>
-                  <p><strong>Status:</strong> 
-                    <mat-chip>
-                      {{ selectedIpReputation.isBlocked ? 'Blocked' : 'Allowed' }}
-                    </mat-chip>
-                  </p>
-                  <p *ngIf="selectedIpReputation.blockedUntil">
-                    <strong>Blocked Until:</strong> {{ selectedIpReputation.blockedUntil | date:'medium' }}
-                  </p>
-                  <p *ngIf="selectedIpReputation.lastFailedAttempt">
-                    <strong>Last Failed Attempt:</strong> {{ selectedIpReputation.lastFailedAttempt | date:'medium' }}
-                  </p>
-                </div>
-              </div>
+              }
 
               <!-- No IP selected message -->
-              <div *ngIf="!loading.ipReputation && !selectedIpReputation" class="no-ip-selected">
-                <mat-icon class="info-icon">info</mat-icon>
-                <h3>No IP Selected</h3>
-                <p>Click on an IP address in the login attempts table to view its reputation and details.</p>
-              </div>
+              @if (!loading.ipReputation && !selectedIpReputation) {
+                <div class="no-ip-selected">
+                  <mat-icon class="info-icon">info</mat-icon>
+                  <h3>No IP Selected</h3>
+                  <p>Select an IP address from the login attempts table to view its reputation analysis.</p>
+                </div>
+              }
             </mat-card-content>
           </mat-card>
         </div>
@@ -440,4 +486,5 @@
 
     </mat-tab-group>
   </div>
+}
 </div> 

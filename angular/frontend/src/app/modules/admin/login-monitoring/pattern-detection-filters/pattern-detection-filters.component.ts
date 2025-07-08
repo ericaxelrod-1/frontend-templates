@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { LoginMonitoringSharedModule } from '../shared/login-monitoring-shared.module';
 import { PatternDetectionFilters } from '../shared/login-monitoring.models';
@@ -10,7 +10,7 @@ import { PatternDetectionFilters } from '../shared/login-monitoring.models';
   templateUrl: './pattern-detection-filters.component.html',
   styleUrls: ['./pattern-detection-filters.component.scss']
 })
-export class PatternDetectionFiltersComponent implements OnInit {
+export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
   @Input() hasPermission = false;
   @Output() filtersChanged = new EventEmitter<PatternDetectionFilters>();
   @Output() filtersReset = new EventEmitter<void>();
@@ -65,18 +65,36 @@ export class PatternDetectionFiltersComponent implements OnInit {
         this.onFiltersChanged();
       }
     });
+
+    // Set initial disabled state
+    this.updateFormDisabledState();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Update form disabled state when hasPermission changes
+    if (changes['hasPermission'] && this.filterForm) {
+      this.updateFormDisabledState();
+    }
   }
 
   private createFilterForm(): FormGroup {
     return this.fb.group({
-      status: [''],
-      patternType: [''],
-      severity: [''],
-      ipAddress: [''],
-      dateFrom: [null],
-      dateTo: [null],
-      search: ['']
+      status: [{ value: '', disabled: !this.hasPermission }],
+      patternType: [{ value: '', disabled: !this.hasPermission }],
+      severity: [{ value: '', disabled: !this.hasPermission }],
+      ipAddress: [{ value: '', disabled: !this.hasPermission }],
+      dateFrom: [{ value: null, disabled: !this.hasPermission }],
+      dateTo: [{ value: null, disabled: !this.hasPermission }],
+      search: [{ value: '', disabled: !this.hasPermission }]
     });
+  }
+
+  private updateFormDisabledState(): void {
+    if (this.hasPermission) {
+      this.filterForm.enable();
+    } else {
+      this.filterForm.disable();
+    }
   }
 
   onFiltersChanged(): void {

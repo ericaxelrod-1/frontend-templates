@@ -1,5 +1,26 @@
 # Angular Template Application - Database Schema Design
 
+## Database Configuration
+
+**Production Database Path:** `angular/backend/db.sqlite`
+
+This is the primary SQLite database file used by the Angular Template Application. The database is located in the backend directory and contains all production data including:
+- User accounts and authentication data
+- Roles and permissions
+- Login attempts and security monitoring data
+- All other application data as defined in this schema
+
+**Database Connection:**
+- The NestJS backend connects to this database via TypeORM configuration
+- Database migrations are applied to this file
+- All seed data is populated into this database
+- This is the database that should be backed up in production
+
+**Development Notes:**
+- Always verify you are working with the correct database file when debugging
+- The database path is relative to the project root: `angular/backend/db.sqlite`
+- Other `.sqlite` files in the project may be cache, development, or test databases
+
 ## Overview
 
 This document outlines the database schema design for the Angular Template Application. The schema is designed to support:

@@ -1,15 +1,28 @@
 @use '@angular/material' as mat;
 @use '../../../../styles/abstracts' as *;
 
+// BUG-113: Enhanced Responsive Design Implementation
+// Mobile-first approach with modern breakpoint system
+
 .login-monitoring-container {
-  padding: 20px;
+  // BUG-113: Dynamic padding using clamp() for fluid responsiveness
+  padding: clamp(8px, 2vw, 20px);
+  
+  // Container query support for component-level responsiveness
+  container-type: inline-size;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: clamp(12px, 3vw, 24px);
+  
+  // Mobile-first responsive adjustments
+  @include respond-to(sm) {
+    flex-direction: row;
+    text-align: left;
+  }
 }
 
 .page-header h1 {
@@ -17,6 +30,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
+  font-size: clamp(1.25rem, 4vw, 2rem);
 }
 
 .no-permission {
@@ -33,16 +47,16 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px;
+  padding: clamp(20px, 5vw, 40px);
   gap: 16px;
 }
 
 .main-content {
-  margin-top: 20px;
+  margin-top: clamp(12px, 3vw, 20px);
 }
 
 .statistics-section {
-  margin-bottom: 30px;
+  margin-bottom: clamp(20px, 4vw, 30px);
 }
 
 .statistics-section h2 {
@@ -50,15 +64,39 @@
   color: var(--mat-sys-on-surface);
 }
 
+// BUG-113: Enhanced Stats Grid with Modern Responsive Patterns
 .stats-grid {
   display: grid;
+  gap: clamp(8px, 2vw, 16px);
+  margin-bottom: clamp(12px, 3vw, 20px);
+  
+  // Mobile-first grid layout
+  grid-template-columns: 1fr;
+  
+  // Small devices (large phones)
+  @include respond-to(sm) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  // Medium devices (tablets)
+  @include respond-to(md) {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+  }
+  
+  // Large devices (desktops)
+  @include respond-to(lg) {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .stat-card {
   text-align: center;
+  
+  // Enhanced accessibility with larger touch targets
+  min-height: $touch-target-comfortable;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .stat-card.success {
@@ -78,23 +116,23 @@
 }
 
 .stat-number {
-  font-size: 2rem;
+  font-size: clamp(1.5rem, 4vw, 2rem);
   font-weight: bold;
   color: var(--mat-sys-on-surface);
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: clamp(0.75rem, 2vw, 0.875rem);
   color: var(--mat-sys-on-surface-variant, #{$text-secondary});
   margin-top: 4px;
 }
 
 .monitoring-tabs {
-  margin-top: 20px;
+  margin-top: clamp(12px, 3vw, 20px);
 }
 
 .tab-content {
-  padding: 20px 0;
+  padding: clamp(12px, 3vw, 20px) 0;
 }
 
 .attempts-table {
@@ -104,13 +142,13 @@
 
 .empty-state {
   text-align: center;
-  padding: 40px;
+  padding: clamp(20px, 5vw, 40px);
   color: var(--mat-sys-on-surface-variant, #{$text-secondary});
 }
 
 .info-icon,
 .success-icon {
-  font-size: 48px;
+  font-size: clamp(32px, 8vw, 48px);
   margin-bottom: 16px;
 }
 
@@ -131,7 +169,7 @@
 .alert-item {
   border: 1px solid var(--mat-sys-outline);
   border-radius: $border-radius-sm;
-  padding: 16px;
+  padding: clamp(12px, 3vw, 16px);
   margin-bottom: 12px;
 }
 
@@ -141,6 +179,13 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+  
+  // Mobile responsive adjustments
+  @include respond-between(xs, sm) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 
 .pattern-info {
@@ -236,32 +281,82 @@
   color: var(--mat-sys-on-surface);
 }
 
-// Keep group-counter chips styled properly
-// No global chip styling needed since severity indicators now use spans
+// BUG-113: Enhanced Responsive Design with Modern Breakpoint System
+// Mobile-first approach with progressive enhancement
 
-// Responsive design
-@media (max-width: 768px) {
-  .login-monitoring-container {
-    padding: 0.5rem;
-  }
-  
+// Extra small devices (portrait phones)
+.login-monitoring-container {
+  // Base mobile styles already applied above
+}
+
+// Small devices (large phones, small tablets) - 576px+
+@include respond-to(sm) {
   .page-header {
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
+    flex-direction: row;
+    text-align: left;
   }
   
-  .alerts-list .alert-item {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
+  .pattern-tiles-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 }
 
-// Test buttons styling
+// Medium devices (tablets, landscape phones) - 768px+
+@include respond-to(md) {
+  .login-monitoring-container {
+    padding: clamp(16px, 3vw, 24px);
+  }
+  
+  .pattern-tiles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .alerts-list .alert-item {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+  }
+}
+
+// Large devices (desktops, large tablets) - 1024px+
+@include respond-to(lg) {
+  .login-monitoring-container {
+    padding: 24px;
+  }
+  
+  .pattern-tiles-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+// Extra large devices (large desktops) - 1280px+
+@include respond-to(xl) {
+  .pattern-tiles-grid {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+// Ultra wide devices (ultra-wide desktops) - 1536px+
+@include respond-to(xxl) {
+  .login-monitoring-container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+
+// Test buttons styling with enhanced responsiveness
 .test-buttons-section {
-  margin-bottom: 24px;
-  padding: 16px;
+  margin-bottom: clamp(16px, 4vw, 24px);
+  padding: clamp(12px, 3vw, 16px);
   background-color: var(--mat-sys-surface-container-low);
   border-radius: 8px;
   border: 1px solid var(--mat-sys-outline-variant);
@@ -275,29 +370,43 @@
   .test-description {
     margin: 0 0 16px 0;
     color: var(--mat-sys-on-surface-variant);
-    font-size: 0.875rem;
+    font-size: clamp(0.75rem, 2vw, 0.875rem);
     line-height: 1.4;
   }
 
   .test-buttons-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
+    gap: clamp(8px, 2vw, 12px);
     margin-bottom: 16px;
 
-    @media (max-width: 768px) {
+    // Mobile-first grid layout
       grid-template-columns: 1fr;
+    
+    // Small devices and up
+    @include respond-to(sm) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    // Medium devices and up  
+    @include respond-to(md) {
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    
+    // Large devices and up
+    @include respond-to(lg) {
+      grid-template-columns: repeat(3, 1fr);
     }
 
     button {
       display: flex;
       align-items: center;
       justify-content: flex-start;
-      padding: 12px 16px;
+      padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px);
       text-align: left;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-height: $touch-target-min; // Accessibility compliance
 
       mat-icon {
         margin-right: 8px;
@@ -337,12 +446,12 @@
   }
 }
 
-// Pattern Summary Dashboard Tiles Styling
+// BUG-113: Enhanced Pattern Summary Dashboard Tiles with Container Queries
 .pattern-summary-section {
-  margin: 30px 0;
+  margin: clamp(20px, 5vw, 30px) 0;
   
   .section-header {
-    margin-bottom: 20px;
+    margin-bottom: clamp(16px, 4vw, 20px);
     
     h2 {
       display: flex;
@@ -350,27 +459,60 @@
       gap: 8px;
       margin: 0 0 8px 0;
       color: var(--mat-sys-on-surface);
-      font-size: 1.5rem;
+      font-size: clamp(1.25rem, 4vw, 1.5rem);
       font-weight: 500;
     }
     
     .section-description {
       margin: 0;
       color: var(--mat-sys-on-surface-variant);
-      font-size: 0.875rem;
+      font-size: clamp(0.75rem, 2vw, 0.875rem);
     }
   }
 }
 
+// BUG-113: FIXED - Pattern Tiles Grid with Container Queries and Modern Responsive Design
 .pattern-tiles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-  margin-top: 20px;
+  gap: clamp(8px, 2vw, 16px);
+  margin-top: clamp(16px, 4vw, 20px);
   
-  @media (max-width: 768px) {
+  // Container query support for component-level responsiveness
+  container-type: inline-size;
+  
+  // Mobile-first grid layout - FIXES mathematical impossibility issue
+  grid-template-columns: 1fr;
+  
+  // Progressive enhancement based on available space
+  @include respond-to(sm) {
     grid-template-columns: 1fr;
-    gap: 12px;
+  }
+  
+  @include respond-to(md) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @include respond-to(lg) {
+    // Safe minimum that works on all screen sizes
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  }
+  
+  @include respond-to(xl) {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+  
+  // Container queries for fine-tuned responsiveness
+  @container (max-width: 320px) {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  @container (min-width: 480px) and (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @container (min-width: 1200px) {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   }
 }
 
@@ -383,6 +525,11 @@
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  &:focus {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
   }
   
   // Severity-based border styling
@@ -403,19 +550,19 @@
   }
   
   mat-card-content {
-    padding: 20px;
+    padding: clamp(16px, 4vw, 20px);
   }
   
   .tile-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: clamp(12px, 3vw, 16px);
     
     .pattern-icon {
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
+      font-size: clamp(20px, 5vw, 24px);
+      width: clamp(20px, 5vw, 24px);
+      height: clamp(20px, 5vw, 24px);
       color: var(--mat-sys-primary);
     }
     
@@ -431,18 +578,23 @@
     text-align: center;
     
     .pattern-count {
-      font-size: 2.5rem;
+      font-size: clamp(1.8rem, 6vw, 2.5rem);
       font-weight: 700;
       color: var(--mat-sys-on-surface);
       line-height: 1;
-      margin-bottom: 8px;
+      margin-bottom: clamp(6px, 2vw, 8px);
+      
+      // Responsive font size for very small screens
+      @container (max-width: 320px) {
+        font-size: 1.8rem;
+      }
     }
     
     .pattern-name {
-      font-size: 1rem;
+      font-size: clamp(0.875rem, 3vw, 1rem);
       font-weight: 500;
       color: var(--mat-sys-on-surface);
-      margin-bottom: 12px;
+      margin-bottom: clamp(8px, 2vw, 12px);
       line-height: 1.2;
     }
     
@@ -450,7 +602,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.75rem;
+      font-size: clamp(0.6rem, 2vw, 0.75rem);
       color: var(--mat-sys-on-surface-variant);
       
       .last-detected {
@@ -462,17 +614,27 @@
         font-weight: 600;
         color: var(--mat-sys-primary);
       }
+      
+      // Stack vertically on very small screens
+      @container (max-width: 280px) {
+        flex-direction: column;
+        gap: 4px;
+        
+        .last-detected {
+          text-align: center;
+        }
+      }
     }
   }
 }
 
 .empty-pattern-summary {
   text-align: center;
-  padding: 40px;
+  padding: clamp(20px, 5vw, 40px);
   color: var(--mat-sys-on-surface-variant);
   
   .info-icon {
-    font-size: 48px;
+    font-size: clamp(32px, 8vw, 48px);
     margin-bottom: 16px;
     color: $info-color;
   }
@@ -480,10 +642,11 @@
   h3 {
     margin: 0 0 8px 0;
     color: var(--mat-sys-on-surface);
+    font-size: clamp(1rem, 3vw, 1.25rem);
   }
   
   p {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: clamp(0.75rem, 2vw, 0.875rem);
   }
 } 
