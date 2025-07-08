@@ -98,46 +98,8 @@ $breakpoints: (
   xxl: 1536px     // Ultra wide devices (ultra-wide desktops)
 );
 
-// Responsive breakpoint mixins for modern mobile-first design
-@mixin respond-to($breakpoint) {
-  @if map-has-key($breakpoints, $breakpoint) {
-    $value: map-get($breakpoints, $breakpoint);
-    @if $value == 0 {
-      @content;
-    } @else {
-      @media (min-width: $value) {
-        @content;
-      }
-    }
-  } @else {
-    @warn "Invalid breakpoint: #{$breakpoint}. Available breakpoints: #{map-keys($breakpoints)}";
-  }
-}
-
-// Range-based responsive mixins for precise control
-@mixin respond-between($min-breakpoint, $max-breakpoint) {
-  $min-value: map-get($breakpoints, $min-breakpoint);
-  $max-value: map-get($breakpoints, $max-breakpoint);
-  
-  @if $min-value and $max-value {
-    @media (min-width: $min-value) and (max-width: $max-value - 1px) {
-      @content;
-    }
-  }
-}
-
-// Container query mixins for component-level responsiveness
-@mixin container-query($size) {
-  @container (min-width: $size) {
-    @content;
-  }
-}
-
-// Dynamic spacing system using clamp() for fluid responsiveness
-// BUG-113: Replace fixed padding with responsive alternatives
-@function fluid-spacing($min, $preferred, $max) {
-  @return clamp(#{$min}, #{$preferred}, #{$max});
-}
+// NOTE: Responsive mixins have been moved to _mixins.scss
+// This fixes the critical issue where SCSS @forward 'variables' was silently ignoring mixins
 
 // Responsive spacing tokens
 $spacing-fluid-xs: fluid-spacing(2px, 1vw, 4px);

@@ -195,8 +195,46 @@
   }
 }
 
-// Responsive breakpoint mixins moved to _variables.scss
-// Using the enhanced modern breakpoint system from _variables.scss
+// Responsive breakpoint mixins for modern mobile-first design
+@mixin respond-to($breakpoint) {
+  @if map-has-key(vars.$breakpoints, $breakpoint) {
+    $value: map-get(vars.$breakpoints, $breakpoint);
+    @if $value == 0 {
+      @content;
+    } @else {
+      @media (min-width: $value) {
+        @content;
+      }
+    }
+  } @else {
+    @warn "Invalid breakpoint: #{$breakpoint}. Available breakpoints: #{map-keys(vars.$breakpoints)}";
+  }
+}
+
+// Range-based responsive mixins for precise control
+@mixin respond-between($min-breakpoint, $max-breakpoint) {
+  $min-value: map-get(vars.$breakpoints, $min-breakpoint);
+  $max-value: map-get(vars.$breakpoints, $max-breakpoint);
+  
+  @if $min-value and $max-value {
+    @media (min-width: $min-value) and (max-width: $max-value - 1px) {
+      @content;
+    }
+  }
+}
+
+// Container query mixins for component-level responsiveness
+@mixin container-query($size) {
+  @container (min-width: $size) {
+    @content;
+  }
+}
+
+// Dynamic spacing system using clamp() for fluid responsiveness
+// BUG-113: Replace fixed padding with responsive alternatives
+@function fluid-spacing($min, $preferred, $max) {
+  @return clamp(#{$min}, #{$preferred}, #{$max});
+}
 
 // Accessibility mixins
 @mixin sr-only {
