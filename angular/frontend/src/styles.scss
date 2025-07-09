@@ -102,13 +102,32 @@
   --mat-sys-outline-variant: #49454f;
 }
 
-/* Base HTML/Body setup - Let Angular Material handle the rest */
+/* FLUID TYPOGRAPHY SYSTEM (2024/2025 Best Practices) */
+:root {
+  /* Fluid typography using clamp() for responsive scaling */
+  --fluid-text-xs: clamp(0.75rem, 0.5rem + 0.5vw, 0.875rem);
+  --fluid-text-sm: clamp(0.875rem, 0.75rem + 0.5vw, 1rem);
+  --fluid-text-base: clamp(1rem, 0.875rem + 0.5vw, 1.125rem);
+  --fluid-text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+  --fluid-text-xl: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  --fluid-text-2xl: clamp(2rem, 1.5rem + 1.5vw, 3rem);
+  
+  /* Fluid spacing using clamp() */
+  --fluid-spacing-xs: clamp(0.25rem, 0.5vw, 0.5rem);
+  --fluid-spacing-sm: clamp(0.5rem, 1vw, 1rem);
+  --fluid-spacing-md: clamp(1rem, 2vw, 1.5rem);
+  --fluid-spacing-lg: clamp(1.5rem, 3vw, 2.5rem);
+  --fluid-spacing-xl: clamp(2rem, 4vw, 4rem);
+}
+
+/* Base HTML/Body setup with fluid typography */
 html, body { 
   height: 100%; 
   width: 100%;
   margin: 0;
   padding: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
+  font-size: var(--fluid-text-base); /* Fluid base font size */
   background-color: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
   overflow-x: hidden;

@@ -1,0 +1,138 @@
+// BUG-124.7: CRITICAL FIX - Enhanced Responsive Spacing Classes
+// These classes are dynamically applied by getResponsiveSpacingClass() method
+// FIXED: Removed conflicting static media queries to prevent CSS specificity conflicts
+
+.mobile-spacing {
+  .login-monitoring-container { 
+    padding: 8px; 
+    margin: 0 4px; 
+  }
+  
+  .stats-grid { 
+    grid-template-columns: 1fr; 
+    gap: 8px; 
+  }
+  
+  .page-header { 
+    flex-direction: column; 
+    align-items: flex-start; 
+    gap: 8px; 
+    margin-bottom: 12px; 
+    
+    h1 { 
+      font-size: 1.25rem; 
+    } 
+  }
+  
+  .pattern-tiles-grid { 
+    grid-template-columns: 1fr; 
+    gap: 8px; 
+  }
+  
+  .tab-content { 
+    padding: 8px 0; 
+  }
+  
+  .alerts-list .alert-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+.tablet-spacing {
+  .login-monitoring-container { 
+    padding: 12px; 
+    margin: 0 8px; 
+  }
+  
+  .stats-grid { 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 12px; 
+  }
+  
+  .page-header { 
+    flex-direction: row; 
+    text-align: left; 
+    
+    h1 { 
+      font-size: 1.5rem; 
+    } 
+  }
+  
+  .pattern-tiles-grid { 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 12px; 
+  }
+  
+  .tab-content { 
+    padding: 12px 0; 
+  }
+  
+  .alerts-list .alert-item {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+  }
+}
+
+.desktop-spacing {
+  .login-monitoring-container { 
+    padding: 16px; 
+    margin: 0 16px; 
+  }
+  
+  .stats-grid { 
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 16px; 
+  }
+  
+  .page-header { 
+    flex-direction: row; 
+    text-align: left; 
+    
+    h1 { 
+      font-size: 1.75rem; 
+    } 
+  }
+  
+  .pattern-tiles-grid { 
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+    gap: 16px; 
+  }
+  
+  .tab-content { 
+    padding: 16px 0; 
+  }
+}
+
+.large-desktop-spacing {
+  .login-monitoring-container { 
+    padding: 20px; 
+    max-width: 1400px; 
+    margin: 0 auto; 
+  }
+  
+  .stats-grid { 
+    grid-template-columns: repeat(6, 1fr); 
+    gap: 20px; 
+  }
+  
+  .page-header { 
+    flex-direction: row; 
+    text-align: left; 
+    
+    h1 { 
+      font-size: 2rem; 
+    } 
+  }
+  
+  .pattern-tiles-grid { 
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); 
+    gap: 20px; 
+  }
+  
+  .tab-content { 
+    padding: 20px 0; 
+  }
+}

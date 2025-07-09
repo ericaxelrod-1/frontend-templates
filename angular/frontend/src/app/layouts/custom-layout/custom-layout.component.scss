@@ -142,12 +142,11 @@
   flex-direction: column;
   min-height: 0; // Important for proper flex behavior
   
-  // Content wrapper for centering (content only, not navigation chrome)
+  // Content wrapper - fluid design (no max-width constraints)
   .content-wrapper {
     flex: 1;
     width: 100%;
-    max-width: 1200px; // Center content for readability
-    margin: 0 auto; // Center content horizontally
+    // REMOVED: max-width: 1200px; // Enable full-width layouts on large screens
     box-sizing: border-box;
     
     // Mobile-first responsive padding

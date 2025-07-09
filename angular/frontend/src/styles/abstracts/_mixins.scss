@@ -256,9 +256,26 @@
   }
 }
 
-// Layout mixins
+// Layout mixins - Updated for fluid design (2024/2025 best practices)
 @mixin container {
+  // REMOVED: max-width: 1200px; // Enable full-width layouts on large screens
+  padding: 0 clamp(vars.$spacing-sm, 2vw, vars.$spacing-lg);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+// Legacy container with fixed max-width (use sparingly for text content only)
+@mixin container-constrained {
   max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 vars.$spacing-md;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+// Text content container (optimal reading width)
+@mixin text-container {
+  max-width: 65ch; // Optimal reading width
   margin: 0 auto;
   padding: 0 vars.$spacing-md;
   width: 100%;

@@ -72,285 +72,6 @@
   
   // Mobile-first grid layout
   grid-template-columns: 1fr;
-  
-  // Small devices (large phones)
-  @include respond-to(sm) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  // Medium devices (tablets)
-  @include respond-to(md) {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  }
-  
-  // Large devices (desktops)
-  @include respond-to(lg) {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-.stat-card {
-  text-align: center;
-  
-  // Enhanced accessibility with larger touch targets
-  min-height: $touch-target-comfortable;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.stat-card.success {
-  border-left: 4px solid $success-color;
-}
-
-.stat-card.failed {
-  border-left: 4px solid var(--mat-sys-error);
-}
-
-.stat-card.blocked {
-  border-left: 4px solid $warning-color;
-}
-
-.stat-card.captcha {
-  border-left: 4px solid $info-color;
-}
-
-.stat-number {
-  font-size: clamp(1.5rem, 4vw, 2rem);
-  font-weight: bold;
-  color: var(--mat-sys-on-surface);
-}
-
-.stat-label {
-  font-size: clamp(0.75rem, 2vw, 0.875rem);
-  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
-  margin-top: 4px;
-}
-
-.monitoring-tabs {
-  margin-top: clamp(12px, 3vw, 20px);
-}
-
-.tab-content {
-  padding: clamp(12px, 3vw, 20px) 0;
-}
-
-.attempts-table {
-  width: 100%;
-  margin-top: 16px;
-}
-
-.empty-state {
-  text-align: center;
-  padding: clamp(20px, 5vw, 40px);
-  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
-}
-
-.info-icon,
-.success-icon {
-  font-size: clamp(32px, 8vw, 48px);
-  margin-bottom: 16px;
-}
-
-.info-icon {
-  color: $info-color;
-}
-
-.success-icon {
-  color: $success-color;
-}
-
-.patterns-list,
-.alerts-list {
-  margin-top: 16px;
-}
-
-.pattern-item,
-.alert-item {
-  border: 1px solid var(--mat-sys-outline);
-  border-radius: $border-radius-sm;
-  padding: clamp(12px, 3vw, 16px);
-  margin-bottom: 12px;
-}
-
-.pattern-header,
-.alert-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-  
-  // Mobile responsive adjustments
-  @include respond-between(xs, sm) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-}
-
-.pattern-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
-
-.pattern-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Group counter chip styling */
-.group-counter {
-  background-color: var(--mat-sys-tertiary-container) !important;
-  color: var(--mat-sys-on-tertiary-container) !important;
-  font-size: 0.75rem;
-  padding: 4px 8px;
-  
-  .group-icon {
-    font-size: 14px;
-    width: 14px;
-    height: 14px;
-    margin-right: 4px;
-  }
-}
-
-.pattern-type,
-.alert-type {
-  font-weight: 500;
-  color: var(--mat-sys-on-surface);
-}
-
-.pattern-details,
-.alert-message {
-  margin: 8px 0;
-  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
-}
-
-.pattern-meta,
-.alert-timestamp {
-  font-size: 0.875rem;
-  color: $text-disabled;
-}
-
-.alert-status {
-  margin-left: auto;
-  font-size: 0.875rem;
-  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
-}
-
-/* Severity cell styling - Combined indicator and text */
-.severity-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.severity-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
-  
-  &.critical {
-    background-color: #b71c1c; /* Dark red for critical */
-  }
-  
-  &.high {
-    background-color: #c62828; /* Red for high */
-  }
-  
-  &.medium {
-    background-color: #e65100; /* Orange for medium */
-  }
-  
-  &.low {
-    background-color: #1b5e20; /* Green for low */
-  }
-  
-  &.default {
-    background-color: #424242; /* Gray for default */
-  }
-}
-
-.severity-text {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--mat-sys-on-surface);
-}
-
-// BUG-113: Enhanced Responsive Design with Modern Breakpoint System
-// Mobile-first approach with progressive enhancement
-
-// Extra small devices (portrait phones)
-.login-monitoring-container {
-  // Base mobile styles already applied above
-}
-
-// Small devices (large phones, small tablets) - 576px+
-@include respond-to(sm) {
-  .page-header {
-    flex-direction: row;
-    text-align: left;
-  }
-  
-  .pattern-tiles-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-}
-
-// Medium devices (tablets, landscape phones) - 768px+
-@include respond-to(md) {
-  .login-monitoring-container {
-    padding: clamp(16px, 3vw, 24px);
-  }
-  
-  .pattern-tiles-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .alerts-list .alert-item {
-    flex-direction: row;
-    align-items: center;
-    gap: 1rem;
-  }
-}
-
-// Large devices (desktops, large tablets) - 1024px+
-@include respond-to(lg) {
-  .login-monitoring-container {
-    padding: 24px;
-  }
-  
-  .pattern-tiles-grid {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-// Extra large devices (large desktops) - 1280px+
-@include respond-to(xl) {
-  .pattern-tiles-grid {
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
-}
-
-// Ultra wide devices (ultra-wide desktops) - 1536px+
-@include respond-to(xxl) {
-  .login-monitoring-container {
-    max-width: 1400px;
-    margin: 0 auto;
-  }
 }
 
 // Test buttons styling with enhanced responsiveness
@@ -473,58 +194,79 @@
 
 // BUG-113: FIXED - Pattern Tiles Grid with Container Queries and Modern Responsive Design
 .pattern-tiles-grid {
-  display: grid;
+  display: grid !important;
   gap: clamp(8px, 2vw, 16px);
   margin-top: clamp(16px, 4vw, 20px);
+  width: 100%;
+  
+  // DEBUG: Enhanced debug styles for better visibility during testing
+  border: 4px solid red !important;
+  background-color: rgba(255, 0, 0, 0.2) !important;
+  outline: 2px dashed orange !important;
+  outline-offset: 2px !important;
   
   // Container query support for component-level responsiveness
   container-type: inline-size;
   
-  // Mobile-first grid layout - FIXES mathematical impossibility issue
-  grid-template-columns: 1fr;
+  // Default grid layout - ensures grid display even without responsive classes
+  // Use a simple approach that should work on all screen sizes
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  
+  // Force grid layout on all children with enhanced debug styles
+  > * {
+    display: block;
+    width: 100%;
+    border: 3px solid blue !important; // DEBUG: Enhanced blue borders for grid items
+    background-color: rgba(0, 0, 255, 0.1) !important;
+    outline: 1px solid green !important;
+    outline-offset: 1px !important;
+  }
   
   // Progressive enhancement based on available space
   @include respond-to(sm) {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
   }
   
   @include respond-to(md) {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
   }
   
   @include respond-to(lg) {
     // Safe minimum that works on all screen sizes
-    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
   }
   
   @include respond-to(xl) {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
   }
   
   // Container queries for fine-tuned responsiveness
   @container (max-width: 320px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
     gap: 8px;
   }
   
   @container (min-width: 480px) and (max-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, 1fr) !important;
   }
   
   @container (min-width: 1200px) {
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
   }
 }
 
 .pattern-tile {
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: transform 0.2s ease-in-out !important; // Match stats-card exactly
   border-radius: 12px;
   overflow: hidden;
+  width: 100% !important;
+  height: auto;
+  text-align: center !important; // Match stats-card
   
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px) !important; // Match stats-card exactly
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12) !important; // Match stats-card exactly
   }
   
   &:focus {
@@ -533,96 +275,108 @@
   }
   
   // Severity-based border styling
-  &.pattern-tile-critical {
+  &.pattern-tile-critical,
+  &.critical-pattern {
     border-left: 4px solid #b71c1c;
   }
   
-  &.pattern-tile-high {
+  &.pattern-tile-high,
+  &.high-pattern {
     border-left: 4px solid #c62828;
   }
   
-  &.pattern-tile-medium {
+  &.pattern-tile-medium,
+  &.medium-pattern {
     border-left: 4px solid #e65100;
   }
   
-  &.pattern-tile-low {
+  &.pattern-tile-low,
+  &.low-pattern {
     border-left: 4px solid #1b5e20;
+  }
+  
+  // Pattern type specific styling
+  &.account_switching-pattern,
+  &.brute_force-pattern,
+  &.distributed_attack-pattern,
+  &.ip_hopping-pattern,
+  &.credential_stuffing-pattern,
+  &.suspicious_location-pattern,
+  &.time_anomaly-pattern {
+    border-left: 4px solid var(--mat-sys-primary);
   }
   
   mat-card-content {
     padding: clamp(16px, 4vw, 20px);
   }
   
-  .tile-header {
+  // FIXED: Target actual Angular Material structure
+  mat-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: clamp(12px, 3vw, 16px);
     
     .pattern-icon {
-      font-size: clamp(20px, 5vw, 24px);
-      width: clamp(20px, 5vw, 24px);
-      height: clamp(20px, 5vw, 24px);
-      color: var(--mat-sys-primary);
+      font-size: clamp(20px, 5vw, 24px) !important;
+      width: clamp(20px, 5vw, 24px) !important;
+      height: clamp(20px, 5vw, 24px) !important;
+      color: var(--mat-sys-primary) !important;
+      
+      mat-icon {
+        font-size: inherit !important;
+        width: inherit !important;
+        height: inherit !important;
+      }
     }
     
-    .severity-indicator {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      flex-shrink: 0;
+    .pattern-title {
+      color: var(--mat-sys-on-surface) !important;
+      font-weight: 500 !important;
+      font-size: clamp(0.875rem, 3vw, 1rem) !important;
     }
   }
   
-  .tile-content {
+  // FIXED: Target actual Angular Material structure
+  mat-card-content {
     text-align: center;
     
     .pattern-count {
-      font-size: clamp(1.8rem, 6vw, 2.5rem);
-      font-weight: 700;
-      color: var(--mat-sys-on-surface);
-      line-height: 1;
-      margin-bottom: clamp(6px, 2vw, 8px);
+      font-size: clamp(1.8rem, 6vw, 2.5rem) !important;
+      font-weight: 700 !important;
+      color: var(--mat-sys-on-surface) !important;
+      line-height: 1 !important;
+      margin-bottom: clamp(6px, 2vw, 8px) !important;
+      display: block !important;
       
       // Responsive font size for very small screens
       @container (max-width: 320px) {
-        font-size: 1.8rem;
+        font-size: 1.8rem !important;
       }
     }
     
-    .pattern-name {
-      font-size: clamp(0.875rem, 3vw, 1rem);
-      font-weight: 500;
-      color: var(--mat-sys-on-surface);
-      margin-bottom: clamp(8px, 2vw, 12px);
-      line-height: 1.2;
-    }
-    
-    .pattern-meta {
+    .pattern-severity {
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
-      font-size: clamp(0.6rem, 2vw, 0.75rem);
-      color: var(--mat-sys-on-surface-variant);
+      margin-top: clamp(8px, 2vw, 12px);
       
-      .last-detected {
-        flex: 1;
-        text-align: left;
-      }
-      
-      .percentage {
-        font-weight: 600;
-        color: var(--mat-sys-primary);
-      }
-      
-      // Stack vertically on very small screens
-      @container (max-width: 280px) {
-        flex-direction: column;
-        gap: 4px;
+      .severity-indicator {
+        width: 12px !important;
+        height: 12px !important;
+        border-radius: 50% !important;
+        margin-right: 8px !important;
+        flex-shrink: 0 !important;
         
-        .last-detected {
-          text-align: center;
-        }
+        &.high { background-color: #f44336 !important; }
+        &.medium { background-color: #ff9800 !important; }
+        &.low { background-color: #4caf50 !important; }
+      }
+      
+      span {
+        font-size: clamp(0.75rem, 2vw, 0.875rem) !important;
+        color: var(--mat-sys-on-surface-variant) !important;
+        text-transform: capitalize !important;
       }
     }
   }
@@ -651,29 +405,141 @@
   }
 }
 
-// BUG-124.7: CRITICAL FIX - Missing Responsive Spacing Classes
+// BUG-124.7.1: CRITICAL FIX - CSS Specificity Conflict Resolution
 // These classes are dynamically applied by getResponsiveSpacingClass() method
+// FIXED: Removed grid-template-columns overrides that were preventing responsive grid layout
 
 .mobile-spacing {
-  .login-monitoring-container { padding: 8px; }
-  .stats-grid { grid-template-columns: 1fr; gap: 8px; }
-  .page-header { flex-direction: column; h1 { font-size: 1.25rem; } }
+  .login-monitoring-container { 
+    padding: clamp(8px, 2vw, 12px) !important; 
+    width: 100% !important;
+  }
+  
+  // REMOVED: .stats-grid doesn't exist in HTML - statistics use .stats-container
+  // .stats-grid { 
+  //   gap: 8px !important; 
+  // }
+  
+  .page-header { 
+    flex-direction: column !important; 
+    align-items: flex-start !important; 
+    gap: 8px !important; 
+    margin-bottom: 12px !important; 
+    
+    h1 { 
+      font-size: 1.25rem !important; 
+    } 
+  }
+  
+  // FIXED: Removed grid-template-columns override - let base .pattern-tiles-grid handle responsive layout
+  .pattern-tiles-grid { 
+    gap: 8px !important; 
+  }
+  
+  .tab-content { 
+    padding: 8px 0 !important; 
+  }
+  
+  .alerts-list .alert-item {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
 }
 
 .tablet-spacing {
-  .login-monitoring-container { padding: 12px; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .page-header h1 { font-size: 1.5rem; }
+  .login-monitoring-container { 
+    padding: clamp(12px, 2vw, 16px) !important; 
+    width: 100% !important;
+  }
+  
+  // REMOVED: .stats-grid doesn't exist in HTML - statistics use .stats-container
+  // .stats-grid { 
+  //   gap: 12px !important; 
+  // }
+  
+  .page-header { 
+    flex-direction: row !important; 
+    text-align: left !important; 
+    
+    h1 { 
+      font-size: 1.5rem !important; 
+    } 
+  }
+  
+  // FIXED: Removed grid-template-columns override - let base .pattern-tiles-grid handle responsive layout
+  .pattern-tiles-grid { 
+    gap: 12px !important; 
+  }
+  
+  .tab-content { 
+    padding: 12px 0 !important; 
+  }
+  
+  .alerts-list .alert-item {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 1rem !important;
+  }
 }
 
 .desktop-spacing {
-  .login-monitoring-container { padding: 16px; }
-  .stats-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .page-header h1 { font-size: 1.75rem; }
+  .login-monitoring-container { 
+    padding: clamp(16px, 2vw, 20px) !important; 
+    width: 100% !important;
+  }
+  
+  // REMOVED: .stats-grid doesn't exist in HTML - statistics use .stats-container
+  // .stats-grid { 
+  //   gap: 16px !important; 
+  // }
+  
+  .page-header { 
+    flex-direction: row !important; 
+    text-align: left !important; 
+    
+    h1 { 
+      font-size: 1.75rem !important; 
+    } 
+  }
+  
+  // FIXED: Removed grid-template-columns override - let base .pattern-tiles-grid handle responsive layout
+  .pattern-tiles-grid { 
+    gap: 16px !important; 
+  }
+  
+  .tab-content { 
+    padding: 16px 0 !important; 
+  }
 }
 
 .large-desktop-spacing {
-  .login-monitoring-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
-  .stats-grid { gap: 20px; }
-  .page-header h1 { font-size: 2rem; }
+  .login-monitoring-container { 
+    padding: clamp(16px, 2vw, 24px) !important; 
+    // REMOVED: max-width: 1400px !important; // Enable full-width on large screens
+    width: 100% !important;
+  }
+  
+  // REMOVED: .stats-grid doesn't exist in HTML - statistics use .stats-container
+  // .stats-grid { 
+  //   gap: 20px !important; 
+  // }
+  
+  .page-header { 
+    flex-direction: row !important; 
+    text-align: left !important; 
+    
+    h1 { 
+      font-size: 2rem !important; 
+    } 
+  }
+  
+  // FIXED: Removed grid-template-columns override - let base .pattern-tiles-grid handle responsive layout
+  .pattern-tiles-grid { 
+    gap: 20px !important; 
+  }
+  
+  .tab-content { 
+    padding: 20px 0 !important; 
+  }
 }
