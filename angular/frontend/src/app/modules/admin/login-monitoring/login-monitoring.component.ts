@@ -1,6 +1,6 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatTabsModule } from '@angular/material/tabs';
+import { MatTabsModule, MatTabGroup } from '@angular/material/tabs';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,7 +10,8 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTableModule } from '@angular/material/table';
 import { MatSortModule } from '@angular/material/sort';
 import { MatPaginatorModule } from '@angular/material/paginator';
-import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { FormGroup } from '@angular/forms';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { LoginMonitoringService } from './shared/login-monitoring.service';
@@ -21,12 +22,16 @@ import { StatisticsDashboardComponent } from './statistics-dashboard/statistics-
 import { TimeFilterComponent } from './components/time-filter/time-filter.component';
 import { PatternDetectionFiltersComponent } from './pattern-detection-filters/pattern-detection-filters.component';
 import { SecurityAlertsFiltersComponent } from './security-alerts-filters/security-alerts-filters.component';
+import { FiltersComponent } from './filters/filters.component';
 
 import { 
   LoginAttempt, 
   SecurityAlert, 
   Pattern,
-  Statistics 
+  Statistics,
+  PatternDetectionFilters,
+  SecurityAlertsFilters,
+  IPReputation
 } from './shared/login-monitoring.models';
 import { PatternSummary } from '../../../models/pattern-summary.interface';
 
@@ -52,7 +57,8 @@ import { Subject } from 'rxjs';
     StatisticsDashboardComponent,
     TimeFilterComponent,
     PatternDetectionFiltersComponent,
-    SecurityAlertsFiltersComponent
+    SecurityAlertsFiltersComponent,
+    FiltersComponent
   ],
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
@@ -92,13 +98,13 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   };
   error: string | null = null;
   hasPermission = false;
-  
+
   // Additional properties referenced in template
   detectedPatterns: Pattern[] = [];
   patternTotalCount = 0;
-  selectedIpReputation: any = null;
-  filterForm: any = null;
-  
+  selectedIpReputation: IPReputation | null = null;
+  filterForm: FormGroup | null = null;
+
   // Pattern table properties
   patternDisplayedColumns: string[] = ['timestamp', 'type', 'severity', 'ipAddresses', 'details', 'groupCount', 'actions'];
   patternPageSize = 10;
@@ -107,30 +113,36 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   // Test data creation state
   isCreatingTestData = false;
 
+  // ViewChild for tab navigation
+  @ViewChild(MatTabGroup) tabGroup!: MatTabGroup;
+  
+  // ViewChild for login attempts table to trigger filter updates
+  @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
+
   // BUG-124.6: Dynamic component loading for performance optimization
   async loadTabComponent(tabIndex: number) {
     switch (tabIndex) {
       case 0: // Login Attempts
         if (!this.loginAttemptsTableLoaded) {
-          const { LoginAttemptsTableComponent } = await import('./login-attempts-table/login-attempts-table.component');
+          await import('./login-attempts-table/login-attempts-table.component');
           this.loginAttemptsTableLoaded = true;
         }
         break;
       case 1: // Pattern Detection
         if (!this.patternDetectionLoaded) {
-          const { PatternDetectionFiltersComponent } = await import('./pattern-detection-filters/pattern-detection-filters.component');
+          await import('./pattern-detection-filters/pattern-detection-filters.component');
           this.patternDetectionLoaded = true;
         }
         break;
       case 2: // Security Alerts
         if (!this.securityAlertsLoaded) {
-          const { SecurityAlertsFiltersComponent } = await import('./security-alerts-filters/security-alerts-filters.component');
+          await import('./security-alerts-filters/security-alerts-filters.component');
           this.securityAlertsLoaded = true;
         }
         break;
       case 3: // Statistics
         if (!this.statisticsLoaded) {
-          const { StatisticsDashboardComponent } = await import('./statistics-dashboard/statistics-dashboard.component');
+          await import('./statistics-dashboard/statistics-dashboard.component');
           this.statisticsLoaded = true;
         }
         break;
@@ -176,13 +188,13 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
       this.customBreakpoints.largeDesktop
     ]).pipe(
       takeUntil(this.destroy$)
-    ).subscribe(result => {
-      this.updateResponsiveState(result);
+    ).subscribe(() => {
+      this.updateResponsiveState();
     });
   }
 
   // BUG-113: Update responsive state based on breakpoint matches
-  private updateResponsiveState(breakpointState: any) {
+  private updateResponsiveState(): void {
     this.isMobile = this.breakpointObserver.isMatched(this.customBreakpoints.mobile);
     this.isTablet = this.breakpointObserver.isMatched(this.customBreakpoints.tablet);
     this.isDesktop = this.breakpointObserver.isMatched(this.customBreakpoints.desktop);
@@ -458,18 +470,30 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
 
   // BUG-113: Handle pattern tile click with responsive navigation
   onPatternTileClick(patternType: string) {
-    // Navigate to pattern detection tab with filter applied
-    // This would typically involve routing or tab selection
+    // Navigate to pattern detection tab (index 1) with filter applied
     console.log('Pattern tile clicked:', patternType);
     
-    // For responsive devices, might need different navigation behavior
-    if (this.isMobile) {
-      // Mobile-specific navigation (e.g., full-screen modal)
-      console.log('Mobile navigation to pattern details');
-    } else {
-      // Standard tab navigation
-      console.log('Standard tab navigation');
+    // Navigate to Pattern Detection tab
+    if (this.tabGroup) {
+      this.tabGroup.selectedIndex = 1; // Pattern Detection tab is index 1
     }
+    
+    // Apply pattern type filter to Pattern Detection filters
+    // This will be handled by the pattern detection filters component
+    // We'll emit the filter change after tab navigation
+    setTimeout(() => {
+      this.applyPatternTypeFilter(patternType);
+    }, 100); // Small delay to ensure tab switch completes
+  }
+
+  // Apply pattern type filter to Pattern Detection filters
+  private applyPatternTypeFilter(patternType: string) {
+    // This method will trigger the pattern detection filters to apply the selected pattern type
+    // The actual filtering will be handled by the pattern detection component
+    console.log('Applying pattern type filter:', patternType);
+    
+    // Emit pattern detection filter change with the selected pattern type
+    this.onPatternDetectionFiltersChanged({ patternType: patternType } as PatternDetectionFilters);
   }
 
   // BUG-113: Get severity class with responsive considerations
@@ -621,26 +645,36 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   }
 
   // Template event handlers
-  onStatsLoaded(stats: Statistics) {
+  onStatsLoaded(stats: Statistics): void {
     this.statistics = stats;
   }
 
-  onTimeFilterChange(timeFilter: any) {
+  onTimeFilterChange(timeFilter: unknown): void {
     console.log('Time filter changed:', timeFilter);
     this.loadPatternSummary();
   }
 
-  onFiltersChanged(filterForm: any) {
+  onFiltersChanged(filterForm: FormGroup): void {
     console.log('Filters changed:', filterForm);
-    // Handle filter changes for login attempts
+    this.filterForm = filterForm;
+    
+    // BUG-124.9 FIX: Trigger data reload in login attempts table when filters change
+    if (this.loginAttemptsTable) {
+      this.loginAttemptsTable.applyFilters();
+    }
   }
 
-  onFiltersReset() {
+  onFiltersReset(): void {
     console.log('Filters reset');
-    // Handle filter reset for login attempts
+    this.filterForm = null;
+    
+    // BUG-124.9 FIX: Trigger data reload in login attempts table when filters are reset
+    if (this.loginAttemptsTable) {
+      this.loginAttemptsTable.applyFilters();
+    }
   }
 
-  onPatternDetectionFiltersChanged(filters: any) {
+  onPatternDetectionFiltersChanged(filters: PatternDetectionFilters): void {
     console.log('Pattern detection filters changed:', filters);
     // Handle filter changes for pattern detection
   }
@@ -652,7 +686,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
 
   // Pattern display methods
   getPatternIcon(patternType: string): string {
-    const iconMap: { [key: string]: string } = {
+    const iconMap: Record<string, string> = {
       'brute_force': 'security',
       'distributed_attack': 'network_check',
       'credential_stuffing': 'vpn_key',
@@ -665,7 +699,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   }
 
   getSeverityColor(severity: string): string {
-    const colorMap: { [key: string]: string } = {
+    const colorMap: Record<string, string> = {
       'critical': 'severity-critical',
       'high': 'severity-high',
       'medium': 'severity-medium',
@@ -675,7 +709,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   }
 
   getPatternDisplayName(patternType: string): string {
-    const displayMap: { [key: string]: string } = {
+    const displayMap: Record<string, string> = {
       'brute_force': 'Brute Force',
       'distributed_attack': 'Distributed Attack',
       'credential_stuffing': 'Credential Stuffing',
@@ -688,12 +722,14 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   }
 
   // Additional template methods
-  onAttemptSelected(attempt: any) {
+  onAttemptSelected(attempt: LoginAttempt): void {
     console.log('Attempt selected:', attempt);
+    // Handle attempt selection
   }
 
-  onIPReputationRequested(ip: string) {
+  onIPReputationRequested(ip: string): void {
     console.log('IP reputation requested for:', ip);
+    // Handle IP reputation request
   }
 
   // Test pattern methods
@@ -731,14 +767,13 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
     // Implementation for expanding/collapsing pattern details
   }
 
-  onPatternPageChange(event: any): void {
+  onPatternPageChange(event: { pageIndex: number; pageSize: number }): void {
     this.patternCurrentPage = event.pageIndex;
     this.patternPageSize = event.pageSize;
-    // Reload data with new pagination
-    this.loadData();
+    // Reload pattern data with new pagination
   }
 
-  onSecurityAlertsFiltersChanged(filters: any): void {
+  onSecurityAlertsFiltersChanged(filters: SecurityAlertsFilters): void {
     console.log('Security alerts filters changed:', filters);
     // Handle security alerts filter changes
   }
@@ -750,13 +785,12 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
 
   sendTestAlert(): void {
     console.log('Sending test alert...');
-    // Implementation for sending test security alert
+    // Implementation for sending test alert
     this.loginMonitoringService.createTestPattern('test_alert').subscribe({
-      next: (result: any) => {
+      next: (result: unknown) => {
         console.log('Test alert sent:', result);
-        this.loadData(); // Refresh data
       },
-      error: (err: any) => {
+      error: (err: unknown) => {
         console.error('Error sending test alert:', err);
       }
     });

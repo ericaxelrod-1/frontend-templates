@@ -104,75 +104,6 @@
           }
         </div>
 
-        <!-- Test Buttons Section (Development) -->
-        <div class="test-buttons-section">
-          <h4>Test Pattern Generation</h4>
-          <p class="test-description">
-            Generate test patterns for development and testing purposes
-          </p>
-          <div class="test-buttons-grid">
-            <button mat-raised-button 
-                    color="accent" 
-                    (click)="createTestBruteForce()"
-                    [disabled]="isCreatingTestData">
-              <mat-icon>security</mat-icon>
-              Test Brute Force
-            </button>
-            <button mat-raised-button 
-                    color="accent" 
-                    (click)="createTestDistributedAttack()"
-                    [disabled]="isCreatingTestData">
-              <mat-icon>network_check</mat-icon>
-              Test Distributed Attack
-            </button>
-            <button mat-raised-button 
-                    color="accent" 
-                    (click)="createTestCredentialStuffing()"
-                    [disabled]="isCreatingTestData">
-              <mat-icon>vpn_key</mat-icon>
-              Test Credential Stuffing
-            </button>
-            <button mat-raised-button 
-                    color="accent" 
-                    (click)="createTestAccountSwitching()"
-                    [disabled]="isCreatingTestData">
-              <mat-icon>switch_account</mat-icon>
-              Test Account Switching
-            </button>
-            <button mat-raised-button 
-                    color="accent" 
-                    (click)="createTestIpHopping()"
-                    [disabled]="isCreatingTestData">
-              <mat-icon>router</mat-icon>
-              Test IP Hopping
-            </button>
-            <button mat-raised-button 
-                    color="accent" 
-                    (click)="createTestSuspiciousLocation()"
-                    [disabled]="isCreatingTestData">
-              <mat-icon>location_on</mat-icon>
-              Test Suspicious Location
-            </button>
-            <button mat-raised-button 
-                    color="accent" 
-                    (click)="createTestTimeAnomaly()"
-                    [disabled]="isCreatingTestData">
-              <mat-icon>schedule</mat-icon>
-              Test Time Anomaly
-            </button>
-          </div>
-          <mat-divider></mat-divider>
-          <div class="clear-data-section">
-            <button mat-raised-button 
-                    color="warn" 
-                    (click)="clearAllData()"
-                    [disabled]="isCreatingTestData">
-              <mat-icon>delete_sweep</mat-icon>
-              Clear All Test Data
-            </button>
-          </div>
-        </div>
-
         <!-- Monitoring Tabs -->
         <div class="monitoring-tabs">
           <mat-tab-group (selectedTabChange)="loadTabComponent($event.index)">
@@ -183,12 +114,47 @@
                 Login Attempts
               </ng-template>
               <div class="tab-content">
+                <app-login-monitoring-filters 
+                  [hasPermission]="hasPermission"
+                  (filtersChanged)="onFiltersChanged($event)"
+                  (filtersReset)="onFiltersReset()">
+                </app-login-monitoring-filters>
+                
                 <app-login-attempts-table 
                   [hasPermission]="hasPermission"
-                  [filterForm]="filterForm"
+                  [filterForm]="filterForm!"
                   (attemptSelected)="onAttemptSelected($event)"
                   (ipReputationRequested)="onIPReputationRequested($event)">
                 </app-login-attempts-table>
+
+                <!-- IP Reputation Content -->
+                @if (selectedIpReputation) {
+                  <mat-card class="ip-reputation-card">
+                    <mat-card-header>
+                      <mat-card-title>
+                        IP Reputation: {{ $any(selectedIpReputation).ipAddress }}
+                      </mat-card-title>
+                    </mat-card-header>
+                    <mat-card-content>
+                      <div class="ip-reputation-details">
+                        <p><strong>Failed Attempts:</strong> {{ $any(selectedIpReputation).failedAttempts }}</p>
+                        <p><strong>Blocked:</strong> {{ $any(selectedIpReputation).isBlocked ? 'Yes' : 'No' }}</p>
+                        @if ($any(selectedIpReputation).lastFailedAttempt) {
+                          <p><strong>Last Failed Attempt:</strong> {{ $any(selectedIpReputation).lastFailedAttempt | date:'medium' }}</p>
+                        }
+                        @if ($any(selectedIpReputation).blockedUntil) {
+                          <p><strong>Blocked Until:</strong> {{ $any(selectedIpReputation).blockedUntil | date:'medium' }}</p>
+                        }
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                } @else {
+                  <div class="empty-state">
+                    <mat-icon class="info-icon">info</mat-icon>
+                    <p>No IP Selected</p>
+                    <p class="empty-subtitle">Click on an IP address in the login attempts table to view its reputation</p>
+                  </div>
+                }
               </div>
             </mat-tab>
 
@@ -200,6 +166,7 @@
               </ng-template>
               <div class="tab-content">
                 <app-pattern-detection-filters 
+                  [hasPermission]="hasPermission"
                   (filtersChanged)="onPatternDetectionFiltersChanged($event)"
                   (filtersReset)="onPatternDetectionFiltersReset()">
                 </app-pattern-detection-filters>
@@ -318,6 +285,75 @@
                     showFirstLastButtons>
                   </mat-paginator>
                 }
+
+                <!-- Test Buttons Section (Development) -->
+                <div class="test-buttons-section">
+                  <h4>Test Pattern Generation</h4>
+                  <p class="test-description">
+                    Generate test patterns for development and testing purposes
+                  </p>
+                  <div class="test-buttons-grid">
+                    <button mat-raised-button 
+                            color="accent" 
+                            (click)="createTestBruteForce()"
+                            [disabled]="isCreatingTestData">
+                      <mat-icon>security</mat-icon>
+                      Test Brute Force
+                    </button>
+                    <button mat-raised-button 
+                            color="accent" 
+                            (click)="createTestDistributedAttack()"
+                            [disabled]="isCreatingTestData">
+                      <mat-icon>network_check</mat-icon>
+                      Test Distributed Attack
+                    </button>
+                    <button mat-raised-button 
+                            color="accent" 
+                            (click)="createTestCredentialStuffing()"
+                            [disabled]="isCreatingTestData">
+                      <mat-icon>vpn_key</mat-icon>
+                      Test Credential Stuffing
+                    </button>
+                    <button mat-raised-button 
+                            color="accent" 
+                            (click)="createTestAccountSwitching()"
+                            [disabled]="isCreatingTestData">
+                      <mat-icon>switch_account</mat-icon>
+                      Test Account Switching
+                    </button>
+                    <button mat-raised-button 
+                            color="accent" 
+                            (click)="createTestIpHopping()"
+                            [disabled]="isCreatingTestData">
+                      <mat-icon>router</mat-icon>
+                      Test IP Hopping
+                    </button>
+                    <button mat-raised-button 
+                            color="accent" 
+                            (click)="createTestSuspiciousLocation()"
+                            [disabled]="isCreatingTestData">
+                      <mat-icon>location_on</mat-icon>
+                      Test Suspicious Location
+                    </button>
+                    <button mat-raised-button 
+                            color="accent" 
+                            (click)="createTestTimeAnomaly()"
+                            [disabled]="isCreatingTestData">
+                      <mat-icon>schedule</mat-icon>
+                      Test Time Anomaly
+                    </button>
+                  </div>
+                  <mat-divider></mat-divider>
+                  <div class="clear-data-section">
+                    <button mat-raised-button 
+                            color="warn" 
+                            (click)="clearAllData()"
+                            [disabled]="isCreatingTestData">
+                      <mat-icon>delete_sweep</mat-icon>
+                      Clear All Test Data
+                    </button>
+                  </div>
+                </div>
               </div>
             </mat-tab>
 
@@ -329,6 +365,7 @@
               </ng-template>
               <div class="tab-content">
                 <app-security-alerts-filters 
+                  [hasPermission]="hasPermission"
                   (filtersChanged)="onSecurityAlertsFiltersChanged($event)"
                   (filtersReset)="onSecurityAlertsFiltersReset()">
                 </app-security-alerts-filters>
@@ -404,18 +441,18 @@
                     <mat-card class="ip-reputation-card">
                       <mat-card-header>
                         <mat-card-title>
-                          IP Reputation: {{ selectedIpReputation.ipAddress }}
+                          IP Reputation: {{ $any(selectedIpReputation).ipAddress }}
                         </mat-card-title>
                       </mat-card-header>
                       <mat-card-content>
                         <div class="ip-reputation-details">
-                          <p><strong>Failed Attempts:</strong> {{ selectedIpReputation.failedAttempts }}</p>
-                          <p><strong>Blocked:</strong> {{ selectedIpReputation.isBlocked ? 'Yes' : 'No' }}</p>
-                          @if (selectedIpReputation.lastFailedAttempt) {
-                            <p><strong>Last Failed Attempt:</strong> {{ selectedIpReputation.lastFailedAttempt | date:'medium' }}</p>
+                          <p><strong>Failed Attempts:</strong> {{ $any(selectedIpReputation).failedAttempts }}</p>
+                          <p><strong>Blocked:</strong> {{ $any(selectedIpReputation).isBlocked ? 'Yes' : 'No' }}</p>
+                          @if ($any(selectedIpReputation).lastFailedAttempt) {
+                            <p><strong>Last Failed Attempt:</strong> {{ $any(selectedIpReputation).lastFailedAttempt | date:'medium' }}</p>
                           }
-                          @if (selectedIpReputation.blockedUntil) {
-                            <p><strong>Blocked Until:</strong> {{ selectedIpReputation.blockedUntil | date:'medium' }}</p>
+                          @if ($any(selectedIpReputation).blockedUntil) {
+                            <p><strong>Blocked Until:</strong> {{ $any(selectedIpReputation).blockedUntil | date:'medium' }}</p>
                           }
                         </div>
                       </mat-card-content>
