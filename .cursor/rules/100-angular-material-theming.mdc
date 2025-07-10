@@ -307,3 +307,172 @@ Before submitting changes:
 - ❌ **Mixing custom component styling with Angular Material theming**
 - ❌ **Ignoring "Could not find Angular Material core theme" console warnings**
 - ❌ **Using any theme other than azure-blue without explicit approval**
+
+## FLUID DESIGN AND RESPONSIVE THEMING (2024/2025 BEST PRACTICES)
+
+### Material 3 Design Tokens for Fluid Layouts
+
+**✅ CORRECT - Fluid Design with Material 3 Tokens**:
+```scss
+// Use Material 3 spacing tokens with clamp() for fluid responsiveness
+.container {
+  padding: clamp(
+    var(--mat-sys-spacing-sm, 8px),
+    2vw,
+    var(--mat-sys-spacing-lg, 24px)
+  );
+  gap: clamp(
+    var(--mat-sys-spacing-xs, 4px),
+    1.5vw,
+    var(--mat-sys-spacing-md, 16px)
+  );
+}
+
+// Fluid typography using Material 3 type scale
+.heading {
+  font-size: clamp(
+    var(--mat-sys-typescale-headline-small-size),
+    4vw,
+    var(--mat-sys-typescale-headline-large-size)
+  );
+}
+```
+
+**❌ PROHIBITED - Fixed Values Without Theme Integration**:
+```scss
+/* DON'T DO THIS - Breaks theme consistency */
+.container {
+  padding: 16px; // Fixed value ignores theme
+  gap: 12px; // No Material token usage
+}
+
+.heading {
+  font-size: 24px; // Hardcoded size
+}
+```
+
+### Responsive Grid Layouts with Material Theming
+
+**✅ CORRECT - Theme-Aware Grid Systems**:
+```scss
+// Grid that respects Material 3 spacing system
+.dashboard-grid {
+  display: grid;
+  gap: var(--mat-sys-spacing-md, 16px);
+  grid-template-columns: repeat(auto-fit, minmax(
+    calc(250px + var(--mat-sys-spacing-md, 16px)),
+    1fr
+  ));
+  
+  // Container queries with Material tokens
+  container-type: inline-size;
+  
+  @container (max-width: 480px) {
+    gap: var(--mat-sys-spacing-sm, 8px);
+  }
+}
+```
+
+### Full-Width Layouts with Material 3
+
+**✅ MODERN APPROACH - Remove Layout Constraints**:
+```scss
+// Let content breathe on large screens
+.mat-sidenav-content {
+  // Remove max-width constraints
+  .content-wrapper {
+    width: 100%;
+    // Only constrain text for readability
+    .text-content {
+      max-width: 65ch;
+      margin: 0 auto;
+    }
+  }
+}
+
+// Admin dashboards use full viewport
+.admin-dashboard {
+  width: 100%;
+  padding: clamp(
+    var(--mat-sys-spacing-md, 16px),
+    3vw,
+    var(--mat-sys-spacing-xl, 32px)
+  );
+}
+```
+
+### Material 3 Surface Containers for Responsive Design
+
+**✅ USE Material 3 Surface Containers**:
+```scss
+// Responsive cards with proper elevation
+.dashboard-card {
+  background: var(--mat-sys-surface-container);
+  border-radius: var(--mat-sys-shape-corner-large);
+  padding: clamp(
+    var(--mat-sys-spacing-md, 16px),
+    3vw,
+    var(--mat-sys-spacing-lg, 24px)
+  );
+  
+  // Elevation on hover
+  transition: box-shadow 200ms ease-in-out;
+  
+  &:hover {
+    box-shadow: var(--mat-sys-elevation-3);
+  }
+}
+```
+
+### Responsive Spacing System Integration
+
+**✅ IMPLEMENT - Dynamic Spacing Classes**:
+```scss
+// Generate responsive spacing utilities
+@each $size, $value in (
+  'xs': var(--mat-sys-spacing-xs, 4px),
+  'sm': var(--mat-sys-spacing-sm, 8px),
+  'md': var(--mat-sys-spacing-md, 16px),
+  'lg': var(--mat-sys-spacing-lg, 24px),
+  'xl': var(--mat-sys-spacing-xl, 32px)
+) {
+  .gap-#{$size} {
+    gap: clamp(
+      calc(#{$value} * 0.75),
+      2vw,
+      calc(#{$value} * 1.25)
+    );
+  }
+  
+  .p-#{$size} {
+    padding: clamp(
+      calc(#{$value} * 0.75),
+      2vw,
+      calc(#{$value} * 1.25)
+    );
+  }
+}
+```
+
+### Key Integration Points
+
+1. **Always Use Material Tokens**: Never hardcode spacing or colors
+2. **Fluid First**: Use clamp() with Material tokens for responsive scaling
+3. **Remove Constraints**: Let admin interfaces use full screen width
+4. **Container Queries**: Modern responsive design at component level
+5. **Theme Consistency**: All responsive utilities must use Material 3 tokens
+
+### Common Responsive Theming Mistakes
+
+- ❌ **Using fixed pixel values instead of Material tokens**
+- ❌ **Applying max-width constraints to admin dashboards**
+- ❌ **Creating responsive utilities without theme integration**
+- ❌ **Ignoring Material 3 spacing scale in fluid calculations**
+- ❌ **Mixing custom breakpoints with Material's responsive system**
+
+**Remember**: Modern Angular Material theming is about combining Material 3 design tokens with fluid design principles. Every responsive decision should respect the theme system while embracing full-width layouts and fluid scaling.
+- ❌ **Assuming CSS custom properties work without theme application**
+- ❌ **Relying on ng add @angular/material for automatic theme setup**
+- ❌ **Mixing custom component styling with Angular Material theming**
+- ❌ **Ignoring "Could not find Angular Material core theme" console warnings**
+- ❌ **Using any theme other than azure-blue without explicit approval**

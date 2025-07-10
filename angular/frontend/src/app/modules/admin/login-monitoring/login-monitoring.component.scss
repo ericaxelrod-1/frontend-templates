@@ -199,12 +199,6 @@
   margin-top: clamp(16px, 4vw, 20px);
   width: 100%;
   
-  // DEBUG: Enhanced debug styles for better visibility during testing
-  border: 4px solid red !important;
-  background-color: rgba(255, 0, 0, 0.2) !important;
-  outline: 2px dashed orange !important;
-  outline-offset: 2px !important;
-  
   // Container query support for component-level responsiveness
   container-type: inline-size;
   
@@ -212,14 +206,10 @@
   // Use a simple approach that should work on all screen sizes
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
   
-  // Force grid layout on all children with enhanced debug styles
+  // Force grid layout on all children
   > * {
     display: block;
     width: 100%;
-    border: 3px solid blue !important; // DEBUG: Enhanced blue borders for grid items
-    background-color: rgba(0, 0, 255, 0.1) !important;
-    outline: 1px solid green !important;
-    outline-offset: 1px !important;
   }
   
   // Progressive enhancement based on available space
