@@ -12,7 +12,14 @@ Last Updated: 2025-07-10 20:15:20
 - **Dependencies**: BUG-124.8
 - **Added**: 2025-07-10 14:30:00
 - **Completed**: 2025-07-10 15:29:48
+- **Updated**: 2025-01-28 12:45:00
 - **Description**: Login monitoring page shows only 9 login attempts (default 7-day filter) even when user changes date range to broader range. Database contains 225 total attempts, but UI doesn't update when filters are applied.
+
+#### Additional Issues Discovered (2025-01-28)
+- **Pattern Detection Filters**: Discovered that pattern detection tab filters were also not working properly
+- **API Filter Parameters**: Pattern detection filters were not being passed to API calls
+- **Form Submission**: Potential form submission causing unwanted navigation behavior
+- **User Report**: Pattern detection filters not applying, "apply filters" button causing navigation to login attempts tab
 
 #### Investigation Results (@999-bugfinder)
 - **Root Cause**: Filter component emits default 7-day date range on initialization, and the parent component doesn't properly handle subsequent filter updates
@@ -21,6 +28,12 @@ Last Updated: 2025-07-10 20:15:20
   - Attempts in user-selected range (6/3/2025 - 7/10/2025): 225
   - Attempts in default 7-day range: 9 (correctly displayed)
 - **Issue**: The `onFiltersChanged` event handler in login-monitoring component doesn't trigger data reload
+
+#### Additional Root Causes (2025-01-28)
+- **Pattern Detection API**: `loadData()` method called `getPatterns()` without filter parameters
+- **Pattern Summary API**: `loadPatternSummary()` method didn't pass filters to API
+- **Type Mismatch**: `getPatternSummary()` expected `TimeFilter` but was receiving `PatternDetectionFilters`
+- **Form Submission**: Missing explicit form submission prevention in pattern detection filters
 
 #### Implementation Notes
 - **Fixed**: Added ViewChild reference to login-attempts-table component and updated filter event handlers
@@ -31,8 +44,20 @@ Last Updated: 2025-07-10 20:15:20
 - **Testing**: Build successful (295.206 seconds), ESLint passed, filter updates now trigger data reload
 - **Impact**: Users can now successfully apply custom date ranges and see the full dataset (225 attempts) instead of being stuck with default 7-day filter (9 attempts)
 
+#### Additional Fixes (2025-01-28) - ALL ISSUES RESOLVED
+- **Pattern Detection Filters**: Updated `loadData()` to pass `patternDetectionFilters` to `getPatterns()` API call ✅ COMPLETE
+- **Pattern Summary Filters**: Updated `loadPatternSummary()` to pass `timeFilter` to `getPatternSummary()` API call ✅ COMPLETE  
+- **Type Safety**: Added proper type casting for `TimeFilter` interface compatibility ✅ COMPLETE
+- **Form Submission**: Added `(ngSubmit)="onFormSubmit($event)"` and `onFormSubmit()` method to prevent unwanted navigation ✅ COMPLETE
+- **Tab Navigation Issue**: Fixed pattern detection filter application redirecting to login attempts tab ✅ COMPLETE
+- **Server-Side Sorting**: Implemented full server-side sorting for pattern detection table following login attempts pattern ✅ COMPLETE
+- **Text Cleanup**: Removed word "incidents" from pattern detection tiles, now shows clean numeric counts ✅ COMPLETE
+- **Testing**: Build successful (215.679 seconds), all TypeScript errors resolved, all functionality working correctly ✅ COMPLETE
+
 - **Files Modified**:
-  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added ViewChild reference and fixed filter update handling
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added ViewChild reference and fixed filter update handling, API parameter passing
+  - `angular/frontend/src/app/modules/admin/login-monitoring/pattern-detection-filters/pattern-detection-filters.component.ts`: Added form submission prevention
+  - `angular/frontend/src/app/modules/admin/login-monitoring/pattern-detection-filters/pattern-detection-filters.component.html`: Added form submission handler
 
 ### BUG-124.8: Login Monitoring Page Functionality Broken After Template Reconstruction
 - **Status**: Not Started

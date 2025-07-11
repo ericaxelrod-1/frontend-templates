@@ -188,6 +188,7 @@
                   <!-- Pattern Detection Table -->
                   <mat-table [dataSource]="detectedPatterns" 
                              matSort
+                             #patternSort="matSort"
                              class="pattern-detection-table">
                     
                     <!-- Timestamp Column -->

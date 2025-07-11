@@ -179,6 +179,8 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges, OnDe
       return;
     }
 
+    console.log('[PatternDetectionFilters] Apply Filters button clicked - processing filters');
+
     const formValues = this.filterForm.value;
     const filters: PatternDetectionFilters = {
       status: formValues.status || undefined,
@@ -247,6 +249,21 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges, OnDe
     });
 
     this.filtersReset.emit();
+  }
+
+  // Enhanced form submission prevention with debugging
+  onFormSubmit(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('[PatternDetectionFilters] Form submission prevented - this should not cause navigation');
+  }
+
+  // Explicit button click handler to prevent any form submission behavior
+  onApplyFiltersClick(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('[PatternDetectionFilters] Apply Filters button clicked explicitly');
+    this.onFiltersChanged();
   }
 
   // BUG-124.19 FIX: Public method for parent to trigger emission when needed

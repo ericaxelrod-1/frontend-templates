@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTabsModule, MatTabGroup } from '@angular/material/tabs';
 import { MatCardModule } from '@angular/material/card';
@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTableModule } from '@angular/material/table';
 import { MatSortModule } from '@angular/material/sort';
+import { MatSort } from '@angular/material/sort';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { FormGroup } from '@angular/forms';
@@ -154,7 +155,7 @@ class LoadingManager {
   templateUrl: './login-monitoring.component.html',
   styleUrls: ['./login-monitoring.component.scss']
 })
-export class LoginMonitoringComponent implements OnInit, OnDestroy {
+export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewInit {
   // BUG-124.19 FIX: Circuit Breaker for Infinite Loop Prevention
   private circuitBreaker = new InfiniteLoopDetector();
   
@@ -233,6 +234,10 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   patternPageSize = 10;
   patternCurrentPage = 0;
   
+  // Pattern sorting properties for server-side sorting
+  patternSortBy = 'detectionTimestamp';
+  patternSortDirection: 'asc' | 'desc' = 'desc';
+  
   // Test data creation state
   isCreatingTestData = false;
 
@@ -241,6 +246,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   
   // ViewChild for login attempts table to trigger filter updates
   @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
+
+  // ViewChild for pattern detection table sorting
+  @ViewChild('patternSort', { static: false }) patternSort!: MatSort;
 
   // BUG-124.19 FIX: Computed Properties (Getters instead of methods)
   get responsiveClass(): string { return this._responsiveClass; }
@@ -308,6 +316,29 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
     this.circuitBreaker.reset();
     console.log('[LoginMonitoring] Component destroyed, circuit breaker reset');
+  }
+
+  ngAfterViewInit(): void {
+    // Set up server-side sorting for the pattern detection table
+    if (this.patternSort) {
+      this.patternSort.sortChange.pipe(
+        takeUntil(this.destroy$)
+      ).subscribe(() => {
+        // Map UI column names to backend field names
+        const columnToFieldMap: { [key: string]: string } = {
+          'timestamp': 'detectionTimestamp',
+          'type': 'patternType',
+          'severity': 'severity'
+        };
+        
+        const activeColumn = this.patternSort.active || 'timestamp';
+        this.patternSortBy = columnToFieldMap[activeColumn] || 'detectionTimestamp';
+        this.patternSortDirection = this.patternSort.direction || 'desc';
+        this.patternCurrentPage = 0; // Reset to first page on sort change
+        console.log('[DEBUG] Pattern sort changed:', this.patternSortBy, this.patternSortDirection);
+        this.loadData();
+      });
+    }
   }
 
   // BUG-113: Modern Responsive Design Initialization
@@ -520,13 +551,15 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Load pattern detection results
+    // Load pattern detection results with filters and sorting
     this.loadingManager.startOperation('patterns');
-    this.loginMonitoringService.getPatterns().subscribe({
+    console.log('[DEBUG] Loading patterns with filters:', this.patternDetectionFilters);
+    this.loginMonitoringService.getPatterns(this.patternDetectionFilters || {}).subscribe({
       next: (patternResults) => {
         this.patterns = patternResults.items;
         this.detectedPatterns = patternResults.items; // Populate detectedPatterns for template
         this.patternTotalCount = patternResults.total || patternResults.items.length; // Use 'total' not 'totalCount'
+        console.log('[DEBUG] Patterns loaded:', patternResults.items.length, 'patterns');
         this.loadingManager.endOperation('patterns');
       },
       error: (err) => {
@@ -553,7 +586,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
     // DEBUG: Add mock data to test grid layout
     console.log('[DEBUG] Loading pattern summary...');
     
-    this.loginMonitoringService.getPatternSummary().subscribe({
+    console.log('[DEBUG] Loading pattern summary with time filter:', this.filterState.timeRange);
+    const timeFilter = { timeRange: this.filterState.timeRange as '30d' | '24h' | '7d' | '90d' | 'all' };
+    this.loginMonitoringService.getPatternSummary(timeFilter).subscribe({
       next: (summary) => {
         console.log('[DEBUG] Pattern summary loaded:', summary);
         this.patternSummary = summary;
@@ -727,9 +762,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   // BUG-113: Format pattern count with responsive considerations
   formatPatternCount(count: number): string {
     // BUG-124.19 FIX: Pure function, no circuit breaker needed
-    if (count === 0) return 'None';
-    if (count === 1) return '1 incident';
-    return `${count} incidents`;
+    return count.toString();
   }
 
   // BUG-113: Get responsive icon size
@@ -1084,6 +1117,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
     this.patternCurrentPage = event.pageIndex;
     this.patternPageSize = event.pageSize;
     console.log('[LoginMonitoring] Pattern page changed:', event);
+    
+    // Reload data with new pagination parameters
+    this.loadData();
   }
 
   onSecurityAlertsFiltersChanged(filters: SecurityAlertsFilters): void {
