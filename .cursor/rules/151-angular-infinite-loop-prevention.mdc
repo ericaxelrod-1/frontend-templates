@@ -1,0 +1,96 @@
+---
+description: "Critical patterns for preventing Angular infinite loops, memory leaks, and refresh issues"
+globs: angular/**/*.ts, angular/**/*.html
+tags: ["angular", "performance", "memory", "loops", "architecture"]
+priority: 50
+---
+
+# Angular Infinite Loop & Memory Leak Prevention
+
+## CRITICAL: Lessons from BUG-124.19 Investigation
+
+⚠️ **This rule prevents catastrophic refresh loops that can make applications completely unusable**
+
+Based on comprehensive investigation of a persistent refresh loop that evaded 6 fix attempts, these patterns are **MANDATORY** for Angular applications.
+
+## 🚨 CIRCUIT BREAKER PATTERN - REQUIRED
+
+### Always Implement Loop Detection for Critical Methods
+
+```typescript
+// REQUIRED: Circuit breaker for any method that can be called frequently
+class ComponentWithFrequentMethods {
+  private circuitBreaker = new InfiniteLoopDetector();
+  
+  criticalMethod(): void {
+    if (!this.circuitBreaker.checkLoop('criticalMethod')) return;
+    // Method implementation
+  }
+}
+
+class InfiniteLoopDetector {
+  private calls = new Map<string, number>();
+  private timestamps = new Map<string, number>();
+  private maxCalls = 10;
+  private timeWindow = 5000;
+
+  checkLoop(method: string): boolean {
+    const now = Date.now();
+    const lastTimestamp = this.timestamps.get(method) || 0;
+    
+    if (now - lastTimestamp > this.timeWindow) {
+      this.calls.set(method, 1);
+      this.timestamps.set(method, now);
+      return true;
+    }
+    
+    const callCount = (this.calls.get(method) || 0) + 1;
+    this.calls.set(method, callCount);
+    
+    if (callCount > this.maxCalls) {
+      console.error(`🚨 INFINITE LOOP DETECTED in ${method}!`);
+      return false;
+    }
+    
+    return true;
+  }
+}
+```
+
+## 🚫 TEMPLATE ANTI-PATTERNS - NEVER DO THESE
+
+### ❌ PROHIBITED: Method Calls in Templates
+```html
+<!-- PROHIBITED - Causes infinite change detection loops -->
+<div [ngClass]="getResponsiveClass()">
+<mat-icon [style.font-size]="getIconSize()">
+<div [style.grid-template-columns]="getGridColumns()">
+```
+
+### ✅ REQUIRED: Computed Properties
+```typescript
+// REQUIRED: Compute once, use getter in template
+export class Component {
+  private _responsiveClass = '';
+  private _iconSize = '24px';
+  private _gridColumns = 3;
+
+  // Compute only when state changes
+  private updateResponsiveProperties(): void {
+    this._responsiveClass = this.computeClass();
+    this._iconSize = this.computeIconSize();
+    this._gridColumns = this.computeGridColumns();
+  }
+
+  // Use getters in template
+  get responsiveClass(): string { return this._responsiveClass; }
+  get iconSize(): string { return this._iconSize; }
+  get gridColumns(): number { return this._gridColumns; }
+}
+```
+
+```html
+<!-- CORRECT - Uses computed properties -->
+<div [ngClass]="responsiveClass">
+<mat-icon [style.font-size]="iconSize">
+<div [style.grid-template-columns]="'repeat(' + gridColumns + ', 1fr)'">

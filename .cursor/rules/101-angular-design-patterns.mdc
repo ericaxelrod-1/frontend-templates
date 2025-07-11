@@ -1,6 +1,6 @@
 ---
 description: "Angular design patterns and implementation guidelines for proper component architecture"
-globs: ["angular/**/*.ts", "angular/**/*.html", "angular/**/*.scss"]
+globs: angular/**/*.ts, angular/**/*.html, angular/**/*.scss
 tags: ["angular", "components", "material", "architecture", "patterns"]
 priority: 2
 ---
