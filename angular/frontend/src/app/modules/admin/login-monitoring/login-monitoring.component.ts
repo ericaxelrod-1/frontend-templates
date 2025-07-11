@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTabsModule, MatTabGroup } from '@angular/material/tabs';
 import { MatCardModule } from '@angular/material/card';
@@ -38,6 +38,97 @@ import { PatternSummary } from '../../../models/pattern-summary.interface';
 import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 
+// BUG-124.19 FIX: Circuit Breaker Pattern for Infinite Loop Detection
+interface CircuitBreaker {
+  calls: Map<string, number>;
+  timestamps: Map<string, number>;
+  maxCalls: number;
+  timeWindow: number;
+  
+  checkLoop(method: string): boolean;
+  reset(): void;
+}
+
+class InfiniteLoopDetector implements CircuitBreaker {
+  calls = new Map<string, number>();
+  timestamps = new Map<string, number>();
+  maxCalls = 10; // Maximum calls per time window
+  timeWindow = 5000; // 5 seconds
+
+  checkLoop(method: string): boolean {
+    const now = Date.now();
+    const lastTimestamp = this.timestamps.get(method) || 0;
+    
+    // Reset counter if time window has passed
+    if (now - lastTimestamp > this.timeWindow) {
+      this.calls.set(method, 1);
+      this.timestamps.set(method, now);
+      return true;
+    }
+    
+    // Increment call count
+    const callCount = (this.calls.get(method) || 0) + 1;
+    this.calls.set(method, callCount);
+    this.timestamps.set(method, now);
+    
+    if (callCount > this.maxCalls) {
+      console.error(`🚨 INFINITE LOOP DETECTED in ${method}! Calls: ${callCount} in ${this.timeWindow}ms`);
+      console.error('🛑 STOPPING EXECUTION to prevent browser crash');
+      return false;
+    }
+    
+    if (callCount > 5) {
+      console.warn(`⚠️ High call frequency detected in ${method}: ${callCount} calls`);
+    }
+    
+    return true;
+  }
+  
+  reset(): void {
+    this.calls.clear();
+    this.timestamps.clear();
+  }
+}
+
+// BUG-124.19 FIX: Centralized Filter State Management
+interface FilterState {
+  timeRange: string;
+  patternFilters: PatternDetectionFilters | null;
+  securityFilters: SecurityAlertsFilters | null;
+  lastUpdated: number;
+}
+
+// BUG-124.19 FIX: Loading State Coordination Manager
+class LoadingManager {
+  private operations = new Set<string>();
+  private onStateChange: (isLoading: boolean) => void;
+  
+  constructor(onStateChange: (isLoading: boolean) => void) {
+    this.onStateChange = onStateChange;
+  }
+  
+  startOperation(name: string): void {
+    this.operations.add(name);
+    this.onStateChange(true);
+    console.log(`[LoadingManager] Started: ${name}, Active operations:`, Array.from(this.operations));
+  }
+  
+  endOperation(name: string): void {
+    this.operations.delete(name);
+    const isLoading = this.operations.size > 0;
+    this.onStateChange(isLoading);
+    console.log(`[LoadingManager] Completed: ${name}, Active operations:`, Array.from(this.operations));
+  }
+  
+  isOperationActive(name: string): boolean {
+    return this.operations.has(name);
+  }
+  
+  getActiveOperations(): string[] {
+    return Array.from(this.operations);
+  }
+}
+
 @Component({
   selector: 'app-login-monitoring',
   standalone: true,
@@ -64,10 +155,41 @@ import { Subject } from 'rxjs';
   styleUrls: ['./login-monitoring.component.scss']
 })
 export class LoginMonitoringComponent implements OnInit, OnDestroy {
+  // BUG-124.19 FIX: Circuit Breaker for Infinite Loop Prevention
+  private circuitBreaker = new InfiniteLoopDetector();
+  
+  // BUG-124.19 FIX: Centralized Filter State
+  public filterState: FilterState = {
+    timeRange: '30d',
+    patternFilters: null,
+    securityFilters: null,
+    lastUpdated: Date.now()
+  };
+  
+  // BUG-124.19 FIX: Loading State Coordination
+  private loadingManager = new LoadingManager((isLoading: boolean) => {
+    // Update the main loading state when any operation changes
+    this.loading = {
+      ...this.loading,
+      statistics: this.loadingManager.isOperationActive('statistics'),
+      patterns: this.loadingManager.isOperationActive('patterns'),
+      alerts: this.loadingManager.isOperationActive('alerts'),
+      ipReputation: this.loadingManager.isOperationActive('ipReputation'),
+      patternSummary: this.loadingManager.isOperationActive('patternSummary')
+    };
+  });
+
   // BUG-113: Enhanced Responsive Design Support
   private destroy$ = new Subject<void>();
   
-  // Responsive breakpoint tracking
+  // BUG-124.19 FIX: Computed Responsive Properties (No more template method calls)
+  private _responsiveClass = '';
+  private _responsiveIconSize = '24px';
+  private _statsGridColumns = 4;
+  private _patternTilesColumns = 3;
+  private _showCompactView = false;
+  
+  // Responsive state - will be computed, not called from template
   isMobile = false;
   isTablet = false;
   isDesktop = false;
@@ -104,7 +226,8 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   patternTotalCount = 0;
   selectedIpReputation: IPReputation | null = null;
   filterForm: FormGroup | null = null;
-
+  patternDetectionFilters: PatternDetectionFilters | null = null;
+  
   // Pattern table properties
   patternDisplayedColumns: string[] = ['timestamp', 'type', 'severity', 'ipAddresses', 'details', 'groupCount', 'actions'];
   patternPageSize = 10;
@@ -119,8 +242,17 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   // ViewChild for login attempts table to trigger filter updates
   @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
 
+  // BUG-124.19 FIX: Computed Properties (Getters instead of methods)
+  get responsiveClass(): string { return this._responsiveClass; }
+  get responsiveIconSize(): string { return this._responsiveIconSize; }
+  get statsGridColumns(): number { return this._statsGridColumns; }
+  get patternTilesColumns(): number { return this._patternTilesColumns; }
+  get showCompactView(): boolean { return this._showCompactView; }
+
   // BUG-124.6: Dynamic component loading for performance optimization
   async loadTabComponent(tabIndex: number) {
+    if (!this.circuitBreaker.checkLoop('loadTabComponent')) return;
+    
     switch (tabIndex) {
       case 0: // Login Attempts
         if (!this.loginAttemptsTableLoaded) {
@@ -160,26 +292,28 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
     private loginMonitoringService: LoginMonitoringService,
     private permissionService: PermissionService,
     private breakpointObserver: BreakpointObserver,
-    private cdr: ChangeDetectorRef,
     private responsiveLayout: ResponsiveLayoutService
   ) {}
 
   ngOnInit() {
-    this.checkPermissions();
-    this.initializeResponsiveDesign();
+    if (!this.circuitBreaker.checkLoop('ngOnInit')) return;
     
-    if (this.hasPermission) {
-      this.loadData();
-    }
+    console.log('[LoginMonitoring] Component initializing with circuit breaker protection');
+    this.initializeResponsiveDesign();
+    this.checkPermissions(); // This handles loadData() asynchronously when permission is granted
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    this.circuitBreaker.reset();
+    console.log('[LoginMonitoring] Component destroyed, circuit breaker reset');
   }
 
   // BUG-113: Modern Responsive Design Initialization
   private initializeResponsiveDesign() {
+    if (!this.circuitBreaker.checkLoop('initializeResponsiveDesign')) return;
+    
     // Monitor breakpoint changes for responsive behavior
     this.breakpointObserver.observe([
       this.customBreakpoints.mobile,
@@ -195,35 +329,77 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
 
   // BUG-113: Update responsive state based on breakpoint matches
   private updateResponsiveState(): void {
+    if (!this.circuitBreaker.checkLoop('updateResponsiveState')) return;
+    
     this.isMobile = this.breakpointObserver.isMatched(this.customBreakpoints.mobile);
     this.isTablet = this.breakpointObserver.isMatched(this.customBreakpoints.tablet);
     this.isDesktop = this.breakpointObserver.isMatched(this.customBreakpoints.desktop);
     this.isLargeDesktop = this.breakpointObserver.isMatched(this.customBreakpoints.largeDesktop);
     
-    // BUG-124.4 FIX: Trigger change detection after responsive state changes
-    this.cdr.detectChanges();
+    // BUG-124.19 FIX: Compute responsive properties once, use getters in template
+    this.computeResponsiveProperties();
     
     // Trigger responsive layout adjustments
     this.onBreakpointChange();
   }
 
+  // BUG-124.19 FIX: Compute responsive properties (called once per breakpoint change)
+  private computeResponsiveProperties(): void {
+    // Responsive class
+    if (this.isMobile) {
+      this._responsiveClass = 'mobile-spacing';
+      this._responsiveIconSize = '20px';
+      this._statsGridColumns = 1;
+      this._patternTilesColumns = 1;
+      this._showCompactView = true;
+    } else if (this.isTablet) {
+      this._responsiveClass = 'tablet-spacing';
+      this._responsiveIconSize = '22px';
+      this._statsGridColumns = 2;
+      this._patternTilesColumns = 2;
+      this._showCompactView = true;
+    } else if (this.isDesktop) {
+      this._responsiveClass = 'desktop-spacing';
+      this._responsiveIconSize = '24px';
+      this._statsGridColumns = 4;
+      this._patternTilesColumns = 3;
+      this._showCompactView = false;
+    } else {
+      this._responsiveClass = 'large-desktop-spacing';
+      this._responsiveIconSize = '24px';
+      this._statsGridColumns = 6;
+      this._patternTilesColumns = 4;
+      this._showCompactView = false;
+    }
+    
+    console.log('[LoginMonitoring] Responsive properties computed:', {
+      class: this._responsiveClass,
+      iconSize: this._responsiveIconSize,
+      statsColumns: this._statsGridColumns,
+      patternColumns: this._patternTilesColumns,
+      compact: this._showCompactView
+    });
+  }
+
   // BUG-113: Handle responsive layout changes
   private onBreakpointChange() {
+    if (!this.circuitBreaker.checkLoop('onBreakpointChange')) return;
+    
     // Responsive behavior can be implemented here
     // For example: adjust grid columns, table display mode, etc.
     
     if (this.isMobile) {
       // Mobile-specific adjustments
-      console.log('Mobile view active');
+      console.log('[LoginMonitoring] Mobile view active');
     } else if (this.isTablet) {
       // Tablet-specific adjustments  
-      console.log('Tablet view active');
+      console.log('[LoginMonitoring] Tablet view active');
     } else if (this.isDesktop) {
       // Desktop-specific adjustments
-      console.log('Desktop view active');
+      console.log('[LoginMonitoring] Desktop view active');
     } else if (this.isLargeDesktop) {
       // Large desktop-specific adjustments
-      console.log('Large desktop view active');
+      console.log('[LoginMonitoring] Large desktop view active');
     }
   }
 
@@ -249,58 +425,74 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
   }
 
   // BUG-124.7.1: Updated to use ResponsiveLayoutService for consistent breakpoint management
+  private _cachedResponsiveClass = '';
+  private _lastResponsiveState = '';
+  
   getResponsiveSpacingClass(): string {
-    // Keep existing logic for backward compatibility during transition
-    let responsiveClass = '';
+    // BUG-124.18 FIX: Cache result to prevent excessive console logging during change detection
+    const currentState = `${this.isMobile}-${this.isTablet}-${this.isDesktop}-${this.isLargeDesktop}`;
     
-    if (this.isMobile) {
-      responsiveClass = 'mobile-spacing';
-    } else if (this.isTablet) {
-      responsiveClass = 'tablet-spacing';
-    } else if (this.isDesktop) {
-      responsiveClass = 'desktop-spacing';
-    } else {
-      responsiveClass = 'large-desktop-spacing';
+    if (this._lastResponsiveState !== currentState) {
+      this._lastResponsiveState = currentState;
+      
+      // Keep existing logic for backward compatibility during transition
+      if (this.isMobile) {
+        this._cachedResponsiveClass = 'mobile-spacing';
+      } else if (this.isTablet) {
+        this._cachedResponsiveClass = 'tablet-spacing';
+      } else if (this.isDesktop) {
+        this._cachedResponsiveClass = 'desktop-spacing';
+      } else {
+        this._cachedResponsiveClass = 'large-desktop-spacing';
+      }
+      
+      // Only log when state actually changes, not on every change detection cycle
+      console.log('[DEBUG] Responsive class changed:', this._cachedResponsiveClass, {
+        isMobile: this.isMobile,
+        isTablet: this.isTablet,
+        isDesktop: this.isDesktop,
+        isLargeDesktop: this.isLargeDesktop
+      });
     }
     
-    console.log('[DEBUG] Responsive class applied:', responsiveClass, {
-      isMobile: this.isMobile,
-      isTablet: this.isTablet,
-      isDesktop: this.isDesktop,
-      isLargeDesktop: this.isLargeDesktop
-    });
-    
-    return responsiveClass;
+    return this._cachedResponsiveClass;
   }
 
   private checkPermissions() {
-    this.permissionService.hasPermission('login-monitoring:read').subscribe(hasPermission => {
-      this.hasPermission = hasPermission;
-      if (this.hasPermission) {
-        this.loadData();
-      }
-    });
+    if (!this.circuitBreaker.checkLoop('checkPermissions')) return;
+    
+    this.permissionService.hasPermission('login-monitoring:read')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(hasPermission => {
+        this.hasPermission = hasPermission;
+        if (this.hasPermission) {
+          this.loadData();
+        }
+      });
   }
 
   private loadData() {
-    this.loading = {
-      patternSummary: false,
-      patterns: true,
-      alerts: true,
-      ipReputation: false,
-      statistics: true
-    };
+    if (!this.circuitBreaker.checkLoop('loadData')) return;
+    
+    // BUG-124.12 FIX: Prevent infinite loop
+    if (this.loadingManager.isOperationActive('loadData')) {
+      console.log('[DEBUG] LoadData already in progress, skipping to prevent infinite loop');
+      return;
+    }
+    
+    this.loadingManager.startOperation('loadData');
     this.error = null;
 
     // Load statistics
+    this.loadingManager.startOperation('statistics');
     this.loginMonitoringService.getStatistics().subscribe({
       next: (stats) => {
         this.statistics = stats;
-        this.loading.statistics = false;
+        this.loadingManager.endOperation('statistics');
       },
       error: (err) => {
         this.error = 'Failed to load statistics';
-        this.loading.statistics = false;
+        this.loadingManager.endOperation('statistics');
         console.error('Error loading statistics:', err);
       }
     });
@@ -316,38 +508,47 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
     });
 
     // Load security alerts
+    this.loadingManager.startOperation('alerts');
     this.loginMonitoringService.getSecurityAlerts().subscribe({
       next: (alerts) => {
         this.securityAlerts = alerts;
-        this.loading.alerts = false;
+        this.loadingManager.endOperation('alerts');
       },
       error: (err) => {
         console.error('Error loading security alerts:', err);
-        this.loading.alerts = false;
+        this.loadingManager.endOperation('alerts');
       }
     });
 
     // Load pattern detection results
+    this.loadingManager.startOperation('patterns');
     this.loginMonitoringService.getPatterns().subscribe({
       next: (patternResults) => {
         this.patterns = patternResults.items;
         this.detectedPatterns = patternResults.items; // Populate detectedPatterns for template
         this.patternTotalCount = patternResults.total || patternResults.items.length; // Use 'total' not 'totalCount'
-        this.loading.patterns = false;
+        this.loadingManager.endOperation('patterns');
       },
       error: (err) => {
         console.error('Error loading pattern detection results:', err);
-        this.loading.patterns = false;
+        this.loadingManager.endOperation('patterns');
       }
     });
 
     // BUG-113: Load pattern summary for dashboard tiles
     this.loadPatternSummary();
+    
+    // BUG-124.12 FIX: Reset loading flag after all data loading is initiated
+    setTimeout(() => {
+      this.loadingManager.endOperation('loadData');
+    }, 100);
   }
 
   // BUG-113: Load pattern summary data for dashboard tiles
   private loadPatternSummary() {
-    this.loading.patternSummary = true;
+    if (!this.circuitBreaker.checkLoop('loadPatternSummary')) return;
+    
+    this.loadingManager.startOperation('patternSummary');
     
     // DEBUG: Add mock data to test grid layout
     console.log('[DEBUG] Loading pattern summary...');
@@ -421,7 +622,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
           console.log('[DEBUG] Mock pattern summary created:', this.patternSummary);
         }
         
-        this.loading.patternSummary = false;
+        this.loadingManager.endOperation('patternSummary');
       },
       error: (err) => {
         console.error('Error loading pattern summary:', err);
@@ -463,57 +664,72 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
           }
         ];
         
-        this.loading.patternSummary = false;
+        this.loadingManager.endOperation('patternSummary');
       }
     });
   }
 
   // BUG-113: Handle pattern tile click with responsive navigation
   onPatternTileClick(patternType: string) {
+    if (!this.circuitBreaker.checkLoop('onPatternTileClick')) return;
+    
     // Navigate to pattern detection tab (index 1) with filter applied
     console.log('Pattern tile clicked:', patternType);
     
-    // Navigate to Pattern Detection tab
+    // Navigate to the pattern detection tab
     if (this.tabGroup) {
-      this.tabGroup.selectedIndex = 1; // Pattern Detection tab is index 1
+      this.tabGroup.selectedIndex = 1;
     }
     
-    // Apply pattern type filter to Pattern Detection filters
-    // This will be handled by the pattern detection filters component
-    // We'll emit the filter change after tab navigation
-    setTimeout(() => {
-      this.applyPatternTypeFilter(patternType);
-    }, 100); // Small delay to ensure tab switch completes
+    // Apply the pattern type filter
+    this.applyPatternTypeFilter(patternType);
   }
 
-  // Apply pattern type filter to Pattern Detection filters
+  // BUG-113: Apply pattern type filter
   private applyPatternTypeFilter(patternType: string) {
-    // This method will trigger the pattern detection filters to apply the selected pattern type
-    // The actual filtering will be handled by the pattern detection component
+    if (!this.circuitBreaker.checkLoop('applyPatternTypeFilter')) return;
+    
+    // BUG-124.12 FIX: Prevent infinite loop when applying pattern filter
+    if (this.loadingManager.isOperationActive('applyPatternTypeFilter')) {
+      console.log('[DEBUG] Pattern filter already being applied, skipping to prevent infinite loop');
+      return;
+    }
+    
+    this.loadingManager.startOperation('applyPatternTypeFilter');
     console.log('Applying pattern type filter:', patternType);
     
-    // Emit pattern detection filter change with the selected pattern type
-    this.onPatternDetectionFiltersChanged({ patternType: patternType } as PatternDetectionFilters);
+    // Store the filter in component state - use proper type casting
+    this.patternDetectionFilters = {
+      patternType: patternType as '' | 'brute_force' | 'distributed_attack' | 'credential_stuffing' | 'rapid_account_switching' | 'ip_hopping' | 'suspicious_location' | 'time_anomaly'
+    };
+    
+    // Trigger data reload for pattern detection
+    this.loadPatternSummary();
+    
+    // Reset the flag after a brief delay
+    setTimeout(() => {
+      this.loadingManager.endOperation('applyPatternTypeFilter');
+    }, 100);
   }
 
   // BUG-113: Get severity class with responsive considerations
   getSeverityClass(severity: string): string {
-    const baseClass = `pattern-tile-${severity.toLowerCase()}`;
-    
-    // Add responsive modifier if needed
-    if (this.shouldShowCompactView()) {
-      return `${baseClass} compact-view`;
-    }
-    
-    return baseClass;
+    // BUG-124.19 FIX: Simple lookup, no circuit breaker needed for pure functions
+    const severityClasses: { [key: string]: string } = {
+      'low': 'severity-low',
+      'medium': 'severity-medium',
+      'high': 'severity-high',
+      'critical': 'severity-critical'
+    };
+    return severityClasses[severity] || 'severity-unknown';
   }
 
   // BUG-113: Format pattern count with responsive considerations
   formatPatternCount(count: number): string {
-    if (this.isMobile && count > 999) {
-      return `${Math.floor(count / 1000)}k+`;
-    }
-    return count.toLocaleString();
+    // BUG-124.19 FIX: Pure function, no circuit breaker needed
+    if (count === 0) return 'None';
+    if (count === 1) return '1 incident';
+    return `${count} incidents`;
   }
 
   // BUG-113: Get responsive icon size
@@ -644,155 +860,272 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy {
     });
   }
 
-  // Template event handlers
+  // BUG-124.19 FIX: Event handlers with circuit breaker protection and centralized state
   onStatsLoaded(stats: Statistics): void {
+    if (!this.circuitBreaker.checkLoop('onStatsLoaded')) return;
     this.statistics = stats;
   }
 
   onTimeFilterChange(timeFilter: unknown): void {
-    console.log('Time filter changed:', timeFilter);
+    if (!this.circuitBreaker.checkLoop('onTimeFilterChange')) return;
+    
+    // BUG-124.19 FIX: Use centralized filter state
+    this.filterState.timeRange = typeof timeFilter === 'object' && timeFilter !== null 
+      ? JSON.stringify(timeFilter) 
+      : String(timeFilter);
+    this.filterState.lastUpdated = Date.now();
+    
+    console.log('[LoginMonitoring] Time filter changed:', timeFilter, 'State:', this.filterState);
+    
+    // BUG-124.16 FIX: Prevent infinite loop from time filter changes during component initialization
+    if (this.loadingManager.isOperationActive('onTimeFilterChange')) {
+      console.log('[DEBUG] Time filter change ignored - already loading data');
+      return;
+    }
+    
+    this.loadingManager.startOperation('onTimeFilterChange');
     this.loadPatternSummary();
+    
+    setTimeout(() => {
+      this.loadingManager.endOperation('onTimeFilterChange');
+    }, 100);
   }
 
   onFiltersChanged(filterForm: FormGroup): void {
-    console.log('Filters changed:', filterForm);
+    if (!this.circuitBreaker.checkLoop('onFiltersChanged')) return;
+    
+    console.log('[LoginMonitoring] Filters changed:', filterForm.value);
     this.filterForm = filterForm;
     
-    // BUG-124.9 FIX: Trigger data reload in login attempts table when filters change
+    // Trigger filter updates on child table
     if (this.loginAttemptsTable) {
       this.loginAttemptsTable.applyFilters();
     }
   }
 
   onFiltersReset(): void {
-    console.log('Filters reset');
-    this.filterForm = null;
+    if (!this.circuitBreaker.checkLoop('onFiltersReset')) return;
     
-    // BUG-124.9 FIX: Trigger data reload in login attempts table when filters are reset
+    console.log('[LoginMonitoring] Filters reset');
+    
+    // Reset the filter form and trigger reload
     if (this.loginAttemptsTable) {
       this.loginAttemptsTable.applyFilters();
     }
   }
 
   onPatternDetectionFiltersChanged(filters: PatternDetectionFilters): void {
-    console.log('Pattern detection filters changed:', filters);
-    // Handle filter changes for pattern detection
+    if (!this.circuitBreaker.checkLoop('onPatternDetectionFiltersChanged')) return;
+    
+    // BUG-124.19 FIX: Use centralized filter state
+    this.filterState.patternFilters = filters;
+    this.filterState.lastUpdated = Date.now();
+    
+    console.log('[LoginMonitoring] Pattern detection filters changed:', filters, 'State:', this.filterState);
+    
+    // BUG-124.12 FIX: Prevent infinite loop from pattern filter changes
+    if (this.loadingManager.isOperationActive('onPatternDetectionFiltersChanged')) {
+      console.log('[DEBUG] Pattern filter change ignored - already applying pattern filter');
+      return;
+    }
+    
+    this.loadingManager.startOperation('onPatternDetectionFiltersChanged');
+    
+    // Store filters in component for data loading
+    this.patternDetectionFilters = filters;
+    
+    // Reload data with new filters
+    this.loadData();
+    
+    setTimeout(() => {
+      this.loadingManager.endOperation('onPatternDetectionFiltersChanged');
+    }, 100);
   }
 
   onPatternDetectionFiltersReset() {
-    console.log('Pattern detection filters reset');
-    // Handle filter reset for pattern detection
+    if (!this.circuitBreaker.checkLoop('onPatternDetectionFiltersReset')) return;
+    
+    // BUG-124.19 FIX: Reset centralized filter state
+    this.filterState.patternFilters = null;
+    this.filterState.lastUpdated = Date.now();
+    
+    console.log('[LoginMonitoring] Pattern detection filters reset, State:', this.filterState);
+    
+    // BUG-124.12 FIX: Prevent infinite loop from pattern filter reset
+    if (this.loadingManager.isOperationActive('onPatternDetectionFiltersReset')) {
+      console.log('[DEBUG] Pattern filter reset ignored - already applying pattern filter');
+      return;
+    }
+    
+    this.loadingManager.startOperation('onPatternDetectionFiltersReset');
+    
+    // Clear stored filters
+    this.patternDetectionFilters = null;
+    
+    // Reload data without filters
+    this.loadData();
+    
+    setTimeout(() => {
+      this.loadingManager.endOperation('onPatternDetectionFiltersReset');
+    }, 100);
   }
 
   // Pattern display methods
   getPatternIcon(patternType: string): string {
-    const iconMap: Record<string, string> = {
+    // BUG-124.19 FIX: Pure function, no circuit breaker needed
+    const iconMap: { [key: string]: string } = {
       'brute_force': 'security',
       'distributed_attack': 'network_check',
       'credential_stuffing': 'vpn_key',
-      'rapid_account_switching': 'swap_horiz',
+      'account_switching': 'switch_account',
       'ip_hopping': 'router',
       'suspicious_location': 'location_on',
-      'time_anomaly': 'access_time'
+      'time_anomaly': 'schedule'
     };
     return iconMap[patternType] || 'warning';
   }
 
   getSeverityColor(severity: string): string {
-    const colorMap: Record<string, string> = {
-      'critical': 'severity-critical',
-      'high': 'severity-high',
-      'medium': 'severity-medium',
-      'low': 'severity-low'
+    // BUG-124.19 FIX: Pure function, no circuit breaker needed
+    const colorMap: { [key: string]: string } = {
+      'low': 'severity-low-color',
+      'medium': 'severity-medium-color',
+      'high': 'severity-high-color',
+      'critical': 'severity-critical-color'
     };
-    return colorMap[severity.toLowerCase()] || 'severity-default';
+    return colorMap[severity] || 'severity-unknown-color';
   }
 
   getPatternDisplayName(patternType: string): string {
-    const displayMap: Record<string, string> = {
+    // BUG-124.19 FIX: Pure function, no circuit breaker needed
+    const nameMap: { [key: string]: string } = {
       'brute_force': 'Brute Force',
       'distributed_attack': 'Distributed Attack',
       'credential_stuffing': 'Credential Stuffing',
-      'rapid_account_switching': 'Account Switching',
+      'account_switching': 'Account Switching',
       'ip_hopping': 'IP Hopping',
       'suspicious_location': 'Suspicious Location',
       'time_anomaly': 'Time Anomaly'
     };
-    return displayMap[patternType] || patternType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return nameMap[patternType] || patternType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
 
   // Additional template methods
   onAttemptSelected(attempt: LoginAttempt): void {
-    console.log('Attempt selected:', attempt);
-    // Handle attempt selection
+    if (!this.circuitBreaker.checkLoop('onAttemptSelected')) return;
+    console.log('[LoginMonitoring] Login attempt selected:', attempt);
   }
 
   onIPReputationRequested(ip: string): void {
-    console.log('IP reputation requested for:', ip);
-    // Handle IP reputation request
+    if (!this.circuitBreaker.checkLoop('onIPReputationRequested')) return;
+    
+    console.log('[LoginMonitoring] IP reputation requested for:', ip);
+    
+    this.loadingManager.startOperation('ipReputation');
+    
+    // Load IP reputation data
+    this.loginMonitoringService.getIPReputation(ip).subscribe({
+      next: (reputation) => {
+        this.selectedIpReputation = reputation;
+        this.loadingManager.endOperation('ipReputation');
+      },
+      error: (err) => {
+        console.error('Error loading IP reputation:', err);
+        this.loadingManager.endOperation('ipReputation');
+      }
+    });
   }
 
-  // Test pattern methods
+  // Test pattern generation methods with circuit breaker protection
   testBruteForcePattern() {
+    if (!this.circuitBreaker.checkLoop('testBruteForcePattern')) return;
     this.createTestBruteForce();
   }
 
   testDistributedAttackPattern() {
+    if (!this.circuitBreaker.checkLoop('testDistributedAttackPattern')) return;
     this.createTestDistributedAttack();
   }
 
   testCredentialStuffingPattern() {
+    if (!this.circuitBreaker.checkLoop('testCredentialStuffingPattern')) return;
     this.createTestCredentialStuffing();
   }
 
   testAccountSwitchingPattern() {
+    if (!this.circuitBreaker.checkLoop('testAccountSwitchingPattern')) return;
     this.createTestAccountSwitching();
   }
 
   clearTestData() {
+    if (!this.circuitBreaker.checkLoop('clearTestData')) return;
     this.clearAllData();
   }
 
   // Additional missing methods referenced in template
   getPatternTypeClass(pattern: Pattern): string {
-    return `pattern-type-${pattern.type.toLowerCase().replace(/_/g, '-')}`; // Use 'type' not 'patternType'
+    // BUG-124.19 FIX: Pure function, no circuit breaker needed
+    return `pattern-type-${pattern.type}`;
   }
 
   getGroupCount(pattern: Pattern): number {
-    return pattern.evidence?.groupCount || 0; // Use evidence.groupCount instead of grouping
+    // BUG-124.19 FIX: Pure function, no circuit breaker needed
+    return pattern.ipAddresses?.length || 0;
   }
 
   togglePatternExpansion(pattern: Pattern): void {
-    console.log('Toggle pattern expansion:', pattern);
-    // Implementation for expanding/collapsing pattern details
+    if (!this.circuitBreaker.checkLoop('togglePatternExpansion')) return;
+    console.log('[LoginMonitoring] Toggling pattern expansion for:', pattern.id);
   }
 
   onPatternPageChange(event: { pageIndex: number; pageSize: number }): void {
+    if (!this.circuitBreaker.checkLoop('onPatternPageChange')) return;
+    
     this.patternCurrentPage = event.pageIndex;
     this.patternPageSize = event.pageSize;
-    // Reload pattern data with new pagination
+    console.log('[LoginMonitoring] Pattern page changed:', event);
   }
 
   onSecurityAlertsFiltersChanged(filters: SecurityAlertsFilters): void {
-    console.log('Security alerts filters changed:', filters);
-    // Handle security alerts filter changes
+    if (!this.circuitBreaker.checkLoop('onSecurityAlertsFiltersChanged')) return;
+    
+    // BUG-124.19 FIX: Use centralized filter state
+    this.filterState.securityFilters = filters;
+    this.filterState.lastUpdated = Date.now();
+    
+    console.log('[LoginMonitoring] Security alerts filters changed:', filters, 'State:', this.filterState);
   }
 
   onSecurityAlertsFiltersReset(): void {
-    console.log('Security alerts filters reset');
-    // Handle security alerts filter reset
+    if (!this.circuitBreaker.checkLoop('onSecurityAlertsFiltersReset')) return;
+    
+    // BUG-124.19 FIX: Reset centralized filter state
+    this.filterState.securityFilters = null;
+    this.filterState.lastUpdated = Date.now();
+    
+    console.log('[LoginMonitoring] Security alerts filters reset, State:', this.filterState);
   }
 
   sendTestAlert(): void {
-    console.log('Sending test alert...');
-    // Implementation for sending test alert
-    this.loginMonitoringService.createTestPattern('test_alert').subscribe({
-      next: (result: unknown) => {
-        console.log('Test alert sent:', result);
-      },
-      error: (err: unknown) => {
-        console.error('Error sending test alert:', err);
-      }
-    });
-} 
+    if (!this.circuitBreaker.checkLoop('sendTestAlert')) return;
+    
+    console.log('[LoginMonitoring] Sending test alert...');
+    
+    // Add a test alert to the list
+    const testAlert: SecurityAlert = {
+      id: Date.now(),
+      title: 'Test Security Alert',
+      message: 'This is a test security alert generated for testing purposes.',
+      severity: 'medium' as 'low' | 'medium' | 'high' | 'critical',
+      timestamp: new Date(),
+      type: 'test',
+      alertType: 'test',
+      createdAt: new Date(),
+      source: 'test-generator',
+      status: 'active',
+      updatedAt: new Date()
+    };
+    
+    this.securityAlerts = [testAlert, ...this.securityAlerts];
+  } 
 } 

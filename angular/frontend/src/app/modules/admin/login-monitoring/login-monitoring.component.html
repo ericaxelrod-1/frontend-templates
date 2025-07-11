@@ -1,4 +1,4 @@
-<div class="login-monitoring-container" [ngClass]="getResponsiveSpacingClass()">
+<div class="login-monitoring-container" [ngClass]="responsiveClass">
   <!-- Permission Check -->
   @if (!hasPermission) {
     <div class="no-permission">
@@ -42,67 +42,13 @@
 
         <!-- Time Filter Component -->
         <app-time-filter 
+          [hasPermission]="hasPermission"
+          [initialTimeRange]="filterState.timeRange"
+          [preventInitialEmission]="true"
           (timeFilterChange)="onTimeFilterChange($event)">
         </app-time-filter>
 
-        <!-- Pattern Summary Section -->
-        <div class="pattern-summary-section">
-          <div class="section-header">
-            <h2>
-              <mat-icon>pattern</mat-icon>
-              Pattern Detection Summary
-            </h2>
-            <p class="section-description">
-              Overview of detected security patterns and threats
-            </p>
-          </div>
 
-          <!-- Pattern Summary Loading -->
-          @if (loading.patternSummary) {
-            <div class="loading-container">
-              <mat-spinner diameter="32"></mat-spinner>
-              <p>Loading pattern summary...</p>
-            </div>
-          } @else {
-            <!-- Pattern Summary Tiles - FIXED: Grid styling with responsive columns -->
-            <div class="pattern-tiles-grid">
-              @for (summary of patternSummary; track summary.patternType) {
-                <mat-card class="pattern-tile" 
-                          [class]="summary.patternType + '-pattern'"
-                          (click)="onPatternTileClick(summary.patternType)"
-                          tabindex="0"
-                          role="button">
-                  <mat-card-header>
-                    <div mat-card-avatar class="pattern-icon">
-                      <mat-icon [style.font-size]="getResponsiveIconSize()">
-                        {{ getPatternIcon(summary.patternType) }}
-                      </mat-icon>
-                    </div>
-                    <mat-card-title class="pattern-title">
-                      {{ getPatternDisplayName(summary.patternType) }}
-                    </mat-card-title>
-                  </mat-card-header>
-                  <mat-card-content>
-                    <div class="pattern-count">
-                      {{ formatPatternCount(summary.count) }}
-                    </div>
-                    <div class="pattern-severity">
-                      <span class="severity-indicator" 
-                            [class]="getSeverityClass(summary.severity)">
-                        {{ summary.severity }}
-                      </span>
-                    </div>
-                  </mat-card-content>
-                </mat-card>
-              } @empty {
-                <div class="empty-state">
-                  <mat-icon class="info-icon">info</mat-icon>
-                  <p>No patterns detected recently</p>
-                </div>
-              }
-            </div>
-          }
-        </div>
 
         <!-- Monitoring Tabs -->
         <div class="monitoring-tabs">
@@ -165,8 +111,69 @@
                 Pattern Detection
               </ng-template>
               <div class="tab-content">
+                <!-- Pattern Summary Section - MOVED from global to Pattern Detection tab only -->
+                <div class="pattern-summary-section">
+                  <div class="section-header">
+                    <h2>
+                      <mat-icon>pattern</mat-icon>
+                      Pattern Detection Summary
+                    </h2>
+                    <p class="section-description">
+                      Overview of detected security patterns and threats
+                    </p>
+                  </div>
+
+                  <!-- Pattern Summary Loading -->
+                  @if (loading.patternSummary) {
+                    <div class="loading-container">
+                      <mat-spinner diameter="32"></mat-spinner>
+                      <p>Loading pattern summary...</p>
+                    </div>
+                  } @else {
+                    <!-- Pattern Summary Tiles - FIXED: Grid styling with responsive columns -->
+                    <div class="pattern-tiles-grid" [style.grid-template-columns]="'repeat(' + patternTilesColumns + ', 1fr)'">
+                      @for (summary of patternSummary; track summary.patternType) {
+                        <mat-card class="pattern-tile" 
+                                  [class]="summary.patternType + '-pattern'"
+                                  (click)="onPatternTileClick(summary.patternType)"
+                                  tabindex="0"
+                                  role="button">
+                          <mat-card-header>
+                            <div mat-card-avatar class="pattern-icon">
+                              <mat-icon [style.font-size]="responsiveIconSize">
+                                {{ getPatternIcon(summary.patternType) }}
+                              </mat-icon>
+                            </div>
+                            <mat-card-title class="pattern-title">
+                              {{ getPatternDisplayName(summary.patternType) }}
+                            </mat-card-title>
+                          </mat-card-header>
+                          <mat-card-content>
+                            <div class="pattern-count">
+                              {{ formatPatternCount(summary.count) }}
+                            </div>
+                            <div class="pattern-severity">
+                              <span class="severity-indicator" 
+                                    [class]="getSeverityClass(summary.severity)">
+                                {{ summary.severity }}
+                              </span>
+                            </div>
+                          </mat-card-content>
+                        </mat-card>
+                      } @empty {
+                        <div class="empty-state">
+                          <mat-icon class="info-icon">info</mat-icon>
+                          <p>No patterns detected recently</p>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+
                 <app-pattern-detection-filters 
                   [hasPermission]="hasPermission"
+                  [initialFilters]="filterState.patternFilters"
+                  [preventInitialEmission]="true"
                   (filtersChanged)="onPatternDetectionFiltersChanged($event)"
                   (filtersReset)="onPatternDetectionFiltersReset()">
                 </app-pattern-detection-filters>

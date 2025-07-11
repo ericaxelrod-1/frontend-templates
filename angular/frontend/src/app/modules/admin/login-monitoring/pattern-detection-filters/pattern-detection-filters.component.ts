@@ -1,5 +1,7 @@
-import { Component, OnInit, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
 import { LoginMonitoringSharedModule } from '../shared/login-monitoring-shared.module';
 import { PatternDetectionFilters } from '../shared/login-monitoring.models';
 
@@ -10,12 +12,16 @@ import { PatternDetectionFilters } from '../shared/login-monitoring.models';
   templateUrl: './pattern-detection-filters.component.html',
   styleUrls: ['./pattern-detection-filters.component.scss']
 })
-export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
+export class PatternDetectionFiltersComponent implements OnInit, OnChanges, OnDestroy {
   @Input() hasPermission = false;
+  @Input() initialFilters: PatternDetectionFilters | null = null; // BUG-124.19 FIX: Accept initial filters from parent
+  @Input() preventInitialEmission = true; // BUG-124.19 FIX: Allow parent to control initial emission
   @Output() filtersChanged = new EventEmitter<PatternDetectionFilters>();
   @Output() filtersReset = new EventEmitter<void>();
 
   filterForm: FormGroup;
+  private destroy$ = new Subject<void>();
+  private componentReady = false; // BUG-124.19 FIX: Track when component is fully ready
 
   // Filter Options
   statusOptions = [
@@ -49,25 +55,45 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
   }
 
   ngOnInit(): void {
-    // Set default date range (last 7 days)
-    const today = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 7);
+    console.log('[PatternDetectionFilters] Initializing with:', {
+      initialFilters: this.initialFilters,
+      preventInitialEmission: this.preventInitialEmission,
+      hasPermission: this.hasPermission
+    });
     
-    this.filterForm.patchValue({
-      dateFrom: sevenDaysAgo,
-      dateTo: today
-    });
-
-    // Subscribe to form changes
-    this.filterForm.valueChanges.subscribe(values => {
-      if (this.hasPermission) {
-        this.onFiltersChanged();
-      }
-    });
+    // BUG-124.19 FIX: Apply initial filters from parent if provided
+    if (this.initialFilters) {
+      this.applyInitialFilters(this.initialFilters);
+    } else {
+      // Set default date range (last 30 days to match parent's timeRange)
+      const today = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      
+      this.filterForm.patchValue({
+        dateFrom: thirtyDaysAgo,
+        dateTo: today
+      }, { emitEvent: false }); // Don't emit during initialization
+    }
 
     // Set initial disabled state
     this.updateFormDisabledState();
+
+    // BUG-124.19 FIX: Set up subscriptions with proper guards
+    this.setupSubscriptions();
+    
+    // Mark component as ready after initialization
+    setTimeout(() => {
+      this.componentReady = true;
+      
+      // BUG-124.19 FIX: Only emit initial value if explicitly allowed by parent
+      if (!this.preventInitialEmission && this.hasPermission) {
+        console.log('[PatternDetectionFilters] Emitting initial filters (not prevented by parent)');
+        this.onFiltersChanged();
+      } else {
+        console.log('[PatternDetectionFilters] Initial emission prevented by parent or no permission');
+      }
+    }, 150); // Slightly longer delay than time filter to ensure proper initialization order
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -75,6 +101,17 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
     if (changes['hasPermission'] && this.filterForm) {
       this.updateFormDisabledState();
     }
+    
+    // BUG-124.19 FIX: Apply new initial filters from parent
+    if (changes['initialFilters'] && this.componentReady && this.initialFilters) {
+      console.log('[PatternDetectionFilters] Applying new filters from parent:', this.initialFilters);
+      this.applyInitialFilters(this.initialFilters);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private createFilterForm(): FormGroup {
@@ -89,6 +126,45 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
     });
   }
 
+  // BUG-124.19 FIX: Apply initial filters without emitting changes
+  private applyInitialFilters(filters: PatternDetectionFilters): void {
+    console.log('[PatternDetectionFilters] Applying initial filters:', filters);
+    
+    // Convert filters to form values
+    const formValues: any = {
+      status: filters.status || '',
+      patternType: filters.patternType || '',
+      severity: filters.severity || '',
+      ipAddress: filters.ipAddress || '',
+      search: filters.search || ''
+    };
+    
+    // Handle date filters
+    if (filters.dateFrom) {
+      formValues.dateFrom = new Date(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      formValues.dateTo = new Date(filters.dateTo);
+    }
+    
+    // Apply values without emitting events
+    this.filterForm.patchValue(formValues, { emitEvent: false });
+  }
+
+  private setupSubscriptions(): void {
+    // BUG-124.19 FIX: Subscribe to form changes with proper guards
+    this.filterForm.valueChanges.pipe(
+      debounceTime(300), // Wait 300ms after user stops typing
+      distinctUntilChanged(), // Only emit when values actually change
+      takeUntil(this.destroy$) // Unsubscribe when component is destroyed
+    ).subscribe(values => {
+      if (this.componentReady && this.hasPermission) {
+        console.log('[PatternDetectionFilters] Form values changed:', values);
+        this.onFiltersChanged();
+      }
+    });
+  }
+
   private updateFormDisabledState(): void {
     if (this.hasPermission) {
       this.filterForm.enable();
@@ -98,7 +174,10 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
   }
 
   onFiltersChanged(): void {
-    if (!this.hasPermission) return;
+    if (!this.hasPermission || !this.componentReady) {
+      console.log('[PatternDetectionFilters] Filters change ignored - no permission or not ready');
+      return;
+    }
 
     const formValues = this.filterForm.value;
     const filters: PatternDetectionFilters = {
@@ -119,23 +198,29 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
       }
     });
 
+    console.log('[PatternDetectionFilters] Emitting filters:', filters);
     this.filtersChanged.emit(filters);
   }
 
   onReset(): void {
-    if (!this.hasPermission) return;
+    if (!this.hasPermission || !this.componentReady) {
+      console.log('[PatternDetectionFilters] Reset ignored - no permission or not ready');
+      return;
+    }
 
-    // Reset form to default values
+    console.log('[PatternDetectionFilters] Resetting filters to default 30-day range');
+    
+    // Reset form to default values (30-day range to match parent)
     const today = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 7);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
     
     this.filterForm.reset({
       status: '',
       patternType: '',
       severity: '',
       ipAddress: '',
-      dateFrom: sevenDaysAgo,
+      dateFrom: thirtyDaysAgo,
       dateTo: today,
       search: ''
     });
@@ -144,7 +229,12 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
   }
 
   onClear(): void {
-    if (!this.hasPermission) return;
+    if (!this.hasPermission || !this.componentReady) {
+      console.log('[PatternDetectionFilters] Clear ignored - no permission or not ready');
+      return;
+    }
+
+    console.log('[PatternDetectionFilters] Clearing all filters');
 
     this.filterForm.reset({
       status: '',
@@ -157,5 +247,25 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges {
     });
 
     this.filtersReset.emit();
+  }
+
+  // BUG-124.19 FIX: Public method for parent to trigger emission when needed
+  public triggerEmission(): void {
+    if (this.componentReady && this.hasPermission) {
+      console.log('[PatternDetectionFilters] Manual emission triggered by parent');
+      this.onFiltersChanged();
+    }
+  }
+
+  // BUG-124.19 FIX: Public method for parent to update filters without emission
+  public updateFilters(filters: PatternDetectionFilters, emitChange = false): void {
+    if (!this.componentReady) return;
+    
+    console.log('[PatternDetectionFilters] Filters updated by parent:', filters, 'emit:', emitChange);
+    this.applyInitialFilters(filters);
+    
+    if (emitChange) {
+      this.onFiltersChanged();
+    }
   }
 } 
