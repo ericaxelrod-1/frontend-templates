@@ -11,6 +11,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatSortModule } from '@angular/material/sort';
 import { MatSort } from '@angular/material/sort';
 import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatMenuModule } from '@angular/material/menu';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { FormGroup } from '@angular/forms';
 
@@ -145,6 +146,7 @@ class LoadingManager {
     MatTableModule,
     MatSortModule,
     MatPaginatorModule,
+    MatMenuModule,
     LoginAttemptsTableComponent,
     StatisticsDashboardComponent,
     TimeFilterComponent,
@@ -235,8 +237,23 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   patternCurrentPage = 0;
   
   // Pattern sorting properties for server-side sorting
-  patternSortBy = 'detectionTimestamp';
-  patternSortDirection: 'asc' | 'desc' = 'desc';
+  patternCurrentSort: { active: string; direction: 'asc' | 'desc' } = {
+    active: 'detectionTimestamp',
+    direction: 'desc'
+  };
+  
+  // Security alerts table properties
+  securityAlertsDisplayedColumns: string[] = ['timestamp', 'title', 'type', 'severity', 'message', 'status', 'actions'];
+  securityAlertsPageSize = 10;
+  securityAlertsCurrentPage = 0;
+  securityAlertsTotalCount = 0;
+  securityAlertsFilters: SecurityAlertsFilters | null = null;
+  
+  // Security alerts sorting properties for server-side sorting
+  securityAlertsCurrentSort: { active: string; direction: 'asc' | 'desc' } = {
+    active: 'createdAt',
+    direction: 'desc'
+  };
   
   // Test data creation state
   isCreatingTestData = false;
@@ -249,6 +266,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   // ViewChild for pattern detection table sorting
   @ViewChild('patternSort', { static: false }) patternSort!: MatSort;
+
+  // ViewChild for security alerts table sorting
+  @ViewChild('securityAlertsSort', { static: false }) securityAlertsSort!: MatSort;
 
   // BUG-124.19 FIX: Computed Properties (Getters instead of methods)
   get responsiveClass(): string { return this._responsiveClass; }
@@ -332,10 +352,23 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
         };
         
         const activeColumn = this.patternSort.active || 'timestamp';
-        this.patternSortBy = columnToFieldMap[activeColumn] || 'detectionTimestamp';
-        this.patternSortDirection = this.patternSort.direction || 'desc';
+        this.patternCurrentSort.active = columnToFieldMap[activeColumn] || 'detectionTimestamp';
+        this.patternCurrentSort.direction = this.patternSort.direction || 'desc';
         this.patternCurrentPage = 0; // Reset to first page on sort change
-        console.log('[DEBUG] Pattern sort changed:', this.patternSortBy, this.patternSortDirection);
+        console.log('[DEBUG] Pattern sort changed:', this.patternCurrentSort);
+        this.loadData();
+      });
+    }
+
+    // Set up server-side sorting for the security alerts table
+    if (this.securityAlertsSort) {
+      this.securityAlertsSort.sortChange.pipe(
+        takeUntil(this.destroy$)
+      ).subscribe(() => {
+        this.securityAlertsCurrentSort.active = this.getSecurityAlertsSortField(this.securityAlertsSort.active || 'timestamp');
+        this.securityAlertsCurrentSort.direction = this.securityAlertsSort.direction || 'desc';
+        this.securityAlertsCurrentPage = 0; // Reset to first page on sort change
+        console.log('[DEBUG] Security alerts sort changed:', this.securityAlertsCurrentSort);
         this.loadData();
       });
     }
@@ -538,11 +571,24 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       }
     });
 
-    // Load security alerts
+    // Load security alerts with filters, sorting, and pagination
     this.loadingManager.startOperation('alerts');
-    this.loginMonitoringService.getSecurityAlerts().subscribe({
+    console.log('[DEBUG] Loading security alerts with filters:', this.securityAlertsFilters);
+    console.log('[DEBUG] Loading security alerts with sorting:', this.securityAlertsCurrentSort);
+    
+    this.loginMonitoringService.getSecurityAlerts(
+      this.securityAlertsFilters || {},
+      this.securityAlertsCurrentPage,
+      this.securityAlertsPageSize,
+      this.getSecurityAlertsSortField(this.securityAlertsCurrentSort.active),
+      this.securityAlertsCurrentSort.direction
+    ).subscribe({
       next: (alerts) => {
         this.securityAlerts = alerts;
+        // Note: If the service returns a paginated response with total count, we would set it here
+        // For now, we'll use the alerts length as a fallback
+        this.securityAlertsTotalCount = alerts.length;
+        console.log('[DEBUG] Security alerts loaded:', alerts.length, 'alerts');
         this.loadingManager.endOperation('alerts');
       },
       error: (err) => {
@@ -554,7 +600,15 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     // Load pattern detection results with filters and sorting
     this.loadingManager.startOperation('patterns');
     console.log('[DEBUG] Loading patterns with filters:', this.patternDetectionFilters);
-    this.loginMonitoringService.getPatterns(this.patternDetectionFilters || {}).subscribe({
+    console.log('[DEBUG] Loading patterns with sorting:', this.patternCurrentSort);
+    
+    this.loginMonitoringService.getPatterns(
+      this.patternDetectionFilters || {}, 
+      this.patternCurrentPage, 
+      this.patternPageSize, 
+      this.getPatternSortField(this.patternCurrentSort.active), 
+      this.patternCurrentSort.direction
+    ).subscribe({
       next: (patternResults) => {
         this.patterns = patternResults.items;
         this.detectedPatterns = patternResults.items; // Populate detectedPatterns for template
@@ -745,6 +799,35 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     setTimeout(() => {
       this.loadingManager.endOperation('applyPatternTypeFilter');
     }, 100);
+  }
+
+  /**
+   * Map frontend column names to backend field names for pattern detection sorting
+   * Following 150-angular-server-side-sorting rule
+   */
+  private getPatternSortField(sortHeaderId: string): string {
+    const fieldMapping: { [key: string]: string } = {
+      'timestamp': 'detectionTimestamp',
+      'type': 'patternType',
+      'severity': 'severity',
+      'ipAddresses': 'ipAddresses',
+      'details': 'details',
+      'groupCount': 'groupCount'
+    };
+    return fieldMapping[sortHeaderId] || 'detectionTimestamp';
+  }
+
+  // Map security alerts UI column names to backend field names
+  private getSecurityAlertsSortField(sortHeaderId: string): string {
+    const fieldMapping: { [key: string]: string } = {
+      'timestamp': 'createdAt',
+      'title': 'title',
+      'type': 'alertType',
+      'severity': 'severity',
+      'message': 'message',
+      'status': 'status'
+    };
+    return fieldMapping[sortHeaderId] || 'createdAt';
   }
 
   // BUG-113: Get severity class with responsive considerations
@@ -1122,6 +1205,17 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loadData();
   }
 
+  onSecurityAlertsPageChange(event: { pageIndex: number; pageSize: number }): void {
+    if (!this.circuitBreaker.checkLoop('onSecurityAlertsPageChange')) return;
+    
+    this.securityAlertsCurrentPage = event.pageIndex;
+    this.securityAlertsPageSize = event.pageSize;
+    console.log('[LoginMonitoring] Security alerts page changed:', event);
+    
+    // Reload data with new pagination parameters
+    this.loadData();
+  }
+
   onSecurityAlertsFiltersChanged(filters: SecurityAlertsFilters): void {
     if (!this.circuitBreaker.checkLoop('onSecurityAlertsFiltersChanged')) return;
     
@@ -1129,7 +1223,13 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.filterState.securityFilters = filters;
     this.filterState.lastUpdated = Date.now();
     
+    // Store filters for API calls
+    this.securityAlertsFilters = filters;
+    
     console.log('[LoginMonitoring] Security alerts filters changed:', filters, 'State:', this.filterState);
+    
+    // Reload data with new filters
+    this.loadData();
   }
 
   onSecurityAlertsFiltersReset(): void {
@@ -1139,7 +1239,13 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.filterState.securityFilters = null;
     this.filterState.lastUpdated = Date.now();
     
+    // Clear stored filters
+    this.securityAlertsFilters = null;
+    
     console.log('[LoginMonitoring] Security alerts filters reset, State:', this.filterState);
+    
+    // Reload data without filters
+    this.loadData();
   }
 
   sendTestAlert(): void {

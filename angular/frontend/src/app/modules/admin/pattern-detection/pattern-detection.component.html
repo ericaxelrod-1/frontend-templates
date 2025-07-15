@@ -1,0 +1,204 @@
+<!-- Pattern Detection Dashboard -->
+<div class="pattern-detection-container">
+  <!-- Page Header -->
+  <div class="page-header">
+    <h2>Pattern Detection</h2>
+    <p>Detect and analyze suspicious login patterns</p>
+  </div>
+
+  <!-- Pattern Summary Tiles -->
+  @if (patternSummary && patternSummary.length > 0) {
+    <div class="pattern-tiles-section">
+      <h3>Pattern Summary</h3>
+      <div class="pattern-tiles-grid">
+        @for (summary of patternSummary; track summary.patternType) {
+          <div class="pattern-tile" [class]="getSeverityClass(summary.severity)">
+            <div class="pattern-header">
+              <mat-icon>{{ getPatternIcon(summary.patternType) }}</mat-icon>
+              <h4>{{ getPatternDisplayName(summary.patternType) }}</h4>
+            </div>
+            <div class="pattern-content">
+              <div class="pattern-count">{{ formatPatternCount(summary.count) }}</div>
+              <div class="pattern-severity">{{ summary.severity | uppercase }}</div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Filters Section -->
+  <div class="filters-section">
+    <app-pattern-detection-filters
+      [hasPermission]="hasPermission"
+      [initialFilters]="filterState"
+      [preventInitialEmission]="true"
+      (filtersChanged)="onPatternDetectionFiltersChanged($event)"
+      (filtersReset)="onPatternDetectionFiltersReset()">
+    </app-pattern-detection-filters>
+  </div>
+
+  <!-- Loading State -->
+  @if (loading) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading patterns...</p>
+    </div>
+  }
+
+  <!-- Pattern Detection Table -->
+  @if (!loading && detectedPatterns && detectedPatterns.length > 0) {
+    <div class="table-container">
+      <mat-table [dataSource]="detectedPatterns"
+                 matSort
+                 #patternSort="matSort"
+                 [matSortActive]="patternCurrentSort.column"
+                 [matSortDirection]="patternCurrentSort.direction">
+
+        <!-- Timestamp Column -->
+        <ng-container matColumnDef="timestamp">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Timestamp</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            {{ pattern.timestamp | date:'medium' }}
+          </mat-cell>
+        </ng-container>
+
+        <!-- Type Column -->
+        <ng-container matColumnDef="type">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Type</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            <div class="pattern-type">
+              <mat-icon>{{ getPatternIcon(pattern.type) }}</mat-icon>
+              <span>{{ getPatternDisplayName(pattern.type) }}</span>
+            </div>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Severity Column -->
+        <ng-container matColumnDef="severity">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Severity</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            <div class="severity-container">
+              <div class="severity-indicator" [class]="getSeverityClass(pattern.severity)"></div>
+              <span class="severity-text">{{ pattern.severity | uppercase }}</span>
+            </div>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Description Column -->
+        <ng-container matColumnDef="description">
+          <mat-header-cell *matHeaderCellDef>Description</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            {{ pattern.details }}
+          </mat-cell>
+        </ng-container>
+
+        <!-- Affected Users Column -->
+        <ng-container matColumnDef="affectedUsers">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Affected Users</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            {{ pattern.affectedUsers?.length || 0 }}
+          </mat-cell>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Actions</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            <button mat-icon-button>
+              <mat-icon>more_vert</mat-icon>
+            </button>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Table Headers and Rows -->
+        <mat-header-row *matHeaderRowDef="['timestamp', 'type', 'severity', 'description', 'affectedUsers', 'actions']"></mat-header-row>
+        <mat-row *matRowDef="let row; columns: ['timestamp', 'type', 'severity', 'description', 'affectedUsers', 'actions']"></mat-row>
+      </mat-table>
+
+      <!-- Pagination -->
+      <mat-paginator
+        *ngIf="patternTotalCount > 0"
+        [length]="patternTotalCount"
+        [pageSize]="patternPageSize"
+        [pageSizeOptions]="[5, 10, 25, 50]"
+        (page)="onPatternPageChange($event)">
+      </mat-paginator>
+    </div>
+  }
+
+  <!-- No Data State -->
+  @if (!loading && (!detectedPatterns || detectedPatterns.length === 0)) {
+    <div class="no-data-container">
+      <mat-icon class="no-data-icon">search</mat-icon>
+      <h3>No Patterns Detected</h3>
+      <p>No suspicious patterns match your current filters.</p>
+    </div>
+  }
+
+  <!-- Test Data Generation Section -->
+  @if (hasPermission) {
+    <div class="test-data-section">
+      <h3>Test Pattern Generation</h3>
+      <div class="test-buttons">
+        <button mat-raised-button color="accent" 
+                (click)="createTestBruteForce()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>security</mat-icon>
+          Brute Force
+        </button>
+        
+        <button mat-raised-button color="accent" 
+                (click)="createTestDistributedAttack()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>network_check</mat-icon>
+          Distributed Attack
+        </button>
+        
+        <button mat-raised-button color="accent" 
+                (click)="createTestCredentialStuffing()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>vpn_key</mat-icon>
+          Credential Stuffing
+        </button>
+        
+        <button mat-raised-button color="accent" 
+                (click)="createTestRapidAccountSwitching()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>switch_account</mat-icon>
+          Account Switching
+        </button>
+        
+        <button mat-raised-button color="accent" 
+                (click)="createTestIpHopping()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>router</mat-icon>
+          IP Hopping
+        </button>
+        
+        <button mat-raised-button color="accent" 
+                (click)="createTestSuspiciousLocation()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>location_on</mat-icon>
+          Suspicious Location
+        </button>
+        
+        <button mat-raised-button color="accent" 
+                (click)="createTestTimeAnomaly()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>schedule</mat-icon>
+          Time Anomaly
+        </button>
+        
+        <mat-divider></mat-divider>
+        
+        <button mat-raised-button color="warn"
+                (click)="clearAllData()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>delete_sweep</mat-icon>
+          Clear All Data
+        </button>
+      </div>
+    </div>
+  }
+</div> 

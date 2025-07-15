@@ -16,6 +16,7 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   @Output() filtersReset = new EventEmitter<void>();
 
   filterForm: FormGroup;
+  private componentReady = false; // BUG-124.19 FIX: Track when component is fully ready
 
   // Filter options based on backend investigation
   statusOptions = [
@@ -49,10 +50,19 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   }
 
   ngOnInit(): void {
+    console.log('[SecurityAlertsFilters] Initializing component...');
+    
     // Set initial disabled state
     this.updateFormDisabledState();
-    // Emit initial form state with default date range
-    this.emitFilters();
+    
+    // BUG-124.19 FIX: Remove immediate emission to prevent infinite loop
+    // Mark component as ready after initialization
+    setTimeout(() => {
+      this.componentReady = true;
+      console.log('[SecurityAlertsFilters] Component ready - NO auto-emission to prevent infinite loop');
+      // NOTE: We don't emit initial filters to prevent infinite loop
+      // The parent component will handle initial data loading
+    }, 100);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -87,13 +97,52 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   }
 
   onApplyFilters(): void {
-    if (this.hasPermission) {
+    if (this.hasPermission && this.componentReady) {
       this.emitFilters();
     }
   }
 
+  onApplyFiltersClick(): void {
+    if (this.hasPermission && this.componentReady) {
+      this.emitFilters();
+    }
+  }
+
+  onFormSubmit(event: Event): void {
+    // Prevent form submission which was causing "Form submission canceled" error
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Apply filters on form submission (e.g., when user presses Enter)
+    this.onApplyFilters();
+  }
+
+  onDateChange(event: any): void {
+    // Prevent any navigation or unwanted behavior when date is selected
+    if (event && event.preventDefault) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
+    console.log('[SecurityAlertsFilters] Date changed:', event);
+    // The reactive form will handle the value change, no need to emit here
+  }
+
+  onDateInput(event: any): void {
+    // Prevent any navigation or unwanted behavior when date is manually typed
+    if (event && event.preventDefault) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
+    console.log('[SecurityAlertsFilters] Date input:', event);
+    // The reactive form will handle the value change, no need to emit here
+  }
+
   onResetFilters(): void {
-    if (this.hasPermission) {
+    if (this.hasPermission && this.componentReady) {
+      console.log('[SecurityAlertsFilters] Resetting filters...');
+      
       // Reset to default date range (last 7 days), not null
       const defaultDateTo = new Date();
       const defaultDateFrom = new Date();
@@ -114,6 +163,13 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   }
 
   private emitFilters(): void {
+    // BUG-124.19 FIX: Guard against emission before component is ready or without permission
+    if (!this.componentReady || !this.hasPermission) {
+      console.log('[SecurityAlertsFilters] Emission blocked - not ready or no permission');
+      return;
+    }
+
+    console.log('[SecurityAlertsFilters] Emitting filters...');
     const formValue = this.filterForm.value;
     const filters: SecurityAlertsFilters = {
       status: formValue.status || undefined,

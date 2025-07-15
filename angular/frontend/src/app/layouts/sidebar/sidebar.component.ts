@@ -57,10 +57,34 @@ export class SidebarComponent implements OnInit, OnDestroy {
   // Admin section items (only for users with admin access)
   adminItems = [
     { 
-      label: 'Administration', 
+      label: 'Login Attempts', 
+      icon: 'login', 
+      route: '/app/admin/login-attempts', 
+      permission: 'login-monitoring:read'
+    },
+    { 
+      label: 'Pattern Detection', 
+      icon: 'pattern', 
+      route: '/app/admin/pattern-detection', 
+      permission: 'login-monitoring:read'
+    },
+    { 
+      label: 'Security Alerts', 
+      icon: 'warning', 
+      route: '/app/admin/security-alerts', 
+      permission: 'login-monitoring:read'
+    },
+    { 
+      label: 'IP Reputation', 
+      icon: 'fingerprint', 
+      route: '/app/admin/ip-reputation', 
+      permission: 'login-monitoring:read'
+    },
+    { 
+      label: 'Login Monitoring (Legacy)', 
       icon: 'security', 
       route: '/app/admin/login-monitoring', 
-      permission: 'system:admin'
+      permission: 'login-monitoring:read'
     }
   ];
   

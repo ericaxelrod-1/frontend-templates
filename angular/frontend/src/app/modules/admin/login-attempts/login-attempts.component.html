@@ -1,0 +1,56 @@
+<!-- Login Attempts Dashboard -->
+<div class="login-attempts-container">
+  <!-- Page Header -->
+  <div class="page-header">
+    <h2>Login Attempts</h2>
+    <p>Monitor and analyze login attempts</p>
+  </div>
+
+  <!-- Statistics Dashboard -->
+  <div class="statistics-section">
+    <app-statistics-dashboard 
+      [hasPermission]="hasPermission"
+      (statsLoaded)="onStatsLoaded($event)">
+    </app-statistics-dashboard>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters-section">
+    <app-login-monitoring-filters
+      [hasPermission]="hasPermission"
+      (filtersChanged)="onFiltersChanged($event)"
+      (filtersReset)="onFiltersReset()">
+    </app-login-monitoring-filters>
+  </div>
+
+  <!-- Login Attempts Table -->
+  <div class="table-section">
+    <app-login-attempts-table
+      [hasPermission]="hasPermission"
+      [filterForm]="filterForm!"
+      (attemptSelected)="onAttemptSelected($event)"
+      (ipReputationRequested)="onIPReputationRequested($event)">
+    </app-login-attempts-table>
+  </div>
+
+  <!-- Test Data Section -->
+  @if (hasPermission) {
+    <div class="test-data-section">
+      <h3>Test Data Generation</h3>
+      <div class="test-buttons">
+        <button mat-raised-button color="accent" 
+                (click)="createTestLoginAttempt()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>add</mat-icon>
+          Create Test Login Attempt
+        </button>
+        <button mat-raised-button color="warn" 
+                (click)="clearTestData()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>delete_sweep</mat-icon>
+          Clear Test Data
+        </button>
+      </div>
+    </div>
+  }
+</div> 

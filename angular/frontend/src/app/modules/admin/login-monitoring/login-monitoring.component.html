@@ -188,6 +188,8 @@
                   <!-- Pattern Detection Table -->
                   <mat-table [dataSource]="detectedPatterns" 
                              matSort
+                             matSortActive="detectionTimestamp"
+                             matSortDirection="desc"
                              #patternSort="matSort"
                              class="pattern-detection-table">
                     
@@ -385,37 +387,116 @@
                     <p>Loading security alerts...</p>
                   </div>
                 } @else {
-                  <!-- Security Alerts List -->
-                  <div class="alerts-list">
-                    @for (alert of securityAlerts; track alert.id) {
-                      <mat-card class="alert-item" [class]="getSeverityClass(alert.severity)">
-                        <mat-card-header>
-                          <div mat-card-avatar class="alert-icon">
-                            <mat-icon>{{ (alert.type || alert.alertType) === 'pattern' ? 'pattern' : 'warning' }}</mat-icon>
+                  <!-- Security Alerts Table -->
+                  <mat-table [dataSource]="securityAlerts" 
+                             matSort
+                             matSortActive="createdAt"
+                             matSortDirection="desc"
+                             #securityAlertsSort="matSort"
+                             class="security-alerts-table">
+                    
+                    <!-- Timestamp Column -->
+                    <ng-container matColumnDef="timestamp">
+                      <mat-header-cell *matHeaderCellDef mat-sort-header>Timestamp</mat-header-cell>
+                      <mat-cell *matCellDef="let alert">
+                        <span class="timestamp-cell">
+                          {{ (alert.timestamp || alert.createdAt) | date:'medium' }}
+                        </span>
+                      </mat-cell>
+                    </ng-container>
+
+                    <!-- Title Column -->
+                    <ng-container matColumnDef="title">
+                      <mat-header-cell *matHeaderCellDef mat-sort-header>Title</mat-header-cell>
+                      <mat-cell *matCellDef="let alert">
+                        <span class="title-cell">{{ alert.title }}</span>
+                      </mat-cell>
+                    </ng-container>
+
+                    <!-- Type Column -->
+                    <ng-container matColumnDef="type">
+                      <mat-header-cell *matHeaderCellDef mat-sort-header>Type</mat-header-cell>
+                      <mat-cell *matCellDef="let alert">
+                        <div class="type-cell">
+                          <mat-icon class="type-icon">{{ (alert.type || alert.alertType) === 'pattern' ? 'pattern' : 'warning' }}</mat-icon>
+                          <span>{{ alert.type || alert.alertType }}</span>
                           </div>
-                          <mat-card-title>{{ alert.title }}</mat-card-title>
-                          <mat-card-subtitle>
-                            {{ (alert.timestamp || alert.createdAt) | date:'medium' }}
-                          </mat-card-subtitle>
-                        </mat-card-header>
-                        <mat-card-content>
+                      </mat-cell>
+                    </ng-container>
+
+                    <!-- Severity Column -->
+                    <ng-container matColumnDef="severity">
+                      <mat-header-cell *matHeaderCellDef mat-sort-header>Severity</mat-header-cell>
+                      <mat-cell *matCellDef="let alert">
+                        <span class="severity-indicator" [class]="getSeverityClass(alert.severity)">
+                          {{ alert.severity }}
+                        </span>
+                      </mat-cell>
+                    </ng-container>
+
+                    <!-- Message Column -->
+                    <ng-container matColumnDef="message">
+                      <mat-header-cell *matHeaderCellDef>Message</mat-header-cell>
+                      <mat-cell *matCellDef="let alert">
+                        <div class="message-cell">
                           <p>{{ alert.message }}</p>
-                          <div class="alert-meta">
-                            <span class="severity-indicator" 
-                                  [class]="getSeverityClass(alert.severity)">
-                              {{ alert.severity }}
+                        </div>
+                      </mat-cell>
+                    </ng-container>
+
+                    <!-- Status Column -->
+                    <ng-container matColumnDef="status">
+                      <mat-header-cell *matHeaderCellDef mat-sort-header>Status</mat-header-cell>
+                      <mat-cell *matCellDef="let alert">
+                        <span class="status-indicator" [class]="'status-' + alert.status">
+                          {{ alert.status }}
                             </span>
-                          </div>
-                        </mat-card-content>
-                      </mat-card>
-                    } @empty {
+                      </mat-cell>
+                    </ng-container>
+
+                    <!-- Actions Column -->
+                    <ng-container matColumnDef="actions">
+                      <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
+                      <mat-cell *matCellDef="let alert">
+                        <button mat-icon-button [matMenuTriggerFor]="alertMenu">
+                          <mat-icon>more_vert</mat-icon>
+                        </button>
+                        <mat-menu #alertMenu="matMenu">
+                          <button mat-menu-item>
+                            <mat-icon>check</mat-icon>
+                            <span>Acknowledge</span>
+                          </button>
+                          <button mat-menu-item>
+                            <mat-icon>close</mat-icon>
+                            <span>Dismiss</span>
+                          </button>
+                        </mat-menu>
+                      </mat-cell>
+                    </ng-container>
+
+                    <!-- Table Headers and Rows -->
+                    <mat-header-row *matHeaderRowDef="securityAlertsDisplayedColumns"></mat-header-row>
+                    <mat-row *matRowDef="let row; columns: securityAlertsDisplayedColumns;"></mat-row>
+
+                    <!-- Empty State -->
+                    @if (securityAlerts.length === 0) {
                       <div class="empty-state">
                         <mat-icon class="success-icon">verified</mat-icon>
                         <p>No security alerts</p>
                         <p class="empty-subtitle">Your system is secure</p>
                       </div>
                     }
-                  </div>
+                  </mat-table>
+
+                  <!-- Security Alerts Pagination -->
+                  <mat-paginator
+                    [length]="securityAlertsTotalCount"
+                    [pageSize]="securityAlertsPageSize"
+                    [pageSizeOptions]="[5, 10, 25, 50]"
+                    [pageIndex]="securityAlertsCurrentPage"
+                    (page)="onSecurityAlertsPageChange($event)"
+                    showFirstLastButtons>
+                  </mat-paginator>
                 }
                 
                 <!-- Test Alert Button -->

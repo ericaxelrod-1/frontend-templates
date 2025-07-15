@@ -7,7 +7,7 @@
   </mat-card-header>
   
   <mat-card-content>
-    <form [formGroup]="filterForm" class="filters-form">
+    <form [formGroup]="filterForm" (ngSubmit)="onFormSubmit($event)" class="filters-form">
       <div class="filters-row">
         <!-- Status Filter -->
         <mat-form-field appearance="outline" class="filter-field">
@@ -59,7 +59,9 @@
           <input matInput 
                  [matDatepicker]="fromPicker"
                  formControlName="dateFrom"
-                 placeholder="Select start date">
+                 placeholder="Select start date"
+                 (dateChange)="onDateChange($event)"
+                 (dateInput)="onDateInput($event)">
           <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
           <mat-datepicker #fromPicker></mat-datepicker>
         </mat-form-field>
@@ -70,7 +72,9 @@
           <input matInput 
                  [matDatepicker]="toPicker"
                  formControlName="dateTo"
-                 placeholder="Select end date">
+                 placeholder="Select end date"
+                 (dateChange)="onDateChange($event)"
+                 (dateInput)="onDateInput($event)">
           <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
           <mat-datepicker #toPicker></mat-datepicker>
         </mat-form-field>
@@ -81,7 +85,8 @@
         <div class="filter-actions">
           <button mat-raised-button 
                   color="primary" 
-                  (click)="onApplyFilters()"
+                  type="button"
+                  (click)="onApplyFiltersClick()"
                   [class.disabled]="!hasPermission"
                   class="apply-btn">
             <mat-icon>search</mat-icon>
@@ -89,6 +94,7 @@
           </button>
           
           <button mat-button 
+                  type="button"
                   (click)="onResetFilters()"
                   [class.disabled]="!hasPermission"
                   class="reset-btn">

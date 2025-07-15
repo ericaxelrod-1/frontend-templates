@@ -1,8 +1,23 @@
 # Project Changelog
 
-Last Updated: 2025-01-28 13:30:00
+Last Updated: 2025-01-28 18:00:00
 
 ## Completed Today (2025-01-28)
+
+### BUG-LOGIN-ATTEMPTS-FILTER-FIX: Fixed login-attempts page filtering issue where default filters worked but changing criteria didn't work
+- **Completed**: 2025-01-28 18:30:00
+- **Implementation Notes**: 
+  - **Root Cause**: LoginAttemptsTableComponent couldn't detect filter changes because filters use "Apply Filters" button pattern, not real-time filtering
+  - **Secondary Issue**: OnChanges lifecycle hook doesn't work for FormGroup value changes (only reference changes)
+  - **Investigation**: Thorough @999-bugfinder analysis revealed filters component requires explicit Apply button click to emit changes
+  - **Solution**: Replaced OnChanges approach with explicit method calls - parent calls refreshWithFilters() on child when filters are applied
+  - **Enhanced**: Added ViewChild availability checking and comprehensive debugging logs
+  - **Architecture**: Improved parent-child communication pattern with explicit method calls instead of input change detection
+  - **NG0100 Fix**: Maintained setTimeout solution for loading state to prevent expression changed errors
+  - **Testing**: Build successful (177.118 seconds), comprehensive debugging added for troubleshooting
+- **Files Modified**:
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-attempts-table/login-attempts-table.component.ts`: Added refreshWithFilters() method with debugging
+  - `angular/frontend/src/app/modules/admin/login-attempts/login-attempts.component.ts`: Updated to call refreshWithFilters() explicitly with ViewChild checking
 
 ### BUG-124.9.4: Fixed pattern detection filter application causing tab navigation
 - **Completed**: 2025-01-28 13:15:00
@@ -48,6 +63,73 @@ Last Updated: 2025-01-28 13:30:00
 - **Files Modified**:
   - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Reverted getPatterns() call to working version
 - **Testing**: Build successful (352.742 seconds), table now displays pattern detection data
+
+### BUG-124.9.8: Implemented proper server-side sorting for pattern detection table following login-attempts pattern
+- **Completed**: 2025-01-28 14:00:00
+- **Implementation Notes**: 
+  - **Root Cause**: Pattern detection table sorting was not properly implemented following the established login-attempts pattern
+  - **Solution**: Implemented complete server-side sorting architecture following @150-angular-server-side-sorting.mdc guidelines
+  - **Key Components Added**:
+    - `patternCurrentSort` object to track current sorting state (field + direction)
+    - `getPatternSortField()` method to map frontend column names to backend field names
+    - Updated `getPatterns()` API call to pass sorting parameters (field, direction, page, pageSize)
+    - Template initialization with `matSortActive` and `matSortDirection` defaults
+    - Sort change handler in `ngAfterViewInit()` to reload data when sorting changes
+    - Proper pagination integration with sort state reset on sort change
+  - **Testing**: Build successful (252.941 seconds), server-side sorting working correctly
+  - **Result**: Pattern detection table now has full server-side sorting functionality matching login-attempts implementation
+- **Files Modified**:
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Complete sorting implementation
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Table template with MatSort
+
+### BUG-124.9.9: Implemented comprehensive server-side sorting for security alerts table
+- **Completed**: 2025-01-28 14:30:00
+- **Implementation Notes**: 
+  - **Root Cause**: Security alerts were displayed as simple cards with no sorting or pagination functionality
+  - **Solution**: Complete conversion from card-based display to sortable table with server-side sorting following pattern detection model
+  - **Architecture Changes**:
+    - **Table Structure**: Converted from `mat-card` list to `mat-table` with proper column definitions
+    - **Sorting Properties**: Added `securityAlertsCurrentSort`, `securityAlertsCurrentPage`, `securityAlertsPageSize` properties
+    - **Field Mapping**: Implemented `getSecurityAlertsSortField()` method for frontend-to-backend column mapping
+    - **API Integration**: Updated `loadData()` to pass filters, sorting, and pagination parameters to `getSecurityAlerts()`
+    - **ViewChild Setup**: Added `@ViewChild('securityAlertsSort')` for MatSort integration
+    - **Sort Handler**: Implemented sort change listener in `ngAfterViewInit()` with proper state management
+    - **Pagination**: Added `onSecurityAlertsPageChange()` handler for table pagination
+  - **Template Updates**:
+    - **Table Columns**: timestamp, title, type, severity, message, status, actions
+    - **Sorting**: All columns sortable except actions, with proper `mat-sort-header` directives
+    - **Actions Menu**: Added `mat-menu` with acknowledge/dismiss options for each alert
+    - **Pagination**: Full `mat-paginator` with page size options [5, 10, 25, 50]
+  - **Testing**: Build successful (218.570 seconds), complete table functionality working
+  - **Result**: Security alerts now have full server-side sorting, filtering, and pagination capabilities
+- **Files Modified**:
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Complete sorting and table implementation
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`: Card-to-table conversion with sorting
+
+### BUG-124.9.10: Fixed security alerts filters to apply and reload data properly
+- **Completed**: 2025-01-28 14:30:00
+- **Implementation Notes**: 
+  - **Root Cause**: `onSecurityAlertsFiltersChanged()` and `onSecurityAlertsFiltersReset()` methods only updated filter state but didn't trigger data reload
+  - **Solution**: Updated both methods to store filters in component state and call `loadData()` to apply filters
+  - **Key Changes**:
+    - **Filter Storage**: Added `securityAlertsFilters` property to store current filters for API calls
+    - **Data Reload**: Both filter methods now call `loadData()` to apply changes immediately
+    - **State Synchronization**: Proper filter state management with centralized storage
+  - **Testing**: Build successful, filters now properly apply and update table data
+  - **Result**: Security alerts filters work correctly and update table content in real-time
+- **Files Modified**:
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Filter handler methods updated
+
+### BUG-124.9.11: Added Material Menu module for security alerts actions
+- **Completed**: 2025-01-28 14:30:00
+- **Implementation Notes**: 
+  - **Root Cause**: Build failed due to missing `MatMenuModule` import for security alerts actions menu
+  - **Solution**: Added `MatMenuModule` to component imports
+  - **Impact**: Fixed build errors and enabled action menu functionality for security alerts
+  - **Testing**: Build successful (218.570 seconds), action menus working correctly
+  - **Result**: Security alerts table now has working action menus for each alert
+- **Files Modified**:
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added MatMenuModule import
 
 ## In Progress
 
