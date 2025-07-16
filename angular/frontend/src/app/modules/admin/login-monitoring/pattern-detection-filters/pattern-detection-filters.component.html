@@ -81,21 +81,15 @@
         <!-- Action Buttons -->
         <div class="filter-actions">
           <button mat-raised-button color="primary" type="button" 
-                  (click)="onApplyFiltersClick($event)" [class.disabled]="!hasPermission">
+                  (click)="onApplyFiltersClick()" [class.disabled]="!hasPermission">
             <mat-icon>filter_list</mat-icon>
             Apply Filters
           </button>
           
           <button mat-stroked-button type="button" 
-                  (click)="onReset()" [class.disabled]="!hasPermission">
-            <mat-icon>refresh</mat-icon>
-            Reset to Default
-          </button>
-          
-          <button mat-stroked-button type="button" 
-                  (click)="onClear()" [class.disabled]="!hasPermission">
+                  (click)="onResetFilters()" [class.disabled]="!hasPermission">
             <mat-icon>clear</mat-icon>
-            Clear All
+            Reset
           </button>
         </div>
       </div>

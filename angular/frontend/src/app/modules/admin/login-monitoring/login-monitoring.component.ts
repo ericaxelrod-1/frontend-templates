@@ -270,6 +270,10 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // ViewChild for security alerts table sorting
   @ViewChild('securityAlertsSort', { static: false }) securityAlertsSort!: MatSort;
 
+  // BUG-FIX: ViewChild for filter components to trigger refresh
+  @ViewChild(PatternDetectionFiltersComponent) patternDetectionFiltersComponent!: PatternDetectionFiltersComponent;
+  @ViewChild(SecurityAlertsFiltersComponent) securityAlertsFiltersComponent!: SecurityAlertsFiltersComponent;
+
   // BUG-124.19 FIX: Computed Properties (Getters instead of methods)
   get responsiveClass(): string { return this._responsiveClass; }
   get responsiveIconSize(): string { return this._responsiveIconSize; }
@@ -861,7 +865,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loginMonitoringService.createTestPattern('brute_force').subscribe({
       next: (result) => {
         console.log('Test brute force created:', result);
-        this.loadData(); // Refresh data
+        // BUG-FIX: Don't call loadData() which applies current filters
+        // The test data will appear when user refreshes or changes filters
+        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
         this.isCreatingTestData = false;
       },
       error: (err) => {
@@ -876,7 +882,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loginMonitoringService.createTestPattern('distributed_attack').subscribe({
       next: (result) => {
         console.log('Test distributed attack created:', result);
-        this.loadData(); // Refresh data
+        // BUG-FIX: Don't call loadData() which applies current filters
+        // The test data will appear when user refreshes or changes filters
+        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
         this.isCreatingTestData = false;
       },
       error: (err) => {
@@ -891,7 +899,8 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loginMonitoringService.createTestPattern('credential_stuffing').subscribe({
       next: (result) => {
         console.log('Test credential stuffing created:', result);
-        this.loadData(); // Refresh data
+        // BUG-FIX: Don't call loadData() which applies current filters
+        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
         this.isCreatingTestData = false;
       },
       error: (err) => {
@@ -906,7 +915,8 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loginMonitoringService.createTestPattern('rapid_account_switching').subscribe({
       next: (result) => {
         console.log('Test account switching created:', result);
-        this.loadData(); // Refresh data
+        // BUG-FIX: Don't call loadData() which applies current filters
+        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
         this.isCreatingTestData = false;
       },
       error: (err) => {
@@ -921,7 +931,8 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loginMonitoringService.createTestPattern('ip_hopping').subscribe({
       next: (result) => {
         console.log('Test IP hopping created:', result);
-        this.loadData(); // Refresh data
+        // BUG-FIX: Don't call loadData() which applies current filters
+        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
         this.isCreatingTestData = false;
       },
       error: (err) => {
@@ -936,7 +947,8 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loginMonitoringService.createTestPattern('suspicious_location').subscribe({
       next: (result) => {
         console.log('Test suspicious location created:', result);
-        this.loadData(); // Refresh data
+        // BUG-FIX: Don't call loadData() which applies current filters
+        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
         this.isCreatingTestData = false;
       },
       error: (err) => {
@@ -951,7 +963,8 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loginMonitoringService.createTestPattern('time_anomaly').subscribe({
       next: (result) => {
         console.log('Test time anomaly created:', result);
-        this.loadData(); // Refresh data
+        // BUG-FIX: Don't call loadData() which applies current filters
+        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
         this.isCreatingTestData = false;
       },
       error: (err) => {
@@ -966,7 +979,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loginMonitoringService.clearTestData().subscribe({
       next: (result) => {
         console.log('All data cleared:', result);
-        this.loadData(); // Refresh data
+        // BUG-FIX: Don't call loadData() which applies current filters
+        // User should refresh filters to see cleared data
+        console.log('[LoginMonitoring] Test data cleared - refresh filters to see updated results');
         this.isCreatingTestData = false;
       },
       error: (err) => {
@@ -1033,57 +1048,41 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   onPatternDetectionFiltersChanged(filters: PatternDetectionFilters): void {
     if (!this.circuitBreaker.checkLoop('onPatternDetectionFiltersChanged')) return;
     
-    // BUG-124.19 FIX: Use centralized filter state
-    this.filterState.patternFilters = filters;
-    this.filterState.lastUpdated = Date.now();
-    
-    console.log('[LoginMonitoring] Pattern detection filters changed:', filters, 'State:', this.filterState);
-    
-    // BUG-124.12 FIX: Prevent infinite loop from pattern filter changes
-    if (this.loadingManager.isOperationActive('onPatternDetectionFiltersChanged')) {
-      console.log('[DEBUG] Pattern filter change ignored - already applying pattern filter');
-      return;
-    }
-    
-    this.loadingManager.startOperation('onPatternDetectionFiltersChanged');
+    console.log('[LoginMonitoring] Pattern detection filters changed:', filters);
     
     // Store filters in component for data loading
     this.patternDetectionFilters = filters;
     
+    // BUG-FIX: Explicitly call the pattern detection component's refresh method
+    if (this.patternDetectionFiltersComponent) {
+      console.log('[LoginMonitoring] Calling pattern detection refreshWithFilters');
+      this.patternDetectionFiltersComponent.refreshWithFilters();
+    } else {
+      console.log('[LoginMonitoring] patternDetectionFiltersComponent not available yet');
+    }
+    
     // Reload data with new filters
     this.loadData();
-    
-    setTimeout(() => {
-      this.loadingManager.endOperation('onPatternDetectionFiltersChanged');
-    }, 100);
   }
 
   onPatternDetectionFiltersReset() {
     if (!this.circuitBreaker.checkLoop('onPatternDetectionFiltersReset')) return;
     
-    // BUG-124.19 FIX: Reset centralized filter state
-    this.filterState.patternFilters = null;
-    this.filterState.lastUpdated = Date.now();
-    
-    console.log('[LoginMonitoring] Pattern detection filters reset, State:', this.filterState);
-    
-    // BUG-124.12 FIX: Prevent infinite loop from pattern filter reset
-    if (this.loadingManager.isOperationActive('onPatternDetectionFiltersReset')) {
-      console.log('[DEBUG] Pattern filter reset ignored - already applying pattern filter');
-      return;
-    }
-    
-    this.loadingManager.startOperation('onPatternDetectionFiltersReset');
+    console.log('[LoginMonitoring] Pattern detection filters reset');
     
     // Clear stored filters
     this.patternDetectionFilters = null;
     
+    // BUG-FIX: Explicitly call the pattern detection component's refresh method
+    if (this.patternDetectionFiltersComponent) {
+      console.log('[LoginMonitoring] Calling pattern detection refreshWithFilters for reset');
+      this.patternDetectionFiltersComponent.refreshWithFilters();
+    } else {
+      console.log('[LoginMonitoring] patternDetectionFiltersComponent not available yet for reset');
+    }
+    
     // Reload data without filters
     this.loadData();
-    
-    setTimeout(() => {
-      this.loadingManager.endOperation('onPatternDetectionFiltersReset');
-    }, 100);
   }
 
   // Pattern display methods
@@ -1219,14 +1218,18 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   onSecurityAlertsFiltersChanged(filters: SecurityAlertsFilters): void {
     if (!this.circuitBreaker.checkLoop('onSecurityAlertsFiltersChanged')) return;
     
-    // BUG-124.19 FIX: Use centralized filter state
-    this.filterState.securityFilters = filters;
-    this.filterState.lastUpdated = Date.now();
+    console.log('[LoginMonitoring] Security alerts filters changed:', filters);
     
     // Store filters for API calls
     this.securityAlertsFilters = filters;
     
-    console.log('[LoginMonitoring] Security alerts filters changed:', filters, 'State:', this.filterState);
+    // BUG-FIX: Explicitly call the security alerts component's refresh method
+    if (this.securityAlertsFiltersComponent) {
+      console.log('[LoginMonitoring] Calling security alerts refreshWithFilters');
+      this.securityAlertsFiltersComponent.refreshWithFilters();
+    } else {
+      console.log('[LoginMonitoring] securityAlertsFiltersComponent not available yet');
+    }
     
     // Reload data with new filters
     this.loadData();
@@ -1235,14 +1238,18 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   onSecurityAlertsFiltersReset(): void {
     if (!this.circuitBreaker.checkLoop('onSecurityAlertsFiltersReset')) return;
     
-    // BUG-124.19 FIX: Reset centralized filter state
-    this.filterState.securityFilters = null;
-    this.filterState.lastUpdated = Date.now();
+    console.log('[LoginMonitoring] Security alerts filters reset');
     
     // Clear stored filters
     this.securityAlertsFilters = null;
     
-    console.log('[LoginMonitoring] Security alerts filters reset, State:', this.filterState);
+    // BUG-FIX: Explicitly call the security alerts component's refresh method
+    if (this.securityAlertsFiltersComponent) {
+      console.log('[LoginMonitoring] Calling security alerts refreshWithFilters for reset');
+      this.securityAlertsFiltersComponent.refreshWithFilters();
+    } else {
+      console.log('[LoginMonitoring] securityAlertsFiltersComponent not available yet for reset');
+    }
     
     // Reload data without filters
     this.loadData();

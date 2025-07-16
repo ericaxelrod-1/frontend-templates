@@ -50,18 +50,23 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   }
 
   ngOnInit(): void {
-    console.log('[SecurityAlertsFilters] Initializing component...');
+    console.log('[SecurityAlertsFilters] Initializing component');
     
     // Set initial disabled state
     this.updateFormDisabledState();
     
-    // BUG-124.19 FIX: Remove immediate emission to prevent infinite loop
-    // Mark component as ready after initialization
+    // BUG-124.19 FIX: Mark component as ready after initialization
     setTimeout(() => {
       this.componentReady = true;
-      console.log('[SecurityAlertsFilters] Component ready - NO auto-emission to prevent infinite loop');
-      // NOTE: We don't emit initial filters to prevent infinite loop
-      // The parent component will handle initial data loading
+      console.log('[SecurityAlertsFilters] Component ready');
+      
+      // BUG-FIX: ALWAYS emit initial filters like login-attempts pattern
+      if (this.hasPermission) {
+        console.log('[SecurityAlertsFilters] Emitting initial filters with default 7-day range');
+        this.emitFilters();
+      } else {
+        console.log('[SecurityAlertsFilters] Initial emission skipped - no permission');
+      }
     }, 100);
   }
 
@@ -97,14 +102,20 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   }
 
   onApplyFilters(): void {
-    if (this.hasPermission && this.componentReady) {
-      this.emitFilters();
+    console.log('[SecurityAlertsFilters] onApplyFilters called');
+    // BUG-124.19 FIX: Add guards to prevent emission when not ready
+    if (!this.componentReady || !this.hasPermission) {
+      console.log('[SecurityAlertsFilters] Not ready or no permission, skipping filter application');
+      return;
     }
+    
+    this.emitFilters();
   }
 
   onApplyFiltersClick(): void {
+    console.log('[SecurityAlertsFilters] Apply filters clicked');
     if (this.hasPermission && this.componentReady) {
-      this.emitFilters();
+      this.onApplyFilters();
     }
   }
 
@@ -140,26 +151,29 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   }
 
   onResetFilters(): void {
-    if (this.hasPermission && this.componentReady) {
-      console.log('[SecurityAlertsFilters] Resetting filters...');
-      
-      // Reset to default date range (last 7 days), not null
-      const defaultDateTo = new Date();
-      const defaultDateFrom = new Date();
-      defaultDateFrom.setDate(defaultDateFrom.getDate() - 7);
-      
-      this.filterForm.reset({
-        status: '',
-        severity: '',
-        alertType: '',
-        dateFrom: defaultDateFrom,
-        dateTo: defaultDateTo,
-        search: ''
-      });
-      
-      this.filtersReset.emit();
-      this.emitFilters();
+    console.log('[SecurityAlertsFilters] onResetFilters called');
+    // BUG-124.19 FIX: Add guards to prevent emission when not ready
+    if (!this.componentReady || !this.hasPermission) {
+      console.log('[SecurityAlertsFilters] Not ready or no permission, skipping filter reset');
+      return;
     }
+    
+    // Reset form to default values (last 7 days)
+    const today = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    
+    this.filterForm.reset({
+      status: '',
+      severity: '',
+      alertType: '',
+      dateFrom: sevenDaysAgo,
+      dateTo: today,
+      search: ''
+    });
+    
+    this.filtersReset.emit();
+    this.emitFilters();
   }
 
   private emitFilters(): void {
@@ -190,4 +204,10 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
   get dateFromControl() { return this.filterForm.get('dateFrom'); }
   get dateToControl() { return this.filterForm.get('dateTo'); }
   get searchControl() { return this.filterForm.get('search'); }
+
+  // BUG-FIX: Public method for parent to trigger refresh (matching login-attempts pattern)
+  public refreshWithFilters(): void {
+    console.log('[SecurityAlertsFilters] refreshWithFilters called');
+    this.onApplyFiltersClick();
+  }
 } 

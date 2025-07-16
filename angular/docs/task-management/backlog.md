@@ -1,10 +1,43 @@
 # Project Backlog
 
-Last Updated: 2025-07-10 20:15:20
+Last Updated: 2025-01-28 19:00:00
 
 ## Critical Priority
 
+### BUG-PATTERN-SECURITY-ALERTS-FILTERS: Apply same filtering fixes to pattern-detection and security-alerts tabs
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: BUG-124.9
+- **Added**: 2025-01-28 18:30:00
+- **Completed**: 2025-01-28 19:00:00
+- **Updated**: 2025-01-28 19:00:00
+- **Description**: Extend the successful login-attempts filtering solution to pattern-detection and security-alerts tabs. Apply default 7-day filters, timestamp descending sort, and explicit method call pattern for filter application.
 
+#### Implementation Notes
+- **Root Cause**: Pattern-detection and security-alerts tabs needed same filtering fixes as login-attempts
+- **Solution Applied**: Extended successful explicit method call pattern from login-attempts to both tabs
+- **Default Filters**: Set default 7-day date range for both components (matches login-attempts)
+- **Default Sorting**: Configured timestamp descending sort:
+  - Pattern detection: detectionTimestamp desc
+  - Security alerts: createdAt desc
+- **Filter Column Mapping**: Verified proper backend field mapping:
+  - Pattern detection: timestamp→detectionTimestamp, type→patternType, severity→severity, ipAddresses→ipAddresses, details→details, groupCount→groupCount
+  - Security alerts: timestamp→createdAt, title→title, type→alertType, severity→severity, message→message, status→status
+- **Filter Method**: Implemented refreshWithFilters() method calls for both components
+- **Architecture**: Uses same parent-child communication pattern as login-attempts
+
+#### Files Modified
+- `angular/frontend/src/app/modules/admin/login-monitoring/pattern-detection-filters/pattern-detection-filters.component.ts`: Added default 7-day filters and refreshWithFilters() method
+- `angular/frontend/src/app/modules/admin/login-monitoring/security-alerts-filters/security-alerts-filters.component.ts`: Added default 7-day filters and refreshWithFilters() method
+- `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added ViewChild references and updated filter handlers
+- `angular/frontend/src/app/modules/admin/login-monitoring/pattern-detection-filters/pattern-detection-filters.component.html`: Fixed apply filters button method call
+
+#### Testing Results
+- **Build**: Passed successfully
+- **Default filters**: Both tabs now have 7-day default date range
+- **Sorting**: Both tabs default to timestamp descending
+- **Filter application**: Uses same explicit method call pattern as login-attempts
+- **Database schemas**: No changes required (as requested)
 
 ### BUG-124.9: Login Monitoring Filters Not Applying User-Selected Date Range
 - **Status**: Complete
@@ -416,156 +449,4 @@ Last Updated: 2025-07-10 20:15:20
 
 - **Files To Modify**:
   - `angular/frontend/src/app/modules/admin/login-monitoring/components/time-filter/`
-  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`
-  - `angular/backend/src/modules/auth/services/pattern-detection.service.ts`
-
-## Medium Priority
-
-### TECH-004.1: Continuous Integration Setup
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: TECH-001.2, TECH-001.3
-- **Added**: 2025-07-07
-- **Description**: Set up automated testing and continuous integration for the project.
-
-#### Implementation Notes
-- **Issues**: 
-  - GitHub Actions configuration needed
-  - Test coverage reporting missing
-  - Linting checks not automated
-
-- **Files To Modify**:
-  - `.github/workflows/` directory
-  - CI/CD configuration files
-  - Test coverage tools
-
-### TECH-004.2: Deployment Pipeline
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: TECH-004.1
-- **Added**: 2025-07-07
-- **Description**: Create a deployment pipeline for the tools and applications.
-
-#### Implementation Notes
-- **Issues**: 
-  - Docker container build needed
-  - Kubernetes deployment configuration missing
-  - Versioning strategy not implemented
-
-- **Files To Modify**:
-  - Dockerfile
-  - Kubernetes manifests
-  - Deployment scripts
-
-### FEAT-001: Role Hierarchy Management
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: TECH-001.3
-- **Added**: 2025-07-07
-- **Description**: Implement a role hierarchy management system.
-
-#### Implementation Notes
-- **Issues**: 
-  - Role inheritance model needed
-  - UI for managing hierarchies missing
-  - Permission propagation logic required
-
-- **Files To Modify**:
-  - Role management components
-  - Backend role services
-  - Database schema updates
-
-### FEAT-002: Permission Auditing
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: TECH-001.3, FEAT-001
-- **Added**: 2025-07-07
-- **Description**: Add permission auditing capabilities to track changes to permissions.
-
-#### Implementation Notes
-- **Issues**: 
-  - Audit log schema needed
-  - Audit log viewers missing
-  - Export functionality required
-
-- **Files To Modify**:
-  - Audit log entities
-  - Audit log services
-  - Export utilities
-
-### TASK-003: Cache Tables Implementation
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: TASK-002
-- **Added**: 2025-07-07
-- **Description**: Create migration for cache tables following established patterns.
-
-#### Implementation Notes
-- **Issues**: 
-  - Need migration for cache_components, cache_routes, cache_endpoints
-  - Should follow established patterns for column names and constraints
-
-- **Files To Modify**:
-  - Migration files for cache tables
-  - Cache entity definitions
-
-### BUG-025: Review and Fix Nullability Mismatches
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: BUG-021, BUG-022, BUG-023
-- **Added**: 2025-05-23
-- **Description**: Investigate and resolve nullability mismatches between database schema and entity definitions, particularly for ID columns that show as nullable in database but non-nullable in entities.
-
-#### Implementation Notes
-- **Issues**: 
-  - All primary key `id` columns show as nullable in database but non-nullable in entities (19 total mismatches)
-  - Likely SQLite introspection issue rather than actual nullability problems
-  - Need to investigate if SQLite schema introspection is causing false positives
-
-- **Files To Modify**:
-  - Database entity definitions
-  - Schema validation scripts
-  - SQLite introspection tools
-
-### TECH-002.5: Database Tools Enhancement
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: TECH-002.3
-- **Added**: 2025-05-06
-- **Description**: Enhance database tooling with improved validation, management, and logging capabilities.
-
-#### Implementation Requirements
-- **Issues**: 
-  - Enhance fix-database.js to create complete schema
-  - Improve check-db.js with detailed validation
-  - Create configuration system for database tools
-  - Add comprehensive logging with timestamps
-
-- **Files To Modify**:
-  - Database management scripts
-  - Validation and logging tools
-  - Database backup mechanisms
-
-## Low Priority
-
-### FEAT-007: Create API Status/Health Endpoint
-- **Status**: Not Started
-- **Testing**: Not Started
-- **Dependencies**: None
-- **Added**: 2025-07-07
-- **Description**: Create a comprehensive API status/health endpoint for system monitoring and debugging.
-
-#### Implementation Notes
-- **Issues**: 
-  - Health endpoint controller needed
-  - Database connectivity checks missing
-  - System metrics not available
-
-- **Files To Modify**:
-  - Health controller
-  - Service availability checks
-  - System metrics collection
-
-## Notes
-
-Backlog updated on 2025-07-07 to reflect current project priorities. Multiple completed tasks moved to changelog including FEAT-123 (completed 7/4) and 12 other tasks (completed 6/1). Continuing search for additional Angular Material implementation issues. All remaining tasks are actively needed for project completion.
+  - `

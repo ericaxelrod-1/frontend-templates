@@ -57,23 +57,12 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges, OnDe
   ngOnInit(): void {
     console.log('[PatternDetectionFilters] Initializing with:', {
       initialFilters: this.initialFilters,
-      preventInitialEmission: this.preventInitialEmission,
       hasPermission: this.hasPermission
     });
     
     // BUG-124.19 FIX: Apply initial filters from parent if provided
     if (this.initialFilters) {
       this.applyInitialFilters(this.initialFilters);
-    } else {
-      // Set default date range (last 30 days to match parent's timeRange)
-      const today = new Date();
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-      
-      this.filterForm.patchValue({
-        dateFrom: thirtyDaysAgo,
-        dateTo: today
-      }, { emitEvent: false }); // Don't emit during initialization
     }
 
     // Set initial disabled state
@@ -86,12 +75,12 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges, OnDe
     setTimeout(() => {
       this.componentReady = true;
       
-      // BUG-124.19 FIX: Only emit initial value if explicitly allowed by parent
-      if (!this.preventInitialEmission && this.hasPermission) {
-        console.log('[PatternDetectionFilters] Emitting initial filters (not prevented by parent)');
+      // BUG-FIX: ALWAYS emit initial filters like login-attempts pattern (removed preventInitialEmission logic)
+      if (this.hasPermission) {
+        console.log('[PatternDetectionFilters] Emitting initial filters with default 7-day range');
         this.onFiltersChanged();
       } else {
-        console.log('[PatternDetectionFilters] Initial emission prevented by parent or no permission');
+        console.log('[PatternDetectionFilters] Initial emission skipped - no permission');
       }
     }, 150); // Slightly longer delay than time filter to ensure proper initialization order
   }
@@ -115,13 +104,18 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges, OnDe
   }
 
   private createFilterForm(): FormGroup {
+    // BUG-FIX: Default date range (last 7 days) to match login-attempts pattern
+    const defaultDateTo = new Date();
+    const defaultDateFrom = new Date();
+    defaultDateFrom.setDate(defaultDateFrom.getDate() - 7);
+    
     return this.fb.group({
       status: [{ value: '', disabled: !this.hasPermission }],
       patternType: [{ value: '', disabled: !this.hasPermission }],
       severity: [{ value: '', disabled: !this.hasPermission }],
       ipAddress: [{ value: '', disabled: !this.hasPermission }],
-      dateFrom: [{ value: null, disabled: !this.hasPermission }],
-      dateTo: [{ value: null, disabled: !this.hasPermission }],
+      dateFrom: [{ value: defaultDateFrom, disabled: !this.hasPermission }], // Default to 7 days ago
+      dateTo: [{ value: defaultDateTo, disabled: !this.hasPermission }],      // Default to today
       search: [{ value: '', disabled: !this.hasPermission }]
     });
   }
@@ -258,20 +252,56 @@ export class PatternDetectionFiltersComponent implements OnInit, OnChanges, OnDe
     console.log('[PatternDetectionFilters] Form submission prevented - this should not cause navigation');
   }
 
+  // BUG-FIX: Public method for parent to trigger refresh (matching login-attempts pattern)
+  public refreshWithFilters(): void {
+    console.log('[PatternDetectionFilters] refreshWithFilters called');
+    this.onApplyFiltersClick();
+  }
+
   // Explicit button click handler to prevent any form submission behavior
-  onApplyFiltersClick(event: Event): void {
-    event.preventDefault();
-    event.stopPropagation();
-    console.log('[PatternDetectionFilters] Apply Filters button clicked explicitly');
+  onApplyFiltersClick(): void {
+    console.log('[PatternDetectionFilters] Apply filters clicked');
+    if (this.hasPermission && this.componentReady) {
+      this.onApplyFilters();
+    }
+  }
+
+  onApplyFilters(): void {
+    console.log('[PatternDetectionFilters] onApplyFilters called');
+    // BUG-124.19 FIX: Add guards to prevent emission when not ready
+    if (!this.componentReady || !this.hasPermission) {
+      console.log('[PatternDetectionFilters] Not ready or no permission, skipping filter application');
+      return;
+    }
+    
     this.onFiltersChanged();
   }
 
-  // BUG-124.19 FIX: Public method for parent to trigger emission when needed
-  public triggerEmission(): void {
-    if (this.componentReady && this.hasPermission) {
-      console.log('[PatternDetectionFilters] Manual emission triggered by parent');
-      this.onFiltersChanged();
+  onResetFilters(): void {
+    console.log('[PatternDetectionFilters] onResetFilters called');
+    // BUG-124.19 FIX: Add guards to prevent emission when not ready
+    if (!this.componentReady || !this.hasPermission) {
+      console.log('[PatternDetectionFilters] Not ready or no permission, skipping filter reset');
+      return;
     }
+    
+    // Reset form to default values (last 7 days)
+    const today = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    
+    this.filterForm.reset({
+      status: '',
+      patternType: '',
+      severity: '',
+      ipAddress: '',
+      dateFrom: sevenDaysAgo,
+      dateTo: today,
+      search: ''
+    });
+    
+    this.filtersReset.emit();
+    this.onFiltersChanged();
   }
 
   // BUG-124.19 FIX: Public method for parent to update filters without emission
