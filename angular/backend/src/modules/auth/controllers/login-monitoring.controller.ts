@@ -281,7 +281,10 @@ export class LoginMonitoringController {
       | 'brute_force'
       | 'distributed_attack'
       | 'credential_stuffing'
-      | 'account_switching',
+      | 'account_switching'
+      | 'ip_hopping'
+      | 'suspicious_location'
+      | 'time_anomaly',
   ) {
     // Create test login attempts
     await this.patternDetectionService.createTestLoginAttempts(scenario);

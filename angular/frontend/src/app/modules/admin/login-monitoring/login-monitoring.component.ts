@@ -867,8 +867,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
         console.log('Test brute force created:', result);
         // BUG-FIX: Don't call loadData() which applies current filters
         // The test data will appear when user refreshes or changes filters
-        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
-        this.isCreatingTestData = false;
+        this.loadData(); this.isCreatingTestData = false;
       },
       error: (err) => {
         console.error('Error creating test brute force:', err);
@@ -884,8 +883,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
         console.log('Test distributed attack created:', result);
         // BUG-FIX: Don't call loadData() which applies current filters
         // The test data will appear when user refreshes or changes filters
-        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
-        this.isCreatingTestData = false;
+        this.loadData(); this.isCreatingTestData = false;
       },
       error: (err) => {
         console.error('Error creating test distributed attack:', err);
@@ -900,8 +898,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       next: (result) => {
         console.log('Test credential stuffing created:', result);
         // BUG-FIX: Don't call loadData() which applies current filters
-        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
-        this.isCreatingTestData = false;
+        this.loadData(); this.isCreatingTestData = false;
       },
       error: (err) => {
         console.error('Error creating test credential stuffing:', err);
@@ -912,12 +909,11 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   createTestAccountSwitching() {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('rapid_account_switching').subscribe({
+    this.loginMonitoringService.createTestPattern('account_switching').subscribe({
       next: (result) => {
         console.log('Test account switching created:', result);
         // BUG-FIX: Don't call loadData() which applies current filters
-        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
-        this.isCreatingTestData = false;
+        this.loadData(); this.isCreatingTestData = false;
       },
       error: (err) => {
         console.error('Error creating test account switching:', err);
@@ -932,8 +928,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       next: (result) => {
         console.log('Test IP hopping created:', result);
         // BUG-FIX: Don't call loadData() which applies current filters
-        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
-        this.isCreatingTestData = false;
+        this.loadData(); this.isCreatingTestData = false;
       },
       error: (err) => {
         console.error('Error creating test IP hopping:', err);
@@ -948,8 +943,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       next: (result) => {
         console.log('Test suspicious location created:', result);
         // BUG-FIX: Don't call loadData() which applies current filters
-        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
-        this.isCreatingTestData = false;
+        this.loadData(); this.isCreatingTestData = false;
       },
       error: (err) => {
         console.error('Error creating test suspicious location:', err);
@@ -964,8 +958,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       next: (result) => {
         console.log('Test time anomaly created:', result);
         // BUG-FIX: Don't call loadData() which applies current filters
-        console.log('[LoginMonitoring] Test pattern created - data will appear when filters are refreshed');
-        this.isCreatingTestData = false;
+        this.loadData(); this.isCreatingTestData = false;
       },
       error: (err) => {
         console.error('Error creating test time anomaly:', err);
@@ -1258,23 +1251,22 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   sendTestAlert(): void {
     if (!this.circuitBreaker.checkLoop('sendTestAlert')) return;
     
-    console.log('[LoginMonitoring] Sending test alert...');
+    console.log('[LoginMonitoring] Sending test alert to backend...');
+    this.isCreatingTestData = true;
     
-    // Add a test alert to the list
-    const testAlert: SecurityAlert = {
-      id: Date.now(),
-      title: 'Test Security Alert',
-      message: 'This is a test security alert generated for testing purposes.',
-      severity: 'medium' as 'low' | 'medium' | 'high' | 'critical',
-      timestamp: new Date(),
-      type: 'test',
-      alertType: 'test',
-      createdAt: new Date(),
-      source: 'test-generator',
-      status: 'active',
-      updatedAt: new Date()
-    };
-    
-    this.securityAlerts = [testAlert, ...this.securityAlerts];
+    this.loginMonitoringService.sendTestAlert().subscribe({
+      next: (result) => {
+        console.log('Test alert sent successfully:', result);
+        // Test alert will appear when filters are refreshed (same pattern as test patterns)
+        this.loadData(); this.isCreatingTestData = false;
+      },
+      error: (err) => {
+        console.error('Error sending test alert:', err);
+        this.isCreatingTestData = false;
+      }
+    });
   } 
 } 
+
+
+

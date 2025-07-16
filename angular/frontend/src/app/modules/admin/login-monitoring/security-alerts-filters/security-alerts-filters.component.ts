@@ -109,7 +109,7 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
       return;
     }
     
-    this.emitFilters();
+      this.emitFilters();
   }
 
   onApplyFiltersClick(): void {
@@ -157,23 +157,23 @@ export class SecurityAlertsFiltersComponent implements OnInit, OnChanges {
       console.log('[SecurityAlertsFilters] Not ready or no permission, skipping filter reset');
       return;
     }
-    
+      
     // Reset form to default values (last 7 days)
     const today = new Date();
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(today.getDate() - 7);
-    
-    this.filterForm.reset({
-      status: '',
-      severity: '',
-      alertType: '',
+      
+      this.filterForm.reset({
+        status: '',
+        severity: '',
+        alertType: '',
       dateFrom: sevenDaysAgo,
       dateTo: today,
-      search: ''
-    });
-    
-    this.filtersReset.emit();
-    this.emitFilters();
+        search: ''
+      });
+      
+      this.filtersReset.emit();
+      this.emitFilters();
   }
 
   private emitFilters(): void {

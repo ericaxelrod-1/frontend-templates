@@ -140,7 +140,7 @@ export class LoginAttemptsTableComponent implements OnInit, AfterViewInit, OnDes
     
     // BUG-FIX: Fix NG0100 error by deferring loading state change to next tick
     setTimeout(() => {
-      this.loading = true;
+    this.loading = true;
     }, 0);
     
     const filters: LoginMonitoringFilters = this.filterForm ? this.filterForm.value : {};

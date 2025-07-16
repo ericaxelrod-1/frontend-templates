@@ -455,7 +455,10 @@ export class PatternDetectionService {
       | 'brute_force'
       | 'distributed_attack'
       | 'credential_stuffing'
-      | 'account_switching',
+      | 'account_switching'
+      | 'ip_hopping'
+      | 'suspicious_location'
+      | 'time_anomaly',
   ): Promise<void> {
     const now = new Date();
 
@@ -542,6 +545,68 @@ export class PatternDetectionService {
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             failureReason:
               Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+          });
+        }
+        break;
+
+      case 'ip_hopping':
+        // Create attempts from rapidly changing IP addresses for same user
+        const hoppingEmail = 'target@example.com';
+        const hoppingIPs = [
+          '10.1.1.1', '10.1.1.2', '10.1.1.3', '10.1.1.4', '10.1.1.5',
+          '10.1.1.6', '10.1.1.7', '10.1.1.8', '10.1.1.9', '10.1.1.10'
+        ];
+        for (let i = 0; i < hoppingIPs.length; i++) {
+          const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
+          await this.createTestAttempt({
+            ipAddress: hoppingIPs[i],
+            emailAttempted: hoppingEmail,
+            status: Math.random() > 0.6 ? 'failed' : 'success',
+            attemptedAt: attemptTime,
+            userAgent: `Mozilla/5.0 (IP Hopping Test ${i})`,
+            failureReason: Math.random() > 0.6 ? 'invalid_credentials' : undefined,
+          });
+        }
+        break;
+
+      case 'suspicious_location':
+        // Create attempts from geographically suspicious locations
+        const suspiciousEmails = ['user1@company.com', 'user2@company.com'];
+        const suspiciousIPs = [
+          '1.2.3.4',    // Suspicious foreign IP
+          '45.67.89.12', // Another suspicious IP
+          '123.45.67.89', // VPN/Proxy IP range
+          '200.100.50.25' // High-risk country IP
+        ];
+        for (let i = 0; i < suspiciousIPs.length; i++) {
+          const attemptTime = new Date(now.getTime() - i * 180000); // 3 minutes apart
+          await this.createTestAttempt({
+            ipAddress: suspiciousIPs[i],
+            emailAttempted: suspiciousEmails[i % suspiciousEmails.length],
+            status: Math.random() > 0.4 ? 'failed' : 'success',
+            attemptedAt: attemptTime,
+            userAgent: 'Mozilla/5.0 (Suspicious Location Test)',
+            failureReason: Math.random() > 0.4 ? 'invalid_credentials' : undefined,
+          });
+        }
+        break;
+
+      case 'time_anomaly':
+        // Create login attempts at unusual hours (2-4 AM)
+        const anomalyEmail = 'nightshift@example.com';
+        const anomalyIP = '192.168.1.100';
+        const baseTime = new Date();
+        baseTime.setHours(3, 0, 0, 0); // 3 AM today
+        
+        for (let i = 0; i < 6; i++) {
+          const attemptTime = new Date(baseTime.getTime() - i * 86400000); // 1 day apart, all at 3 AM
+          await this.createTestAttempt({
+            ipAddress: anomalyIP,
+            emailAttempted: anomalyEmail,
+            status: Math.random() > 0.3 ? 'success' : 'failed',
+            attemptedAt: attemptTime,
+            userAgent: 'Mozilla/5.0 (Time Anomaly Test)',
+            failureReason: Math.random() > 0.7 ? 'invalid_credentials' : undefined,
           });
         }
         break;
