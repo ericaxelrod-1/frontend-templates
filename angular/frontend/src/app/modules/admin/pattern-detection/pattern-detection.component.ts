@@ -129,6 +129,41 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
     });
   }
 
+  // BUG-126 FIX: Load data after test creation with expanded date range to ensure test data is visible
+  private loadDataAfterTest(): void {
+    this.loading = true;
+    
+    // Create expanded filter state that includes freshly created test data
+    const expandedFilters = { 
+      ...this.filterState,
+      // Expand date range to include last 10 minutes (covers all test scenarios)
+      dateTo: new Date(), // Now
+      dateFrom: new Date(Date.now() - 10 * 60 * 1000) // 10 minutes ago
+    };
+    
+    console.log('[DEBUG] Loading data after test creation with expanded filters:', expandedFilters);
+    
+    this.loginMonitoringService.getPatterns(
+      expandedFilters,
+      0,
+      this.patternPageSize,
+      this.patternCurrentSort.column,
+      this.patternCurrentSort.direction
+    ).pipe(takeUntil(this.destroy$))
+    .subscribe({
+      next: (response: PaginatedResponse<Pattern>) => {
+        this.detectedPatterns = response.items;
+        this.patternTotalCount = response.total;
+        this.loading = false;
+        console.log('[DEBUG] Data loaded after test creation:', response.items.length, 'patterns found');
+      },
+      error: (error) => {
+        console.error('Error loading patterns after test:', error);
+        this.loading = false;
+      }
+    });
+  }
+
   private loadPatternSummary(): void {
     const timeFilter: TimeFilter = {
       timeRange: '7d' as "30d" | "24h" | "7d" | "90d" | "all" | undefined
@@ -254,7 +289,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadData();
+          this.loadDataAfterTest();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -271,7 +306,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadData();
+          this.loadDataAfterTest();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -288,7 +323,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadData();
+          this.loadDataAfterTest();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -305,7 +340,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadData();
+          this.loadDataAfterTest();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -322,7 +357,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadData();
+          this.loadDataAfterTest();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -339,7 +374,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadData();
+          this.loadDataAfterTest();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -356,7 +391,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadData();
+          this.loadDataAfterTest();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -373,7 +408,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadData();
+          this.loadData(); // Use normal loadData() for clearing since we want to see the absence of data
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },

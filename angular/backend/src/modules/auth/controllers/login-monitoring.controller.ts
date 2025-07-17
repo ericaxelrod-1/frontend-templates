@@ -197,19 +197,21 @@ export class LoginMonitoringController {
     description: 'Pattern type summary with counts and severity distribution',
     type: [PatternSummaryDto],
   })
-  async getPatternSummary(@Query() query: PatternSummaryQueryDto): Promise<PatternSummaryDto[]> {
+  async getPatternSummary(
+    @Query() query: PatternSummaryQueryDto,
+  ): Promise<PatternSummaryDto[]> {
     const { dateFrom, dateTo, timeRange } = query;
-    
+
     const startDate = dateFrom ? new Date(dateFrom) : undefined;
     const endDate = dateTo ? new Date(dateTo) : undefined;
-    
+
     const summary = await this.patternDetectionService.getPatternSummary(
       startDate,
       endDate,
       timeRange,
     );
-    
-    return summary.map(item => ({
+
+    return summary.map((item) => ({
       patternType: item.patternType,
       displayName: item.displayName,
       count: item.count,
@@ -290,7 +292,8 @@ export class LoginMonitoringController {
     await this.patternDetectionService.createTestLoginAttempts(scenario);
 
     // FIXED: Race condition - immediately run detection and storage synchronously
-    const detectedPatterns = await this.patternDetectionService.detectAndStorePatterns();
+    const detectedPatterns =
+      await this.patternDetectionService.detectAndStorePatterns();
     console.log(
       `Test scenario '${scenario}' created. Detected and stored patterns:`,
       detectedPatterns.length,
