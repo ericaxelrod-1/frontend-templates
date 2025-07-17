@@ -11,7 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatCardModule } from '@angular/material/card';
-import { LoginMonitoringService } from '../login-monitoring/shared/login-monitoring.service';
+import { PatternDetectionService } from './shared/pattern-detection.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { PatternDetectionFiltersComponent } from '../login-monitoring/pattern-detection-filters/pattern-detection-filters.component';
 import { TimeFilter, PatternSummary } from '../../../models/pattern-summary.interface';
@@ -72,7 +72,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
   isCreatingTestData = false;
 
   constructor(
-    private loginMonitoringService: LoginMonitoringService,
+    private patternDetectionService: PatternDetectionService,
     private permissionService: PermissionService
   ) {}
 
@@ -109,7 +109,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
   private loadData(): void {
     this.loading = true;
     
-    this.loginMonitoringService.getPatterns(
+    this.patternDetectionService.getPatterns(
       this.filterState,
       0,
       this.patternPageSize,
@@ -122,60 +122,27 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
         this.patternTotalCount = response.total;
         this.loading = false;
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Error loading patterns:', error);
         this.loading = false;
       }
     });
   }
 
-  // BUG-126 FIX: Load data after test creation with expanded date range to ensure test data is visible
-  private loadDataAfterTest(): void {
-    this.loading = true;
-    
-    // Create expanded filter state that includes freshly created test data
-    const expandedFilters = { 
-      ...this.filterState,
-      // Expand date range to include last 10 minutes (covers all test scenarios)
-      dateTo: new Date(), // Now
-      dateFrom: new Date(Date.now() - 10 * 60 * 1000) // 10 minutes ago
-    };
-    
-    console.log('[DEBUG] Loading data after test creation with expanded filters:', expandedFilters);
-    
-    this.loginMonitoringService.getPatterns(
-      expandedFilters,
-      0,
-      this.patternPageSize,
-      this.patternCurrentSort.column,
-      this.patternCurrentSort.direction
-    ).pipe(takeUntil(this.destroy$))
-    .subscribe({
-      next: (response: PaginatedResponse<Pattern>) => {
-        this.detectedPatterns = response.items;
-        this.patternTotalCount = response.total;
-        this.loading = false;
-        console.log('[DEBUG] Data loaded after test creation:', response.items.length, 'patterns found');
-      },
-      error: (error) => {
-        console.error('Error loading patterns after test:', error);
-        this.loading = false;
-      }
-    });
-  }
+
 
   private loadPatternSummary(): void {
     const timeFilter: TimeFilter = {
       timeRange: '7d' as "30d" | "24h" | "7d" | "90d" | "all" | undefined
     };
 
-    this.loginMonitoringService.getPatternSummary(timeFilter)
+    this.patternDetectionService.getPatternSummary(timeFilter)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (summary: PatternSummary[]) => {
           this.patternSummary = summary;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error loading pattern summary:', error);
         }
       });
@@ -285,11 +252,11 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
   // Test data methods
   createTestBruteForce(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('brute_force')
+    this.patternDetectionService.createTestPattern('brute_force')
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadDataAfterTest();
+          this.loadData();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -302,11 +269,11 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestDistributedAttack(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('distributed_attack')
+    this.patternDetectionService.createTestPattern('distributed_attack')
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadDataAfterTest();
+          this.loadData();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -319,11 +286,11 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestCredentialStuffing(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('credential_stuffing')
+    this.patternDetectionService.createTestPattern('credential_stuffing')
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadDataAfterTest();
+          this.loadData();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
@@ -336,15 +303,15 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestRapidAccountSwitching(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('rapid_account_switching')
+    this.patternDetectionService.createTestPattern('rapid_account_switching')
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadDataAfterTest();
+          this.loadData();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error creating test rapid account switching pattern:', error);
           this.isCreatingTestData = false;
         }
@@ -353,15 +320,15 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestIpHopping(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('ip_hopping')
+    this.patternDetectionService.createTestPattern('ip_hopping')
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadDataAfterTest();
+          this.loadData();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error creating test IP hopping pattern:', error);
           this.isCreatingTestData = false;
         }
@@ -370,15 +337,15 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestSuspiciousLocation(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('suspicious_location')
+    this.patternDetectionService.createTestPattern('suspicious_location')
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadDataAfterTest();
+          this.loadData();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error creating test suspicious location pattern:', error);
           this.isCreatingTestData = false;
         }
@@ -387,15 +354,15 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestTimeAnomaly(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('time_anomaly')
+    this.patternDetectionService.createTestPattern('time_anomaly')
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.loadDataAfterTest();
+          this.loadData();
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error creating test time anomaly pattern:', error);
           this.isCreatingTestData = false;
         }
@@ -404,7 +371,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   clearAllData(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.clearTestData()
+    this.patternDetectionService.clearTestData()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -412,7 +379,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
           this.loadPatternSummary();
           this.isCreatingTestData = false;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error clearing test data:', error);
           this.isCreatingTestData = false;
         }

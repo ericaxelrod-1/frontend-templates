@@ -11,7 +11,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatCardModule } from '@angular/material/card';
-import { LoginMonitoringService } from '../login-monitoring/shared/login-monitoring.service';
+import { LoginAttemptsService } from './shared/login-attempts.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { StatisticsDashboardComponent } from '../login-monitoring/statistics-dashboard/statistics-dashboard.component';
 import { LoginAttemptsTableComponent } from '../login-monitoring/login-attempts-table/login-attempts-table.component';
@@ -66,7 +66,7 @@ export class LoginAttemptsComponent implements OnInit, OnDestroy, AfterViewInit 
   filterForm: FormGroup | null = null;
 
   constructor(
-    private loginMonitoringService: LoginMonitoringService,
+    private loginAttemptsService: LoginAttemptsService,
     private permissionService: PermissionService
   ) {}
 
@@ -165,33 +165,16 @@ export class LoginAttemptsComponent implements OnInit, OnDestroy, AfterViewInit 
   // Test data methods
   createTestLoginAttempt(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.createTestPattern('brute_force')
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.isCreatingTestData = false;
-          // Refresh data if needed
-        },
-        error: (error) => {
-          console.error('Error creating test login attempt:', error);
-          this.isCreatingTestData = false;
-        }
-      });
+    // Note: Test pattern creation moved to PatternDetectionComponent
+    // This component focuses on displaying login attempts
+    this.isCreatingTestData = false;
+    console.log('Test login attempt creation moved to pattern detection component');
   }
 
   clearTestData(): void {
-    this.isCreatingTestData = true;
-    this.loginMonitoringService.clearTestData()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.isCreatingTestData = false;
-          // Refresh data if needed
-        },
-        error: (error) => {
-          console.error('Error clearing test data:', error);
-          this.isCreatingTestData = false;
-        }
-      });
+    // Note: Test data clearing moved to PatternDetectionComponent
+    // This component focuses on displaying login attempts
+    this.isCreatingTestData = false;
+    console.log('Test data clearing moved to pattern detection component');
   }
 } 

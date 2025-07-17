@@ -27,6 +27,9 @@ import { CleanupTask } from './tasks/cleanup.task';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoginMonitoringController } from './controllers/login-monitoring.controller';
 import { SecurityAlertController } from './controllers/security-alert.controller';
+import { PatternDetectionController } from './controllers/pattern-detection.controller';
+import { LoginAttemptsController } from './controllers/login-attempts.controller';
+import { IpReputationController } from './controllers/ip-reputation.controller';
 import { User } from '../users/entities/user.entity';
 
 @Module({
@@ -60,6 +63,9 @@ import { User } from '../users/entities/user.entity';
     AuthController,
     LoginMonitoringController,
     SecurityAlertController,
+    PatternDetectionController,
+    LoginAttemptsController,
+    IpReputationController,
   ],
   providers: [
     AuthService,

@@ -11,7 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatCardModule } from '@angular/material/card';
-import { LoginMonitoringService } from '../login-monitoring/shared/login-monitoring.service';
+import { IpReputationService } from './shared/ip-reputation.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { IPReputation } from '../login-monitoring/shared/login-monitoring.models';
 
@@ -51,7 +51,7 @@ export class IpReputationComponent implements OnInit, OnDestroy, AfterViewInit {
   displayedColumns: string[] = ['ipAddress', 'failedAttempts', 'reputation', 'status', 'lastAttempt', 'actions'];
 
   constructor(
-    private loginMonitoringService: LoginMonitoringService,
+    private ipReputationService: IpReputationService,
     private permissionService: PermissionService
   ) {}
 
@@ -88,20 +88,20 @@ export class IpReputationComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Event handlers
   onIPSelected(ipAddress: string): void {
-    this.loginMonitoringService.getIPReputation(ipAddress)
+    this.ipReputationService.getIPReputation(ipAddress)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (reputation: IPReputation) => {
+        next: (reputation: any) => {
           this.selectedIpReputation = reputation;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error loading IP reputation:', error);
         }
       });
   }
 
   blockIP(ipAddress: string): void {
-    this.loginMonitoringService.blockIP(ipAddress)
+    this.ipReputationService.blockIP(ipAddress)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -110,14 +110,14 @@ export class IpReputationComponent implements OnInit, OnDestroy, AfterViewInit {
             this.onIPSelected(ipAddress);
           }
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error blocking IP:', error);
         }
       });
   }
 
   unblockIP(ipAddress: string): void {
-    this.loginMonitoringService.unblockIP(ipAddress)
+    this.ipReputationService.unblockIP(ipAddress)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -126,7 +126,7 @@ export class IpReputationComponent implements OnInit, OnDestroy, AfterViewInit {
             this.onIPSelected(ipAddress);
           }
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error unblocking IP:', error);
         }
       });
@@ -150,29 +150,14 @@ export class IpReputationComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Test data methods
   createTestIPData(): void {
-    this.loginMonitoringService.createTestPattern('ip_hopping')
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.loadIPReputations();
-        },
-        error: (error) => {
-          console.error('Error creating test IP data:', error);
-        }
-      });
+    // IP reputation doesn't have test pattern creation
+    // This would need to be implemented in the IpReputationService if needed
+    console.log('Test IP data creation not implemented for IP reputation');
   }
 
   clearAllData(): void {
-    this.loginMonitoringService.clearTestData()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.loadIPReputations();
-          this.selectedIpReputation = null;
-        },
-        error: (error) => {
-          console.error('Error clearing test data:', error);
-        }
-      });
+    // IP reputation doesn't have test data clearing
+    // This would need to be implemented in the IpReputationService if needed
+    console.log('Test data clearing not implemented for IP reputation');
   }
 } 

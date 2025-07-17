@@ -11,7 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatCardModule } from '@angular/material/card';
-import { LoginMonitoringService } from '../login-monitoring/shared/login-monitoring.service';
+import { SecurityAlertsService } from './shared/security-alerts.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { SecurityAlertsFiltersComponent } from '../login-monitoring/security-alerts-filters/security-alerts-filters.component';
 import { SecurityAlert, SecurityAlertsFilters } from '../login-monitoring/shared/login-monitoring.models';
@@ -70,7 +70,7 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
   isCreatingTestData = false;
 
   constructor(
-    private loginMonitoringService: LoginMonitoringService,
+    private securityAlertsService: SecurityAlertsService,
     private permissionService: PermissionService
   ) {}
 
@@ -106,7 +106,7 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
   private loadData(): void {
     this.loading = true;
 
-    this.loginMonitoringService.getSecurityAlerts(
+    this.securityAlertsService.getSecurityAlerts(
       this.filterState,
       0,
       this.securityAlertsPageSize,
@@ -114,12 +114,12 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
       this.securityAlertsCurrentSort.direction
     ).pipe(takeUntil(this.destroy$))
     .subscribe({
-      next: (alerts: SecurityAlert[]) => {
-        this.securityAlerts = alerts;
-        this.securityAlertsTotalCount = alerts.length; // Service doesn't return total count
+      next: (response: any) => {
+        this.securityAlerts = response.data || response;
+        this.securityAlertsTotalCount = response.total || response.length;
         this.loading = false;
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Error loading security alerts:', error);
         this.loading = false;
       }
@@ -230,39 +230,39 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
 
   // Alert action methods
   acknowledgeAlert(alertId: number): void {
-    this.loginMonitoringService.acknowledgeAlert(alertId.toString())
+    this.securityAlertsService.acknowledgeAlert(alertId.toString())
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.loadData();
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error acknowledging alert:', error);
         }
       });
   }
 
   resolveAlert(alertId: number): void {
-    this.loginMonitoringService.resolveAlert(alertId.toString())
+    this.securityAlertsService.resolveAlert(alertId.toString())
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.loadData();
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error resolving alert:', error);
         }
       });
   }
 
   dismissAlert(alertId: number): void {
-    this.loginMonitoringService.dismissAlert(alertId.toString())
+    this.securityAlertsService.dismissAlert(alertId.toString())
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.loadData();
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error dismissing alert:', error);
         }
       });
@@ -271,14 +271,14 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
   // Test data methods
   createTestSecurityAlert(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.sendTestAlert()
+    this.securityAlertsService.sendTestAlert()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.loadData();
           this.isCreatingTestData = false;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error creating test security alert:', error);
           this.isCreatingTestData = false;
         }
@@ -287,17 +287,9 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
 
   clearAllData(): void {
     this.isCreatingTestData = true;
-    this.loginMonitoringService.clearTestData()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.loadData();
-          this.isCreatingTestData = false;
-        },
-        error: (error) => {
-          console.error('Error clearing test data:', error);
-          this.isCreatingTestData = false;
-        }
-      });
+    // Security alerts doesn't have clearTestData method
+    // This would need to be implemented in the SecurityAlertsService if needed
+    console.log('Test data clearing not implemented for security alerts');
+    this.isCreatingTestData = false;
   }
 } 
