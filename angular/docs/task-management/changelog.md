@@ -1,8 +1,52 @@
 # Project Changelog
 
-Last Updated: 2025-07-17 12:00:00
+Last Updated: 2025-07-17 19:50:00
+
+## In Progress
+
+*No items currently in progress*
 
 ## Completed Today (2025-01-28)
+
+### FEAT-127: Simple vs Enhanced Test Mode for Pattern Detection
+- **Status**: Complete
+- **Started**: 2025-07-17
+- **Completed**: 2025-01-28
+- **Testing**: Passed - Frontend and Backend both 100% complete
+- **Dependencies**: BUG-126 (Pattern Detection must be working)
+- **Added**: 2025-07-17 14:35:36
+- **Description**: Add dual test modes (Simple/Enhanced) to pattern detection test buttons. Simple mode creates isolated test data triggering only the selected pattern. Enhanced mode creates realistic scenarios triggering multiple related patterns as would occur in real attacks.
+
+#### ✅ Implementation Complete (100%)
+**Frontend Implementation (100%)**:
+- UI Components: Mode toggle, tooltips, warning indicators, explanation panel
+- Technical Integration: All 7 test buttons pass mode parameter, dynamic tooltip system
+- Build Status: Successful compilation, all TypeScript issues resolved
+
+**Backend Implementation (100%)**:
+- API Layer: CreateTestPatternDto, conditional detection logic, mode parameter handling
+- Simple Mode Test Data: All 7 test cases implemented with isolated pattern creation
+- Detection Logic: detectSpecificPattern() method working for all pattern types
+
+#### ✅ All Simple Mode Implementations Complete
+- ✅ Brute Force: 6 failed attempts from single IP (192.168.200.1)
+- ✅ Distributed Attack: 4 IPs targeting same email (10.200.0.x range)
+- ✅ Credential Stuffing: 10 different emails from single IP (192.168.201.1)
+- ✅ Rapid Account Switching: 4 different accounts from same IP (192.168.202.1)
+- ✅ IP Hopping: 3 IPs for same email in short time (10.201.1.x range)
+- ✅ Suspicious Location: Single attempt from known VPN/proxy IP (45.67.89.12)
+- ✅ Time Anomaly: Single login at 3 AM (192.168.203.1)
+
+#### ✅ Build Verification
+- Backend builds successfully without TypeScript errors
+- All mode parameter handling working correctly
+- Simple mode creates isolated test data for each pattern type
+- Enhanced mode provides realistic multi-pattern scenarios
+
+**Files Modified:**
+- `angular/backend/src/modules/auth/services/pattern-detection.service.ts`: Added simple mode implementations for all 5 remaining test cases
+- `angular/docs/task-management/backlog.md`: Updated status to Complete
+- `angular/docs/task-management/changelog.md`: Moved to Completed Today
 
 ### BUG-126: Suspicious Location Test Button Not Creating Visible Test Records
 - **Status**: Complete
@@ -422,6 +466,167 @@ The core architectural issue has been resolved and the application is now functi
 - **Files Modified**:
   - `angular/frontend/src/app/modules/admin/login-monitoring/components/time-filter/time-filter.component.ts`: Added initialization guard
   - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.ts`: Added loading guard
+
+### BUG-124.19: CRITICAL - Comprehensive Investigation Results - Root Cause Analysis
+- **Status**: Complete
+- **Testing**: Passed
+- **Dependencies**: BUG-124.12, BUG-124.13, BUG-124.14, BUG-124.15, BUG-124.16, BUG-124.17, BUG-124.18
+- **Added**: 2025-01-28 15:00:00
+- **Completed**: 2025-01-28 16:30:00
+- **Description**: Comprehensive investigation using @999-bugfinder methodology to identify the definitive root cause of persistent refresh loop that evaded all previous fix attempts (BUG-124.12 through BUG-124.18).
+
+#### Investigation Results (@999-bugfinder)
+- **Root Cause**: **Circular event emission chain** between login-monitoring component and its child components
+- **Event Storm Pattern**: 
+  1. Time Filter Component emits changes
+  2. Login Monitoring Component responds by calling `loadPatternSummary()`
+  3. Pattern Detection Filters initialize with default 7-day range
+  4. Filter change triggers new data load
+  5. Component state changes trigger new renders
+  6. Process repeats infinitely
+
+#### Why Previous Fixes Failed
+- **BUG-124.12-14**: Added loop prevention flags → Only delayed the inevitable
+- **BUG-124.15**: Fixed subscription management → Helped with memory but not the loop
+- **BUG-124.16**: Added initialization guard → Flawed implementation
+- **BUG-124.17**: Removed auto-emission → Broke functionality, caused blank screen
+- **BUG-124.18**: Removed detectChanges → Good fix but didn't address root cause
+
+#### The Hidden Culprit: Component Architecture Flaw
+
+**Multiple Sources of Truth:**
+```typescript
+// Time Filter Component has its own state
+timeFilterForm = new FormGroup({
+  timeRange: new FormControl('30d'), // Default
+});
+
+// Pattern Detection Filters has different default
+const sevenDaysAgo = new Date();
+sevenDaysAgo.setDate(today.getDate() - 7); // Different default!
+```
+
+**Uncoordinated Event Emissions:**
+- Time filter emits on value changes
+- Pattern detection filters emit on initialization
+- Both trigger data reloads in parent
+- Parent doesn't coordinate between them
+
+**Template Method Calls Amplifying the Problem:**
+```html
+<div class="login-monitoring-container" [ngClass]="getResponsiveSpacingClass()">
+```
+- Method called on EVERY change detection cycle
+- Excessive console logging
+- Performance degradation
+- Change detection thrashing
+
+#### Critical Discovery: The Event Storm
+When component initializes:
+1. `ngOnInit()` → `checkPermissions()` → `loadData()`
+2. `loadData()` → Loads statistics, attempts, alerts, patterns, AND `loadPatternSummary()`
+3. Time Filter initializes → Emits change (even after "fix")
+4. Pattern Detection Filters initialize → Emit default 7-day range
+5. Both emissions trigger `onTimeFilterChange()` and `onPatternDetectionFiltersChanged()`
+6. Both methods call `loadPatternSummary()` or `loadData()`
+7. Loading state changes trigger change detection
+8. Template methods execute, logging to console
+9. State changes trigger more change detection
+10. **Memory pressure builds → Component destroyed and recreated → Loop repeats**
+
+#### The Proof
+From web research (trungk18.com article):
+> "Memory leaks occur when components are re-rendered multiple times... When the application started to get slower, we tended to reload the browser."
+
+This exactly matched the observed behavior: component destruction and recreation due to memory pressure from the event storm.
+
+#### Comprehensive Solution Framework
+
+**1. Implement Proper State Management**
+```typescript
+// Single source of truth for filters
+private filterState = {
+  timeRange: '30d',
+  patternFilters: null,
+  securityFilters: null
+};
+
+// Debounced filter updates
+private filterUpdates$ = new Subject();
+```
+
+**2. Prevent Child Component Auto-Emissions**
+```typescript
+// Pass initial values to children
+<app-time-filter 
+  [initialValue]="filterState.timeRange"
+  [preventInitialEmission]="true"
+  (timeFilterChange)="onTimeFilterChange($event)">
+</app-time-filter>
+```
+
+**3. Optimize Template Methods**
+```typescript
+// Replace method calls with computed properties
+private _responsiveClass = signal('');
+```
+
+**4. Implement Loading State Coordination**
+```typescript
+private loadingManager = {
+  operations: new Set<string>(),
+  startOperation(name: string) {
+    this.operations.add(name);
+    this.loading = true;
+  },
+  endOperation(name: string) {
+    this.operations.delete(name);
+    this.loading = this.operations.size > 0;
+  }
+};
+```
+
+**5. Add Circuit Breaker**
+```typescript
+private loopDetector = {
+  calls: 0,
+  resetTimer: null,
+  checkLoop(method: string) {
+    this.calls++;
+    if (this.calls > 10) {
+      console.error(`Infinite loop detected in ${method}`);
+      return false; // Prevent execution
+    }
+    clearTimeout(this.resetTimer);
+    this.resetTimer = setTimeout(() => this.calls = 0, 1000);
+    return true;
+  }
+};
+```
+
+#### Implementation Notes
+- **Architectural Diagnosis**: The issue was NOT a simple subscription leak or change detection problem
+- **Fundamental Flaw**: Uncoordinated event emissions creating an event storm
+- **Root Cause**: Component architecture flaw in how components communicate and manage state
+- **Solution**: Comprehensive state management, debounced updates, and proper lifecycle coordination
+
+#### Immediate Actions Required
+1. **Stop the Event Storm**: Prevent child components from emitting during initialization
+2. **Centralize State**: Create single source of truth for all filters
+3. **Optimize Templates**: Remove all method calls from templates
+4. **Coordinate Loading**: Implement proper loading state management
+5. **Add Circuit Breaker**: Detect and prevent infinite loops
+
+#### Validation Steps
+1. Component should initialize only ONCE
+2. Console should show minimal logging
+3. Memory should stabilize after initial load
+4. No duplicate API calls
+5. Performance monitor should show stable memory usage
+
+- **Files Modified**:
+  - Investigation completed - no code changes made in this phase
+  - Analysis provided foundation for BUG-124.20 implementation
 
 ### BUG-124.20: CRITICAL - Fix security alerts filters infinite loop using initialization guard pattern
 - **Status**: Complete

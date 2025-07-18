@@ -4,6 +4,7 @@ import {
   Post,
   Delete,
   Param,
+  Body,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiProperty,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PatternDetectionService } from '../services/pattern-detection.service';
@@ -19,6 +21,16 @@ import { PermissionGuard } from '../../permissions/guards/permission.guard';
 import { RequirePermission } from '../../permissions/decorators/require-permission.decorator';
 import { PatternSummaryDto } from '../dto/pattern-summary.dto';
 import { PatternSummaryQueryDto } from '../dto/pattern-summary-query.dto';
+
+// DTO for test pattern creation request
+class CreateTestPatternDto {
+  @ApiProperty({ 
+    enum: ['simple', 'enhanced'],
+    default: 'simple',
+    description: 'Test mode - simple creates isolated patterns, enhanced creates realistic multi-pattern scenarios'
+  })
+  mode?: 'simple' | 'enhanced';
+}
 
 @ApiTags('pattern-detection')
 @Controller('pattern-detection')
@@ -111,12 +123,13 @@ export class PatternDetectionController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('login-monitoring:manage')
   @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Create test login attempts to simulate attack patterns',
+  @ApiOperation({ 
+    summary: 'Create test patterns for a specific scenario',
+    description: 'Creates test login attempts that will trigger pattern detection. Simple mode creates isolated patterns, enhanced mode creates realistic multi-pattern scenarios.'
   })
   @ApiResponse({
-    status: 200,
-    description: 'Test login attempts created successfully',
+    status: 201,
+    description: 'Test pattern created successfully',
   })
   async createTestPattern(
     @Param('scenario')
@@ -128,23 +141,38 @@ export class PatternDetectionController {
       | 'ip_hopping'
       | 'suspicious_location'
       | 'time_anomaly',
+    @Body() createTestPatternDto: CreateTestPatternDto,
   ) {
-    // Create test login attempts
-    await this.patternDetectionService.createTestLoginAttempts(scenario);
+    const mode = createTestPatternDto.mode || 'simple';
+    
+    // Create test login attempts with mode
+    await this.patternDetectionService.createTestLoginAttempts(scenario, mode);
 
-    // FIXED: Race condition - immediately run detection and storage synchronously
-    const detectedPatterns =
-      await this.patternDetectionService.detectAndStorePatterns();
+    // For simple mode, only detect the specific pattern type
+    let detectedPatterns: any[];
+    if (mode === 'simple') {
+      // Run detection for only the requested pattern type
+      detectedPatterns = await this.patternDetectionService.detectSpecificPattern(scenario);
+    } else {
+      // Enhanced mode - run full detection (current behavior)
+      detectedPatterns = await this.patternDetectionService.detectAndStorePatterns();
+    }
+    
     console.log(
-      `Test scenario '${scenario}' created. Detected and stored patterns:`,
+      `Test scenario '${scenario}' (${mode} mode) created. Detected and stored patterns:`,
       detectedPatterns.length,
     );
 
     return {
       success: true,
-      message: `Test ${scenario} scenario created successfully. ${detectedPatterns.length} patterns detected and stored.`,
+      message: `Test ${scenario} scenario created successfully in ${mode} mode. ${detectedPatterns.length} patterns detected and stored.`,
       scenario: scenario,
+      mode: mode,
       patternsDetected: detectedPatterns.length,
+      patterns: detectedPatterns.map(p => ({
+        type: p.type,
+        severity: p.severity
+      }))
     };
   }
 

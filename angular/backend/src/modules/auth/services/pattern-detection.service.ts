@@ -106,6 +106,68 @@ export class PatternDetectionService {
   }
 
   /**
+   * Detect only a specific pattern type (for simple mode testing)
+   * This method runs only the detector for the requested pattern type
+   * @param patternType The specific pattern type to detect
+   * @returns Array of detected patterns of only the specified type
+   */
+  async detectSpecificPattern(
+    patternType: string
+  ): Promise<DetectedPattern[]> {
+    let patterns: DetectedPattern[] = [];
+
+    // Map scenario names to pattern detection methods
+    switch (patternType) {
+      case 'brute_force':
+        patterns = await this.detectBruteForceAttempts();
+        break;
+      case 'distributed_attack':
+        patterns = await this.detectDistributedAttacks();
+        break;
+      case 'credential_stuffing':
+        // Note: credential stuffing uses same detector as brute force
+        // but with different thresholds - for simple mode, we'll
+        // tag it specifically
+        patterns = await this.detectBruteForceAttempts();
+        patterns.forEach(p => {
+          if (p.details.includes('multiple different emails')) {
+            p.type = PatternType.CREDENTIAL_STUFFING;
+          }
+        });
+        break;
+      case 'rapid_account_switching':
+      case 'account_switching':
+        patterns = await this.detectRapidAccountSwitching();
+        break;
+      case 'ip_hopping':
+        patterns = await this.detectIPHopping();
+        break;
+      case 'suspicious_location':
+        patterns = await this.detectSuspiciousLocations();
+        break;
+      case 'time_anomaly':
+        patterns = await this.detectTimeAnomalies();
+        break;
+      default:
+        console.error(`Unknown pattern type: ${patternType}`);
+        return [];
+    }
+
+    // Store the detected patterns
+    const storedPatterns: DetectedPattern[] = [];
+    for (const pattern of patterns) {
+      const stored = await this.storePatternWithGrouping(pattern);
+      if (stored) {
+        storedPatterns.push(
+          this.transformStoredPatternToDetectedPattern(stored),
+        );
+      }
+    }
+
+    return storedPatterns;
+  }
+
+  /**
    * UNIFIED PATTERN RETRIEVAL: Get all patterns from single data source with optional filtering
    * This method serves as the single source of truth for all pattern queries
    */
@@ -509,181 +571,304 @@ export class PatternDetectionService {
       | 'ip_hopping'
       | 'suspicious_location'
       | 'time_anomaly',
+    mode: 'simple' | 'enhanced' = 'enhanced',
   ): Promise<void> {
     const now = new Date();
 
     switch (scenarioType) {
       case 'brute_force':
-        // Create 8 failed attempts from same IP in last 10 minutes
-        for (let i = 0; i < 8; i++) {
-          const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
-          await this.createTestAttempt({
-            ipAddress: '192.168.100.50',
-            emailAttempted: `test${i % 3}@example.com`, // Rotate between 3 emails
-            status: 'failed',
-            attemptedAt: attemptTime,
-            userAgent: 'Mozilla/5.0 (Test Browser)',
-            failureReason: 'invalid_credentials',
-          });
+        if (mode === 'simple') {
+          // Simple mode: Minimal data that ONLY triggers brute force
+          const simpleIP = '192.168.200.1';  // Use unique IP range for simple tests
+          const simpleEmail = 'bruteforce.simple@test.example.com';
+          
+          // Create exactly 6 failed attempts (just above threshold of 5)
+          for (let i = 0; i < 6; i++) {
+            const attemptTime = new Date(now.getTime() - i * 120000); // 2 minutes apart
+            await this.createTestAttempt({
+              ipAddress: simpleIP,
+              emailAttempted: simpleEmail,
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'Simple-Test-Agent/1.0',
+              failureReason: 'invalid_credentials',
+            });
+          }
+        } else {
+          // Enhanced mode: existing code
+          for (let i = 0; i < 8; i++) {
+            const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
+            await this.createTestAttempt({
+              ipAddress: '192.168.100.50',
+              emailAttempted: `test${i % 3}@example.com`, // Rotate between 3 emails
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'Mozilla/5.0 (Test Browser)',
+              failureReason: 'invalid_credentials',
+            });
+          }
         }
         break;
 
       case 'distributed_attack':
-        // Create attempts for same email from 4 different IPs
-        const targetEmail = 'admin@example.com';
-        const ips = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
-        for (let i = 0; i < ips.length; i++) {
-          const attemptTime = new Date(now.getTime() - i * 300000); // 5 minutes apart
-          await this.createTestAttempt({
-            ipAddress: ips[i],
-            emailAttempted: targetEmail,
-            status: Math.random() > 0.5 ? 'failed' : 'success',
-            attemptedAt: attemptTime,
-            userAgent: `Mozilla/5.0 (Test Browser ${i})`,
-            failureReason:
-              Math.random() > 0.5 ? 'invalid_credentials' : undefined,
-          });
+        if (mode === 'simple') {
+          // Simple mode: Exactly 4 IPs (minimum for distributed) with same email
+          const targetEmail = 'distributed.simple@test.example.com';
+          const simpleIPs = ['10.200.0.1', '10.200.0.2', '10.200.0.3', '10.200.0.4'];
+          
+          for (let i = 0; i < simpleIPs.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 600000); // 10 minutes apart
+            await this.createTestAttempt({
+              ipAddress: simpleIPs[i],
+              emailAttempted: targetEmail,
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: `Simple-Test-Agent/${i}`,
+              failureReason: 'invalid_credentials',
+            });
+          }
+        } else {
+          // Enhanced mode: existing code
+          const targetEmail = 'admin@example.com';
+          const ips = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
+          for (let i = 0; i < ips.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 300000); // 5 minutes apart
+            await this.createTestAttempt({
+              ipAddress: ips[i],
+              emailAttempted: targetEmail,
+              status: Math.random() > 0.5 ? 'failed' : 'success',
+              attemptedAt: attemptTime,
+              userAgent: `Mozilla/5.0 (Test Browser ${i})`,
+              failureReason:
+                Math.random() > 0.5 ? 'invalid_credentials' : undefined,
+            });
+          }
         }
         break;
 
       case 'credential_stuffing':
-        // Create attempts with many different emails from same IP
-        const stuffingIP = '172.16.0.100';
-        const emails = [
-          'admin@test.com',
-          'user@test.com',
-          'manager@test.com',
-          'support@test.com',
-          'info@test.com',
-          'sales@test.com',
-          'contact@test.com',
-          'help@test.com',
-          'service@test.com',
-          'team@test.com',
-          'office@test.com',
-          'staff@test.com',
-        ];
-        for (let i = 0; i < emails.length; i++) {
-          const attemptTime = new Date(now.getTime() - i * 30000); // 30 seconds apart
-          await this.createTestAttempt({
-            ipAddress: stuffingIP,
-            emailAttempted: emails[i],
-            status: 'failed',
-            attemptedAt: attemptTime,
-            userAgent: 'curl/7.68.0',
-            failureReason: 'invalid_credentials',
-          });
+        if (mode === 'simple') {
+          // Simple mode: Many different emails from one IP
+          const stuffingIP = '192.168.201.1';
+          const emails = [
+            'user1.simple@test.com', 'user2.simple@test.com', 'user3.simple@test.com',
+            'user4.simple@test.com', 'user5.simple@test.com', 'user6.simple@test.com',
+            'user7.simple@test.com', 'user8.simple@test.com', 'user9.simple@test.com',
+            'user10.simple@test.com'
+          ];
+          
+          for (let i = 0; i < emails.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 30000); // 30 seconds apart
+            await this.createTestAttempt({
+              ipAddress: stuffingIP,
+              emailAttempted: emails[i],
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'Simple-Test-Agent/1.0',
+              failureReason: 'invalid_credentials',
+            });
+          }
+        } else {
+          // Enhanced mode: Create attempts with many different emails from same IP
+          const stuffingIP = '172.16.0.100';
+          const emails = [
+            'admin@test.com',
+            'user@test.com',
+            'manager@test.com',
+            'support@test.com',
+            'info@test.com',
+            'sales@test.com',
+            'contact@test.com',
+            'help@test.com',
+            'service@test.com',
+            'team@test.com',
+            'office@test.com',
+            'staff@test.com',
+          ];
+          for (let i = 0; i < emails.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 30000); // 30 seconds apart
+            await this.createTestAttempt({
+              ipAddress: stuffingIP,
+              emailAttempted: emails[i],
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'curl/7.68.0',
+              failureReason: 'invalid_credentials',
+            });
+          }
         }
         break;
 
       case 'account_switching':
-        // Create attempts with multiple different emails from same IP
-        const switchingIP = '203.0.113.10';
-        const switchEmails = [
-          'alice@corp.com',
-          'bob@corp.com',
-          'charlie@corp.com',
-          'diana@corp.com',
-        ];
-        for (let i = 0; i < switchEmails.length; i++) {
-          const attemptTime = new Date(now.getTime() - i * 120000); // 2 minutes apart
-          await this.createTestAttempt({
-            ipAddress: switchingIP,
-            emailAttempted: switchEmails[i],
-            status: Math.random() > 0.3 ? 'failed' : 'success',
-            attemptedAt: attemptTime,
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            failureReason:
-              Math.random() > 0.7 ? 'invalid_credentials' : undefined,
-          });
+        if (mode === 'simple') {
+          // Simple mode: 4 different accounts from same IP
+          const switchingIP = '192.168.202.1';
+          const simpleEmails = [
+            'alice.simple@test.com', 'bob.simple@test.com',
+            'charlie.simple@test.com', 'diana.simple@test.com'
+          ];
+          
+          for (let i = 0; i < simpleEmails.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 90000); // 1.5 minutes apart
+            await this.createTestAttempt({
+              ipAddress: switchingIP,
+              emailAttempted: simpleEmails[i],
+              status: 'success',  // All successful to avoid brute force
+              attemptedAt: attemptTime,
+              userAgent: 'Simple-Test-Agent/1.0',
+            });
+          }
+        } else {
+          // Enhanced mode: Create attempts with multiple different emails from same IP
+          const switchingIP = '203.0.113.10';
+          const switchEmails = [
+            'alice@corp.com',
+            'bob@corp.com',
+            'charlie@corp.com',
+            'diana@corp.com',
+          ];
+          for (let i = 0; i < switchEmails.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 120000); // 2 minutes apart
+            await this.createTestAttempt({
+              ipAddress: switchingIP,
+              emailAttempted: switchEmails[i],
+              status: Math.random() > 0.3 ? 'failed' : 'success',
+              attemptedAt: attemptTime,
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+              failureReason:
+                Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+            });
+          }
         }
         break;
 
       case 'ip_hopping':
-        // Create attempts from rapidly changing IP addresses for same user
-        const hoppingEmail = 'target@example.com';
-        const hoppingIPs = [
-          '10.1.1.1',
-          '10.1.1.2',
-          '10.1.1.3',
-          '10.1.1.4',
-          '10.1.1.5',
-          '10.1.1.6',
-          '10.1.1.7',
-          '10.1.1.8',
-          '10.1.1.9',
-          '10.1.1.10',
-        ];
-        for (let i = 0; i < hoppingIPs.length; i++) {
-          const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
-          await this.createTestAttempt({
-            ipAddress: hoppingIPs[i],
-            emailAttempted: hoppingEmail,
-            status: Math.random() > 0.6 ? 'failed' : 'success',
-            attemptedAt: attemptTime,
-            userAgent: `Mozilla/5.0 (IP Hopping Test ${i})`,
-            failureReason:
-              Math.random() > 0.6 ? 'invalid_credentials' : undefined,
-          });
+        if (mode === 'simple') {
+          // Simple mode: Same email from 3 different IPs in short time
+          const hoppingEmail = 'iphopper.simple@test.example.com';
+          const simpleHoppingIPs = ['10.201.1.1', '10.201.1.2', '10.201.1.3'];
+          
+          for (let i = 0; i < simpleHoppingIPs.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 180000); // 3 minutes apart
+            await this.createTestAttempt({
+              ipAddress: simpleHoppingIPs[i],
+              emailAttempted: hoppingEmail,
+              status: 'success',
+              attemptedAt: attemptTime,
+              userAgent: 'Simple-Test-Agent/1.0',
+            });
+          }
+        } else {
+          // Enhanced mode: Create attempts from rapidly changing IP addresses for same user
+          const hoppingEmail = 'target@example.com';
+          const hoppingIPs = [
+            '10.1.1.1',
+            '10.1.1.2',
+            '10.1.1.3',
+            '10.1.1.4',
+            '10.1.1.5',
+            '10.1.1.6',
+            '10.1.1.7',
+            '10.1.1.8',
+            '10.1.1.9',
+            '10.1.1.10',
+          ];
+          for (let i = 0; i < hoppingIPs.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
+            await this.createTestAttempt({
+              ipAddress: hoppingIPs[i],
+              emailAttempted: hoppingEmail,
+              status: Math.random() > 0.6 ? 'failed' : 'success',
+              attemptedAt: attemptTime,
+              userAgent: `Mozilla/5.0 (IP Hopping Test ${i})`,
+              failureReason:
+                Math.random() > 0.6 ? 'invalid_credentials' : undefined,
+            });
+          }
         }
         break;
 
       case 'suspicious_location':
-        // Create multiple attempts from SAME suspicious foreign IP to trigger indicators
-        const suspiciousIP = '1.2.3.4'; // Confirmed foreign IP (not in private ranges)
-        const suspiciousEmails = [
-          'user1@company.com',
-          'user2@company.com',
-          'admin@company.com',
-          'manager@company.com',
-        ];
-
-        console.log(
-          `[DEBUG] Creating suspicious location test data for IP: ${suspiciousIP}`,
-        );
-
-        // Create multiple failed attempts from same IP (triggers multiple_failures)
-        for (let i = 0; i < 4; i++) {
-          const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
+        if (mode === 'simple') {
+          // Simple mode: Single attempt from known suspicious IP
           await this.createTestAttempt({
-            ipAddress: suspiciousIP,
-            emailAttempted: suspiciousEmails[i],
-            status: 'failed', // All failed to trigger multiple_failures indicator
-            attemptedAt: attemptTime,
-            userAgent: 'Mozilla/5.0 (Suspicious Location Test)',
-            failureReason: 'invalid_credentials',
+            ipAddress: '45.67.89.12',  // Known VPN/proxy range
+            emailAttempted: 'location.simple@test.example.com',
+            status: 'success',
+            attemptedAt: now,
+            userAgent: 'Simple-Test-Agent/1.0 (VPN)',
           });
+        } else {
+          // Enhanced mode: Create multiple attempts from SAME suspicious foreign IP to trigger indicators
+          const suspiciousIP = '1.2.3.4'; // Confirmed foreign IP (not in private ranges)
+          const suspiciousEmails = [
+            'user1@company.com',
+            'user2@company.com',
+            'admin@company.com',
+            'manager@company.com',
+          ];
+
           console.log(
-            `[DEBUG] Created attempt ${i + 1}/4 for ${suspiciousEmails[i]} from ${suspiciousIP}`,
+            `[DEBUG] Creating suspicious location test data for IP: ${suspiciousIP}`,
+          );
+
+          // Create multiple failed attempts from same IP (triggers multiple_failures)
+          for (let i = 0; i < 4; i++) {
+            const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
+            await this.createTestAttempt({
+              ipAddress: suspiciousIP,
+              emailAttempted: suspiciousEmails[i],
+              status: 'failed', // All failed to trigger multiple_failures indicator
+              attemptedAt: attemptTime,
+              userAgent: 'Mozilla/5.0 (Suspicious Location Test)',
+              failureReason: 'invalid_credentials',
+            });
+            console.log(
+              `[DEBUG] Created attempt ${i + 1}/4 for ${suspiciousEmails[i]} from ${suspiciousIP}`,
+            );
+          }
+
+          console.log(
+            `[DEBUG] Test data created: 4 failed attempts from foreign IP ${suspiciousIP} on 4 different emails`,
+          );
+          console.log(
+            `[DEBUG] Expected indicators: foreign_ip (IP not private), multiple_failures (4 failed >= 3), multiple_accounts (4 emails >= 3)`,
           );
         }
-
-        console.log(
-          `[DEBUG] Test data created: 4 failed attempts from foreign IP ${suspiciousIP} on 4 different emails`,
-        );
-        console.log(
-          `[DEBUG] Expected indicators: foreign_ip (IP not private), multiple_failures (4 failed >= 3), multiple_accounts (4 emails >= 3)`,
-        );
         break;
 
       case 'time_anomaly':
-        // Create login attempts at unusual hours (2-4 AM)
-        const anomalyEmail = 'nightshift@example.com';
-        const anomalyIP = '192.168.1.100';
-        const baseTime = new Date();
-        baseTime.setHours(3, 0, 0, 0); // 3 AM today
-
-        for (let i = 0; i < 6; i++) {
-          const attemptTime = new Date(baseTime.getTime() - i * 86400000); // 1 day apart, all at 3 AM
+        if (mode === 'simple') {
+          // Simple mode: Login at unusual time (3 AM local)
+          const anomalyTime = new Date();
+          anomalyTime.setHours(3, 0, 0, 0);  // 3:00 AM
+          
           await this.createTestAttempt({
-            ipAddress: anomalyIP,
-            emailAttempted: anomalyEmail,
-            status: Math.random() > 0.3 ? 'success' : 'failed',
-            attemptedAt: attemptTime,
-            userAgent: 'Mozilla/5.0 (Time Anomaly Test)',
-            failureReason:
-              Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+            ipAddress: '192.168.203.1',
+            emailAttempted: 'nightowl.simple@test.example.com',
+            status: 'success',
+            attemptedAt: anomalyTime,
+            userAgent: 'Simple-Test-Agent/1.0',
           });
+        } else {
+          // Enhanced mode: Create login attempts at unusual hours (2-4 AM)
+          const anomalyEmail = 'nightshift@example.com';
+          const anomalyIP = '192.168.1.100';
+          const baseTime = new Date();
+          baseTime.setHours(3, 0, 0, 0); // 3 AM today
+
+          for (let i = 0; i < 6; i++) {
+            const attemptTime = new Date(baseTime.getTime() - i * 86400000); // 1 day apart, all at 3 AM
+            await this.createTestAttempt({
+              ipAddress: anomalyIP,
+              emailAttempted: anomalyEmail,
+              status: Math.random() > 0.3 ? 'success' : 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'Mozilla/5.0 (Time Anomaly Test)',
+              failureReason:
+                Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+            });
+          }
         }
         break;
     }

@@ -104,9 +104,11 @@ export class PatternDetectionService {
 
   /**
    * Create test pattern for testing purposes
+   * @param patternType The type of pattern to create test data for
+   * @param mode 'simple' for isolated patterns, 'enhanced' for realistic multi-pattern scenarios
    */
-  createTestPattern(patternType: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/patterns/test/${patternType}`, {})
+  createTestPattern(patternType: string, mode: 'simple' | 'enhanced' = 'simple'): Observable<any> {
+    return this.http.post(`${this.apiUrl}/patterns/test/${patternType}`, { mode })
       .pipe(catchError(this.handleError));
   }
 

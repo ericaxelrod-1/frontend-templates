@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -8,6 +9,9 @@ import { MatSortModule } from '@angular/material/sort';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatCardModule } from '@angular/material/card';
@@ -33,6 +37,10 @@ import { Pattern, PatternDetectionFilters, PaginatedResponse } from '../login-mo
     MatDividerModule,
     MatMenuModule,
     MatCardModule,
+    FormsModule,
+    MatButtonToggleModule,
+    MatTooltipModule,
+    MatExpansionModule,
     PatternDetectionFiltersComponent
   ]
 })
@@ -70,6 +78,58 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
   
   // Test data state
   isCreatingTestData = false;
+  
+  // Test mode state - controls whether to use simple or enhanced test data
+  testMode: 'simple' | 'enhanced' = 'simple';
+  
+  // Expected test results for tooltips - maps each test type to expected patterns
+  testExpectations = {
+    simple: {
+      brute_force: ['Brute Force (1 pattern)'],
+      distributed_attack: ['Distributed Attack (1 pattern)'],
+      credential_stuffing: ['Credential Stuffing (1 pattern)'],
+      rapid_account_switching: ['Rapid Account Switching (1 pattern)'],
+      ip_hopping: ['IP Hopping (1 pattern)'],
+      suspicious_location: ['Suspicious Location (1 pattern)'],
+      time_anomaly: ['Time Anomaly (1 pattern)']
+    },
+    enhanced: {
+      brute_force: [
+        'Brute Force (1 pattern)',
+        'Suspicious Location (2-3 patterns)',
+        'Rapid Account Switching (1 pattern)'
+      ],
+      distributed_attack: [
+        'Distributed Attack (1 pattern)',
+        'Suspicious Location (4 patterns)',
+        'IP Hopping (1 pattern)'
+      ],
+      credential_stuffing: [
+        'Credential Stuffing (1 pattern)',
+        'Brute Force (1 pattern)',
+        'Suspicious Location (1 pattern)'
+      ],
+      rapid_account_switching: [
+        'Rapid Account Switching (1 pattern)',
+        'Suspicious Location (1 pattern)',
+        'Brute Force (1 pattern)'
+      ],
+      ip_hopping: [
+        'IP Hopping (1 pattern)',
+        'Suspicious Location (3-5 patterns)',
+        'Distributed Attack (1 pattern)',
+        'Rapid Account Switching (1-2 patterns)'
+      ],
+      suspicious_location: [
+        'Suspicious Location (1-3 patterns)',
+        'Time Anomaly (1 pattern)'
+      ],
+      time_anomaly: [
+        'Time Anomaly (1 pattern)',
+        'Suspicious Location (1 pattern)'
+      ]
+    }
+  } as const;
 
   constructor(
     private patternDetectionService: PatternDetectionService,
@@ -92,6 +152,19 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  /**
+   * Get tooltip text showing expected patterns for a test button
+   * @param patternType The type of pattern test (e.g., 'ip_hopping')
+   * @returns Formatted tooltip text listing expected patterns
+   */
+  getTestTooltip(patternType: string): string {
+    const expectations = this.testExpectations[this.testMode][patternType as keyof typeof this.testExpectations.simple];
+    if (!expectations) {
+      return 'No expectations available for this pattern type';
+    }
+    return `This test will create:\n${expectations.join('\n')}`;
   }
 
   private checkPermissions(): void {
@@ -252,7 +325,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
   // Test data methods
   createTestBruteForce(): void {
     this.isCreatingTestData = true;
-    this.patternDetectionService.createTestPattern('brute_force')
+    this.patternDetectionService.createTestPattern('brute_force', this.testMode)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -269,7 +342,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestDistributedAttack(): void {
     this.isCreatingTestData = true;
-    this.patternDetectionService.createTestPattern('distributed_attack')
+    this.patternDetectionService.createTestPattern('distributed_attack', this.testMode)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -286,7 +359,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestCredentialStuffing(): void {
     this.isCreatingTestData = true;
-    this.patternDetectionService.createTestPattern('credential_stuffing')
+    this.patternDetectionService.createTestPattern('credential_stuffing', this.testMode)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -303,7 +376,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestRapidAccountSwitching(): void {
     this.isCreatingTestData = true;
-    this.patternDetectionService.createTestPattern('rapid_account_switching')
+    this.patternDetectionService.createTestPattern('rapid_account_switching', this.testMode)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -320,7 +393,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestIpHopping(): void {
     this.isCreatingTestData = true;
-    this.patternDetectionService.createTestPattern('ip_hopping')
+    this.patternDetectionService.createTestPattern('ip_hopping', this.testMode)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -337,7 +410,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestSuspiciousLocation(): void {
     this.isCreatingTestData = true;
-    this.patternDetectionService.createTestPattern('suspicious_location')
+    this.patternDetectionService.createTestPattern('suspicious_location', this.testMode)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -354,7 +427,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   createTestTimeAnomaly(): void {
     this.isCreatingTestData = true;
-    this.patternDetectionService.createTestPattern('time_anomaly')
+    this.patternDetectionService.createTestPattern('time_anomaly', this.testMode)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {

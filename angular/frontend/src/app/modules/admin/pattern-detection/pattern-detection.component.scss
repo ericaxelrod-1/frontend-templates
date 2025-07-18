@@ -268,4 +268,130 @@
       display: none;
     }
   }
+}
+
+// Test Mode Styles
+.test-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+  
+  h3 {
+    margin: 0;
+  }
+}
+
+.test-mode-toggle {
+  border: 1px solid rgba(var(--mdc-theme-primary-rgb), 0.5);
+  border-radius: 4px;
+  
+  mat-button-toggle {
+    &.mat-button-toggle-checked {
+      background-color: var(--mdc-theme-primary);
+      color: white;
+      
+      mat-icon {
+        color: white;
+      }
+    }
+  }
+}
+
+.test-pattern-button {
+  position: relative;
+  overflow: visible;
+  
+  .multi-pattern-indicator {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #ff9800;
+    color: white;
+    border-radius: 50%;
+    padding: 2px;
+    font-size: 16px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse 2s infinite;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@keyframes pulse {
+  0% { 
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  50% { 
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.5);
+  }
+  100% { 
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.test-mode-explanation {
+  margin-top: 1rem;
+  
+  .mode-explanation-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 1rem 0;
+    
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .mode-section {
+    h4 {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--mdc-theme-primary);
+      margin-bottom: 0.5rem;
+    }
+    
+    ul {
+      margin-left: 1.5rem;
+      line-height: 1.8;
+    }
+    
+    &.simple-mode-section {
+      mat-icon {
+        color: #4caf50;
+      }
+    }
+    
+    &.enhanced-mode-section {
+      mat-icon {
+        color: #ff9800;
+      }
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .test-section-header {
+    flex-direction: column;
+    align-items: stretch;
+    
+    .test-mode-toggle {
+      width: 100%;
+      
+      mat-button-toggle {
+        flex: 1;
+      }
+    }
+  }
 } 

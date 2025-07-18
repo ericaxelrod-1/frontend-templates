@@ -138,67 +138,201 @@
 
   <!-- Test Data Generation Section -->
   @if (hasPermission) {
-    <div class="test-data-section">
-      <h3>Test Pattern Generation</h3>
-      <div class="test-buttons">
-        <button mat-raised-button color="accent" 
+    <div class="test-data-section" id="test-data-section">
+      <div class="test-section-header" id="test-section-header">
+        <h3>Test Pattern Generation</h3>
+        
+        <!-- Mode Toggle -->
+        <mat-button-toggle-group 
+          [(ngModel)]="testMode" 
+          class="test-mode-toggle"
+          id="test-mode-toggle"
+          aria-label="Test mode selection">
+          
+          <mat-button-toggle 
+            value="simple" 
+            id="test-mode-simple"
+            [matTooltip]="'Simple Mode: Creates isolated test data that triggers only the selected pattern type. Ideal for testing individual detection algorithms.'"
+            matTooltipPosition="above">
+            <mat-icon>looks_one</mat-icon>
+            Simple
+          </mat-button-toggle>
+          
+          <mat-button-toggle 
+            value="enhanced"
+            id="test-mode-enhanced"
+            [matTooltip]="'Enhanced Mode: Creates realistic attack scenarios that may trigger multiple related patterns. This simulates real-world security incidents where attackers use multiple techniques simultaneously.'"
+            matTooltipPosition="above">
+            <mat-icon>layers</mat-icon>
+            Enhanced
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
+      <div class="test-buttons" id="test-buttons-container">
+        <!-- Brute Force Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-brute-force"
                 (click)="createTestBruteForce()"
-                [disabled]="isCreatingTestData">
-          <mat-icon>security</mat-icon>
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('brute_force')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>lock_open</mat-icon>
           Brute Force
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator" 
+                      matTooltip="Will trigger multiple patterns">
+              warning
+            </mat-icon>
+          }
         </button>
-        
-        <button mat-raised-button color="accent" 
+
+        <!-- Distributed Attack Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-distributed-attack"
                 (click)="createTestDistributedAttack()"
-                [disabled]="isCreatingTestData">
-          <mat-icon>network_check</mat-icon>
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('distributed_attack')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>share</mat-icon>
           Distributed Attack
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
         </button>
-        
-        <button mat-raised-button color="accent" 
+
+        <!-- Credential Stuffing Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-credential-stuffing"
                 (click)="createTestCredentialStuffing()"
-                [disabled]="isCreatingTestData">
-          <mat-icon>vpn_key</mat-icon>
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('credential_stuffing')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>list</mat-icon>
           Credential Stuffing
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
         </button>
-        
-        <button mat-raised-button color="accent" 
+
+        <!-- Rapid Account Switching Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-rapid-switching"
                 (click)="createTestRapidAccountSwitching()"
-                [disabled]="isCreatingTestData">
-          <mat-icon>switch_account</mat-icon>
-          Account Switching
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('rapid_account_switching')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>swap_horiz</mat-icon>
+          Rapid Account Switching
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
         </button>
-        
-        <button mat-raised-button color="accent" 
+
+        <!-- IP Hopping Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-ip-hopping"
                 (click)="createTestIpHopping()"
-                [disabled]="isCreatingTestData">
-          <mat-icon>router</mat-icon>
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('ip_hopping')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>shuffle</mat-icon>
           IP Hopping
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
         </button>
-        
-        <button mat-raised-button color="accent" 
+
+        <!-- Suspicious Location Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-suspicious-location"
                 (click)="createTestSuspiciousLocation()"
-                [disabled]="isCreatingTestData">
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('suspicious_location')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
           <mat-icon>location_on</mat-icon>
           Suspicious Location
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
         </button>
-        
-        <button mat-raised-button color="accent" 
+
+        <!-- Time Anomaly Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-time-anomaly"
                 (click)="createTestTimeAnomaly()"
-                [disabled]="isCreatingTestData">
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('time_anomaly')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
           <mat-icon>schedule</mat-icon>
           Time Anomaly
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
         </button>
-        
-        <mat-divider></mat-divider>
-        
-        <button mat-raised-button color="warn"
+
+        <mat-divider vertical></mat-divider>
+
+        <!-- Clear Test Data Button -->
+        <button mat-raised-button 
+                color="warn"
+                id="test-button-clear-data"
                 (click)="clearAllData()"
                 [disabled]="isCreatingTestData">
-          <mat-icon>delete_sweep</mat-icon>
-          Clear All Data
+          <mat-icon>delete</mat-icon>
+          Clear Test Data
         </button>
       </div>
+
+      <!-- Mode Explanation Panel -->
+      <mat-expansion-panel class="test-mode-explanation" id="test-mode-explanation-panel">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>info</mat-icon>
+            Understanding Test Modes
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+        
+        <div class="mode-explanation-content">
+          <div class="mode-section simple-mode-section">
+            <h4><mat-icon>looks_one</mat-icon> Simple Mode</h4>
+            <p>Creates minimal, isolated test data designed to trigger only the selected pattern type. 
+               Perfect for:</p>
+            <ul>
+              <li>Testing individual detection algorithms</li>
+              <li>Debugging specific pattern logic</li>
+              <li>Clean demonstrations</li>
+              <li>Unit testing pattern detectors</li>
+            </ul>
+          </div>
+          
+          <div class="mode-section enhanced-mode-section">
+            <h4><mat-icon>layers</mat-icon> Enhanced Mode</h4>
+            <p>Creates realistic attack scenarios that naturally trigger multiple related patterns. 
+               This reflects real-world behavior where:</p>
+            <ul>
+              <li>Attackers use multiple techniques simultaneously</li>
+              <li>One attack method often exhibits characteristics of others</li>
+              <li>Security systems must detect correlated threats</li>
+              <li>Patterns overlap in realistic attack scenarios</li>
+            </ul>
+          </div>
+        </div>
+      </mat-expansion-panel>
     </div>
   }
 </div> 
