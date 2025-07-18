@@ -2,6 +2,9 @@
 node_modules/
 **/node_modules/
 
+#deprecated directories
+.delete/
+
 # Build/dist directories
 dist/
 **/dist/
