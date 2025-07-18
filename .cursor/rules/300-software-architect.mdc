@@ -1,3 +1,8 @@
+---
+description: "Strict architectecture requirements for creating project plans and tasks"
+tags: ["architect", "project planning", "project management"]
+priority: 5
+---
 
 # Expert Software Architect Rule
 
@@ -71,6 +76,7 @@ Provide production-ready code snippets that include:
 - [`@151-angular-infinite-loop-prevention.mdc`](.cursor/rules/151-angular-infinite-loop-prevention.mdc) - Loop prevention
 - [`@200-typescript.mdc`](.cursor/rules/200-typescript.mdc) - TypeScript standards
 - [`@package-management.mdc`](.cursor/rules/package-management.mdc) - Package management
+- [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc) - Testing standards and implementation
 
 ### 6. Comprehensive Documentation Requirements
 
@@ -830,10 +836,10 @@ EXTERNAL API CALLS:
    - State management
 
 7. **Testing Requirements**
-   - Unit test specifications
-   - Integration test scenarios
-   - E2E test cases
-   - Test data requirements
+   - Unit test specifications per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+   - Integration test scenarios per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+   - E2E test cases per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+   - Test data requirements per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
 
 8. **Deployment Checklist**
    - Migration execution order
@@ -1245,7 +1251,7 @@ describe('UserFormComponent', () => {
 })
 ```
 
-**Coverage Requirements**:
+**Coverage Requirements per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)**:
 - Minimum 80% code coverage
 - 100% coverage for critical business logic
 - 100% coverage for security-related code
@@ -1253,8 +1259,8 @@ describe('UserFormComponent', () => {
 
 #### Integration Testing References
 - Defer to [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc) for E2E test specifications
-- Ensure test database configuration is documented
-- Provide test data seeding requirements
+- Ensure test database configuration is documented per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- Provide test data seeding requirements per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
 
 ### 10. Rule Compliance Requirements
 
@@ -1425,7 +1431,7 @@ Success Criteria:
 - All CRUD operations functional with <200ms response time
 - Email verification workflow completes successfully
 - Role-based permissions properly enforced
-- 100% test coverage for critical paths
+- 100% test coverage for critical paths per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
 
 ## Prerequisites
 
@@ -1950,36 +1956,36 @@ Each configuration file must include:
 
 ## Testing Requirements
 
-⚠️ **MANDATORY**: Testing must be implemented AFTER task completion
+⚠️ **MANDATORY**: Testing must be implemented AFTER task completion following [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
 
 ### Testing Implementation Order
 1. **Complete all functional implementation first**
 2. **Verify all functionality works correctly**
-3. **Then create comprehensive test suite**
+3. **Then create comprehensive test suite per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)**
 
 ### Required Test Documentation
-For each implementation plan, document:
+For each implementation plan, document per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc):
 
 #### Unit Test Requirements
-- **Test file locations**: Follow [`@PROJECT_STRUCTURE.md`](angular/docs/PROJECT_STRUCTURE.md) structure
-- **Test coverage requirements**: Minimum 80% coverage for critical business logic
-- **Test data setup**: Complete test data and mock objects
-- **Test scenarios**: All success and failure cases
+- **Test file locations**: Follow [`@PROJECT_STRUCTURE.md`](angular/docs/PROJECT_STRUCTURE.md) structure and [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Test coverage requirements**: Minimum 80% coverage for critical business logic per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Test data setup**: Complete test data and mock objects per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Test scenarios**: All success and failure cases per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
 
 #### Integration Test Requirements
-- **API endpoint testing**: All endpoints with various input scenarios
-- **Database integration**: All database operations with rollback
-- **Service integration**: All service-to-service communication
-- **Authentication testing**: All auth-protected endpoints
+- **API endpoint testing**: All endpoints with various input scenarios per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Database integration**: All database operations with rollback per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Service integration**: All service-to-service communication per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Authentication testing**: All auth-protected endpoints per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
 
 #### End-to-End Test Requirements
-- **User workflow testing**: Complete user journeys from login to logout
-- **Cross-browser compatibility**: Testing on major browsers
-- **Responsive design testing**: Testing on different screen sizes
-- **Performance testing**: Load testing for critical operations
+- **User workflow testing**: Complete user journeys from login to logout per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Cross-browser compatibility**: Testing on major browsers per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Responsive design testing**: Testing on different screen sizes per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
+- **Performance testing**: Load testing for critical operations per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc)
 
 ### Test Implementation Documentation
-The implementation plan must include:
+The implementation plan must include per [`@301-software-testing.mdc`](.cursor/rules/301-software-testing.mdc):
 - **Complete test file contents** (no partial examples)
 - **All test cases with expected results**
 - **Test data setup and teardown procedures**
