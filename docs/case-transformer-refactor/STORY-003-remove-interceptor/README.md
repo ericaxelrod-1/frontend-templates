@@ -12,9 +12,9 @@ With the `SnakeNamingStrategy` handling `camelCase` <-> `snake_case` mapping aut
 
 | # | Task | Description | Status |
 |---|------|-------------|--------|
-| 1 | [TASK-001](./TASK-001-remove-interceptor-registration.md) | Remove interceptor registration from providers | Open |
-| 2 | [TASK-002](./TASK-002-delete-interceptor-files.md) | Delete interceptor source files | Open |
-| 3 | [TASK-003](./TASK-003-verify-frontend.md) | Verify frontend compiles and runs | Open |
+| 1 | [TASK-001](./TASK-001-remove-interceptor-registration.md) | Remove interceptor registration from providers | Completed |
+| 2 | [TASK-002](./TASK-002-delete-interceptor-files.md) | Delete interceptor source files | Completed |
+| 3 | [TASK-003](./TASK-003-verify-frontend.md) | Verify frontend compiles and runs | Completed |
 
 > [!IMPORTANT]
 > ## ALWAYS DO

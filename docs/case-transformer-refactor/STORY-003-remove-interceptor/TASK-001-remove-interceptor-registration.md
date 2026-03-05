@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Task ID** | STORY-003 / TASK-001 |
-| **Status** | Open |
+| **Status** | Completed |
 | **Story** | STORY-003: Remove the CaseTransformInterceptor from the Frontend |
 | **Description** | Remove the CaseTransformInterceptor from the HTTP interceptor providers array |
 | **Estimated Effort** | 5 minutes |
