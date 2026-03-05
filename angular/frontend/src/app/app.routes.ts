@@ -76,7 +76,7 @@ export const routes: Routes = [
         children: [
           {
             path: '',
-            redirectTo: 'login-monitoring',
+            redirectTo: 'login-attempts',
             pathMatch: 'full'
           },
           {
@@ -84,7 +84,39 @@ export const routes: Routes = [
             loadComponent: () => import('./modules/admin/login-monitoring/login-monitoring.component').then(c => c.LoginMonitoringComponent),
             canActivate: [PermissionGuard],
             data: {
-              permissions: 'system:admin'
+              permissions: 'login-monitoring:read'
+            }
+          },
+          {
+            path: 'login-attempts',
+            loadComponent: () => import('./modules/admin/login-attempts/login-attempts.component').then(c => c.LoginAttemptsComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'login-monitoring:read'
+            }
+          },
+          {
+            path: 'pattern-detection',
+            loadComponent: () => import('./modules/admin/pattern-detection/pattern-detection.component').then(c => c.PatternDetectionComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'login-monitoring:read'
+            }
+          },
+          {
+            path: 'security-alerts',
+            loadComponent: () => import('./modules/admin/security-alerts/security-alerts.component').then(c => c.SecurityAlertsComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'login-monitoring:read'
+            }
+          },
+          {
+            path: 'ip-reputation',
+            loadComponent: () => import('./modules/admin/ip-reputation/ip-reputation.component').then(c => c.IpReputationComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'login-monitoring:read'
             }
           }
         ]

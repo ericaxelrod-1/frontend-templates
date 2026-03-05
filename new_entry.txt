@@ -1,0 +1,38 @@
+
+### BUG-124: Angular Material Best Practices Violations
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-07-07 14:50:24
+- **Description**: Critical Angular Material 18+ implementation violations found in Tasks component using deprecated/non-functional mat-chip color binding patterns that produce no visual effect.
+
+#### Investigation Results (@999-bugfinder)
+- **Primary Issue**: \	asks.component.html\ line 38 uses \[color]=\"getStatusColor(task.status)\"\ on mat-chip which is non-functional in Angular Material 18+
+- **Root Cause**: Angular Material 18+ chips use MDC evolution architecture where \[color]\ property doesn't accept dynamic string values
+- **Current Impact**: Status chips display with default styling, losing visual hierarchy for task status indication
+- **Inconsistency**: Violates established project patterns where other components use \[ngClass]\ approach (login-monitoring, accessibility-tester)
+
+#### Technical Analysis
+- **Invalid Implementation**: \getStatusColor()\ returns \'primary'\, \'accent'\, \'warn'\ which are invalid for MDC evolution chips
+- **Web Research Findings**: 10+ searches confirmed Angular Material 18+ requires CSS custom properties (\--mdc-*\, \--sys-*\) and \[ngClass]\ binding
+- **Best Practice**: Should target internal MDC elements (\.mdc-evolution-chip__action\, \.mdc-evolution-chip__text-label\) with proper CSS variables
+- **Project Pattern**: FEAT-123 was correctly resolved using \[ngClass]\ and CSS targeting MDC internal structure
+
+#### Implementation Requirements
+- **Issues**: 
+  - Replace \[color]\ binding with \[ngClass]\ approach following FEAT-123 pattern
+  - Update \getStatusColor()\ to \getStatusClass()\ returning CSS class names
+  - Implement proper CSS targeting MDC internal elements with Material 3 design tokens
+  - Add status-specific CSS classes using \--mat-sys-*\ variables for theming consistency
+  - Document Angular Material 18+ best practices for future implementations
+
+- **Files To Modify**:
+  - \ngular/frontend/src/app/features/tasks/tasks.component.html\: Replace \[color]\ with \[ngClass]\
+  - \ngular/frontend/src/app/features/tasks/tasks.component.ts\: Update method to return CSS classes
+  - \ngular/frontend/src/app/features/tasks/tasks.component.scss\: Add MDC-compliant status styling
+  - Project documentation: Add Angular Material 18+ implementation guidelines
+
+#### Responsive Design Investigation
+- **BUG-113 Status**: ✅ RESOLVED - All architectural issues fixed, responsive design working correctly
+- **Current State**: Login monitoring component has comprehensive responsive implementation with modern breakpoint system
+- **No Recent Issues**: No responsive design issues found with bug numbers >113

@@ -1,0 +1,338 @@
+<!-- Pattern Detection Dashboard -->
+<div class="pattern-detection-container">
+  <!-- Page Header -->
+  <div class="page-header">
+    <h2>Pattern Detection</h2>
+    <p>Detect and analyze suspicious login patterns</p>
+  </div>
+
+  <!-- Pattern Summary Tiles -->
+  @if (patternSummary && patternSummary.length > 0) {
+    <div class="pattern-tiles-section">
+      <h3>Pattern Summary</h3>
+      <div class="pattern-tiles-grid">
+        @for (summary of patternSummary; track summary.patternType) {
+          <div class="pattern-tile" [class]="getSeverityClass(summary.severity)">
+            <div class="pattern-header">
+              <mat-icon>{{ getPatternIcon(summary.patternType) }}</mat-icon>
+              <h4>{{ getPatternDisplayName(summary.patternType) }}</h4>
+            </div>
+            <div class="pattern-content">
+              <div class="pattern-count">{{ formatPatternCount(summary.count) }}</div>
+              <div class="pattern-severity">{{ summary.severity | uppercase }}</div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Filters Section -->
+  <div class="filters-section">
+    <app-pattern-detection-filters
+      [hasPermission]="hasPermission"
+      [initialFilters]="filterState"
+      [preventInitialEmission]="true"
+      (filtersChanged)="onPatternDetectionFiltersChanged($event)"
+      (filtersReset)="onPatternDetectionFiltersReset()">
+    </app-pattern-detection-filters>
+  </div>
+
+  <!-- Loading State -->
+  @if (loading) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading patterns...</p>
+    </div>
+  }
+
+  <!-- Pattern Detection Table -->
+  @if (!loading && detectedPatterns && detectedPatterns.length > 0) {
+    <div class="table-container">
+      <mat-table [dataSource]="detectedPatterns"
+                 matSort
+                 #patternSort="matSort"
+                 [matSortActive]="patternCurrentSort.column"
+                 [matSortDirection]="patternCurrentSort.direction">
+
+        <!-- Timestamp Column -->
+        <ng-container matColumnDef="timestamp">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Timestamp</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            {{ pattern.timestamp | date:'medium' }}
+          </mat-cell>
+        </ng-container>
+
+        <!-- Type Column -->
+        <ng-container matColumnDef="type">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Type</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            <div class="pattern-type">
+              <mat-icon>{{ getPatternIcon(pattern.type) }}</mat-icon>
+              <span>{{ getPatternDisplayName(pattern.type) }}</span>
+            </div>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Severity Column -->
+        <ng-container matColumnDef="severity">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Severity</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            <div class="severity-container">
+              <div class="severity-indicator" [class]="getSeverityClass(pattern.severity)"></div>
+              <span class="severity-text">{{ pattern.severity | uppercase }}</span>
+            </div>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Description Column -->
+        <ng-container matColumnDef="description">
+          <mat-header-cell *matHeaderCellDef>Description</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            {{ pattern.details }}
+          </mat-cell>
+        </ng-container>
+
+        <!-- Affected Users Column -->
+        <ng-container matColumnDef="affectedUsers">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Affected Users</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            {{ pattern.affectedUsers?.length || 0 }}
+          </mat-cell>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Actions</mat-header-cell>
+          <mat-cell *matCellDef="let pattern">
+            <button mat-icon-button>
+              <mat-icon>more_vert</mat-icon>
+            </button>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Table Headers and Rows -->
+        <mat-header-row *matHeaderRowDef="['timestamp', 'type', 'severity', 'description', 'affectedUsers', 'actions']"></mat-header-row>
+        <mat-row *matRowDef="let row; columns: ['timestamp', 'type', 'severity', 'description', 'affectedUsers', 'actions']"></mat-row>
+      </mat-table>
+
+      <!-- Pagination -->
+      <mat-paginator
+        *ngIf="patternTotalCount > 0"
+        [length]="patternTotalCount"
+        [pageSize]="patternPageSize"
+        [pageSizeOptions]="[5, 10, 25, 50]"
+        (page)="onPatternPageChange($event)">
+      </mat-paginator>
+    </div>
+  }
+
+  <!-- No Data State -->
+  @if (!loading && (!detectedPatterns || detectedPatterns.length === 0)) {
+    <div class="no-data-container">
+      <mat-icon class="no-data-icon">search</mat-icon>
+      <h3>No Patterns Detected</h3>
+      <p>No suspicious patterns match your current filters.</p>
+    </div>
+  }
+
+  <!-- Test Data Generation Section -->
+  @if (hasPermission) {
+    <div class="test-data-section" id="test-data-section">
+      <div class="test-section-header" id="test-section-header">
+        <h3>Test Pattern Generation</h3>
+        
+        <!-- Mode Toggle -->
+        <mat-button-toggle-group 
+          [(ngModel)]="testMode" 
+          class="test-mode-toggle"
+          id="test-mode-toggle"
+          aria-label="Test mode selection">
+          
+          <mat-button-toggle 
+            value="simple" 
+            id="test-mode-simple"
+            [matTooltip]="'Simple Mode: Creates isolated test data that triggers only the selected pattern type. Ideal for testing individual detection algorithms.'"
+            matTooltipPosition="above">
+            <mat-icon>looks_one</mat-icon>
+            Simple
+          </mat-button-toggle>
+          
+          <mat-button-toggle 
+            value="enhanced"
+            id="test-mode-enhanced"
+            [matTooltip]="'Enhanced Mode: Creates realistic attack scenarios that may trigger multiple related patterns. This simulates real-world security incidents where attackers use multiple techniques simultaneously.'"
+            matTooltipPosition="above">
+            <mat-icon>layers</mat-icon>
+            Enhanced
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
+      <div class="test-buttons" id="test-buttons-container">
+        <!-- Brute Force Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-brute-force"
+                (click)="createTestBruteForce()"
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('brute_force')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>lock_open</mat-icon>
+          Brute Force
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator" 
+                      matTooltip="Will trigger multiple patterns">
+              warning
+            </mat-icon>
+          }
+        </button>
+
+        <!-- Distributed Attack Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-distributed-attack"
+                (click)="createTestDistributedAttack()"
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('distributed_attack')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>share</mat-icon>
+          Distributed Attack
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
+        </button>
+
+        <!-- Credential Stuffing Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-credential-stuffing"
+                (click)="createTestCredentialStuffing()"
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('credential_stuffing')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>list</mat-icon>
+          Credential Stuffing
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
+        </button>
+
+        <!-- Rapid Account Switching Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-rapid-switching"
+                (click)="createTestRapidAccountSwitching()"
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('rapid_account_switching')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>swap_horiz</mat-icon>
+          Rapid Account Switching
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
+        </button>
+
+        <!-- IP Hopping Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-ip-hopping"
+                (click)="createTestIpHopping()"
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('ip_hopping')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>shuffle</mat-icon>
+          IP Hopping
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
+        </button>
+
+        <!-- Suspicious Location Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-suspicious-location"
+                (click)="createTestSuspiciousLocation()"
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('suspicious_location')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>location_on</mat-icon>
+          Suspicious Location
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
+        </button>
+
+        <!-- Time Anomaly Button -->
+        <button mat-raised-button 
+                color="accent"
+                id="test-button-time-anomaly"
+                (click)="createTestTimeAnomaly()"
+                [disabled]="isCreatingTestData"
+                [matTooltip]="getTestTooltip('time_anomaly')"
+                matTooltipPosition="above"
+                class="test-pattern-button">
+          <mat-icon>schedule</mat-icon>
+          Time Anomaly
+          @if (testMode === 'enhanced') {
+            <mat-icon class="multi-pattern-indicator">warning</mat-icon>
+          }
+        </button>
+
+        <mat-divider vertical></mat-divider>
+
+        <!-- Clear Test Data Button -->
+        <button mat-raised-button 
+                color="warn"
+                id="test-button-clear-data"
+                (click)="clearAllData()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>delete</mat-icon>
+          Clear Test Data
+        </button>
+      </div>
+
+      <!-- Mode Explanation Panel -->
+      <mat-expansion-panel class="test-mode-explanation" id="test-mode-explanation-panel">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>info</mat-icon>
+            Understanding Test Modes
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+        
+        <div class="mode-explanation-content">
+          <div class="mode-section simple-mode-section">
+            <h4><mat-icon>looks_one</mat-icon> Simple Mode</h4>
+            <p>Creates minimal, isolated test data designed to trigger only the selected pattern type. 
+               Perfect for:</p>
+            <ul>
+              <li>Testing individual detection algorithms</li>
+              <li>Debugging specific pattern logic</li>
+              <li>Clean demonstrations</li>
+              <li>Unit testing pattern detectors</li>
+            </ul>
+          </div>
+          
+          <div class="mode-section enhanced-mode-section">
+            <h4><mat-icon>layers</mat-icon> Enhanced Mode</h4>
+            <p>Creates realistic attack scenarios that naturally trigger multiple related patterns. 
+               This reflects real-world behavior where:</p>
+            <ul>
+              <li>Attackers use multiple techniques simultaneously</li>
+              <li>One attack method often exhibits characteristics of others</li>
+              <li>Security systems must detect correlated threats</li>
+              <li>Patterns overlap in realistic attack scenarios</li>
+            </ul>
+          </div>
+        </div>
+      </mat-expansion-panel>
+    </div>
+  }
+</div> 

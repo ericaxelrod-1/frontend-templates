@@ -1,0 +1,163 @@
+<!-- Security Alerts Dashboard -->
+<div class="security-alerts-container">
+  <!-- Page Header -->
+  <div class="page-header">
+    <h2>Security Alerts</h2>
+    <p>Monitor and manage security alerts and incidents</p>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters-section">
+    <app-security-alerts-filters
+      [hasPermission]="hasPermission"
+      (filtersChanged)="onSecurityAlertsFiltersChanged($event)"
+      (filtersReset)="onSecurityAlertsFiltersReset()">
+    </app-security-alerts-filters>
+  </div>
+
+  <!-- Loading State -->
+  @if (loading) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading security alerts...</p>
+    </div>
+  }
+
+  <!-- Security Alerts Table -->
+  @if (!loading && securityAlerts && securityAlerts.length > 0) {
+    <div class="table-container">
+      <mat-table [dataSource]="securityAlerts"
+                 matSort
+                 #securityAlertsSort="matSort"
+                 [matSortActive]="securityAlertsCurrentSort.column"
+                 [matSortDirection]="securityAlertsCurrentSort.direction">
+
+        <!-- Timestamp Column -->
+        <ng-container matColumnDef="timestamp">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Timestamp</mat-header-cell>
+          <mat-cell *matCellDef="let alert">
+            {{ alert.timestamp | date:'medium' }}
+          </mat-cell>
+        </ng-container>
+
+        <!-- Title Column -->
+        <ng-container matColumnDef="title">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Title</mat-header-cell>
+          <mat-cell *matCellDef="let alert">
+            <div class="alert-title">
+              <mat-icon class="alert-icon">{{ getAlertIcon(alert.type) }}</mat-icon>
+              <span>{{ alert.title }}</span>
+            </div>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Type Column -->
+        <ng-container matColumnDef="type">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Type</mat-header-cell>
+          <mat-cell *matCellDef="let alert">
+            <span class="alert-type">{{ getAlertDisplayType(alert.type) }}</span>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Severity Column -->
+        <ng-container matColumnDef="severity">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Severity</mat-header-cell>
+          <mat-cell *matCellDef="let alert">
+            <div class="severity-container">
+              <div class="severity-indicator" [class]="getSeverityClass(alert.severity)"></div>
+              <span class="severity-text">{{ alert.severity | uppercase }}</span>
+            </div>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Message Column -->
+        <ng-container matColumnDef="message">
+          <mat-header-cell *matHeaderCellDef>Message</mat-header-cell>
+          <mat-cell *matCellDef="let alert">
+            <div class="alert-message">{{ alert.message }}</div>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <mat-header-cell *matHeaderCellDef mat-sort-header>Status</mat-header-cell>
+          <mat-cell *matCellDef="let alert">
+            <span class="status-badge" [class]="getStatusClass(alert.status)">
+              {{ alert.status | uppercase }}
+            </span>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
+          <mat-cell *matCellDef="let alert">
+            <button mat-icon-button [matMenuTriggerFor]="alertMenu">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #alertMenu="matMenu">
+              <button mat-menu-item (click)="acknowledgeAlert(alert.id)">
+                <mat-icon>check</mat-icon>
+                <span>Acknowledge</span>
+              </button>
+              <button mat-menu-item (click)="resolveAlert(alert.id)">
+                <mat-icon>check_circle</mat-icon>
+                <span>Resolve</span>
+              </button>
+              <button mat-menu-item (click)="dismissAlert(alert.id)">
+                <mat-icon>close</mat-icon>
+                <span>Dismiss</span>
+              </button>
+            </mat-menu>
+          </mat-cell>
+        </ng-container>
+
+        <!-- Table Headers and Rows -->
+        <mat-header-row *matHeaderRowDef="['timestamp', 'title', 'type', 'severity', 'message', 'status', 'actions']"></mat-header-row>
+        <mat-row *matRowDef="let row; columns: ['timestamp', 'title', 'type', 'severity', 'message', 'status', 'actions']"></mat-row>
+      </mat-table>
+
+      <!-- Pagination -->
+      <mat-paginator
+        #securityAlertsPaginator
+        [length]="securityAlertsTotalCount"
+        [pageSize]="securityAlertsPageSize"
+        [pageSizeOptions]="[5, 10, 25, 50]"
+        (page)="onSecurityAlertsPageChange($event)">
+      </mat-paginator>
+    </div>
+  }
+
+  <!-- No Data State -->
+  @if (!loading && (!securityAlerts || securityAlerts.length === 0)) {
+    <div class="no-data-container">
+      <mat-icon class="no-data-icon">security</mat-icon>
+      <h3>No Security Alerts</h3>
+      <p>No security alerts match your current filters.</p>
+    </div>
+  }
+
+  <!-- Test Data Generation Section -->
+  @if (hasPermission) {
+    <div class="test-data-section">
+      <h3>Test Data Generation</h3>
+      <div class="test-buttons">
+        <button mat-raised-button color="accent" 
+                (click)="createTestSecurityAlert()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>add_alert</mat-icon>
+          Create Test Alert
+        </button>
+        
+        <mat-divider></mat-divider>
+        
+        <button mat-raised-button color="warn"
+                (click)="clearAllData()"
+                [disabled]="isCreatingTestData">
+          <mat-icon>delete_sweep</mat-icon>
+          Clear All Data
+        </button>
+      </div>
+    </div>
+  }
+</div> 

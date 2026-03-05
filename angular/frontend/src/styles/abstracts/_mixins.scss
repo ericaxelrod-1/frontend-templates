@@ -195,23 +195,45 @@
   }
 }
 
-// Responsive breakpoint mixins
+// Responsive breakpoint mixins for modern mobile-first design
 @mixin respond-to($breakpoint) {
-  @if $breakpoint == 'xs' {
-    @media (max-width: #{vars.$breakpoint-sm - 1px}) { @content; }
+  @if map-has-key(vars.$breakpoints, $breakpoint) {
+    $value: map-get(vars.$breakpoints, $breakpoint);
+    @if $value == 0 {
+      @content;
+    } @else {
+      @media (min-width: $value) {
+        @content;
+      }
+    }
+  } @else {
+    @warn "Invalid breakpoint: #{$breakpoint}. Available breakpoints: #{map-keys(vars.$breakpoints)}";
   }
-  @else if $breakpoint == 'sm' {
-    @media (min-width: #{vars.$breakpoint-sm}) { @content; }
+}
+
+// Range-based responsive mixins for precise control
+@mixin respond-between($min-breakpoint, $max-breakpoint) {
+  $min-value: map-get(vars.$breakpoints, $min-breakpoint);
+  $max-value: map-get(vars.$breakpoints, $max-breakpoint);
+  
+  @if $min-value and $max-value {
+    @media (min-width: $min-value) and (max-width: $max-value - 1px) {
+      @content;
+    }
   }
-  @else if $breakpoint == 'md' {
-    @media (min-width: #{vars.$breakpoint-md}) { @content; }
+}
+
+// Container query mixins for component-level responsiveness
+@mixin container-query($size) {
+  @container (min-width: $size) {
+    @content;
   }
-  @else if $breakpoint == 'lg' {
-    @media (min-width: #{vars.$breakpoint-lg}) { @content; }
-  }
-  @else if $breakpoint == 'xl' {
-    @media (min-width: #{vars.$breakpoint-xl}) { @content; }
-  }
+}
+
+// Dynamic spacing system using clamp() for fluid responsiveness
+// BUG-113: Replace fixed padding with responsive alternatives
+@function fluid-spacing($min, $preferred, $max) {
+  @return clamp(#{$min}, #{$preferred}, #{$max});
 }
 
 // Accessibility mixins
@@ -234,9 +256,26 @@
   }
 }
 
-// Layout mixins
+// Layout mixins - Updated for fluid design (2024/2025 best practices)
 @mixin container {
+  // REMOVED: max-width: 1200px; // Enable full-width layouts on large screens
+  padding: 0 clamp(vars.$spacing-sm, 2vw, vars.$spacing-lg);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+// Legacy container with fixed max-width (use sparingly for text content only)
+@mixin container-constrained {
   max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 vars.$spacing-md;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+// Text content container (optimal reading width)
+@mixin text-container {
+  max-width: 65ch; // Optimal reading width
   margin: 0 auto;
   padding: 0 vars.$spacing-md;
   width: 100%;

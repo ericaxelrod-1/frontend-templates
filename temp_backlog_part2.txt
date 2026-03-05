@@ -1,0 +1,156 @@
+
+- **Files To Modify**:
+  - `angular/frontend/src/app/modules/admin/login-monitoring/components/time-filter/`
+  - `angular/frontend/src/app/modules/admin/login-monitoring/login-monitoring.component.html`
+  - `angular/backend/src/modules/auth/services/pattern-detection.service.ts`
+
+## Medium Priority
+
+### TECH-004.1: Continuous Integration Setup
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: TECH-001.2, TECH-001.3
+- **Added**: 2025-07-07
+- **Description**: Set up automated testing and continuous integration for the project.
+
+#### Implementation Notes
+- **Issues**: 
+  - GitHub Actions configuration needed
+  - Test coverage reporting missing
+  - Linting checks not automated
+
+- **Files To Modify**:
+  - `.github/workflows/` directory
+  - CI/CD configuration files
+  - Test coverage tools
+
+### TECH-004.2: Deployment Pipeline
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: TECH-004.1
+- **Added**: 2025-07-07
+- **Description**: Create a deployment pipeline for the tools and applications.
+
+#### Implementation Notes
+- **Issues**: 
+  - Docker container build needed
+  - Kubernetes deployment configuration missing
+  - Versioning strategy not implemented
+
+- **Files To Modify**:
+  - Dockerfile
+  - Kubernetes manifests
+  - Deployment scripts
+
+### FEAT-001: Role Hierarchy Management
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: TECH-001.3
+- **Added**: 2025-07-07
+- **Description**: Implement a role hierarchy management system.
+
+#### Implementation Notes
+- **Issues**: 
+  - Role inheritance model needed
+  - UI for managing hierarchies missing
+  - Permission propagation logic required
+
+- **Files To Modify**:
+  - Role management components
+  - Backend role services
+  - Database schema updates
+
+### FEAT-002: Permission Auditing
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: TECH-001.3, FEAT-001
+- **Added**: 2025-07-07
+- **Description**: Add permission auditing capabilities to track changes to permissions.
+
+#### Implementation Notes
+- **Issues**: 
+  - Audit log schema needed
+  - Audit log viewers missing
+  - Export functionality required
+
+- **Files To Modify**:
+  - Audit log entities
+  - Audit log services
+  - Export utilities
+
+### TASK-003: Cache Tables Implementation
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: TASK-002
+- **Added**: 2025-07-07
+- **Description**: Create migration for cache tables following established patterns.
+
+#### Implementation Notes
+- **Issues**: 
+  - Need migration for cache_components, cache_routes, cache_endpoints
+  - Should follow established patterns for column names and constraints
+
+- **Files To Modify**:
+  - Migration files for cache tables
+  - Cache entity definitions
+
+### BUG-025: Review and Fix Nullability Mismatches
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: BUG-021, BUG-022, BUG-023
+- **Added**: 2025-05-23
+- **Description**: Investigate and resolve nullability mismatches between database schema and entity definitions, particularly for ID columns that show as nullable in database but non-nullable in entities.
+
+#### Implementation Notes
+- **Issues**: 
+  - All primary key `id` columns show as nullable in database but non-nullable in entities (19 total mismatches)
+  - Likely SQLite introspection issue rather than actual nullability problems
+  - Need to investigate if SQLite schema introspection is causing false positives
+
+- **Files To Modify**:
+  - Database entity definitions
+  - Schema validation scripts
+  - SQLite introspection tools
+
+### TECH-002.5: Database Tools Enhancement
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: TECH-002.3
+- **Added**: 2025-05-06
+- **Description**: Enhance database tooling with improved validation, management, and logging capabilities.
+
+#### Implementation Requirements
+- **Issues**: 
+  - Enhance fix-database.js to create complete schema
+  - Improve check-db.js with detailed validation
+  - Create configuration system for database tools
+  - Add comprehensive logging with timestamps
+
+- **Files To Modify**:
+  - Database management scripts
+  - Validation and logging tools
+  - Database backup mechanisms
+
+## Low Priority
+
+### FEAT-007: Create API Status/Health Endpoint
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-07-07
+- **Description**: Create a comprehensive API status/health endpoint for system monitoring and debugging.
+
+#### Implementation Notes
+- **Issues**: 
+  - Health endpoint controller needed
+  - Database connectivity checks missing
+  - System metrics not available
+
+- **Files To Modify**:
+  - Health controller
+  - Service availability checks
+  - System metrics collection
+
+## Notes
+
+Backlog updated on 2025-07-07 to reflect current project priorities. Multiple completed tasks moved to changelog including FEAT-123 (completed 7/4) and 12 other tasks (completed 6/1). Continuing search for additional Angular Material implementation issues. All remaining tasks are actively needed for project completion.

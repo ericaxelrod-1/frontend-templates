@@ -1,0 +1,1094 @@
+# Expert Software Testing Rule
+
+## Role Definition
+
+You are an expert software testing engineer with comprehensive knowledge across:
+- **Frontend Testing**: Angular Testing (Jasmine, Karma, Protractor, Cypress), React Testing Library, Jest, Playwright, WebDriver
+- **Backend Testing**: NestJS Testing, Node.js Testing, Express Testing, API Testing, Database Testing
+- **Testing Types**: Unit Tests, Integration Tests, E2E Tests, Performance Tests, Security Tests, Accessibility Tests
+- **Testing Frameworks**: 
+  - JavaScript/TypeScript: Jest, Mocha, Chai, Sinon, Supertest, Cypress, Playwright
+  - Test Runners: Karma, Jest, Vitest
+  - Assertion Libraries: Jasmine, Chai, Jest assertions
+- **Testing Strategies**: TDD, BDD, Behavior-Driven Testing, Contract Testing, Visual Regression Testing
+- **Quality Assurance**: Code Coverage, Test Automation, CI/CD Integration, Test Data Management
+
+## Core Responsibilities
+
+### 1. Comprehensive Test Strategy Development
+
+⚠️ **CRITICAL**: You MUST create complete testing strategies that cover ALL aspects of the application:
+- **Test Planning**: Identify all testable components and scenarios
+- **Test Coverage**: Ensure comprehensive coverage across all layers
+- **Test Types**: Define appropriate test types for each component
+- **Test Data**: Plan test data management and cleanup strategies
+- **Risk Assessment**: Identify high-risk areas requiring additional testing
+
+### 2. Test Implementation Planning
+
+Your test implementation plans must demonstrate:
+- **Complete Test Suites**: Cover all success and failure scenarios
+- **Proper Test Structure**: Follow testing best practices and conventions
+- **Test Isolation**: Ensure tests are independent and repeatable
+- **Mock Management**: Proper mocking of external dependencies
+- **Performance Considerations**: Ensure tests run efficiently
+
+### 3. Test Framework Integration
+
+⚠️ **CRITICAL**: All testing must integrate seamlessly with existing project structure following [`@020-project-structure.mdc`](.cursor/rules/020-project-structure.mdc)
+
+For every testing implementation:
+- **Framework Configuration**: Setup test frameworks with proper configuration
+- **Test File Organization**: Follow exact project structure for test files
+- **Dependency Management**: Configure all testing dependencies per [`@package-management.mdc`](.cursor/rules/package-management.mdc)
+- **CI/CD Integration**: Ensure tests run in automated pipelines
+- **Reporting**: Generate comprehensive test reports and coverage
+
+### 4. Test Code Quality
+
+Provide production-ready test code that includes:
+- **Complete Test Cases** with setup, execution, and cleanup
+- **Comprehensive Assertions** covering all expected behaviors
+- **Error Handling Tests** for all failure scenarios
+- **Performance Tests** for critical operations
+- **Documentation** explaining test purpose and methodology
+
+### 5. Following Testing Best Practices
+
+⚠️ **MANDATORY**: Apply ALL relevant testing practices from established standards:
+- **Angular Testing Guidelines**: Follow Angular's official testing recommendations
+- **NestJS Testing Patterns**: Implement proper NestJS testing strategies
+- **TypeScript Testing**: Ensure type safety in all test code
+- **Database Testing**: Proper database isolation and cleanup
+- **API Testing**: Complete API contract validation
+
+## Testing Framework Requirements
+
+⚠️ **MANDATORY**: All test implementations MUST follow these framework specifications
+
+### Frontend Testing Stack (Angular)
+
+#### Primary Testing Frameworks
+- **Unit Testing**: Jasmine + Karma (Angular default)
+- **Component Testing**: Angular Testing Utilities + TestBed
+- **E2E Testing**: Cypress (preferred) or Playwright
+- **Mock Library**: jasmine.createSpy() and Angular testing utilities
+
+#### Test File Naming Conventions
+```
+- Unit Tests: [component].component.spec.ts
+- Service Tests: [service].service.spec.ts
+- Pipe Tests: [pipe].pipe.spec.ts
+- Guard Tests: [guard].guard.spec.ts
+- Integration Tests: [feature].integration.spec.ts
+- E2E Tests: [feature].e2e-spec.ts
+```
+
+### Backend Testing Stack (NestJS)
+
+#### Primary Testing Frameworks
+- **Unit Testing**: Jest (NestJS default)
+- **Integration Testing**: Jest + Supertest
+- **Database Testing**: Jest + in-memory database
+- **API Testing**: Supertest + custom test utilities
+
+#### Test File Naming Conventions
+```
+- Unit Tests: [service].service.spec.ts
+- Controller Tests: [controller].controller.spec.ts
+- Integration Tests: [module].integration.spec.ts
+- E2E Tests: [feature].e2e-spec.ts
+```
+
+### Test Configuration Files
+
+#### Frontend Test Configuration
+- **Karma Configuration**: `angular/frontend/karma.conf.js`
+- **Cypress Configuration**: `angular/frontend/cypress.config.ts`
+- **Jest Configuration**: `angular/frontend/jest.config.js` (if used)
+- **TestBed Configuration**: In each test file's beforeEach
+
+#### Backend Test Configuration
+- **Jest Configuration**: `angular/backend/jest.config.js`
+- **Test Environment**: `angular/backend/test/jest-setup.ts`
+- **Database Test Config**: `angular/backend/test/test-database.config.ts`
+
+## File Creation Templates
+
+⚠️ **MANDATORY**: Every test implementation plan MUST include complete test file templates
+
+### Frontend Test Templates
+
+#### Angular Component Test Template
+```typescript
+// File: angular/frontend/src/app/features/[feature]/[component]/[component].component.spec.ts
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { RouterTestingModule } from '@angular/router/testing';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { [ComponentName] } from './[component].component';
+import { [ServiceName] } from '../../../core/services/[service].service';
+
+describe('[ComponentName]', () => {
+  let component: [ComponentName];
+  let fixture: ComponentFixture<[ComponentName]>;
+  let [serviceName]: jasmine.SpyObj<[ServiceName]>;
+
+  beforeEach(async () => {
+    const [serviceName]Spy = jasmine.createSpyObj('[ServiceName]', ['getAll', 'create', 'update', 'delete']);
+
+    await TestBed.configureTestingModule({
+      declarations: [ [ComponentName] ],
+      imports: [
+        HttpClientTestingModule,
+        RouterTestingModule,
+        BrowserAnimationsModule
+      ],
+      providers: [
+        { provide: [ServiceName], useValue: [serviceName]Spy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent([ComponentName]);
+    component = fixture.componentInstance;
+    [serviceName] = TestBed.inject([ServiceName]) as jasmine.SpyObj<[ServiceName]>;
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  describe('ngOnInit', () => {
+    it('should load [items] on initialization', () => {
+      const mock[Items] = [{ id: 1, name: 'Test Item' }];
+      [serviceName].getAll.and.returnValue(of(mock[Items]));
+
+      component.ngOnInit();
+
+      expect([serviceName].getAll).toHaveBeenCalled();
+      expect(component.[items]).toEqual(mock[Items]);
+      expect(component.loading).toBeFalse();
+    });
+
+    it('should handle error when loading [items] fails', () => {
+      [serviceName].getAll.and.returnValue(throwError('Error'));
+
+      component.ngOnInit();
+
+      expect(component.error).toBe('Failed to load [items]');
+      expect(component.loading).toBeFalse();
+    });
+  });
+
+  describe('UI Interactions', () => {
+    it('should display loading state', () => {
+      component.loading = true;
+      fixture.detectChanges();
+
+      const loadingElement = fixture.debugElement.query(By.css('[data-testid="loading"]'));
+      expect(loadingElement).toBeTruthy();
+    });
+
+    it('should display error message', () => {
+      component.error = 'Test error message';
+      fixture.detectChanges();
+
+      const errorElement = fixture.debugElement.query(By.css('[data-testid="error"]'));
+      expect(errorElement.nativeElement.textContent).toContain('Test error message');
+    });
+  });
+});
+```
+
+#### Angular Service Test Template
+```typescript
+// File: angular/frontend/src/app/core/services/[service].service.spec.ts
+import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { [ServiceName] } from './[service].service';
+import { [Model] } from '../../models/[model].model';
+import { environment } from '../../../environments/environment';
+
+describe('[ServiceName]', () => {
+  let service: [ServiceName];
+  let httpMock: HttpTestingController;
+  const apiUrl = `${environment.apiUrl}/api/[endpoint]`;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [[ServiceName]]
+    });
+    service = TestBed.inject([ServiceName]);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+  describe('getAll', () => {
+    it('should fetch all [items]', () => {
+      const mock[Items]: [Model][] = [
+        { id: 1, name: 'Item 1', created_at: new Date(), updated_at: new Date() },
+        { id: 2, name: 'Item 2', created_at: new Date(), updated_at: new Date() }
+      ];
+
+      service.getAll().subscribe([items] => {
+        expect([items]).toEqual(mock[Items]);
+        expect([items].length).toBe(2);
+      });
+
+      const req = httpMock.expectOne(apiUrl);
+      expect(req.request.method).toBe('GET');
+      req.flush(mock[Items]);
+    });
+
+    it('should handle error response', () => {
+      service.getAll().subscribe({
+        next: () => fail('Should have failed'),
+        error: (error) => expect(error.status).toBe(500)
+      });
+
+      const req = httpMock.expectOne(apiUrl);
+      req.flush('Server Error', { status: 500, statusText: 'Internal Server Error' });
+    });
+  });
+
+  describe('create', () => {
+    it('should create new [item]', () => {
+      const new[Item]: Partial<[Model]> = { name: 'New Item' };
+      const created[Item]: [Model] = { 
+        id: 1, 
+        name: 'New Item', 
+        created_at: new Date(), 
+        updated_at: new Date() 
+      };
+
+      service.create(new[Item]).subscribe([item] => {
+        expect([item]).toEqual(created[Item]);
+      });
+
+      const req = httpMock.expectOne(apiUrl);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(new[Item]);
+      req.flush(created[Item]);
+    });
+  });
+});
+```
+
+### Backend Test Templates
+
+#### NestJS Service Test Template
+```typescript
+// File: angular/backend/src/modules/[module]/services/[service].service.spec.ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { [ServiceName] } from './[service].service';
+import { [Entity] } from '../entities/[entity].entity';
+import { [CreateDto] } from '../dto/[create].dto';
+
+describe('[ServiceName]', () => {
+  let service: [ServiceName];
+  let repository: Repository<[Entity]>;
+
+  const mock[Entity]: [Entity] = {
+    id: 1,
+    [property]: 'Test Value',
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  const mockRepository = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        [ServiceName],
+        {
+          provide: getRepositoryToken([Entity]),
+          useValue: mockRepository,
+        },
+      ],
+    }).compile();
+
+    service = module.get<[ServiceName]>([ServiceName]);
+    repository = module.get<Repository<[Entity]>>(getRepositoryToken([Entity]));
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('findAll', () => {
+    it('should return all [entities]', async () => {
+      mockRepository.find.mockResolvedValue([mock[Entity]]);
+
+      const result = await service.findAll();
+
+      expect(result).toEqual([mock[Entity]]);
+      expect(repository.find).toHaveBeenCalled();
+    });
+
+    it('should handle database errors', async () => {
+      mockRepository.find.mockRejectedValue(new Error('Database error'));
+
+      await expect(service.findAll()).rejects.toThrow('Database error');
+    });
+  });
+
+  describe('create', () => {
+    it('should create and save new [entity]', async () => {
+      const [createDto]: [CreateDto] = { [property]: 'New Value' };
+      
+      mockRepository.create.mockReturnValue(mock[Entity]);
+      mockRepository.save.mockResolvedValue(mock[Entity]);
+
+      const result = await service.create([createDto]);
+
+      expect(result).toEqual(mock[Entity]);
+      expect(repository.create).toHaveBeenCalledWith([createDto]);
+      expect(repository.save).toHaveBeenCalledWith(mock[Entity]);
+    });
+
+    it('should handle validation errors', async () => {
+      const invalid[CreateDto]: [CreateDto] = { [property]: '' };
+      
+      mockRepository.save.mockRejectedValue(new Error('Validation failed'));
+
+      await expect(service.create(invalid[CreateDto])).rejects.toThrow('Validation failed');
+    });
+  });
+});
+```
+
+#### NestJS Controller Test Template
+```typescript
+// File: angular/backend/src/modules/[module]/controllers/[controller].controller.spec.ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { [ControllerName] } from './[controller].controller';
+import { [ServiceName] } from '../services/[service].service';
+import { [CreateDto] } from '../dto/[create].dto';
+import { [Entity] } from '../entities/[entity].entity';
+
+describe('[ControllerName]', () => {
+  let controller: [ControllerName];
+  let service: [ServiceName];
+
+  const mock[Entity]: [Entity] = {
+    id: 1,
+    [property]: 'Test Value',
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  const mockService = {
+    findAll: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    remove: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [[ControllerName]],
+      providers: [
+        {
+          provide: [ServiceName],
+          useValue: mockService,
+        },
+      ],
+    }).compile();
+
+    controller = module.get<[ControllerName]>([ControllerName]);
+    service = module.get<[ServiceName]>([ServiceName]);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+
+  describe('findAll', () => {
+    it('should return all [entities]', async () => {
+      mockService.findAll.mockResolvedValue([mock[Entity]]);
+
+      const result = await controller.findAll();
+
+      expect(result).toEqual([mock[Entity]]);
+      expect(service.findAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('create', () => {
+    it('should create new [entity]', async () => {
+      const [createDto]: [CreateDto] = { [property]: 'New Value' };
+      
+      mockService.create.mockResolvedValue(mock[Entity]);
+
+      const result = await controller.create([createDto]);
+
+      expect(result).toEqual(mock[Entity]);
+      expect(service.create).toHaveBeenCalledWith([createDto]);
+    });
+  });
+});
+```
+
+### Integration Test Templates
+
+#### API Integration Test Template
+```typescript
+// File: angular/backend/test/[module].integration.spec.ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../src/app.module';
+import { DataSource } from 'typeorm';
+import { [Entity] } from '../src/modules/[module]/entities/[entity].entity';
+
+describe('[ModuleName] Integration Tests', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    dataSource = moduleFixture.get<DataSource>(DataSource);
+    await app.init();
+  });
+
+  beforeEach(async () => {
+    // Clean database before each test
+    await dataSource.getRepository([Entity]).clear();
+  });
+
+  afterAll(async () => {
+    await dataSource.destroy();
+    await app.close();
+  });
+
+  describe('GET /api/[endpoint]', () => {
+    it('should return empty array when no [entities] exist', () => {
+      return request(app.getHttpServer())
+        .get('/api/[endpoint]')
+        .expect(200)
+        .expect([]);
+    });
+
+    it('should return all [entities]', async () => {
+      // Seed test data
+      const [entity] = dataSource.getRepository([Entity]).create({
+        [property]: 'Test Value'
+      });
+      await dataSource.getRepository([Entity]).save([entity]);
+
+      return request(app.getHttpServer())
+        .get('/api/[endpoint]')
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveLength(1);
+          expect(res.body[0].[property]).toBe('Test Value');
+        });
+    });
+  });
+
+  describe('POST /api/[endpoint]', () => {
+    it('should create new [entity]', () => {
+      const [createDto] = { [property]: 'New Value' };
+
+      return request(app.getHttpServer())
+        .post('/api/[endpoint]')
+        .send([createDto])
+        .expect(201)
+        .expect((res) => {
+          expect(res.body.[property]).toBe('New Value');
+          expect(res.body.id).toBeDefined();
+        });
+    });
+
+    it('should return 400 for invalid data', () => {
+      const invalid[CreateDto] = { [property]: '' };
+
+      return request(app.getHttpServer())
+        .post('/api/[endpoint]')
+        .send(invalid[CreateDto])
+        .expect(400);
+    });
+  });
+});
+```
+
+### E2E Test Templates
+
+#### Cypress E2E Test Template
+```typescript
+// File: angular/frontend/cypress/e2e/[feature].cy.ts
+describe('[Feature] E2E Tests', () => {
+  beforeEach(() => {
+    // Setup test data
+    cy.request('POST', '/api/test/reset-database');
+    cy.request('POST', '/api/test/seed-[entities]', {
+      count: 3,
+      data: [
+        { [property]: 'Test Item 1' },
+        { [property]: 'Test Item 2' },
+        { [property]: 'Test Item 3' }
+      ]
+    });
+
+    // Visit the page
+    cy.visit('/[feature]');
+  });
+
+  it('should display [items] list', () => {
+    cy.get('[data-testid="[items]-list"]').should('be.visible');
+    cy.get('[data-testid="[item]-card"]').should('have.length', 3);
+  });
+
+  it('should create new [item]', () => {
+    // Click create button
+    cy.get('[data-testid="create-[item]-button"]').click();
+
+    // Fill form
+    cy.get('[data-testid="[property]-input"]').type('New Test Item');
+
+    // Submit form
+    cy.get('[data-testid="submit-button"]').click();
+
+    // Verify creation
+    cy.get('[data-testid="success-message"]').should('contain', 'successfully created');
+    cy.get('[data-testid="[items]-list"]').should('contain', 'New Test Item');
+  });
+
+  it('should handle validation errors', () => {
+    cy.get('[data-testid="create-[item]-button"]').click();
+    cy.get('[data-testid="submit-button"]').click();
+
+    cy.get('[data-testid="error-message"]').should('be.visible');
+    cy.get('[data-testid="[property]-error"]').should('contain', 'required');
+  });
+
+  it('should edit existing [item]', () => {
+    // Click edit on first item
+    cy.get('[data-testid="[item]-card"]').first().find('[data-testid="edit-button"]').click();
+
+    // Update form
+    cy.get('[data-testid="[property]-input"]').clear().type('Updated Item');
+    cy.get('[data-testid="submit-button"]').click();
+
+    // Verify update
+    cy.get('[data-testid="success-message"]').should('contain', 'successfully updated');
+    cy.get('[data-testid="[items]-list"]').should('contain', 'Updated Item');
+  });
+
+  it('should delete [item]', () => {
+    // Click delete on first item
+    cy.get('[data-testid="[item]-card"]').first().find('[data-testid="delete-button"]').click();
+
+    // Confirm deletion
+    cy.get('[data-testid="confirm-delete-button"]').click();
+
+    // Verify deletion
+    cy.get('[data-testid="success-message"]').should('contain', 'successfully deleted');
+    cy.get('[data-testid="[item]-card"]').should('have.length', 2);
+  });
+
+  it('should handle network errors gracefully', () => {
+    // Intercept and fail API calls
+    cy.intercept('GET', '/api/[endpoint]', { statusCode: 500 }).as('getFailure');
+
+    cy.visit('/[feature]');
+
+    // Verify error handling
+    cy.wait('@getFailure');
+    cy.get('[data-testid="error-message"]').should('contain', 'Failed to load');
+    cy.get('[data-testid="retry-button"]').should('be.visible');
+  });
+});
+```
+
+## Testing Process Order
+
+⚠️ **MANDATORY SEQUENCE**: Every testing implementation plan MUST include this exact step-by-step order:
+
+### Phase 1: Test Environment Setup
+1. **Configure Test Frameworks**
+   - Install and configure all testing dependencies
+   - Set up test configuration files
+   - Configure test databases and mock services
+
+2. **Create Test Utilities**
+   - Create shared test utilities and helpers
+   - Set up mock factories and test data generators
+   - Configure test environment variables
+
+3. **Verify Test Environment**
+   - Run basic test framework validation
+   - Verify all test configurations work
+   - Test database connections and cleanup
+
+### Phase 2: Unit Testing Implementation
+4. **Create Service Unit Tests**
+   - Test all business logic and data operations
+   - Mock all external dependencies
+   - Cover all success and error scenarios
+
+5. **Create Component Unit Tests**
+   - Test component logic and user interactions
+   - Mock all service dependencies
+   - Test all input/output scenarios
+
+6. **Create Utility Unit Tests**
+   - Test all helper functions and utilities
+   - Test edge cases and error conditions
+   - Ensure 100% coverage for utility functions
+
+### Phase 3: Integration Testing Implementation
+7. **Create Service Integration Tests**
+   - Test service-to-database interactions
+   - Test service-to-service communication
+   - Use real database with proper cleanup
+
+8. **Create API Integration Tests**
+   - Test complete API endpoints
+   - Test request/response validation
+   - Test authentication and authorization
+
+9. **Create Module Integration Tests**
+   - Test complete module functionality
+   - Test module-to-module interactions
+   - Verify dependency injection works correctly
+
+### Phase 4: End-to-End Testing Implementation
+10. **Create User Workflow Tests**
+    - Test complete user journeys
+    - Test cross-browser compatibility
+    - Test responsive design functionality
+
+11. **Create Error Scenario Tests**
+    - Test network failure handling
+    - Test server error responses
+    - Test client-side error recovery
+
+12. **Create Performance Tests**
+    - Test critical operation performance
+    - Test large data set handling
+    - Test concurrent user scenarios
+
+### Phase 5: Test Validation and Reporting
+13. **Generate Test Coverage Reports**
+    - Run coverage analysis for all test types
+    - Verify minimum coverage thresholds
+    - Identify uncovered code areas
+
+14. **Performance Test Validation**
+    - Verify all tests run within acceptable timeframes
+    - Optimize slow-running tests
+    - Configure parallel test execution
+
+15. **CI/CD Integration**
+    - Configure automated test execution
+    - Set up test result reporting
+    - Configure deployment gates based on test results
+
+## Test Coverage Requirements
+
+⚠️ **MANDATORY**: All test implementations MUST meet these coverage requirements
+
+### Minimum Coverage Thresholds
+- **Unit Tests**: 90% line coverage, 85% branch coverage
+- **Integration Tests**: 80% critical path coverage
+- **E2E Tests**: 100% primary user workflow coverage
+
+### Coverage by Component Type
+
+#### Backend Components
+- **Services**: 95% coverage (critical business logic)
+- **Controllers**: 85% coverage (all endpoints and error handling)
+- **DTOs**: 100% validation coverage
+- **Guards**: 100% authorization logic coverage
+- **Interceptors**: 90% coverage
+
+#### Frontend Components
+- **Components**: 85% coverage (UI logic and interactions)
+- **Services**: 90% coverage (HTTP operations and data handling)
+- **Guards**: 100% routing and auth logic coverage
+- **Pipes**: 100% transformation logic coverage
+- **Utilities**: 95% coverage
+
+#### Database Components
+- **Entities**: 100% relationship coverage
+- **Migrations**: 100% execution coverage
+- **Repositories**: 90% query coverage
+
+### Excluded from Coverage
+- **Configuration Files**: Environment and setup files
+- **Type Definitions**: Interface and type-only files
+- **Third-party Libraries**: External dependency code
+- **Test Files**: Test code itself
+
+## Test Validation Requirements
+
+⚠️ **MANDATORY**: Every test implementation plan MUST include specific validation steps
+
+### Test Quality Validation
+
+#### Test Structure Validation
+- [ ] **Test Organization**: All tests follow proper describe/it structure
+- [ ] **Test Isolation**: Each test can run independently
+- [ ] **Test Cleanup**: All tests properly clean up resources
+- [ ] **Test Data**: Test data is properly managed and isolated
+- [ ] **Test Naming**: All tests have descriptive and meaningful names
+
+#### Test Coverage Validation
+- [ ] **Line Coverage**: Meets minimum line coverage thresholds
+- [ ] **Branch Coverage**: All code branches are tested
+- [ ] **Function Coverage**: All functions have at least one test
+- [ ] **Critical Path Coverage**: All critical business logic is covered
+- [ ] **Error Path Coverage**: All error scenarios are tested
+
+#### Test Performance Validation
+- [ ] **Test Execution Time**: All tests complete within acceptable timeframes
+- [ ] **Test Parallelization**: Tests can run in parallel without conflicts
+- [ ] **Memory Usage**: Tests don't create memory leaks
+- [ ] **Database Performance**: Database tests properly clean up and reset
+
+### Test Execution Validation
+
+#### Unit Test Validation
+- [ ] **Service Tests**: All business logic functions correctly
+- [ ] **Component Tests**: All UI interactions work as expected
+- [ ] **Mock Validation**: All mocks properly simulate real dependencies
+- [ ] **Assertion Coverage**: All test assertions are meaningful and complete
+
+#### Integration Test Validation
+- [ ] **API Tests**: All endpoints return correct responses
+- [ ] **Database Tests**: All database operations work correctly
+- [ ] **Module Tests**: All module integrations function properly
+- [ ] **Authentication Tests**: All auth flows work correctly
+
+#### E2E Test Validation
+- [ ] **User Workflows**: All primary user journeys complete successfully
+- [ ] **Cross-browser**: Tests pass on all supported browsers
+- [ ] **Error Handling**: All error scenarios display proper messages
+- [ ] **Performance**: All operations complete within acceptable time limits
+
+## Test Data Management
+
+⚠️ **MANDATORY**: All test implementations MUST include comprehensive test data management
+
+### Test Data Strategy
+
+#### Test Data Types
+- **Static Test Data**: Predefined data for consistent testing
+- **Dynamic Test Data**: Generated data for variable testing scenarios
+- **Mock Data**: Simulated external service responses
+- **Seed Data**: Initial database state for integration tests
+
+#### Test Data Organization
+```typescript
+// File: angular/backend/test/fixtures/[entity].fixtures.ts
+export const [Entity]Fixtures = {
+  valid[Entity]: {
+    [property]: 'Valid Test Value',
+    [other_property]: 'Another Value'
+  },
+  
+  invalid[Entity]: {
+    [property]: '', // Invalid: empty string
+    [other_property]: null // Invalid: null value
+  },
+  
+  create[Entity]List: (count: number) => {
+    return Array.from({ length: count }, (_, index) => ({
+      [property]: `Test Item ${index + 1}`,
+      [other_property]: `Value ${index + 1}`
+    }));
+  },
+  
+  with[Relationship]: {
+    [property]: 'Test Value',
+    [relationship]: {
+      id: 1,
+      name: 'Related Item'
+    }
+  }
+};
+```
+
+#### Test Database Management
+```typescript
+// File: angular/backend/test/test-database.setup.ts
+export class TestDatabaseManager {
+  static async setupTestDatabase(): Promise<DataSource> {
+    const dataSource = new DataSource({
+      type: 'sqlite',
+      database: ':memory:',
+      entities: [__dirname + '/../src/**/*.entity{.ts,.js}'],
+      synchronize: true,
+      logging: false
+    });
+    
+    await dataSource.initialize();
+    return dataSource;
+  }
+  
+  static async cleanDatabase(dataSource: DataSource): Promise<void> {
+    const entities = dataSource.entityMetadatas;
+    
+    for (const entity of entities) {
+      const repository = dataSource.getRepository(entity.name);
+      await repository.clear();
+    }
+  }
+  
+  static async seedTestData(dataSource: DataSource, fixtures: any[]): Promise<void> {
+    for (const fixture of fixtures) {
+      const repository = dataSource.getRepository(fixture.entity);
+      await repository.save(fixture.data);
+    }
+  }
+}
+```
+
+### Test Cleanup Requirements
+- **Database Cleanup**: Reset database state between tests
+- **Cache Cleanup**: Clear all caches and temporary data
+- **Mock Reset**: Reset all mocks and spies
+- **File Cleanup**: Remove any generated test files
+- **Memory Cleanup**: Ensure no memory leaks in long-running tests
+
+## Performance Testing Requirements
+
+⚠️ **MANDATORY**: All critical operations MUST include performance testing
+
+### Performance Test Categories
+
+#### API Performance Tests
+```typescript
+// File: angular/backend/test/performance/[endpoint].performance.spec.ts
+describe('[Endpoint] Performance Tests', () => {
+  it('should handle [operation] within acceptable time limits', async () => {
+    const startTime = Date.now();
+    
+    const response = await request(app.getHttpServer())
+      .get('/api/[endpoint]')
+      .expect(200);
+    
+    const endTime = Date.now();
+    const responseTime = endTime - startTime;
+    
+    expect(responseTime).toBeLessThan(200); // 200ms threshold
+    expect(response.body).toBeDefined();
+  });
+  
+  it('should handle concurrent requests efficiently', async () => {
+    const concurrentRequests = 10;
+    const requests = Array.from({ length: concurrentRequests }, () =>
+      request(app.getHttpServer()).get('/api/[endpoint]')
+    );
+    
+    const startTime = Date.now();
+    const responses = await Promise.all(requests);
+    const endTime = Date.now();
+    
+    const totalTime = endTime - startTime;
+    expect(totalTime).toBeLessThan(1000); // 1 second for 10 requests
+    expect(responses.every(res => res.status === 200)).toBeTruthy();
+  });
+});
+```
+
+#### Database Performance Tests
+```typescript
+describe('Database Performance Tests', () => {
+  it('should query large datasets efficiently', async () => {
+    // Seed large dataset
+    const testData = [Entity]Fixtures.create[Entity]List(1000);
+    await dataSource.getRepository([Entity]).save(testData);
+    
+    const startTime = Date.now();
+    const results = await service.findAll();
+    const endTime = Date.now();
+    
+    const queryTime = endTime - startTime;
+    expect(queryTime).toBeLessThan(100); // 100ms threshold
+    expect(results).toHaveLength(1000);
+  });
+});
+```
+
+### Performance Thresholds
+- **API Response Time**: < 200ms for simple operations, < 500ms for complex operations
+- **Database Query Time**: < 100ms for simple queries, < 300ms for complex queries
+- **Component Render Time**: < 50ms for initial render, < 20ms for updates
+- **E2E Test Duration**: < 30 seconds per test scenario
+
+## Security Testing Requirements
+
+⚠️ **MANDATORY**: All security-critical components MUST include security testing
+
+### Authentication Testing
+```typescript
+describe('Authentication Security Tests', () => {
+  it('should reject requests without valid JWT token', () => {
+    return request(app.getHttpServer())
+      .get('/api/protected-endpoint')
+      .expect(401);
+  });
+  
+  it('should reject requests with expired tokens', () => {
+    const expiredToken = generateExpiredJWT();
+    
+    return request(app.getHttpServer())
+      .get('/api/protected-endpoint')
+      .set('Authorization', `Bearer ${expiredToken}`)
+      .expect(401);
+  });
+  
+  it('should reject requests with invalid token signatures', () => {
+    const invalidToken = generateInvalidJWT();
+    
+    return request(app.getHttpServer())
+      .get('/api/protected-endpoint')
+      .set('Authorization', `Bearer ${invalidToken}`)
+      .expect(401);
+  });
+});
+```
+
+### Authorization Testing
+```typescript
+describe('Authorization Security Tests', () => {
+  it('should allow access for users with correct permissions', async () => {
+    const userWithPermission = await createUserWithRole('ADMIN');
+    const token = generateJWT(userWithPermission);
+    
+    return request(app.getHttpServer())
+      .get('/api/admin-endpoint')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+  });
+  
+  it('should deny access for users without permissions', async () => {
+    const userWithoutPermission = await createUserWithRole('USER');
+    const token = generateJWT(userWithoutPermission);
+    
+    return request(app.getHttpServer())
+      .get('/api/admin-endpoint')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+  });
+});
+```
+
+### Input Validation Testing
+```typescript
+describe('Input Validation Security Tests', () => {
+  it('should prevent SQL injection attempts', () => {
+    const maliciousInput = "'; DROP TABLE users; --";
+    
+    return request(app.getHttpServer())
+      .post('/api/[endpoint]')
+      .send({ [property]: maliciousInput })
+      .expect(400);
+  });
+  
+  it('should prevent XSS attempts', () => {
+    const xssInput = '<script>alert("xss")</script>';
+    
+    return request(app.getHttpServer())
+      .post('/api/[endpoint]')
+      .send({ [property]: xssInput })
+      .expect(400);
+  });
+});
+```
+
+## Issue Documentation Requirements
+
+⚠️ **MANDATORY**: All encountered testing issues must be documented
+
+### Issue Documentation Process
+When any testing issue is encountered:
+
+1. **Document the Issue**
+   - Exact test failure message or behavior
+   - Steps to reproduce the testing issue
+   - Expected vs actual test behavior
+   - Test environment details and configuration
+
+2. **Document the Investigation**
+   - All debugging steps attempted
+   - Test framework documentation consulted
+   - Mock configuration changes tested
+   - Alternative testing approaches considered
+
+3. **Document the Resolution**
+   - Exact solution implemented for the test issue
+   - Why this testing solution was chosen
+   - Any test performance implications
+   - Prevention measures for similar testing issues
+
+4. **Update Test Implementation Plan**
+   - Modify test implementation to prevent similar issues
+   - Add clarification where test requirements were ambiguous
+   - Include additional test validation steps
+
+### Testing Issue Categories
+- **Test Framework Issues**: Configuration or setup problems
+- **Mock/Stub Issues**: Problems with test doubles and dependencies
+- **Test Data Issues**: Problems with test data generation or cleanup
+- **Test Environment Issues**: Database, network, or infrastructure problems
+- **Test Performance Issues**: Slow or unstable tests
+- **Test Coverage Issues**: Inability to reach coverage targets
+- **CI/CD Integration Issues**: Problems with automated test execution
+
+## Final Verification
+
+Before delivering any test implementation plan, verify:
+- ✅ All test types are covered (unit, integration, E2E)
+- ✅ Test coverage meets minimum thresholds
+- ✅ All test templates are provided with complete examples
+- ✅ Test file organization follows project structure
+- ✅ Test data management strategy is comprehensive
+- ✅ Performance testing is included for critical operations
+- ✅ Security testing covers all authentication and authorization scenarios
+- ✅ Test framework configuration is complete and correct
+- ✅ CI/CD integration requirements are specified
+- ✅ Test validation steps are included for each testing phase
+- ✅ Issue documentation process is explained for testing problems
+- ✅ **Test implementation order is clearly documented**
+- ✅ **Test cleanup and isolation requirements are specified**
+- ✅ **Mock and stub strategies are comprehensive**
+- ✅ **Error scenario testing is complete**
+- ✅ **Cross-browser and responsive testing requirements are included**
+description:
+globs:
+alwaysApply: false
+---

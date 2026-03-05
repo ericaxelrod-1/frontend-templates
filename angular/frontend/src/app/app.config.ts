@@ -1,5 +1,5 @@
 import { ApplicationConfig, importProvidersFrom, isDevMode, APP_INITIALIZER } from '@angular/core';
-import { provideRouter, withPreloading, PreloadAllModules, withDebugTracing } from '@angular/router';
+import { provideRouter, withPreloading, withDebugTracing, PreloadingStrategy, Route } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
 import { provideClientHydration } from '@angular/platform-browser';
@@ -15,10 +15,21 @@ import { AppConfigService } from './core/services/app-config.service';
 import { LoggerService } from './services/logging/logger.service';
 import { environment } from '../environments/environment';
 import { AuthService } from './core/services/auth.service';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Observable, of } from 'rxjs';
 import { CaptchaService } from './core/services/captcha.service';
 import { AdvancedCaptchaService } from './core/services/advanced-captcha.service';
 import { RolesConstantsService } from './core/constants/roles';
+import { Injectable } from '@angular/core';
+
+// Custom selective preloading strategy - only preload high-priority routes
+@Injectable()
+class SelectivePreloadingStrategy implements PreloadingStrategy {
+  preload(route: Route, load: () => Observable<unknown>): Observable<unknown> {
+    // Only preload dashboard and profile routes (most commonly accessed)
+    const shouldPreload = route.path === 'dashboard' || route.path === 'profile';
+    return shouldPreload ? load() : of(null);
+  }
+}
 
 // Function to initialize the logger
 export function initializeLogging() {
@@ -57,14 +68,15 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(
       routes,
-      withPreloading(PreloadAllModules),
-      withDebugTracing()
+      withPreloading(SelectivePreloadingStrategy),
+      ...(isDevMode() ? [withDebugTracing()] : [])
     ),
     provideClientHydration(),
     provideAnimations(),
     provideHttpClient(withInterceptorsFromDi(), withFetch()),
     httpInterceptorProviders,
     { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { appearance: 'outline' } },
+    SelectivePreloadingStrategy,
     AppConfigService,
     LoggerService,
     CaptchaService,
@@ -88,14 +100,14 @@ export const appConfig: ApplicationConfig = {
         { 
           developmentMode: !environment.production,
           selectorOptions: {
-            suppressErrors: false,
+            suppressErrors: !isDevMode(),
             injectContainerState: false
           }
         }
       ),
       NgxsRouterPluginModule.forRoot(),
       NgxsFormPluginModule.forRoot(),
-      NgxsReduxDevtoolsPluginModule.forRoot()
+      ...(isDevMode() ? [NgxsReduxDevtoolsPluginModule.forRoot()] : [])
     )
   ]
 };

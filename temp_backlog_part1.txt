@@ -1,0 +1,47 @@
+# Project Backlog
+
+Last Updated: 2025-07-07 14:35:00
+
+## Critical Priority
+
+### BUG-111: IP Reputation Tab Shows "No IP Selected" with No Selection Interface
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: None
+- **Added**: 2025-01-26 19:30:00
+- **Description**: IP Reputation tab shows "No IP Selected" message with no way to select IPs. User expects vertical bar chart of IPs ranked by recent attempts with block/unblock status, but current implementation requires clicking IPs in login attempts table.
+
+#### Investigation Results (@999-bugfinder)
+- **Current Architecture**: Click-based IP selection from login attempts table to view individual IP reputation
+- **User Expectation**: Dashboard/overview approach with bar chart showing IP rankings and block status
+- **Backend Support**: `/api/login-monitoring/ip/:ipAddress` endpoint exists for individual IP lookup
+- **Missing**: Overview/dashboard endpoint for all IPs with statistics and ranking
+
+#### Implementation Requirements
+- **Issues**: 
+  - Create dashboard view of all IPs with attempt counts
+  - Implement bar chart visualization (suggested: vertical bars)
+  - Add bulk IP management with block/unblock capabilities
+  - Design IP ranking algorithm based on recent attempts
+  - Add filtering for IP reputation dashboard
+
+- **Files To Modify**:
+  - `angular/backend/src/modules/auth/controllers/login-monitoring.controller.ts`
+  - `angular/frontend/src/app/modules/admin/login-monitoring/ip-reputation/`
+  - IP reputation dashboard components
+
+## High Priority
+
+### FEAT-122: Global Time Filter for Summary Tiles
+- **Status**: Not Started
+- **Testing**: Not Started
+- **Dependencies**: FEAT-121
+- **Added**: 2025-07-01 17:05:10
+- **Description**: Add time filter component for summary tiles that operates independently from tab-specific filters. Follow existing design patterns from filter components.
+
+#### Implementation Requirements
+- **Issues**: 
+  - Time filter options needed (24h, 7d, 30d, 90d, Custom, All)
+  - Follow existing filter component patterns
+  - Position above summary tiles grid, separate from tab-specific filters
+  - Backend integration with time filter parameters

@@ -10,9 +10,9 @@ export class PatternSummaryDto {
   @ApiProperty({ description: 'Total count of patterns of this type' })
   count: number;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Predominant severity level',
-    enum: ['low', 'medium', 'high', 'critical']
+    enum: ['low', 'medium', 'high', 'critical'],
   })
   severity: 'low' | 'medium' | 'high' | 'critical';
 
@@ -21,4 +21,4 @@ export class PatternSummaryDto {
 
   @ApiProperty({ description: 'Percentage of total patterns', required: false })
   percentage?: number;
-} 
+}

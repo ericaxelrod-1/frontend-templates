@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { LoginMonitoringSharedModule } from '../shared/login-monitoring-shared.module';
 
@@ -9,7 +9,7 @@ import { LoginMonitoringSharedModule } from '../shared/login-monitoring-shared.m
   templateUrl: './filters.component.html',
   styleUrls: ['./filters.component.scss']
 })
-export class FiltersComponent implements OnInit {
+export class FiltersComponent implements OnInit, OnChanges {
   @Input() hasPermission = false;
   @Output() filtersChanged = new EventEmitter<FormGroup>();
   @Output() filtersReset = new EventEmitter<void>();
@@ -17,23 +17,44 @@ export class FiltersComponent implements OnInit {
   filterForm: FormGroup;
 
   constructor(private fb: FormBuilder) {
+    this.filterForm = this.createFilterForm();
+  }
+
+  ngOnInit(): void {
+    // Set initial disabled state
+    this.updateFormDisabledState();
+    // Emit initial form state with default date range
+    this.filtersChanged.emit(this.filterForm);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Update form disabled state when hasPermission changes
+    if (changes['hasPermission'] && this.filterForm) {
+      this.updateFormDisabledState();
+    }
+  }
+
+  private createFilterForm(): FormGroup {
     // BUG-109 ENHANCEMENT: Calculate default date range (last 7 days)
     const defaultDateTo = new Date();
     const defaultDateFrom = new Date();
     defaultDateFrom.setDate(defaultDateFrom.getDate() - 7);
     
-    this.filterForm = this.fb.group({
-      email: [''],
-      ipAddress: [''],
-      status: [''],
-      dateFrom: [defaultDateFrom], // Default to 7 days ago
-      dateTo: [defaultDateTo]      // Default to today
+    return this.fb.group({
+      email: [{ value: '', disabled: !this.hasPermission }],
+      ipAddress: [{ value: '', disabled: !this.hasPermission }],
+      status: [{ value: '', disabled: !this.hasPermission }],
+      dateFrom: [{ value: defaultDateFrom, disabled: !this.hasPermission }], // Default to 7 days ago
+      dateTo: [{ value: defaultDateTo, disabled: !this.hasPermission }]      // Default to today
     });
   }
 
-  ngOnInit(): void {
-    // Emit initial form state with default date range
-    this.filtersChanged.emit(this.filterForm);
+  private updateFormDisabledState(): void {
+    if (this.hasPermission) {
+      this.filterForm.enable();
+    } else {
+      this.filterForm.disable();
+    }
   }
 
   onApplyFilters(): void {

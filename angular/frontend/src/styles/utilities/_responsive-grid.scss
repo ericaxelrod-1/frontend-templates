@@ -1,0 +1,65 @@
+@use "abstracts" as *;
+
+// Responsive Grid Container Mixin
+@mixin responsive-grid-container {
+  display: grid;
+  width: 100%;
+  
+  // Mobile-first approach with gap and padding adjustments
+  &.mobile-spacing {
+    gap: 8px;
+    padding: 8px;
+  }
+  
+  &.tablet-spacing {
+    gap: 12px;
+    padding: 12px;
+  }
+  
+  &.desktop-spacing {
+    gap: 16px;
+    padding: 16px;
+  }
+  
+  &.large-desktop-spacing {
+    gap: 20px;
+    padding: 20px;
+  }
+}
+
+// Container Query Responsive Mixin
+@mixin container-responsive-grid($name: "grid") {
+  container-type: inline-size;
+  container-name: #{$name};
+  
+  @container #{$name} (max-width: 575px) {
+    grid-template-columns: 1fr;
+  }
+  
+  @container #{$name} (min-width: 576px) and (max-width: 1023px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @container #{$name} (min-width: 1024px) {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+// Export as CSS utility classes
+.responsive-grid {
+  @include responsive-grid-container;
+}
+
+.responsive-stats-grid {
+  @include responsive-grid-container;
+  @include container-responsive-grid("stats");
+}
+
+.responsive-pattern-grid {
+  @include responsive-grid-container;
+  @include container-responsive-grid("patterns");
+  
+  @container patterns (min-width: 1024px) {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}

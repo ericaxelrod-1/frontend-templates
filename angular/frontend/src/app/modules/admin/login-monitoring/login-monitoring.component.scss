@@ -1,15 +1,28 @@
 @use '@angular/material' as mat;
 @use '../../../../styles/abstracts' as *;
 
+// BUG-113: Enhanced Responsive Design Implementation
+// Mobile-first approach with modern breakpoint system
+
 .login-monitoring-container {
-  padding: 20px;
+  // BUG-113: Dynamic padding using clamp() for fluid responsiveness
+  padding: clamp(8px, 2vw, 20px);
+  
+  // Container query support for component-level responsiveness
+  container-type: inline-size;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: clamp(12px, 3vw, 24px);
+  
+  // Mobile-first responsive adjustments
+  @include respond-to(sm) {
+    flex-direction: row;
+    text-align: left;
+  }
 }
 
 .page-header h1 {
@@ -17,6 +30,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
+  font-size: clamp(1.25rem, 4vw, 2rem);
 }
 
 .no-permission {
@@ -33,16 +47,16 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px;
+  padding: clamp(20px, 5vw, 40px);
   gap: 16px;
 }
 
 .main-content {
-  margin-top: 20px;
+  margin-top: clamp(12px, 3vw, 20px);
 }
 
 .statistics-section {
-  margin-bottom: 30px;
+  margin-bottom: clamp(20px, 4vw, 30px);
 }
 
 .statistics-section h2 {
@@ -50,218 +64,20 @@
   color: var(--mat-sys-on-surface);
 }
 
+// BUG-113: Enhanced Stats Grid with Modern Responsive Patterns
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  text-align: center;
-}
-
-.stat-card.success {
-  border-left: 4px solid $success-color;
-}
-
-.stat-card.failed {
-  border-left: 4px solid var(--mat-sys-error);
-}
-
-.stat-card.blocked {
-  border-left: 4px solid $warning-color;
-}
-
-.stat-card.captcha {
-  border-left: 4px solid $info-color;
-}
-
-.stat-number {
-  font-size: 2rem;
-  font-weight: bold;
-  color: var(--mat-sys-on-surface);
-}
-
-.stat-label {
-  font-size: 0.875rem;
-  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
-  margin-top: 4px;
-}
-
-.monitoring-tabs {
-  margin-top: 20px;
-}
-
-.tab-content {
-  padding: 20px 0;
-}
-
-.attempts-table {
-  width: 100%;
-  margin-top: 16px;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px;
-  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
-}
-
-.info-icon,
-.success-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.info-icon {
-  color: $info-color;
-}
-
-.success-icon {
-  color: $success-color;
-}
-
-.patterns-list,
-.alerts-list {
-  margin-top: 16px;
-}
-
-.pattern-item,
-.alert-item {
-  border: 1px solid var(--mat-sys-outline);
-  border-radius: $border-radius-sm;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-
-.pattern-header,
-.alert-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.pattern-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
-
-.pattern-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Group counter chip styling */
-.group-counter {
-  background-color: var(--mat-sys-tertiary-container) !important;
-  color: var(--mat-sys-on-tertiary-container) !important;
-  font-size: 0.75rem;
-  padding: 4px 8px;
+  gap: clamp(8px, 2vw, 16px);
+  margin-bottom: clamp(12px, 3vw, 20px);
   
-  .group-icon {
-    font-size: 14px;
-    width: 14px;
-    height: 14px;
-    margin-right: 4px;
-  }
+  // Mobile-first grid layout
+  grid-template-columns: 1fr;
 }
 
-.pattern-type,
-.alert-type {
-  font-weight: 500;
-  color: var(--mat-sys-on-surface);
-}
-
-.pattern-details,
-.alert-message {
-  margin: 8px 0;
-  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
-}
-
-.pattern-meta,
-.alert-timestamp {
-  font-size: 0.875rem;
-  color: $text-disabled;
-}
-
-.alert-status {
-  margin-left: auto;
-  font-size: 0.875rem;
-  color: var(--mat-sys-on-surface-variant, #{$text-secondary});
-}
-
-/* Severity cell styling - Combined indicator and text */
-.severity-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.severity-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
-  
-  &.critical {
-    background-color: #b71c1c; /* Dark red for critical */
-  }
-  
-  &.high {
-    background-color: #c62828; /* Red for high */
-  }
-  
-  &.medium {
-    background-color: #e65100; /* Orange for medium */
-  }
-  
-  &.low {
-    background-color: #1b5e20; /* Green for low */
-  }
-  
-  &.default {
-    background-color: #424242; /* Gray for default */
-  }
-}
-
-.severity-text {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--mat-sys-on-surface);
-}
-
-// Keep group-counter chips styled properly
-// No global chip styling needed since severity indicators now use spans
-
-// Responsive design
-@media (max-width: 768px) {
-  .login-monitoring-container {
-    padding: 0.5rem;
-  }
-  
-  .page-header {
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
-  }
-  
-  .alerts-list .alert-item {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
-  }
-}
-
-// Test buttons styling
+// Test buttons styling with enhanced responsiveness
 .test-buttons-section {
-  margin-bottom: 24px;
-  padding: 16px;
+  margin-bottom: clamp(16px, 4vw, 24px);
+  padding: clamp(12px, 3vw, 16px);
   background-color: var(--mat-sys-surface-container-low);
   border-radius: 8px;
   border: 1px solid var(--mat-sys-outline-variant);
@@ -275,29 +91,43 @@
   .test-description {
     margin: 0 0 16px 0;
     color: var(--mat-sys-on-surface-variant);
-    font-size: 0.875rem;
+    font-size: clamp(0.75rem, 2vw, 0.875rem);
     line-height: 1.4;
   }
 
   .test-buttons-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
+    gap: clamp(8px, 2vw, 12px);
     margin-bottom: 16px;
 
-    @media (max-width: 768px) {
+    // Mobile-first grid layout
       grid-template-columns: 1fr;
+    
+    // Small devices and up
+    @include respond-to(sm) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    // Medium devices and up  
+    @include respond-to(md) {
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    
+    // Large devices and up
+    @include respond-to(lg) {
+      grid-template-columns: repeat(3, 1fr);
     }
 
     button {
       display: flex;
       align-items: center;
       justify-content: flex-start;
-      padding: 12px 16px;
+      padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px);
       text-align: left;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-height: $touch-target-min; // Accessibility compliance
 
       mat-icon {
         margin-right: 8px;
@@ -337,12 +167,12 @@
   }
 }
 
-// Pattern Summary Dashboard Tiles Styling
+// BUG-113: Enhanced Pattern Summary Dashboard Tiles with Container Queries
 .pattern-summary-section {
-  margin: 30px 0;
+  margin: clamp(20px, 5vw, 30px) 0;
   
   .section-header {
-    margin-bottom: 20px;
+    margin-bottom: clamp(16px, 4vw, 20px);
     
     h2 {
       display: flex;
@@ -350,117 +180,193 @@
       gap: 8px;
       margin: 0 0 8px 0;
       color: var(--mat-sys-on-surface);
-      font-size: 1.5rem;
+      font-size: clamp(1.25rem, 4vw, 1.5rem);
       font-weight: 500;
     }
     
     .section-description {
       margin: 0;
       color: var(--mat-sys-on-surface-variant);
-      font-size: 0.875rem;
+      font-size: clamp(0.75rem, 2vw, 0.875rem);
     }
   }
 }
 
+// BUG-113: FIXED - Pattern Tiles Grid with Container Queries and Modern Responsive Design
 .pattern-tiles-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-  margin-top: 20px;
+  display: grid !important;
+  gap: clamp(8px, 2vw, 16px);
+  margin-top: clamp(16px, 4vw, 20px);
+  width: 100%;
   
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    gap: 12px;
+  // Container query support for component-level responsiveness
+  container-type: inline-size;
+  
+  // Default grid layout - ensures grid display even without responsive classes
+  // Use a simple approach that should work on all screen sizes
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  
+  // Force grid layout on all children
+  > * {
+    display: block;
+    width: 100%;
+  }
+  
+  // Progressive enhancement based on available space
+  @include respond-to(sm) {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  }
+  
+  @include respond-to(md) {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+  }
+  
+  @include respond-to(lg) {
+    // Safe minimum that works on all screen sizes
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+  }
+  
+  @include respond-to(xl) {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+  }
+  
+  // Container queries for fine-tuned responsiveness
+  @container (max-width: 320px) {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+  
+  @container (min-width: 480px) and (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  @container (min-width: 1200px) {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
   }
 }
 
 .pattern-tile {
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: transform 0.2s ease-in-out !important; // Match stats-card exactly
   border-radius: 12px;
   overflow: hidden;
+  width: 100% !important;
+  height: auto;
+  text-align: center !important; // Match stats-card
   
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px) !important; // Match stats-card exactly
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12) !important; // Match stats-card exactly
+  }
+  
+  &:focus {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
   }
   
   // Severity-based border styling
-  &.pattern-tile-critical {
+  &.pattern-tile-critical,
+  &.critical-pattern {
     border-left: 4px solid #b71c1c;
   }
   
-  &.pattern-tile-high {
+  &.pattern-tile-high,
+  &.high-pattern {
     border-left: 4px solid #c62828;
   }
   
-  &.pattern-tile-medium {
+  &.pattern-tile-medium,
+  &.medium-pattern {
     border-left: 4px solid #e65100;
   }
   
-  &.pattern-tile-low {
+  &.pattern-tile-low,
+  &.low-pattern {
     border-left: 4px solid #1b5e20;
   }
   
-  mat-card-content {
-    padding: 20px;
+  // Pattern type specific styling
+  &.account_switching-pattern,
+  &.brute_force-pattern,
+  &.distributed_attack-pattern,
+  &.ip_hopping-pattern,
+  &.credential_stuffing-pattern,
+  &.suspicious_location-pattern,
+  &.time_anomaly-pattern {
+    border-left: 4px solid var(--mat-sys-primary);
   }
   
-  .tile-header {
+  mat-card-content {
+    padding: clamp(16px, 4vw, 20px);
+  }
+  
+  // FIXED: Target actual Angular Material structure
+  mat-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: clamp(12px, 3vw, 16px);
     
     .pattern-icon {
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
-      color: var(--mat-sys-primary);
+      font-size: clamp(20px, 5vw, 24px) !important;
+      width: clamp(20px, 5vw, 24px) !important;
+      height: clamp(20px, 5vw, 24px) !important;
+      color: var(--mat-sys-primary) !important;
+      
+      mat-icon {
+        font-size: inherit !important;
+        width: inherit !important;
+        height: inherit !important;
+      }
     }
     
-    .severity-indicator {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      flex-shrink: 0;
+    .pattern-title {
+      color: var(--mat-sys-on-surface) !important;
+      font-weight: 500 !important;
+      font-size: clamp(0.875rem, 3vw, 1rem) !important;
     }
   }
   
-  .tile-content {
+  // FIXED: Target actual Angular Material structure
+  mat-card-content {
     text-align: center;
     
     .pattern-count {
-      font-size: 2.5rem;
-      font-weight: 700;
-      color: var(--mat-sys-on-surface);
-      line-height: 1;
-      margin-bottom: 8px;
-    }
-    
-    .pattern-name {
-      font-size: 1rem;
-      font-weight: 500;
-      color: var(--mat-sys-on-surface);
-      margin-bottom: 12px;
-      line-height: 1.2;
-    }
-    
-    .pattern-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.75rem;
-      color: var(--mat-sys-on-surface-variant);
+      font-size: clamp(1.8rem, 6vw, 2.5rem) !important;
+      font-weight: 700 !important;
+      color: var(--mat-sys-on-surface) !important;
+      line-height: 1 !important;
+      margin-bottom: clamp(6px, 2vw, 8px) !important;
+      display: block !important;
       
-      .last-detected {
-        flex: 1;
-        text-align: left;
+      // Responsive font size for very small screens
+      @container (max-width: 320px) {
+        font-size: 1.8rem !important;
+      }
+    }
+    
+    .pattern-severity {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: clamp(8px, 2vw, 12px);
+      
+      .severity-indicator {
+        width: 12px !important;
+        height: 12px !important;
+        border-radius: 50% !important;
+        margin-right: 8px !important;
+        flex-shrink: 0 !important;
+        
+        &.high { background-color: #f44336 !important; }
+        &.medium { background-color: #ff9800 !important; }
+        &.low { background-color: #4caf50 !important; }
       }
       
-      .percentage {
-        font-weight: 600;
-        color: var(--mat-sys-primary);
+      span {
+        font-size: clamp(0.75rem, 2vw, 0.875rem) !important;
+        color: var(--mat-sys-on-surface-variant) !important;
+        text-transform: capitalize !important;
       }
     }
   }
@@ -468,11 +374,11 @@
 
 .empty-pattern-summary {
   text-align: center;
-  padding: 40px;
+  padding: clamp(20px, 5vw, 40px);
   color: var(--mat-sys-on-surface-variant);
   
   .info-icon {
-    font-size: 48px;
+    font-size: clamp(32px, 8vw, 48px);
     margin-bottom: 16px;
     color: $info-color;
   }
@@ -480,10 +386,150 @@
   h3 {
     margin: 0 0 8px 0;
     color: var(--mat-sys-on-surface);
+    font-size: clamp(1rem, 3vw, 1.25rem);
   }
   
   p {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: clamp(0.75rem, 2vw, 0.875rem);
   }
-} 
+}
+
+// BUG-124.7.1: CRITICAL FIX - CSS Specificity Conflict Resolution
+// These classes are dynamically applied by getResponsiveSpacingClass() method
+// FIXED: Removed grid-template-columns overrides that were preventing responsive grid layout
+
+.mobile-spacing {
+  .login-monitoring-container { 
+    padding: clamp(8px, 2vw, 12px) !important; 
+    width: 100% !important;
+  }
+  
+  // REMOVED: .stats-grid doesn't exist in HTML - statistics use .stats-container
+  // .stats-grid { 
+  //   gap: 8px !important; 
+  // }
+  
+  .page-header { 
+    flex-direction: column !important; 
+    align-items: flex-start !important; 
+    gap: 8px !important; 
+    margin-bottom: 12px !important; 
+    
+    h1 { 
+      font-size: 1.25rem !important; 
+    } 
+  }
+  
+  // FIXED: Removed grid-template-columns override - let base .pattern-tiles-grid handle responsive layout
+  .pattern-tiles-grid { 
+    gap: 8px !important; 
+  }
+  
+  .tab-content { 
+    padding: 8px 0 !important; 
+  }
+  
+  .alerts-list .alert-item {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+}
+
+.tablet-spacing {
+  .login-monitoring-container { 
+    padding: clamp(12px, 2vw, 16px) !important; 
+    width: 100% !important;
+  }
+  
+  // REMOVED: .stats-grid doesn't exist in HTML - statistics use .stats-container
+  // .stats-grid { 
+  //   gap: 12px !important; 
+  // }
+  
+  .page-header { 
+    flex-direction: row !important; 
+    text-align: left !important; 
+    
+    h1 { 
+      font-size: 1.5rem !important; 
+    } 
+  }
+  
+  // FIXED: Removed grid-template-columns override - let base .pattern-tiles-grid handle responsive layout
+  .pattern-tiles-grid { 
+    gap: 12px !important; 
+  }
+  
+  .tab-content { 
+    padding: 12px 0 !important; 
+  }
+  
+  .alerts-list .alert-item {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 1rem !important;
+  }
+}
+
+.desktop-spacing {
+  .login-monitoring-container { 
+    padding: clamp(16px, 2vw, 20px) !important; 
+    width: 100% !important;
+  }
+  
+  // REMOVED: .stats-grid doesn't exist in HTML - statistics use .stats-container
+  // .stats-grid { 
+  //   gap: 16px !important; 
+  // }
+  
+  .page-header { 
+    flex-direction: row !important; 
+    text-align: left !important; 
+    
+    h1 { 
+      font-size: 1.75rem !important; 
+    } 
+  }
+  
+  // FIXED: Removed grid-template-columns override - let base .pattern-tiles-grid handle responsive layout
+  .pattern-tiles-grid { 
+    gap: 16px !important; 
+  }
+  
+  .tab-content { 
+    padding: 16px 0 !important; 
+  }
+}
+
+.large-desktop-spacing {
+  .login-monitoring-container { 
+    padding: clamp(16px, 2vw, 24px) !important; 
+    // REMOVED: max-width: 1400px !important; // Enable full-width on large screens
+    width: 100% !important;
+  }
+  
+  // REMOVED: .stats-grid doesn't exist in HTML - statistics use .stats-container
+  // .stats-grid { 
+  //   gap: 20px !important; 
+  // }
+  
+  .page-header { 
+    flex-direction: row !important; 
+    text-align: left !important; 
+    
+    h1 { 
+      font-size: 2rem !important; 
+    } 
+  }
+  
+  // FIXED: Removed grid-template-columns override - let base .pattern-tiles-grid handle responsive layout
+  .pattern-tiles-grid { 
+    gap: 20px !important; 
+  }
+  
+  .tab-content { 
+    padding: 20px 0 !important; 
+  }
+}

@@ -95,12 +95,76 @@ export class PatternDetectionService {
     for (const pattern of realTimePatterns) {
       const stored = await this.storePatternWithGrouping(pattern);
       if (stored) {
-        storedPatterns.push(this.transformStoredPatternToDetectedPattern(stored));
+        storedPatterns.push(
+          this.transformStoredPatternToDetectedPattern(stored),
+        );
       }
     }
 
     // Return all patterns from database (includes both new and existing)
     return this.getStoredPatterns();
+  }
+
+  /**
+   * Detect only a specific pattern type (for simple mode testing)
+   * This method runs only the detector for the requested pattern type
+   * @param patternType The specific pattern type to detect
+   * @returns Array of detected patterns of only the specified type
+   */
+  async detectSpecificPattern(
+    patternType: string
+  ): Promise<DetectedPattern[]> {
+    let patterns: DetectedPattern[] = [];
+
+    // Map scenario names to pattern detection methods
+    switch (patternType) {
+      case 'brute_force':
+        patterns = await this.detectBruteForceAttempts();
+        break;
+      case 'distributed_attack':
+        patterns = await this.detectDistributedAttacks();
+        break;
+      case 'credential_stuffing':
+        // Note: credential stuffing uses same detector as brute force
+        // but with different thresholds - for simple mode, we'll
+        // tag it specifically
+        patterns = await this.detectBruteForceAttempts();
+        patterns.forEach(p => {
+          if (p.details.includes('multiple different emails')) {
+            p.type = PatternType.CREDENTIAL_STUFFING;
+          }
+        });
+        break;
+      case 'rapid_account_switching':
+      case 'account_switching':
+        patterns = await this.detectRapidAccountSwitching();
+        break;
+      case 'ip_hopping':
+        patterns = await this.detectIPHopping();
+        break;
+      case 'suspicious_location':
+        patterns = await this.detectSuspiciousLocations();
+        break;
+      case 'time_anomaly':
+        patterns = await this.detectTimeAnomalies();
+        break;
+      default:
+        console.error(`Unknown pattern type: ${patternType}`);
+        return [];
+    }
+
+    // Store the detected patterns
+    const storedPatterns: DetectedPattern[] = [];
+    for (const pattern of patterns) {
+      const stored = await this.storePatternWithGrouping(pattern);
+      if (stored) {
+        storedPatterns.push(
+          this.transformStoredPatternToDetectedPattern(stored),
+        );
+      }
+    }
+
+    return storedPatterns;
   }
 
   /**
@@ -198,21 +262,27 @@ export class PatternDetectionService {
     try {
       const detectionTime = new Date(pattern.timestamp);
       const timeWindow = this.calculateTimeWindow(pattern.type);
-      const windowStart = new Date(detectionTime.getTime() - timeWindow.lookback);
-      const windowEnd = new Date(detectionTime.getTime() + timeWindow.lookahead);
+      const windowStart = new Date(
+        detectionTime.getTime() - timeWindow.lookback,
+      );
+      const windowEnd = new Date(
+        detectionTime.getTime() + timeWindow.lookahead,
+      );
 
       // Look for existing patterns of the same type and IP within a reasonable time window (5 minutes)
       // This prevents exact duplicates while allowing legitimate new patterns
       const fiveMinutesAgo = new Date(detectionTime.getTime() - 5 * 60 * 1000);
-      const existingPattern = await this.securityDetectedPatternRepository.findOne({
-        where: {
-          patternType: pattern.type,
-          ipAddress: pattern.ipAddress || pattern.ipAddresses?.[0] || 'unknown',
-          detectionTimestamp: MoreThan(fiveMinutesAgo),
-          status: 'active'
-        },
-        order: { detectionTimestamp: 'DESC' }
-      });
+      const existingPattern =
+        await this.securityDetectedPatternRepository.findOne({
+          where: {
+            patternType: pattern.type,
+            ipAddress:
+              pattern.ipAddress || pattern.ipAddresses?.[0] || 'unknown',
+            detectionTimestamp: MoreThan(fiveMinutesAgo),
+            status: 'active',
+          },
+          order: { detectionTimestamp: 'DESC' },
+        });
 
       if (existingPattern) {
         // Update existing pattern with new evidence and increment group count
@@ -227,16 +297,24 @@ export class PatternDetectionService {
             {
               timestamp: detectionTime,
               attemptCount: pattern.evidence?.attemptCount || 0,
-              source: pattern.evidence?.source || 'real-time'
-            }
-          ]
+              source: pattern.evidence?.source || 'real-time',
+            },
+          ],
         };
 
         existingPattern.evidence = JSON.stringify(newEvidence);
-        existingPattern.attemptCount = Math.max(existingPattern.attemptCount, pattern.evidence?.attemptCount || 0);
-        existingPattern.uniqueEmailCount = Math.max(existingPattern.uniqueEmailCount, pattern.evidence?.uniqueEmailCount || pattern.emails?.length || 0);
-        
-        return await this.securityDetectedPatternRepository.save(existingPattern);
+        existingPattern.attemptCount = Math.max(
+          existingPattern.attemptCount,
+          pattern.evidence?.attemptCount || 0,
+        );
+        existingPattern.uniqueEmailCount = Math.max(
+          existingPattern.uniqueEmailCount,
+          pattern.evidence?.uniqueEmailCount || pattern.emails?.length || 0,
+        );
+
+        return await this.securityDetectedPatternRepository.save(
+          existingPattern,
+        );
       }
 
       // Create new pattern with grouping metadata
@@ -252,20 +330,24 @@ export class PatternDetectionService {
           groupedPatternCount: 1,
           firstDetection: detectionTime,
           lastDetection: detectionTime,
-          detectionHistory: [{
-            timestamp: detectionTime,
-            attemptCount: pattern.evidence?.attemptCount || 0,
-            source: pattern.evidence?.source || 'real-time'
-          }]
+          detectionHistory: [
+            {
+              timestamp: detectionTime,
+              attemptCount: pattern.evidence?.attemptCount || 0,
+              source: pattern.evidence?.source || 'real-time',
+            },
+          ],
         }),
         status: 'active',
         attemptCount: pattern.evidence?.attemptCount || 0,
-        uniqueEmailCount: pattern.evidence?.uniqueEmailCount || pattern.emails?.length || 0,
+        uniqueEmailCount:
+          pattern.evidence?.uniqueEmailCount || pattern.emails?.length || 0,
       });
 
-      const savedPattern = await this.securityDetectedPatternRepository.save(storedPattern);
+      const savedPattern =
+        await this.securityDetectedPatternRepository.save(storedPattern);
       console.log(
-        `Stored new pattern: ${pattern.type} from IP ${pattern.ipAddress || pattern.ipAddresses?.[0]} (${windowStart.toISOString()} - ${windowEnd.toISOString()})`
+        `Stored new pattern: ${pattern.type} from IP ${pattern.ipAddress || pattern.ipAddresses?.[0]} (${windowStart.toISOString()} - ${windowEnd.toISOString()})`,
       );
 
       return savedPattern;
@@ -279,18 +361,47 @@ export class PatternDetectionService {
   /**
    * Calculate time window for pattern based on pattern type
    */
-  private calculateTimeWindow(patternType: PatternType): { lookback: number; lookahead: number } {
+  private calculateTimeWindow(patternType: PatternType): {
+    lookback: number;
+    lookahead: number;
+  } {
     const timeWindows = {
-      [PatternType.BRUTE_FORCE]: { lookback: 30 * 60 * 1000, lookahead: 10 * 60 * 1000 }, // 30min back, 10min ahead
-      [PatternType.DISTRIBUTED_ATTACK]: { lookback: 60 * 60 * 1000, lookahead: 15 * 60 * 1000 }, // 1hr back, 15min ahead
-      [PatternType.CREDENTIAL_STUFFING]: { lookback: 60 * 60 * 1000, lookahead: 15 * 60 * 1000 }, // 1hr back, 15min ahead
-      [PatternType.RAPID_ACCOUNT_SWITCHING]: { lookback: 15 * 60 * 1000, lookahead: 5 * 60 * 1000 }, // 15min back, 5min ahead
-      [PatternType.IP_HOPPING]: { lookback: 10 * 60 * 1000, lookahead: 5 * 60 * 1000 }, // 10min back, 5min ahead
-      [PatternType.SUSPICIOUS_LOCATION]: { lookback: 24 * 60 * 60 * 1000, lookahead: 60 * 60 * 1000 }, // 24hr back, 1hr ahead
-      [PatternType.TIME_ANOMALY]: { lookback: 60 * 60 * 1000, lookahead: 30 * 60 * 1000 }, // 1hr back, 30min ahead
+      [PatternType.BRUTE_FORCE]: {
+        lookback: 30 * 60 * 1000,
+        lookahead: 10 * 60 * 1000,
+      }, // 30min back, 10min ahead
+      [PatternType.DISTRIBUTED_ATTACK]: {
+        lookback: 60 * 60 * 1000,
+        lookahead: 15 * 60 * 1000,
+      }, // 1hr back, 15min ahead
+      [PatternType.CREDENTIAL_STUFFING]: {
+        lookback: 60 * 60 * 1000,
+        lookahead: 15 * 60 * 1000,
+      }, // 1hr back, 15min ahead
+      [PatternType.RAPID_ACCOUNT_SWITCHING]: {
+        lookback: 15 * 60 * 1000,
+        lookahead: 5 * 60 * 1000,
+      }, // 15min back, 5min ahead
+      [PatternType.IP_HOPPING]: {
+        lookback: 10 * 60 * 1000,
+        lookahead: 5 * 60 * 1000,
+      }, // 10min back, 5min ahead
+      [PatternType.SUSPICIOUS_LOCATION]: {
+        lookback: 24 * 60 * 60 * 1000,
+        lookahead: 60 * 60 * 1000,
+      }, // 24hr back, 1hr ahead
+      [PatternType.TIME_ANOMALY]: {
+        lookback: 60 * 60 * 1000,
+        lookahead: 30 * 60 * 1000,
+      }, // 1hr back, 30min ahead
     };
 
-    return timeWindows[patternType] || { lookback: 30 * 60 * 1000, lookahead: 10 * 60 * 1000 };
+    return (
+      timeWindows[patternType] || {
+        lookback: 30 * 60 * 1000,
+        lookahead: 10 * 60 * 1000,
+      }
+    );
   }
 
   /**
@@ -339,7 +450,8 @@ export class PatternDetectionService {
     // Create enhanced details with grouping information
     const groupCount = evidence.groupedPatternCount || 1;
     const baseDetails = `Pattern: ${pattern.patternType} from IP ${pattern.ipAddress}`;
-    const groupDetails = groupCount > 1 ? ` (${groupCount} similar patterns grouped)` : '';
+    const groupDetails =
+      groupCount > 1 ? ` (${groupCount} similar patterns grouped)` : '';
 
     return {
       id: pattern.id.toString(),
@@ -349,7 +461,7 @@ export class PatternDetectionService {
       evidence: {
         ...evidence,
         groupedPatternCount: groupCount,
-        displayCount: groupCount // For frontend display
+        displayCount: groupCount, // For frontend display
       },
       timestamp: pattern.detectionTimestamp,
       ipAddress: pattern.ipAddress, // Keep for backwards compatibility
@@ -455,94 +567,308 @@ export class PatternDetectionService {
       | 'brute_force'
       | 'distributed_attack'
       | 'credential_stuffing'
-      | 'account_switching',
+      | 'account_switching'
+      | 'ip_hopping'
+      | 'suspicious_location'
+      | 'time_anomaly',
+    mode: 'simple' | 'enhanced' = 'enhanced',
   ): Promise<void> {
     const now = new Date();
 
     switch (scenarioType) {
       case 'brute_force':
-        // Create 8 failed attempts from same IP in last 10 minutes
-        for (let i = 0; i < 8; i++) {
-          const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
-          await this.createTestAttempt({
-            ipAddress: '192.168.100.50',
-            emailAttempted: `test${i % 3}@example.com`, // Rotate between 3 emails
-            status: 'failed',
-            attemptedAt: attemptTime,
-            userAgent: 'Mozilla/5.0 (Test Browser)',
-            failureReason: 'invalid_credentials',
-          });
+        if (mode === 'simple') {
+          // Simple mode: Minimal data that ONLY triggers brute force
+          const simpleIP = '192.168.200.1';  // Use unique IP range for simple tests
+          const simpleEmail = 'bruteforce.simple@test.example.com';
+          
+          // Create exactly 6 failed attempts (just above threshold of 5)
+          for (let i = 0; i < 6; i++) {
+            const attemptTime = new Date(now.getTime() - i * 120000); // 2 minutes apart
+            await this.createTestAttempt({
+              ipAddress: simpleIP,
+              emailAttempted: simpleEmail,
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'Simple-Test-Agent/1.0',
+              failureReason: 'invalid_credentials',
+            });
+          }
+        } else {
+          // Enhanced mode: existing code
+          for (let i = 0; i < 8; i++) {
+            const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
+            await this.createTestAttempt({
+              ipAddress: '192.168.100.50',
+              emailAttempted: `test${i % 3}@example.com`, // Rotate between 3 emails
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'Mozilla/5.0 (Test Browser)',
+              failureReason: 'invalid_credentials',
+            });
+          }
         }
         break;
 
       case 'distributed_attack':
-        // Create attempts for same email from 4 different IPs
-        const targetEmail = 'admin@example.com';
-        const ips = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
-        for (let i = 0; i < ips.length; i++) {
-          const attemptTime = new Date(now.getTime() - i * 300000); // 5 minutes apart
-          await this.createTestAttempt({
-            ipAddress: ips[i],
-            emailAttempted: targetEmail,
-            status: Math.random() > 0.5 ? 'failed' : 'success',
-            attemptedAt: attemptTime,
-            userAgent: `Mozilla/5.0 (Test Browser ${i})`,
-            failureReason:
-              Math.random() > 0.5 ? 'invalid_credentials' : undefined,
-          });
+        if (mode === 'simple') {
+          // Simple mode: Exactly 4 IPs (minimum for distributed) with same email
+          const targetEmail = 'distributed.simple@test.example.com';
+          const simpleIPs = ['10.200.0.1', '10.200.0.2', '10.200.0.3', '10.200.0.4'];
+          
+          for (let i = 0; i < simpleIPs.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 600000); // 10 minutes apart
+            await this.createTestAttempt({
+              ipAddress: simpleIPs[i],
+              emailAttempted: targetEmail,
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: `Simple-Test-Agent/${i}`,
+              failureReason: 'invalid_credentials',
+            });
+          }
+        } else {
+          // Enhanced mode: existing code
+          const targetEmail = 'admin@example.com';
+          const ips = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
+          for (let i = 0; i < ips.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 300000); // 5 minutes apart
+            await this.createTestAttempt({
+              ipAddress: ips[i],
+              emailAttempted: targetEmail,
+              status: Math.random() > 0.5 ? 'failed' : 'success',
+              attemptedAt: attemptTime,
+              userAgent: `Mozilla/5.0 (Test Browser ${i})`,
+              failureReason:
+                Math.random() > 0.5 ? 'invalid_credentials' : undefined,
+            });
+          }
         }
         break;
 
       case 'credential_stuffing':
-        // Create attempts with many different emails from same IP
-        const stuffingIP = '172.16.0.100';
-        const emails = [
-          'admin@test.com',
-          'user@test.com',
-          'manager@test.com',
-          'support@test.com',
-          'info@test.com',
-          'sales@test.com',
-          'contact@test.com',
-          'help@test.com',
-          'service@test.com',
-          'team@test.com',
-          'office@test.com',
-          'staff@test.com',
-        ];
-        for (let i = 0; i < emails.length; i++) {
-          const attemptTime = new Date(now.getTime() - i * 30000); // 30 seconds apart
-          await this.createTestAttempt({
-            ipAddress: stuffingIP,
-            emailAttempted: emails[i],
-            status: 'failed',
-            attemptedAt: attemptTime,
-            userAgent: 'curl/7.68.0',
-            failureReason: 'invalid_credentials',
-          });
+        if (mode === 'simple') {
+          // Simple mode: Many different emails from one IP
+          const stuffingIP = '192.168.201.1';
+          const emails = [
+            'user1.simple@test.com', 'user2.simple@test.com', 'user3.simple@test.com',
+            'user4.simple@test.com', 'user5.simple@test.com', 'user6.simple@test.com',
+            'user7.simple@test.com', 'user8.simple@test.com', 'user9.simple@test.com',
+            'user10.simple@test.com'
+          ];
+          
+          for (let i = 0; i < emails.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 30000); // 30 seconds apart
+            await this.createTestAttempt({
+              ipAddress: stuffingIP,
+              emailAttempted: emails[i],
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'Simple-Test-Agent/1.0',
+              failureReason: 'invalid_credentials',
+            });
+          }
+        } else {
+          // Enhanced mode: Create attempts with many different emails from same IP
+          const stuffingIP = '172.16.0.100';
+          const emails = [
+            'admin@test.com',
+            'user@test.com',
+            'manager@test.com',
+            'support@test.com',
+            'info@test.com',
+            'sales@test.com',
+            'contact@test.com',
+            'help@test.com',
+            'service@test.com',
+            'team@test.com',
+            'office@test.com',
+            'staff@test.com',
+          ];
+          for (let i = 0; i < emails.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 30000); // 30 seconds apart
+            await this.createTestAttempt({
+              ipAddress: stuffingIP,
+              emailAttempted: emails[i],
+              status: 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'curl/7.68.0',
+              failureReason: 'invalid_credentials',
+            });
+          }
         }
         break;
 
       case 'account_switching':
-        // Create attempts with multiple different emails from same IP
-        const switchingIP = '203.0.113.10';
-        const switchEmails = [
-          'alice@corp.com',
-          'bob@corp.com',
-          'charlie@corp.com',
-          'diana@corp.com',
-        ];
-        for (let i = 0; i < switchEmails.length; i++) {
-          const attemptTime = new Date(now.getTime() - i * 120000); // 2 minutes apart
+        if (mode === 'simple') {
+          // Simple mode: 4 different accounts from same IP
+          const switchingIP = '192.168.202.1';
+          const simpleEmails = [
+            'alice.simple@test.com', 'bob.simple@test.com',
+            'charlie.simple@test.com', 'diana.simple@test.com'
+          ];
+          
+          for (let i = 0; i < simpleEmails.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 90000); // 1.5 minutes apart
+            await this.createTestAttempt({
+              ipAddress: switchingIP,
+              emailAttempted: simpleEmails[i],
+              status: 'success',  // All successful to avoid brute force
+              attemptedAt: attemptTime,
+              userAgent: 'Simple-Test-Agent/1.0',
+            });
+          }
+        } else {
+          // Enhanced mode: Create attempts with multiple different emails from same IP
+          const switchingIP = '203.0.113.10';
+          const switchEmails = [
+            'alice@corp.com',
+            'bob@corp.com',
+            'charlie@corp.com',
+            'diana@corp.com',
+          ];
+          for (let i = 0; i < switchEmails.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 120000); // 2 minutes apart
+            await this.createTestAttempt({
+              ipAddress: switchingIP,
+              emailAttempted: switchEmails[i],
+              status: Math.random() > 0.3 ? 'failed' : 'success',
+              attemptedAt: attemptTime,
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+              failureReason:
+                Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+            });
+          }
+        }
+        break;
+
+      case 'ip_hopping':
+        if (mode === 'simple') {
+          // Simple mode: Same email from 3 different IPs in short time
+          const hoppingEmail = 'iphopper.simple@test.example.com';
+          const simpleHoppingIPs = ['10.201.1.1', '10.201.1.2', '10.201.1.3'];
+          
+          for (let i = 0; i < simpleHoppingIPs.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 180000); // 3 minutes apart
+            await this.createTestAttempt({
+              ipAddress: simpleHoppingIPs[i],
+              emailAttempted: hoppingEmail,
+              status: 'success',
+              attemptedAt: attemptTime,
+              userAgent: 'Simple-Test-Agent/1.0',
+            });
+          }
+        } else {
+          // Enhanced mode: Create attempts from rapidly changing IP addresses for same user
+          const hoppingEmail = 'target@example.com';
+          const hoppingIPs = [
+            '10.1.1.1',
+            '10.1.1.2',
+            '10.1.1.3',
+            '10.1.1.4',
+            '10.1.1.5',
+            '10.1.1.6',
+            '10.1.1.7',
+            '10.1.1.8',
+            '10.1.1.9',
+            '10.1.1.10',
+          ];
+          for (let i = 0; i < hoppingIPs.length; i++) {
+            const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
+            await this.createTestAttempt({
+              ipAddress: hoppingIPs[i],
+              emailAttempted: hoppingEmail,
+              status: Math.random() > 0.6 ? 'failed' : 'success',
+              attemptedAt: attemptTime,
+              userAgent: `Mozilla/5.0 (IP Hopping Test ${i})`,
+              failureReason:
+                Math.random() > 0.6 ? 'invalid_credentials' : undefined,
+            });
+          }
+        }
+        break;
+
+      case 'suspicious_location':
+        if (mode === 'simple') {
+          // Simple mode: Single attempt from known suspicious IP
           await this.createTestAttempt({
-            ipAddress: switchingIP,
-            emailAttempted: switchEmails[i],
-            status: Math.random() > 0.3 ? 'failed' : 'success',
-            attemptedAt: attemptTime,
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            failureReason:
-              Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+            ipAddress: '45.67.89.12',  // Known VPN/proxy range
+            emailAttempted: 'location.simple@test.example.com',
+            status: 'success',
+            attemptedAt: now,
+            userAgent: 'Simple-Test-Agent/1.0 (VPN)',
           });
+        } else {
+          // Enhanced mode: Create multiple attempts from SAME suspicious foreign IP to trigger indicators
+          const suspiciousIP = '1.2.3.4'; // Confirmed foreign IP (not in private ranges)
+          const suspiciousEmails = [
+            'user1@company.com',
+            'user2@company.com',
+            'admin@company.com',
+            'manager@company.com',
+          ];
+
+          console.log(
+            `[DEBUG] Creating suspicious location test data for IP: ${suspiciousIP}`,
+          );
+
+          // Create multiple failed attempts from same IP (triggers multiple_failures)
+          for (let i = 0; i < 4; i++) {
+            const attemptTime = new Date(now.getTime() - i * 60000); // 1 minute apart
+            await this.createTestAttempt({
+              ipAddress: suspiciousIP,
+              emailAttempted: suspiciousEmails[i],
+              status: 'failed', // All failed to trigger multiple_failures indicator
+              attemptedAt: attemptTime,
+              userAgent: 'Mozilla/5.0 (Suspicious Location Test)',
+              failureReason: 'invalid_credentials',
+            });
+            console.log(
+              `[DEBUG] Created attempt ${i + 1}/4 for ${suspiciousEmails[i]} from ${suspiciousIP}`,
+            );
+          }
+
+          console.log(
+            `[DEBUG] Test data created: 4 failed attempts from foreign IP ${suspiciousIP} on 4 different emails`,
+          );
+          console.log(
+            `[DEBUG] Expected indicators: foreign_ip (IP not private), multiple_failures (4 failed >= 3), multiple_accounts (4 emails >= 3)`,
+          );
+        }
+        break;
+
+      case 'time_anomaly':
+        if (mode === 'simple') {
+          // Simple mode: Login at unusual time (3 AM local)
+          const anomalyTime = new Date();
+          anomalyTime.setHours(3, 0, 0, 0);  // 3:00 AM
+          
+          await this.createTestAttempt({
+            ipAddress: '192.168.203.1',
+            emailAttempted: 'nightowl.simple@test.example.com',
+            status: 'success',
+            attemptedAt: anomalyTime,
+            userAgent: 'Simple-Test-Agent/1.0',
+          });
+        } else {
+          // Enhanced mode: Create login attempts at unusual hours (2-4 AM)
+          const anomalyEmail = 'nightshift@example.com';
+          const anomalyIP = '192.168.1.100';
+          const baseTime = new Date();
+          baseTime.setHours(3, 0, 0, 0); // 3 AM today
+
+          for (let i = 0; i < 6; i++) {
+            const attemptTime = new Date(baseTime.getTime() - i * 86400000); // 1 day apart, all at 3 AM
+            await this.createTestAttempt({
+              ipAddress: anomalyIP,
+              emailAttempted: anomalyEmail,
+              status: Math.random() > 0.3 ? 'success' : 'failed',
+              attemptedAt: attemptTime,
+              userAgent: 'Mozilla/5.0 (Time Anomaly Test)',
+              failureReason:
+                Math.random() > 0.7 ? 'invalid_credentials' : undefined,
+            });
+          }
         }
         break;
     }
@@ -592,9 +918,9 @@ export class PatternDetectionService {
       })
       .execute();
 
-    return { 
+    return {
       deleted: loginAttemptsResult.affected || 0,
-      patternsDeleted: patternsResult.affected || 0
+      patternsDeleted: patternsResult.affected || 0,
     };
   }
 
@@ -719,9 +1045,275 @@ export class PatternDetectionService {
   }
 
   async detectSuspiciousLocations(): Promise<DetectedPattern[]> {
-    // This would typically use IP geolocation data to detect logins from unusual locations
-    // For this implementation, we'll just use mock data
-    return [];
+    console.log('[DEBUG] detectSuspiciousLocations() called');
+    const patterns: DetectedPattern[] = [];
+    const startTime = new Date();
+    startTime.setHours(startTime.getHours() - 24); // Last 24 hours
+    console.log(
+      `[DEBUG] Looking for attempts since: ${startTime.toISOString()}`,
+    );
+
+    try {
+      // Get login attempts from potentially suspicious locations
+      const suspiciousAttempts = await this.loginAttemptRepository
+        .createQueryBuilder('attempt')
+        .where('attempt.attemptedAt >= :startTime', { startTime })
+        .andWhere('attempt.ipAddress IS NOT NULL')
+        .orderBy('attempt.attemptedAt', 'DESC')
+        .getMany();
+
+      console.log(
+        `[DEBUG] Found ${suspiciousAttempts.length} total attempts with IP addresses`,
+      );
+
+      if (suspiciousAttempts.length > 0) {
+        console.log(
+          '[DEBUG] Sample attempts:',
+          suspiciousAttempts.slice(0, 3).map((a) => ({
+            ip: a.ipAddress,
+            email: a.emailAttempted,
+            status: a.status,
+            time: a.attemptedAt,
+          })),
+        );
+      }
+
+      // Group attempts by IP address for pattern detection
+      const ipGroups = new Map<string, LoginAttempt[]>();
+      suspiciousAttempts.forEach((attempt) => {
+        const ip = attempt.ipAddress;
+        if (!ipGroups.has(ip)) {
+          ipGroups.set(ip, []);
+        }
+        ipGroups.get(ip)!.push(attempt);
+      });
+
+      console.log(`[DEBUG] Grouped into ${ipGroups.size} unique IP addresses`);
+      console.log(
+        '[DEBUG] IP groups:',
+        Array.from(ipGroups.keys()).map(
+          (ip) => `${ip} (${ipGroups.get(ip)!.length} attempts)`,
+        ),
+      );
+
+      // Analyze each IP group for suspicious patterns
+      for (const [ipAddress, attempts] of ipGroups.entries()) {
+        console.log(
+          `[DEBUG] Analyzing IP ${ipAddress} with ${attempts.length} attempts`,
+        );
+
+        const suspiciousIndicators = this.analyzeSuspiciousLocation(
+          ipAddress,
+          attempts,
+        );
+
+        console.log(
+          `[DEBUG] IP ${ipAddress} - Suspicious indicators: [${suspiciousIndicators.join(', ')}]`,
+        );
+
+        if (suspiciousIndicators.length > 0) {
+          const affectedEmails = [
+            ...new Set(attempts.map((a) => a.emailAttempted)),
+          ];
+          const pattern: DetectedPattern = {
+            id: `suspicious_location_${ipAddress}_${Date.now()}`,
+            type: PatternType.SUSPICIOUS_LOCATION,
+            severity:
+              this.calculateSuspiciousLocationSeverity(suspiciousIndicators),
+            timestamp: new Date(),
+            details: `Suspicious location detected from IP ${ipAddress}. Attempts: ${attempts.length}, Indicators: ${suspiciousIndicators.join(', ')}`,
+            evidence: {
+              ipAddress,
+              attemptCount: attempts.length,
+              suspiciousIndicators,
+              timeRange: {
+                start: attempts[attempts.length - 1].attemptedAt,
+                end: attempts[0].attemptedAt,
+              },
+              affectedEmails,
+              userAgents: [
+                ...new Set(attempts.map((a) => a.userAgent).filter((ua) => ua)),
+              ],
+              riskScore: this.calculateLocationRiskScore(suspiciousIndicators),
+              recommendedAction:
+                this.getRecommendedAction(suspiciousIndicators),
+            },
+            ipAddress,
+            ipAddresses: [ipAddress],
+            email: affectedEmails[0],
+            emails: affectedEmails,
+          };
+
+          patterns.push(pattern);
+        }
+      }
+
+      console.log(
+        `[PatternDetection] Detected ${patterns.length} suspicious location patterns`,
+      );
+      return patterns;
+    } catch (error) {
+      console.error(
+        '[PatternDetection] Error detecting suspicious locations:',
+        error,
+      );
+      return [];
+    }
+  }
+
+  private analyzeSuspiciousLocation(
+    ipAddress: string,
+    attempts: LoginAttempt[],
+  ): string[] {
+    console.log(`[DEBUG] analyzeSuspiciousLocation for IP ${ipAddress}`);
+    const indicators: string[] = [];
+
+    // Check for foreign IP patterns (simplified detection)
+    const isForeignResult = this.isForeignIP(ipAddress);
+    console.log(`[DEBUG] IP ${ipAddress} isForeign: ${isForeignResult}`);
+    if (isForeignResult) {
+      indicators.push('foreign_ip');
+      console.log(`[DEBUG] Added 'foreign_ip' indicator for ${ipAddress}`);
+    }
+
+    // Check for VPN/proxy patterns
+    const isVPNResult = this.isVPNOrProxy(ipAddress);
+    console.log(`[DEBUG] IP ${ipAddress} isVPN: ${isVPNResult}`);
+    if (isVPNResult) {
+      indicators.push('vpn_proxy');
+      console.log(`[DEBUG] Added 'vpn_proxy' indicator for ${ipAddress}`);
+    }
+
+    // Check for multiple failed attempts from same IP
+    const failedAttempts = attempts.filter((a) => a.status === 'failed');
+    console.log(
+      `[DEBUG] IP ${ipAddress} failed attempts: ${failedAttempts.length}/${attempts.length} (need >=3)`,
+    );
+    if (failedAttempts.length >= 3) {
+      indicators.push('multiple_failures');
+      console.log(
+        `[DEBUG] Added 'multiple_failures' indicator for ${ipAddress}`,
+      );
+    }
+
+    // Check for attempts on multiple accounts from same IP
+    const uniqueEmails = new Set(attempts.map((a) => a.emailAttempted));
+    console.log(
+      `[DEBUG] IP ${ipAddress} unique emails: ${uniqueEmails.size} (need >=3)`,
+      Array.from(uniqueEmails),
+    );
+    if (uniqueEmails.size >= 3) {
+      indicators.push('multiple_accounts');
+      console.log(
+        `[DEBUG] Added 'multiple_accounts' indicator for ${ipAddress}`,
+      );
+    }
+
+    // Check for unusual user agents
+    const userAgents = attempts.map((a) => a.userAgent).filter((ua) => ua);
+    console.log(`[DEBUG] IP ${ipAddress} user agents:`, userAgents);
+    if (userAgents.some((ua) => this.isUnusualUserAgent(ua))) {
+      indicators.push('unusual_user_agent');
+      console.log(
+        `[DEBUG] Added 'unusual_user_agent' indicator for ${ipAddress}`,
+      );
+    }
+
+    console.log(
+      `[DEBUG] IP ${ipAddress} final indicators: [${indicators.join(', ')}]`,
+    );
+    return indicators;
+  }
+
+  private isForeignIP(ipAddress: string): boolean {
+    // Simplified foreign IP detection
+    // In production, this would use a geolocation service
+    console.log(`[DEBUG] isForeignIP checking: ${ipAddress}`);
+
+    // Fixed regex: Check if IP is NOT in private ranges
+    const privateIPPattern =
+      /^(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
+    const isPrivate = privateIPPattern.test(ipAddress);
+    const isForeign = !isPrivate;
+
+    console.log(
+      `[DEBUG] IP ${ipAddress} - isPrivate: ${isPrivate}, isForeign: ${isForeign}`,
+    );
+    return isForeign;
+  }
+
+  private isVPNOrProxy(ipAddress: string): boolean {
+    // Simplified VPN/proxy detection
+    // In production, this would use a VPN detection service
+    const knownVPNRanges = [
+      /^185\./, // Common VPN ranges
+      /^46\./, // Common proxy ranges
+      /^5\./, // Some VPN providers
+    ];
+
+    return knownVPNRanges.some((pattern) => pattern.test(ipAddress));
+  }
+
+  private isUnusualUserAgent(userAgent: string): boolean {
+    // Check for suspicious user agent patterns
+    const suspiciousPatterns = [
+      /bot/i,
+      /crawler/i,
+      /spider/i,
+      /curl/i,
+      /wget/i,
+      /python/i,
+      /^$/, // Empty user agent
+    ];
+
+    return suspiciousPatterns.some((pattern) => pattern.test(userAgent));
+  }
+
+  private calculateSuspiciousLocationSeverity(
+    indicators: string[],
+  ): 'low' | 'medium' | 'high' | 'critical' {
+    const severityScore = indicators.length;
+
+    if (severityScore >= 4) return 'critical';
+    if (severityScore >= 3) return 'high';
+    if (severityScore >= 2) return 'medium';
+    return 'low';
+  }
+
+  private calculateLocationRiskScore(indicators: string[]): number {
+    const weights = {
+      foreign_ip: 30,
+      vpn_proxy: 25,
+      multiple_failures: 20,
+      multiple_accounts: 15,
+      unusual_user_agent: 10,
+    };
+
+    return indicators.reduce((score, indicator) => {
+      return score + (weights[indicator as keyof typeof weights] || 5);
+    }, 0);
+  }
+
+  private getRecommendedAction(indicators: string[]): string {
+    if (
+      indicators.includes('foreign_ip') &&
+      indicators.includes('multiple_failures')
+    ) {
+      return 'Block IP and require additional verification';
+    }
+
+    if (
+      indicators.includes('vpn_proxy') &&
+      indicators.includes('multiple_accounts')
+    ) {
+      return 'Implement rate limiting and CAPTCHA';
+    }
+
+    if (indicators.length >= 3) {
+      return 'Monitor closely and consider temporary restrictions';
+    }
+
+    return 'Continue monitoring';
   }
 
   async detectTimeAnomalies(): Promise<DetectedPattern[]> {
@@ -883,14 +1475,16 @@ export class PatternDetectionService {
     dateFrom?: Date,
     dateTo?: Date,
     timeRange?: '24h' | '7d' | '30d' | '90d' | 'all',
-  ): Promise<{
-    patternType: string;
-    displayName: string;
-    count: number;
-    severity: 'low' | 'medium' | 'high' | 'critical';
-    lastDetected: Date;
-    percentage?: number;
-  }[]> {
+  ): Promise<
+    {
+      patternType: string;
+      displayName: string;
+      count: number;
+      severity: 'low' | 'medium' | 'high' | 'critical';
+      lastDetected: Date;
+      percentage?: number;
+    }[]
+  > {
     // Calculate time range if predefined range is provided
     let startDate: Date | undefined = dateFrom;
     let endDate: Date | undefined = dateTo;
@@ -898,7 +1492,7 @@ export class PatternDetectionService {
     if (timeRange && timeRange !== 'all') {
       endDate = new Date();
       startDate = new Date();
-      
+
       switch (timeRange) {
         case '24h':
           startDate.setHours(startDate.getHours() - 24);
@@ -922,10 +1516,22 @@ export class PatternDetectionService {
       .addSelect('COUNT(*)', 'count')
       .addSelect('MAX(pattern.detectionTimestamp)', 'lastDetected')
       .addSelect('pattern.severity', 'severity')
-      .addSelect('COUNT(CASE WHEN pattern.severity = \'critical\' THEN 1 END)', 'criticalCount')
-      .addSelect('COUNT(CASE WHEN pattern.severity = \'high\' THEN 1 END)', 'highCount')
-      .addSelect('COUNT(CASE WHEN pattern.severity = \'medium\' THEN 1 END)', 'mediumCount')
-      .addSelect('COUNT(CASE WHEN pattern.severity = \'low\' THEN 1 END)', 'lowCount');
+      .addSelect(
+        "COUNT(CASE WHEN pattern.severity = 'critical' THEN 1 END)",
+        'criticalCount',
+      )
+      .addSelect(
+        "COUNT(CASE WHEN pattern.severity = 'high' THEN 1 END)",
+        'highCount',
+      )
+      .addSelect(
+        "COUNT(CASE WHEN pattern.severity = 'medium' THEN 1 END)",
+        'mediumCount',
+      )
+      .addSelect(
+        "COUNT(CASE WHEN pattern.severity = 'low' THEN 1 END)",
+        'lowCount',
+      );
 
     // Apply time filters
     if (startDate) {
@@ -941,21 +1547,24 @@ export class PatternDetectionService {
     const results = await query.getRawMany();
 
     // Calculate total count for percentages
-    const totalCount = results.reduce((sum, item) => sum + parseInt(item.count), 0);
+    const totalCount = results.reduce(
+      (sum, item) => sum + parseInt(item.count),
+      0,
+    );
 
     // Pattern type display names mapping
     const displayNames = {
-      'brute_force': 'Brute Force Attacks',
-      'distributed_attack': 'Distributed Attacks',
-      'credential_stuffing': 'Credential Stuffing',
-      'rapid_account_switching': 'Account Switching',
-      'ip_hopping': 'IP Hopping',
-      'suspicious_location': 'Suspicious Locations',
-      'time_anomaly': 'Time Anomalies',
+      brute_force: 'Brute Force Attacks',
+      distributed_attack: 'Distributed Attacks',
+      credential_stuffing: 'Credential Stuffing',
+      rapid_account_switching: 'Account Switching',
+      ip_hopping: 'IP Hopping',
+      suspicious_location: 'Suspicious Locations',
+      time_anomaly: 'Time Anomalies',
     };
 
     // Process results and determine predominant severity
-    const summaries = results.map(item => {
+    const summaries = results.map((item) => {
       const count = parseInt(item.count);
       const criticalCount = parseInt(item.criticalCount) || 0;
       const highCount = parseInt(item.highCount) || 0;
@@ -984,8 +1593,8 @@ export class PatternDetectionService {
 
     // Ensure all pattern types are represented, even with 0 count
     const allPatternTypes = Object.keys(displayNames);
-    const existingTypes = summaries.map(s => s.patternType);
-    
+    const existingTypes = summaries.map((s) => s.patternType);
+
     for (const patternType of allPatternTypes) {
       if (!existingTypes.includes(patternType)) {
         summaries.push({
@@ -1004,7 +1613,7 @@ export class PatternDetectionService {
       if (a.count !== b.count) {
         return b.count - a.count;
       }
-      const severityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
+      const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
       return severityOrder[b.severity] - severityOrder[a.severity];
     });
   }

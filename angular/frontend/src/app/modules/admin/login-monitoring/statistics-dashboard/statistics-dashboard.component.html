@@ -1,5 +1,8 @@
 <!-- Statistics Cards -->
-<div class="stats-container" *ngIf="statistics">
+<div class="stats-container" 
+     *ngIf="statistics"
+     [ngClass]="responsiveClass$ | async"
+     [style.grid-template-columns]="gridColumns$ | async">
   <mat-card class="stats-card">
     <mat-card-header>
       <mat-card-title>Total Attempts</mat-card-title>
