@@ -22,18 +22,21 @@ export class CacheRoute {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ name: 'component_name', length: 255, nullable: true })
+  @Column({ length: 255, nullable: true })
   componentName: string;
 
-  @Column({ name: 'last_synced_at', nullable: true })
+
+  @Column({ nullable: true })
   lastSyncedAt: Date;
+
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }

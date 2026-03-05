@@ -23,37 +23,24 @@ export class Captcha {
   @Column({ type: 'text' })
   solution: string;
 
-  @Column({ name: 'is_used', type: 'boolean', default: false })
+  @Column({ type: 'boolean', default: false })
   isUsed: boolean;
 
-  /**
-   * Getter for backward compatibility with services expecting used
-   * Returns the isUsed value
-   */
-  get used(): boolean {
-    return this.isUsed;
-  }
 
-  /**
-   * Setter for backward compatibility with services setting used
-   * Sets the isUsed field
-   */
-  set used(value: boolean) {
-    this.isUsed = value;
-  }
-
-  @Column({ name: 'expires_at', type: 'datetime' })
+  @Column({ type: 'datetime' })
   expiresAt: Date;
 
-  @Column({ name: 'ip_address', type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true })
   ipAddress: string;
+
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'datetime' })
+  @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
+
 }

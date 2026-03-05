@@ -35,8 +35,9 @@ export class Action {
    * The system code for consistent identification
    * Used for system-level permission checks
    */
-  @Column({ name: 'action_code', unique: true, length: 255 })
+  @Column({ unique: true, length: 255 })
   actionCode: string;
+
 
   /**
    * Icon to represent this action in the UI
@@ -56,9 +57,10 @@ export class Action {
   @OneToMany(() => Permission, (permission) => permission.actionEntity)
   permissions: Permission[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }

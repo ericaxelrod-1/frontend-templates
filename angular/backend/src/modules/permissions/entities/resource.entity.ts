@@ -27,11 +27,12 @@ export class Resource {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 
   // This relation is no longer valid since Permission doesn't have a resource property
   // @OneToMany(() => Permission, permission => permission.resource)

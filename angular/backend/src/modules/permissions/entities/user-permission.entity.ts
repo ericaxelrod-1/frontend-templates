@@ -16,35 +16,21 @@ import { User } from '../../users/entities/user.entity';
  */
 @Entity('user_permissions')
 export class UserPermission {
-  @PrimaryColumn({ name: 'user_id' })
+  @PrimaryColumn()
   userId: number;
 
-  @PrimaryColumn({ name: 'permission_id' })
+  @PrimaryColumn()
   permissionId: number;
+
 
   /**
    * Whether the permission is granted (true) or denied (false)
    * Used for explicit permission denial in hierarchical permission systems
    * This allows for overriding group and role permissions at the user level
    */
-  @Column({ name: 'is_granted', default: true })
+  @Column({ default: true })
   isGranted: boolean;
 
-  /**
-   * Getter for backward compatibility with services expecting granted
-   * Returns the isGranted value
-   */
-  get granted(): boolean {
-    return this.isGranted;
-  }
-
-  /**
-   * Setter for backward compatibility with services setting granted
-   * Sets the isGranted field
-   */
-  set granted(value: boolean) {
-    this.isGranted = value;
-  }
 
   /**
    * User relationship
@@ -63,12 +49,13 @@ export class UserPermission {
   /**
    * Creation timestamp
    */
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
   /**
    * Last update timestamp
    */
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }

@@ -1,6 +1,8 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import * as path from 'path';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
+
 
 export default registerAs('database', () => {
   const nodeEnv = process.env.NODE_ENV || 'development';
@@ -23,7 +25,9 @@ export default registerAs('database', () => {
         : ['error'],
     autoLoadEntities: true,
     extra: { foreign_keys: true },
+    namingStrategy: new SnakeNamingStrategy(),
     migrationsRun: false,
+
     migrations: [], // CLI uses data-source.ts for migrations array
   };
 
@@ -40,7 +44,9 @@ export default registerAs('database', () => {
     logging:
       nodeEnv === 'development' ? ['query', 'error', 'schema'] : ['error'],
     autoLoadEntities: true,
+    namingStrategy: new SnakeNamingStrategy(),
     migrationsRun: false, // Typically false for app runtime, true for migration tool if needed
+
     migrations: commonMigrations,
     migrationsTableName: 'migrations_history',
   };

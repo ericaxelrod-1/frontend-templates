@@ -22,7 +22,7 @@ export class IpReputationController {
   constructor(
     private readonly ipReputationService: IPReputationService,
     private readonly loginAttemptService: LoginAttemptService,
-  ) {}
+  ) { }
 
   @Get('reputation/:ipAddress')
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -65,8 +65,8 @@ export class IpReputationController {
     return {
       ipAddress: reputation.ipAddress,
       failedAttempts: reputation.failedLoginAttempts,
-      isBlocked: reputation.isBlocked,
-      blockedUntil: reputation.blockedUntil,
+      isBlocked: reputation.isManuallyBlocked,
+      blockedUntil: reputation.blockedUntilAuto,
       lastFailedAttempt: lastFailedAttempt?.attemptedAt,
       reputation: reputationScore,
       recentAttempts: recentAttempts.slice(0, 10), // Last 10 attempts

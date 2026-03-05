@@ -41,15 +41,15 @@ export class Component {
    * If true, only explicitly assigned permissions apply
    * If false, inherited permissions from parent resources apply
    */
-  @Column({ name: 'override_permissions', default: false })
+  @Column({ default: false })
   overridePermissions: boolean;
 
   /**
    * Last time this component was synced with the codebase
    * Used to detect stale components
    */
-  @Column({ name: 'last_synced', nullable: true })
-  lastSynced: Date;
+  @Column({ nullable: true })
+  lastSyncedAt: Date;
 
   /**
    * The module that declares this component
@@ -68,9 +68,9 @@ export class Component {
   })
   requiredPermissions: Permission[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
 }

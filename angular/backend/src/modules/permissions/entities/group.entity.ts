@@ -43,24 +43,27 @@ export class Group {
   /**
    * Flag to indicate if this is a system-managed group that shouldn't be modified
    */
-  @Column({ name: 'is_system_group', default: false })
+  @Column({ default: false })
   isSystemGroup: boolean;
+
 
   /**
    * Owner of the group (nullable FK to users.id)
    */
-  @Column({ name: 'owner_id', nullable: true })
+  @Column({ nullable: true })
   ownerId: number;
+
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'owner_id' })
   owner: User;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 
   @ManyToMany(() => User, (user) => user.groups)
   users: User[];

@@ -51,7 +51,7 @@ export class EndpointScannerService {
     private readonly metadataScanner: MetadataScanner,
     private readonly reflector: Reflector,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Scan all NestJS controllers to find endpoints with permission requirements
@@ -206,7 +206,7 @@ export class EndpointScannerService {
           handlerName: methodName,
           requiredPermissions: [],
           overridePermissions: false,
-          lastSynced: new Date(),
+          lastSyncedAt: new Date(),
         });
       } else {
         // Only update if not overridden
@@ -214,7 +214,7 @@ export class EndpointScannerService {
           endpoint.description = description;
           endpoint.controllerName = controllerName;
           endpoint.handlerName = methodName;
-          endpoint.lastSynced = new Date();
+          endpoint.lastSyncedAt = new Date();
         }
       }
 
@@ -227,13 +227,12 @@ export class EndpointScannerService {
           const [resourceName, actionName] = permString.split(':');
 
           let permission = await this.permissionRepository.findOne({
-            where: { resourceName, actionName },
+            where: { name: permString },
           });
 
           if (!permission) {
             permission = this.permissionRepository.create({
               resourceName,
-              actionName,
               name: permString,
               description: `Permission required by ${httpMethod.toUpperCase()} ${fullPath}`,
             });
