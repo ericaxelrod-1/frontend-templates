@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Task ID** | STORY-003 / TASK-002 |
-| **Status** | Open |
+| **Status** | Completed |
 | **Story** | STORY-003: Remove the CaseTransformInterceptor from the Frontend |
 | **Description** | Delete the CaseTransformInterceptor implementation and test files |
 | **Estimated Effort** | 2 minutes |
