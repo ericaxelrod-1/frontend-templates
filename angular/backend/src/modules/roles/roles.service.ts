@@ -20,7 +20,7 @@ export class RolesService {
     @InjectRepository(Permission)
     private permissionRepository: Repository<Permission>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {}
+  ) { }
 
   async create(createRoleDto: CreateRoleDto): Promise<Role> {
     const { permissionIds, ...roleData } = createRoleDto;
@@ -152,9 +152,8 @@ export class RolesService {
     });
 
     // Format permissions as 'resource:action' strings following the dynamic-access-control rule
-    const permissions = rolePermissions.map(
-      (rp) => `${rp.permission.resourceName}:${rp.permission.actionName}`,
-    );
+    const permissions = rolePermissions.map((rp) => rp.permission.name);
+
 
     // Remove duplicates
     const uniquePermissions = [...new Set(permissions)];

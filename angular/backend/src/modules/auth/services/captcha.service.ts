@@ -13,7 +13,7 @@ export class CaptchaService {
   constructor(
     @InjectRepository(Captcha)
     private readonly captchaRepository: Repository<Captcha>,
-  ) {}
+  ) { }
 
   private generateToken(): string {
     return crypto.randomBytes(32).toString('hex');
@@ -119,13 +119,13 @@ export class CaptchaService {
       where: { token },
     });
 
-    if (!captcha || captcha.used || captcha.expiresAt < new Date()) {
+    if (!captcha || captcha.isUsed || captcha.expiresAt < new Date()) {
       return false;
     }
 
     const isValid = captcha.solution === solution;
     if (isValid) {
-      captcha.used = true;
+      captcha.isUsed = true;
       await this.captchaRepository.save(captcha);
     }
 

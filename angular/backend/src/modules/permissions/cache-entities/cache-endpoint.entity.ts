@@ -27,21 +27,24 @@ export class CacheEndpoint {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ name: 'controller_name', length: 100, nullable: true })
+  @Column({ length: 100, nullable: true })
   controllerName: string;
 
-  @Column({ name: 'handler_name', length: 100, nullable: true })
+  @Column({ length: 100, nullable: true })
   handlerName: string;
 
-  @Column({ name: 'last_synced_at', nullable: true })
+
+  @Column({ nullable: true })
   lastSyncedAt: Date;
+
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }

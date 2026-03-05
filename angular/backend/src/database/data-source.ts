@@ -1,5 +1,7 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
+
 import { Permission } from '../modules/permissions/entities/permission.entity';
 import { Role } from '../modules/roles/entities/role.entity';
 import { UiComponent } from '../modules/permissions/entities/ui-component.entity';
@@ -43,7 +45,9 @@ export const dataSourceOptions: DataSourceOptions = {
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false, // Disable synchronize as we're handling schema manually
+  namingStrategy: new SnakeNamingStrategy(),
   migrationsRun: false, // Disable migrations as we're handling them manually
+
   logging: ['query', 'error', 'schema'], // Added 'schema' logging
 };
 

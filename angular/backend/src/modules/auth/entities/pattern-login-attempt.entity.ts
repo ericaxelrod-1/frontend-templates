@@ -27,9 +27,11 @@ export class PatternLoginAttempt {
   @JoinColumn({ name: 'login_attempt_id' })
   loginAttempt: LoginAttempt;
 
-  @Column({ name: 'is_primary_evidence', type: 'boolean', default: false })
+  @Column({ type: 'boolean', default: false })
   isPrimaryEvidence: boolean;
 
-  @CreateDateColumn({ name: 'created_at' })
+
+  @CreateDateColumn()
   createdAt: Date;
+
 }

@@ -46,35 +46,22 @@ export class Permission {
    * The name of the resource this permission applies to
    * Example: 'users', 'groups', 'reports'
    */
-  @Column({ name: 'resource_name', length: 50 })
+  @Column({ length: 50 })
   resourceName: string;
+
 
   /**
    * Reference to the Action entity (foreign key)
    */
-  @Column({ name: 'action_id' })
+  @Column()
   actionId: number;
+
 
   @ManyToOne(() => Action, { nullable: true, eager: true })
   @JoinColumn({ name: 'action_id' })
   actionEntity: Action;
 
-  /**
-   * Virtual column for backward compatibility with services expecting actionName
-   * This maps to the Action entity's actionCode field for consistent lowercase permissions
-   */
-  get actionName(): string {
-    return this.actionEntity?.actionCode || '';
-  }
 
-  /**
-   * Setter for backward compatibility with services setting actionName
-   * This is a no-op since actionName should be set via the Action relationship
-   */
-  set actionName(value: string) {
-    // No-op: actionName should be set via the Action relationship
-    // This setter exists only for backward compatibility
-  }
 
   /**
    * Relationships with RolePermission join entity
@@ -134,9 +121,10 @@ export class Permission {
   @ManyToMany(() => UiComponent, (component) => component.requiredPermissions)
   components: UiComponent[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }

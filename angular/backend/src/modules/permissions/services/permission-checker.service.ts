@@ -33,7 +33,7 @@ export class PermissionCheckerService implements IPermissionChecker {
 
     @InjectRepository(GroupPermission)
     private readonly groupPermissionRepository: Repository<GroupPermission>,
-  ) {}
+  ) { }
 
   /**
    * Check if a user has a specific permission
@@ -101,7 +101,8 @@ export class PermissionCheckerService implements IPermissionChecker {
               rolePermission.isGranted !== false
             ) {
               const permission = rolePermission.permission;
-              const permString = `${permission.resourceName}:${permission.actionName}`;
+              const permString = permission.name;
+
               if (!permissions.includes(permString)) {
                 permissions.push(permString);
               }
@@ -119,7 +120,8 @@ export class PermissionCheckerService implements IPermissionChecker {
               groupPermission.isGranted !== false
             ) {
               const permission = groupPermission.permission;
-              const permString = `${permission.resourceName}:${permission.actionName}`;
+              const permString = permission.name;
+
               if (!permissions.includes(permString)) {
                 permissions.push(permString);
               }
@@ -132,7 +134,8 @@ export class PermissionCheckerService implements IPermissionChecker {
       for (const userPermission of user.userPermissions || []) {
         if (userPermission.permission && userPermission.isGranted !== false) {
           const permission = userPermission.permission;
-          const permString = `${permission.resourceName}:${permission.actionName}`;
+          const permString = permission.name;
+
           if (!permissions.includes(permString)) {
             permissions.push(permString);
           }

@@ -37,7 +37,7 @@ export class LoginMonitoringController {
     private readonly patternDetectionService: PatternDetectionService,
     private readonly alertService: AlertService,
     private readonly securityAlertService: SecurityAlertService,
-  ) {}
+  ) { }
 
   @Get('attempts/recent')
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -364,8 +364,8 @@ export class LoginMonitoringController {
     return {
       ipAddress: reputation.ipAddress,
       failedAttempts: reputation.failedLoginAttempts,
-      isBlocked: reputation.isBlocked,
-      blockedUntil: reputation.blockedUntil,
+      isBlocked: reputation.isManuallyBlocked,
+      blockedUntil: reputation.blockedUntilAuto,
       lastFailedAttempt: lastFailedAttempt?.attemptedAt,
       reputation: reputationScore,
       // Additional aggregated data

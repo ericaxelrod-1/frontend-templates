@@ -41,15 +41,17 @@ export class Role {
   @Column({ length: 255, nullable: true })
   description: string;
 
-  @Column({ default: false, name: 'is_system_role' })
+  @Column({ default: false })
   isSystemRole: boolean;
 
-  @Column({ default: false, name: 'is_default' })
+  @Column({ default: false })
   isDefault: boolean;
 
+
   // Parent-child relationship
-  @Column({ nullable: true, name: 'parent_id' })
+  @Column({ nullable: true })
   parentId: number;
+
 
   @ManyToOne(() => Role, (role) => role.children, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'parent_id' })
@@ -67,9 +69,10 @@ export class Role {
   @OneToMany(() => RolePermission, (rolePermission) => rolePermission.role)
   rolePermissions: RolePermission[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }
