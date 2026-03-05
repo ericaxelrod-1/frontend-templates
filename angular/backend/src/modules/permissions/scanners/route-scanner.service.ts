@@ -43,7 +43,7 @@ export class RouteScannerService {
     private readonly permissionRepository: Repository<Permission>,
 
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Scan all routing modules to find routes with permission guards
@@ -209,24 +209,23 @@ export class RouteScannerService {
         routeInfos.push(routeInfo);
 
         // Find or create the route entity
-        let route = await this.routeRepository.findOne({ where: { path } });
+        let route = await this.routeRepository.findOne({ where: { id: path } });
 
         if (!route) {
           route = this.routeRepository.create({
             id: routeId,
-            path,
-            component: component || '',
+            componentName: component || '',
             description: description || `Route: ${path}`,
             requiredPermissions: [],
             overridePermissions: false,
-            lastSynced: new Date(),
+            lastSyncedAt: new Date(),
           });
         } else {
           // Only update if not overridden
           if (!route.overridePermissions) {
-            route.component = component || route.component;
+            route.componentName = component || route.componentName;
             route.description = description || route.description;
-            route.lastSynced = new Date();
+            route.lastSyncedAt = new Date();
           }
         }
 
@@ -239,13 +238,12 @@ export class RouteScannerService {
             const [resourceName, actionName] = permString.split(':');
 
             let permission = await this.permissionRepository.findOne({
-              where: { resourceName, actionName },
+              where: { name: permString },
             });
 
             if (!permission) {
               permission = this.permissionRepository.create({
                 resourceName,
-                actionName,
                 name: permString,
                 description: `Permission required by route ${path}`,
               });

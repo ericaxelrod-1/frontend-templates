@@ -17,39 +17,26 @@ import { Permission } from '../../permissions/entities/permission.entity';
  */
 @Entity('role_permissions')
 export class RolePermission {
-  @PrimaryColumn({ name: 'role_id' })
+  @PrimaryColumn()
   roleId: number;
 
-  @PrimaryColumn({ name: 'permission_id' })
+  @PrimaryColumn()
   permissionId: number;
+
 
   /**
    * Whether the permission is granted (true) or denied (false)
    */
-  @Column({ name: 'is_granted', default: true })
+  @Column({ default: true })
   isGranted: boolean;
 
-  /**
-   * Getter for backward compatibility with services expecting granted
-   * Returns the isGranted value
-   */
-  get granted(): boolean {
-    return this.isGranted;
-  }
 
-  /**
-   * Setter for backward compatibility with services setting granted
-   * Sets the isGranted field
-   */
-  set granted(value: boolean) {
-    this.isGranted = value;
-  }
-
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 
   @ManyToOne(() => Role, (role) => role.rolePermissions)
   @JoinColumn({ name: 'role_id' })

@@ -80,7 +80,7 @@ export class PermissionsService {
     @InjectRepository(Action)
     private actionRepository: Repository<Action>,
     private readonly cacheSyncService: CacheSyncService,
-  ) {}
+  ) { }
 
   /**
    * Get all available permissions
@@ -197,7 +197,8 @@ export class PermissionsService {
         for (const rolePermission of role.rolePermissions) {
           if (rolePermission.permission && rolePermission.isGranted !== false) {
             const permission = rolePermission.permission;
-            const permString = `${permission.resourceName}:${permission.actionName}`;
+            const permString = permission.name;
+
             if (!permissions.includes(permString)) {
               permissions.push(permString);
             }
@@ -215,7 +216,8 @@ export class PermissionsService {
             groupPermission.isGranted !== false
           ) {
             const permission = groupPermission.permission;
-            const permString = `${permission.resourceName}:${permission.actionName}`;
+            const permString = permission.name;
+
             if (!permissions.includes(permString)) {
               permissions.push(permString);
             }
@@ -228,7 +230,8 @@ export class PermissionsService {
     for (const userPermission of user.userPermissions || []) {
       if (userPermission.permission && userPermission.isGranted !== false) {
         const permission = userPermission.permission;
-        const permString = `${permission.resourceName}:${permission.actionName}`;
+        const permString = permission.name;
+
         if (!permissions.includes(permString)) {
           permissions.push(permString);
         }
@@ -285,7 +288,8 @@ export class PermissionsService {
 
     component.requiredPermissions = permissions;
     component.overridePermissions = overridePermissions;
-    component.lastSynced = new Date();
+    component.lastSyncedAt = new Date();
+
 
     return this.componentRepository.save(component);
   }
@@ -330,7 +334,8 @@ export class PermissionsService {
 
     route.requiredPermissions = permissions;
     route.overridePermissions = overridePermissions;
-    route.lastSynced = new Date();
+    route.lastSyncedAt = new Date();
+
 
     return this.routeRepository.save(route);
   }
@@ -355,7 +360,8 @@ export class PermissionsService {
 
     // Find the route by path
     const route = await this.routeRepository.findOne({
-      where: { path },
+      where: { id: path },
+
       relations: ['requiredPermissions'],
     });
 
@@ -372,7 +378,8 @@ export class PermissionsService {
 
     // Check if user has any of the required permissions
     const requiredPermissionStrings = route.requiredPermissions.map(
-      (p) => `${p.resourceName}:${p.actionName}`,
+      (p) => p.name,
+
     );
 
     const hasAccess = requiredPermissionStrings.some((permission) =>
@@ -425,7 +432,8 @@ export class PermissionsService {
 
     endpoint.requiredPermissions = permissions;
     endpoint.overridePermissions = overridePermissions;
-    endpoint.lastSynced = new Date();
+    endpoint.lastSyncedAt = new Date();
+
 
     return this.endpointRepository.save(endpoint);
   }
@@ -472,7 +480,8 @@ export class PermissionsService {
 
     // Check if user has any of the required permissions
     const requiredPermissionStrings = endpoint.requiredPermissions.map(
-      (p) => `${p.resourceName}:${p.actionName}`,
+      (p) => p.name,
+
     );
 
     const hasAccess = requiredPermissionStrings.some((perm) =>
@@ -602,7 +611,8 @@ export class PermissionsService {
 
     // Invalidate caches
     this.cacheService.delete(`permissions:resource:${permission.resourceName}`);
-    this.cacheService.delete(`permissions:action:${permission.actionName}`);
+    this.cacheService.delete(`permissions:action:${permission.actionEntity?.name || ''}`);
+
     this.cacheService.delete('permissions:all');
 
     return permission;
@@ -648,7 +658,8 @@ export class PermissionsService {
 
     // Check if action has been changed
     if (updatePermissionDto.name) {
-      this.cacheService.delete(`permissions:action:${permission.actionName}`);
+      this.cacheService.delete(`permissions:action:${permission.actionEntity?.name || ''}`);
+
     }
 
     this.cacheService.delete('permissions:all');
@@ -665,7 +676,8 @@ export class PermissionsService {
     // Invalidate caches before deletion
     this.cacheService.delete(`permissions:id:${id}`);
     this.cacheService.delete(`permissions:resource:${permission.resourceName}`);
-    this.cacheService.delete(`permissions:action:${permission.actionName}`);
+    this.cacheService.delete(`permissions:action:${permission.actionEntity?.name || ''}`);
+
     this.cacheService.delete('permissions:all');
 
     await this.permissionRepository.delete(id);
@@ -952,10 +964,9 @@ export class PermissionsService {
 
       // Check if role already has this permission
       const hasPermission = role.rolePermissions.some(
-        (rp) =>
-          rp.permission.resourceName === permission.resourceName &&
-          rp.permission.actionName === permission.actionName,
+        (rp) => rp.permission.name === permission.name,
       );
+
 
       if (!hasPermission) {
         // Create role permission relationship
@@ -997,7 +1008,8 @@ export class PermissionsService {
       id: rp.permission.id,
       name: rp.permission.name,
       resourceName: rp.permission.resourceName,
-      actionName: rp.permission.actionName,
+      actionName: rp.permission.name.split(':')[1] || '',
+
       description: rp.permission.description,
       granted: rp.isGranted,
     }));
@@ -1084,7 +1096,8 @@ export class PermissionsService {
       id: gp.permission.id,
       name: gp.permission.name,
       resourceName: gp.permission.resourceName,
-      actionName: gp.permission.actionName,
+      actionName: gp.permission.name.split(':')[1] || '',
+
       granted: gp.isGranted,
     }));
 
@@ -1169,7 +1182,8 @@ export class PermissionsService {
       id: up.permission.id,
       name: up.permission.name,
       resourceName: up.permission.resourceName,
-      actionName: up.permission.actionName,
+      actionName: up.permission.name.split(':')[1] || '',
+
       description: up.permission.description,
       granted: up.isGranted,
     }));

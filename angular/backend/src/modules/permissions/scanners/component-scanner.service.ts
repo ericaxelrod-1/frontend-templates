@@ -42,7 +42,7 @@ export class ComponentScannerService {
     private readonly permissionRepository: Repository<Permission>,
 
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Scan all Angular components to find those with appHasPermission directives
@@ -180,24 +180,24 @@ export class ComponentScannerService {
 
       // Find or create component entity
       let component = await this.componentRepository.findOne({
-        where: { selector },
+        where: { id: selector },
       });
 
       if (!component) {
         component = this.componentRepository.create({
-          selector,
+          id: selector,
           description: componentInfo.description,
           filePath: tsFile,
           requiredPermissions: [],
           overridePermissions: false,
-          lastSynced: new Date(),
+          lastSyncedAt: new Date(),
         });
       } else {
         // Only update if not overridden
         if (!component.overridePermissions) {
           component.description = description || component.description;
           component.filePath = tsFile;
-          component.lastSynced = new Date();
+          component.lastSyncedAt = new Date();
         }
       }
 
@@ -209,14 +209,13 @@ export class ComponentScannerService {
           const [resourceName, actionName] = permission.split(':');
 
           let permissionEntity = await this.permissionRepository.findOne({
-            where: { resourceName, actionName },
+            where: { name: permission },
           });
 
           if (!permissionEntity) {
             // Create the permission if it doesn't exist
             permissionEntity = this.permissionRepository.create({
               resourceName,
-              actionName,
               name: permission,
               description: `Permission required by component ${selector}`,
             });

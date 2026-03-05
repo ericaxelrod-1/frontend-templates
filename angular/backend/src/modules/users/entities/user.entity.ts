@@ -33,116 +33,67 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({ name: 'first_name', nullable: true })
+  @Column({ nullable: true })
   firstName: string;
 
-  @Column({ name: 'last_name', nullable: true })
+  @Column({ nullable: true })
   lastName: string;
 
-  @Column({ name: 'is_active', default: false })
+  @Column({ default: false })
   isActive: boolean;
 
-  @Column({ name: 'is_email_verified', default: false })
+  @Column({ default: false })
   isEmailVerified: boolean;
 
-  /**
-   * Getter for backward compatibility with services expecting emailVerified
-   * Returns the isEmailVerified value
-   */
-  get emailVerified(): boolean {
-    return this.isEmailVerified;
-  }
 
-  /**
-   * Setter for backward compatibility with services setting emailVerified
-   * Sets the isEmailVerified field
-   */
-  set emailVerified(value: boolean) {
-    this.isEmailVerified = value;
-  }
 
-  @Column({ name: 'last_login_at', nullable: true })
+
+  @Column({ nullable: true })
+
   lastLoginAt: Date;
 
-  /**
-   * Getter for backward compatibility with services expecting lastLogin
-   * Returns the lastLoginAt value
-   */
-  get lastLogin(): Date {
-    return this.lastLoginAt;
-  }
 
-  /**
-   * Setter for backward compatibility with services setting lastLogin
-   * Sets the lastLoginAt field
-   */
-  set lastLogin(value: Date) {
-    this.lastLoginAt = value;
-  }
 
-  @Column({ name: 'requires_password_change', default: false })
+  @Column({ default: false })
+
   requiresPasswordChange: boolean;
 
   @Column({ type: 'simple-json', nullable: true })
   preferences: Record<string, any>;
 
-  @Column({ name: 'email_verified_at', nullable: true })
+  @Column({ nullable: true })
   emailVerifiedAt: Date;
 
-  @Column({ name: 'registration_verification_sent_at', nullable: true })
+  @Column({ nullable: true })
   registrationVerificationSentAt: Date;
 
-  /**
-   * Getter for backward compatibility with services expecting registrationVerificationSent
-   * Returns the registrationVerificationSentAt value
-   */
-  get registrationVerificationSent(): Date {
-    return this.registrationVerificationSentAt;
-  }
 
-  /**
-   * Setter for backward compatibility with services setting registrationVerificationSent
-   * Sets the registrationVerificationSentAt field
-   */
-  set registrationVerificationSent(value: Date) {
-    this.registrationVerificationSentAt = value;
-  }
 
-  @Column({ name: 'user_verified_at', nullable: true })
+
+  @Column({ nullable: true })
+
   userVerifiedAt: Date;
 
-  /**
-   * Getter for backward compatibility with services expecting userVerified
-   * Returns the userVerifiedAt value
-   */
-  get userVerified(): Date {
-    return this.userVerifiedAt;
-  }
 
-  /**
-   * Setter for backward compatibility with services setting userVerified
-   * Sets the userVerifiedAt field
-   */
-  set userVerified(value: Date) {
-    this.userVerifiedAt = value;
-  }
 
-  @Column({ name: 'is_deleted', default: false })
+  @Column({ default: false })
   isDeleted: boolean;
 
-  @Column({ name: 'deleted_at', nullable: true })
+  @Column({ nullable: true })
   deletedAt: Date;
 
-  @Column({ name: 'is_blocked', default: false })
+
+  @Column({ default: false })
   isBlocked: boolean;
 
-  @Column({ name: 'blocked_at', nullable: true })
+  @Column({ nullable: true })
   blockedAt: Date;
 
-  @Column({ name: 'blocked_until', nullable: true })
+  @Column({ nullable: true })
   blockedUntil: Date;
 
-  @Column({ name: 'blocked_reason', type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true })
+
   blockedReason: string;
 
   @ManyToMany(() => Role, (role) => role.users)
@@ -184,9 +135,10 @@ export class User {
   })
   permissions: Permission[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }

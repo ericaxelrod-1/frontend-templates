@@ -15,8 +15,9 @@ export class SecurityAlert {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'alert_type', length: 50 })
+  @Column({ length: 50 })
   alertType: string;
+
 
   @Column({ length: 20, default: 'medium' })
   severity: string;
@@ -36,8 +37,9 @@ export class SecurityAlert {
   @JoinColumn({ name: 'pattern_id' })
   pattern: SecurityDetectedPattern;
 
-  @Column({ name: 'ip_address', type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true })
   ipAddress: string;
+
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'user_id' })
@@ -46,32 +48,38 @@ export class SecurityAlert {
   @Column({ length: 20, default: 'active' })
   status: string;
 
-  @Column({ name: 'acknowledged_at', type: 'datetime', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   acknowledgedAt: Date;
+
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'acknowledged_by' })
   acknowledgedBy: User;
 
-  @Column({ name: 'resolved_at', type: 'datetime', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   resolvedAt: Date;
+
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'resolved_by' })
   resolvedBy: User;
 
-  @Column({ name: 'resolution_notes', type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true })
   resolutionNotes: string;
 
-  @Column({ name: 'alert_data', type: 'text', nullable: true })
+
+  @Column({ type: 'text', nullable: true })
   alertData: string;
 
-  @Column({ name: 'expires_at', type: 'datetime', nullable: true })
+
+  @Column({ type: 'datetime', nullable: true })
   expiresAt: Date;
 
-  @CreateDateColumn({ name: 'created_at' })
+
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }

@@ -199,14 +199,13 @@ export class ManifestService {
 
       // Check if permission already exists
       let permission = await this.permissionRepo.findOne({
-        where: { resourceName, actionName },
+        where: { name: permString },
       });
 
       if (!permission) {
         // Create new permission
         permission = this.permissionRepo.create({
           resourceName,
-          actionName,
           name: permString,
           description: `Permission for ${permString}`,
         });

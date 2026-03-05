@@ -41,46 +41,33 @@ export class ApiEndpoint {
    * Controller name that handles this endpoint
    * Used for tracing and documentation
    */
-  @Column({ name: 'controller_name', nullable: true, length: 100 })
+  @Column({ nullable: true, length: 100 })
   controllerName: string;
 
   /**
    * Handler method name in the controller
    * Used for tracing and documentation
    */
-  @Column({ name: 'handler_name', nullable: true, length: 100 })
+  @Column({ nullable: true, length: 100 })
   handlerName: string;
+
 
   /**
    * Whether this endpoint overrides default permissions
    * If true, only explicitly assigned permissions apply
    * If false, inherited permissions from parent resources apply
    */
-  @Column({ name: 'override_permissions', default: false })
+  @Column({ default: false })
   overridePermissions: boolean;
+
 
   /**
    * Last time this endpoint was synced with the codebase
    * Used to detect stale endpoints
    */
-  @Column({ name: 'last_synced_at', nullable: true })
+  @Column({ nullable: true })
   lastSyncedAt: Date;
 
-  /**
-   * Getter for backward compatibility with services expecting lastSynced
-   * Returns the lastSyncedAt value
-   */
-  get lastSynced(): Date {
-    return this.lastSyncedAt;
-  }
-
-  /**
-   * Setter for backward compatibility with services setting lastSynced
-   * Sets the lastSyncedAt field
-   */
-  set lastSynced(value: Date) {
-    this.lastSyncedAt = value;
-  }
 
   /**
    * Relationship to the permissions required to access this endpoint
@@ -93,9 +80,10 @@ export class ApiEndpoint {
   })
   requiredPermissions: Permission[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 }

@@ -17,33 +17,37 @@ export class SecurityDetectedPattern {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'pattern_type', length: 50 })
+  @Column({ length: 50 })
   patternType: string;
+
 
   @Column({ length: 20, default: 'medium' })
   severity: string;
 
-  @Column({ name: 'ip_address', type: 'text' })
+  @Column({ type: 'text' })
   ipAddress: string;
 
+
   @Column({
-    name: 'detection_timestamp',
     type: 'datetime',
     default: () => "datetime('now')",
   })
   detectionTimestamp: Date;
 
-  @Column({ name: 'time_window_start', type: 'datetime' })
+
+  @Column({ type: 'datetime' })
   timeWindowStart: Date;
 
-  @Column({ name: 'time_window_end', type: 'datetime' })
+  @Column({ type: 'datetime' })
   timeWindowEnd: Date;
 
-  @Column({ name: 'attempt_count', type: 'integer', default: 0 })
+
+  @Column({ type: 'integer', default: 0 })
   attemptCount: number;
 
-  @Column({ name: 'unique_email_count', type: 'integer', default: 0 })
+  @Column({ type: 'integer', default: 0 })
   uniqueEmailCount: number;
+
 
   @Column({ type: 'text' })
   evidence: string;
@@ -51,24 +55,27 @@ export class SecurityDetectedPattern {
   @Column({ length: 20, default: 'active' })
   status: string;
 
-  @Column({ name: 'resolved_at', type: 'datetime', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   resolvedAt: Date;
+
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'resolved_by' })
   resolvedBy: User;
 
-  @Column({ name: 'resolution_notes', type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true })
   resolutionNotes: string;
+
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
+
 
   // Relations
   @OneToMany(() => SecurityAlert, (alert) => alert.pattern)
