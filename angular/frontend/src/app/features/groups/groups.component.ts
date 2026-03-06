@@ -1,10 +1,17 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatListModule } from '@angular/material/list';
+import { MatTableModule } from '@angular/material/table';
+import { MatSort, MatSortModule, MatSortable } from '@angular/material/sort';
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { GroupService } from '../../services/group.service';
 import { UserService } from '../../services/user.service';
@@ -17,6 +24,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
 import { SidePanelService } from '../../shared/components/side-panel';
+import { merge, startWith, switchMap, debounceTime, tap, catchError, of } from 'rxjs';
 
 @Component({
   selector: 'app-groups',
@@ -27,7 +35,14 @@ import { SidePanelService } from '../../shared/components/side-panel';
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatListModule
+    MatListModule,
+    MatTableModule,
+    MatSortModule,
+    MatPaginatorModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatProgressSpinnerModule,
+    ReactiveFormsModule
   ],
   template: `
     <div class="groups-container">
@@ -40,58 +55,95 @@ import { SidePanelService } from '../../shared/components/side-panel';
       
       <ng-container *ngIf="hasPermission">
         <div class="actions-bar">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Search groups</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput [formControl]="searchControl" placeholder="Search by name or description">
+          </mat-form-field>
+
           <button mat-raised-button color="primary" (click)="createGroup()">
             <mat-icon>add</mat-icon> Create Group
           </button>
         </div>
         
-        <div *ngIf="loading" class="loading">
-          Loading groups...
+        <div *ngIf="loading" class="loading-overlay">
+          <mat-spinner diameter="40"></mat-spinner>
+          <span>Loading groups...</span>
         </div>
         
-        <div class="groups-grid">
-          <mat-card *ngFor="let group of groups" class="group-card">
-            <mat-card-header>
-              <mat-card-title>{{ group.name }}</mat-card-title>
-              <mat-card-subtitle>Owner: {{ group.owner }}</mat-card-subtitle>
-            </mat-card-header>
-            
-            <mat-card-content>
-              <p>{{ group.description }}</p>
-              
-              <div class="members-section">
-                <h3>Members ({{ group.users ? group.users.length : 0 }})</h3>
-                <mat-list *ngIf="group.users && group.users.length > 0">
-                  <mat-list-item *ngFor="let user of group.users">
-                    <span matListItemTitle>{{ (user.firstName || '') + ' ' + (user.lastName || '') || user.email }}</span>
-                    <span matListItemLine>{{ user.roles?.[0]?.name || 'Member' }}</span>
-                    <button mat-icon-button (click)="openMemberActions(group, user)" matListItemMeta class="member-actions-button">
-                      <mat-icon>more_vert</mat-icon>
-                    </button>
-                  </mat-list-item>
-                </mat-list>
-                <div *ngIf="!group.users || group.users.length === 0" class="no-members">
-                  No members in this group.
+        <div class="table-container mat-elevation-z8">
+          <table mat-table [dataSource]="dataSource" matSort matSortActive="name" matSortDirection="asc" class="groups-table">
+            <!-- Name Column -->
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+              <td mat-cell *matCellDef="let group">{{ group.name }}</td>
+            </ng-container>
+
+            <!-- Owner Column -->
+            <ng-container matColumnDef="owner">
+              <th mat-header-cell *matHeaderCellDef>Owner</th>
+              <td mat-cell *matCellDef="let group">{{ group.owner?.firstName }} {{ group.owner?.lastName }}</td>
+            </ng-container>
+
+            <!-- Description Column -->
+            <ng-container matColumnDef="description">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+              <td mat-cell *matCellDef="let group">{{ group.description }}</td>
+            </ng-container>
+
+            <!-- Members Column -->
+            <ng-container matColumnDef="members">
+              <th mat-header-cell *matHeaderCellDef>Members</th>
+              <td mat-cell *matCellDef="let group">
+                <mat-chip-set>
+                  <mat-chip *ngFor="let user of ($any(group.users) | slice:0:3)">
+                    {{ ($any(user).firstName || '') + ' ' + ($any(user).lastName || '') || $any(user).email }}
+                  </mat-chip>
+                  <mat-chip *ngIf="($any(group.users)?.length || 0) > 3">
+                    +{{ $any(group.users).length - 3 }} more
+                  </mat-chip>
+                </mat-chip-set>
+                <div *ngIf="!group.users || group.users.length === 0" class="no-members-text">
+                  No members
                 </div>
-                
-                <button mat-button color="primary" (click)="addMember(group)" class="add-member-button">
-                  <mat-icon>person_add</mat-icon> Add Member
+              </td>
+            </ng-container>
+
+            <!-- Actions Column -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>Actions</th>
+              <td mat-cell *matCellDef="let group">
+                <button mat-icon-button color="primary" (click)="editGroup(group)" matTooltip="Edit Group">
+                  <mat-icon>edit</mat-icon>
                 </button>
-              </div>
-            </mat-card-content>
-            
-            <mat-card-actions>
-              <button mat-button color="primary" (click)="editGroup(group)">
-                <mat-icon>edit</mat-icon> Edit
-              </button>
-              <button mat-button color="warn" (click)="deleteGroup(group)">
-                <mat-icon>delete</mat-icon> Delete
-              </button>
-            </mat-card-actions>
-          </mat-card>
+                <button mat-icon-button (click)="addMember(group)" matTooltip="Add Member">
+                  <mat-icon>person_add</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" (click)="deleteGroup(group)" matTooltip="Delete Group">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+            <!-- Row shown when there is no matching data. -->
+            <tr class="mat-row" *matNoDataRow>
+              <td class="mat-cell" colspan="5" *ngIf="!loading">
+                No groups found matching the filter "{{searchControl.value}}"
+              </td>
+            </tr>
+          </table>
+
+          <mat-paginator 
+            [length]="totalCount" 
+            [pageSize]="pageSize" 
+            [pageSizeOptions]="[5, 10, 25, 100]"
+            aria-label="Select page of groups">
+          </mat-paginator>
         </div>
       </ng-container>
-      
     </div>
   `,
   styles: [`
@@ -101,29 +153,39 @@ import { SidePanelService } from '../../shared/components/side-panel';
     
     .actions-bar {
       margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .search-field {
+      width: 300px;
     }
     
-    .groups-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
+    .table-container {
+      position: relative;
+      background: white;
+      border-radius: 4px;
+      overflow: hidden;
     }
     
-    .group-card {
-      height: 100%;
+    .groups-table {
+      width: 100%;
     }
-    
-    .members-section {
-      margin-top: 16px;
-    }
-    
-    .members-section h3 {
-      margin-bottom: 8px;
-    }
-    
-    mat-list {
-      max-height: 200px;
-      overflow-y: auto;
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.7);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
     }
     
     .permission-error {
@@ -134,28 +196,33 @@ import { SidePanelService } from '../../shared/components/side-panel';
       margin: 20px 0;
     }
     
-    .loading {
-      text-align: center;
-      padding: 20px;
-    }
-    
-    .no-members {
+    .no-members-text {
       font-style: italic;
-      color: #666;
-      margin: 16px 0;
+      color: #757575;
+      font-size: 12px;
     }
-    
-    .add-member-button {
-    }
-    
-    .member-actions-button {
+
+    mat-chip {
+      --mdc-chip-label-text-size: 11px;
     }
   `]
 })
-export class GroupsComponent implements OnInit {
-  groups: Group[] = [];
+export class GroupsComponent implements OnInit, AfterViewInit {
+  displayedColumns: string[] = ['name', 'owner', 'description', 'members', 'actions'];
+  dataSource: Group[] = [];
+  totalCount = 0;
+  pageSize = 10;
+
   hasPermission = false;
   loading = true;
+
+  searchControl = new FormControl('');
+
+  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+
+  private reactivePatternInitialized = false;
+  private shouldInitializeReactivePattern = false;
 
   constructor(
     private groupService: GroupService,
@@ -174,7 +241,11 @@ export class GroupsComponent implements OnInit {
       this.hasPermission = hasPermission;
 
       if (hasPermission) {
-        this.loadGroups();
+        this.shouldInitializeReactivePattern = true;
+        // If ViewChild is already available (shouldn't happen in ngOnInit but good practice)
+        if (this.sort && this.paginator) {
+          this.initializeReactivePattern();
+        }
       } else {
         this.loading = false;
         this.snackBar.open('You do not have permission to access this page', 'Close', { duration: 5000 });
@@ -182,30 +253,74 @@ export class GroupsComponent implements OnInit {
     });
   }
 
-  loadGroups(): void {
-    this.loading = true;
-    this.groupService.getGroups().subscribe({
-      next: (groups) => {
-        this.groups = groups.map(group => {
-          // Ensure users is an array
-          if (!group.users) {
-            group.users = [];
+  ngAfterViewInit(): void {
+    if (this.shouldInitializeReactivePattern && !this.reactivePatternInitialized) {
+      this.initializeReactivePattern();
+    }
+  }
+
+  private initializeReactivePattern(): void {
+    if (this.reactivePatternInitialized || !this.sort || !this.paginator || !this.hasPermission) {
+      return;
+    }
+
+    this.reactivePatternInitialized = true;
+
+    // Use setTimeout to avoid NG0100 error with default sort
+    setTimeout(() => {
+      this.sort.sort({
+        id: 'name',
+        start: 'asc',
+        disableClear: false
+      } as MatSortable);
+    }, 0);
+
+    // Combine all user interaction streams
+    merge(
+      this.sort.sortChange.pipe(tap(() => this.paginator.pageIndex = 0)),
+      this.paginator.page,
+      this.searchControl.valueChanges.pipe(
+        debounceTime(300),
+        tap(() => this.paginator.pageIndex = 0)
+      )
+    )
+      .pipe(
+        startWith({}),
+        switchMap(() => {
+          this.loading = true;
+          return this.groupService.getGroups({
+            page: this.paginator.pageIndex,
+            pageSize: this.paginator.pageSize,
+            sortBy: this.sort.active,
+            sortDirection: this.sort.direction.toUpperCase(),
+            search: this.searchControl.value || ''
+          }).pipe(
+            catchError((error) => {
+              console.error('Error loading groups:', error);
+              this.snackBar.open('Error loading groups', 'Close', { duration: 3000 });
+              return of(null);
+            })
+          );
+        })
+      )
+      .subscribe({
+        next: (response) => {
+          if (response) {
+            this.dataSource = response.items;
+            this.totalCount = response.total;
           }
-          return group;
-        });
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error loading groups:', error);
-        this.loading = false;
-        if (error.status === 403) {
-          this.hasPermission = false;
-          this.snackBar.open('You do not have permission to view groups', 'Close', { duration: 5000 });
-        } else {
-          this.snackBar.open('Error loading groups', 'Close', { duration: 3000 });
+          this.loading = false;
         }
-      }
-    });
+      });
+  }
+
+  loadGroups(): void {
+    // Manually trigger a reload by clearing page index if needed
+    // In our reactive pattern, we can just trigger a dummy event or let switchMap handle it
+    // For simplicity, we just trigger the paginator's page event or similar
+    if (this.paginator) {
+      this.paginator.page.emit();
+    }
   }
 
   createGroup(): void {
@@ -248,7 +363,8 @@ export class GroupsComponent implements OnInit {
           if (!group.users) {
             group.users = [];
           }
-          this.groups.push(group);
+          // With reactive loading, we reload the entire list to keep pagination/sorting correct
+          this.loadGroups();
           this.snackBar.open('Group created successfully', 'Close', { duration: 3000 });
         },
         error: (error) => {
@@ -263,7 +379,7 @@ export class GroupsComponent implements OnInit {
     if (confirm(`Are you sure you want to delete the group "${group.name}"?`)) {
       this.groupService.deleteGroup(group.id).subscribe({
         next: () => {
-          this.groups = this.groups.filter(g => g.id !== group.id);
+          this.loadGroups();
           this.snackBar.open('Group deleted successfully', 'Close', { duration: 3000 });
         },
         error: (error) => {

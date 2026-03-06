@@ -319,7 +319,7 @@ export class UsersComponent implements OnInit {
         }).subscribe({
           next: (data) => {
             this.users = data.users;
-            this.availableGroups = data.groups;
+            this.availableGroups = data.groups.items;
             this.availableRoles = data.roles;
             this.loading = false;
             this.cdr.detectChanges();
@@ -347,8 +347,8 @@ export class UsersComponent implements OnInit {
     }
 
     this.groupService.getGroups().subscribe({
-      next: (groups) => {
-        this.currentUserGroups = groups.map(group => ({
+      next: (response) => {
+        this.currentUserGroups = response.items.map(group => ({
           ...group,
           permissions: group.permissions || []
         }));

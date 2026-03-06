@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -42,17 +43,28 @@ export class UpdateGroupSettingsDto {
 @UseGuards(JwtAuthGuard)
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly groupsService: GroupsService) {}
+  constructor(private readonly groupsService: GroupsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all groups' })
   @ApiResponse({
     status: 200,
-    description: 'List of all groups',
-    type: [Group],
+    description: 'List of all groups (paginated)',
   })
-  findAll(): Promise<Group[]> {
-    return this.groupsService.findAll();
+  findAll(
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDirection') sortDirection?: 'asc' | 'desc',
+    @Query('search') search?: string,
+  ): Promise<{ items: Group[]; total: number; page: number; pageSize: number }> {
+    return this.groupsService.findAll(
+      page ? +page : 0,
+      pageSize ? +pageSize : 10,
+      sortBy || 'name',
+      (sortDirection?.toUpperCase() as 'ASC' | 'DESC') || 'ASC',
+      search || '',
+    );
   }
 
   @Get(':id')

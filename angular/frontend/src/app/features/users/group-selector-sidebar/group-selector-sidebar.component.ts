@@ -200,8 +200,8 @@ export class GroupSelectorSidebarComponent implements OnInit {
 
   loadGroups(): void {
     this.groupService.getGroups().subscribe({
-      next: (groups) => {
-        this.availableGroups = groups;
+      next: (response) => {
+        this.availableGroups = response.items;
       },
       error: (error) => {
         console.error('Error loading groups:', error);

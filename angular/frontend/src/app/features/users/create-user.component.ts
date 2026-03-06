@@ -486,9 +486,9 @@ export class CreateUserComponent implements OnInit {
 
   loadGroups(): void {
     this.groupService.getGroups().subscribe({
-      next: (groups) => {
-        this.availableGroups = groups;
-        this.logger.info('CreateUserComponent', 'Groups loaded successfully', { count: groups.length });
+      next: (response) => {
+        this.availableGroups = response.items;
+        this.logger.info('CreateUserComponent', 'Groups loaded successfully', { count: response.items.length });
       },
       error: (error) => {
         this.logger.error('CreateUserComponent', 'Error loading groups', error);

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of, map, catchError, throwError } from 'rxjs';
+import { ServerResponse } from '../models/server-response.model';
 import { environment } from '../../environments/environment';
 import { Group, Member, Permission, GROUP_PERMISSION_SETS } from '../models/group.model';
 import { User } from '../models/user.model';
@@ -11,10 +12,24 @@ import { User } from '../models/user.model';
 export class GroupService {
   private apiUrl = `${environment.apiUrl}/groups`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
-  getGroups(): Observable<Group[]> {
-    return this.http.get<Group[]>(this.apiUrl).pipe(
+  getGroups(params: {
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDirection?: string;
+    search?: string;
+  } = {}): Observable<ServerResponse<Group>> {
+    let httpParams = new HttpParams();
+
+    if (params.page !== undefined) httpParams = httpParams.append('page', params.page.toString());
+    if (params.pageSize !== undefined) httpParams = httpParams.append('pageSize', params.pageSize.toString());
+    if (params.sortBy) httpParams = httpParams.append('sortBy', params.sortBy);
+    if (params.sortDirection) httpParams = httpParams.append('sortDirection', params.sortDirection);
+    if (params.search) httpParams = httpParams.append('search', params.search);
+
+    return this.http.get<ServerResponse<Group>>(this.apiUrl, { params: httpParams }).pipe(
       catchError(error => {
         console.error('Error getting groups:', error);
         return throwError(() => error);
@@ -112,8 +127,8 @@ export class GroupService {
   }
 
   updateMemberPermissions(groupId: number, userId: number, permissions: Permission[]): Observable<void> {
-    return this.http.put<void>(`${this.apiUrl}/${groupId}/members/${userId}`, { 
-      permissions 
+    return this.http.put<void>(`${this.apiUrl}/${groupId}/members/${userId}`, {
+      permissions
     }).pipe(
       catchError(error => {
         console.error(`Error updating member permissions in group ${groupId}:`, error);
