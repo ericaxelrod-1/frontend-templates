@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, OnInit, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -6,6 +6,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatDividerModule } from '@angular/material/divider';
 import { Group } from '../../../models/group.model';
 import { User } from '../../../models/user.model';
+import { SidePanelRef, SIDE_PANEL_DATA } from '../../../shared/components/side-panel';
 
 export interface MemberAction {
   id: string;
@@ -13,6 +14,11 @@ export interface MemberAction {
   icon: string;
   color?: 'primary' | 'accent' | 'warn';
   description?: string;
+}
+
+export interface MemberActionsPanelData {
+  member: User;
+  group: Group;
 }
 
 @Component({
@@ -26,96 +32,56 @@ export interface MemberAction {
     MatDividerModule
   ],
   template: `
-    <div class="member-actions-sidebar" [class.sidebar-open]="isOpen">
-      <!-- Sidebar Content -->
-      <div class="sidebar-content">
-        <!-- Header -->
-        <div class="sidebar-header">
-          <div class="header-content">
-            <h2>Member Actions</h2>
-            <p *ngIf="member">{{ (member.firstName || '') + ' ' + (member.lastName || '') || member.email }}</p>
-            <p *ngIf="group" class="group-name">{{ group.name }}</p>
-          </div>
-          <button mat-icon-button (click)="onCloseSidebar()" class="close-button">
-            <mat-icon>close</mat-icon>
-          </button>
+    <div class="sidebar-content">
+      <!-- Header -->
+      <div class="sidebar-header">
+        <div class="header-content">
+          <h2>Member Actions</h2>
+          <p *ngIf="member">{{ (member.firstName || '') + ' ' + (member.lastName || '') || member.email }}</p>
+          <p *ngIf="group" class="group-name">{{ group.name }}</p>
         </div>
-        
-        <mat-divider></mat-divider>
-        
-        <!-- Member Info -->
-        <div class="member-info" *ngIf="member">
-          <div class="member-details">
-            <mat-icon class="member-icon">person</mat-icon>
-            <div class="member-text">
-              <div class="member-name">{{ (member.firstName || '') + ' ' + (member.lastName || '') || member.email }}</div>
-              <div class="member-role">{{ member.roles?.[0]?.name || 'Member' }}</div>
-            </div>
+        <button mat-icon-button (click)="onCloseSidebar()" class="close-button">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      
+      <mat-divider></mat-divider>
+      
+      <!-- Member Info -->
+      <div class="member-info" *ngIf="member">
+        <div class="member-details">
+          <mat-icon class="member-icon">person</mat-icon>
+          <div class="member-text">
+            <div class="member-name">{{ (member.firstName || '') + ' ' + (member.lastName || '') || member.email }}</div>
+            <div class="member-role">{{ member.roles?.[0]?.name || 'Member' }}</div>
           </div>
-        </div>
-        
-        <mat-divider></mat-divider>
-        
-        <!-- Actions List -->
-        <div class="actions-section">
-          <h3>Available Actions</h3>
-          <mat-list class="actions-list">
-            <mat-list-item 
-              *ngFor="let action of availableActions" 
-              (click)="onActionSelected(action)"
-              class="action-item"
-              [class.action-warn]="action.color === 'warn'">
-              <mat-icon matListItemIcon [color]="action.color">{{ action.icon }}</mat-icon>
-              <div matListItemTitle>{{ action.label }}</div>
-              <div matListItemLine *ngIf="action.description">{{ action.description }}</div>
-            </mat-list-item>
-          </mat-list>
         </div>
       </div>
+      
+      <mat-divider></mat-divider>
+      
+      <!-- Actions List -->
+      <div class="actions-section">
+        <h3>Available Actions</h3>
+        <mat-list class="actions-list">
+          <mat-list-item 
+            *ngFor="let action of availableActions" 
+            (click)="onActionSelected(action)"
+            class="action-item"
+            [class.action-warn]="action.color === 'warn'">
+            <mat-icon matListItemIcon [color]="action.color">{{ action.icon }}</mat-icon>
+            <div matListItemTitle>{{ action.label }}</div>
+            <div matListItemLine *ngIf="action.description">{{ action.description }}</div>
+          </mat-list-item>
+        </mat-list>
+      </div>
     </div>
-    
-    <!-- Backdrop outside sidebar -->
-    <div class="sidebar-backdrop" 
-         [class.backdrop-visible]="isOpen" 
-         (click)="onCloseSidebar()"></div>
   `,
   styles: [`
-    .member-actions-sidebar {
-      position: fixed;
-      top: 0;
-      right: 0;
-      width: 400px;
-      height: 100vh;
-      background-color: var(--mdc-theme-surface);
-      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-      transform: translateX(100%);
-      transition: transform 0.3s ease-in-out;
-      z-index: 1100;
-      overflow-y: auto;
+    :host {
       display: flex;
       flex-direction: column;
-      
-      &.sidebar-open {
-        transform: translateX(0);
-      }
-    }
-    
-    .sidebar-backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
       height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 1099;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-      
-      &.backdrop-visible {
-        opacity: 1;
-        visibility: visible;
-      }
     }
     
     .sidebar-content {
@@ -129,8 +95,8 @@ export interface MemberAction {
       justify-content: space-between;
       align-items: flex-start;
       padding: 24px;
-      background-color: var(--mdc-theme-primary);
-      color: var(--mdc-theme-on-primary);
+      background-color: var(--mat-sys-primary, #6750a4);
+      color: var(--mat-sys-on-primary, #ffffff);
       
       .header-content {
         flex: 1;
@@ -154,7 +120,7 @@ export interface MemberAction {
       }
       
       .close-button {
-        color: var(--mdc-theme-on-primary);
+        color: var(--mat-sys-on-primary, #ffffff);
         margin-left: 16px;
       }
     }
@@ -171,7 +137,7 @@ export interface MemberAction {
           font-size: 2rem;
           width: 2rem;
           height: 2rem;
-          color: var(--mdc-theme-primary);
+          color: var(--mat-sys-primary, #6750a4);
         }
         
         .member-text {
@@ -185,7 +151,7 @@ export interface MemberAction {
           
           .member-role {
             font-size: 0.9rem;
-            color: var(--mdc-theme-text-secondary);
+            color: var(--mat-sys-on-surface-variant, #49454f);
           }
         }
       }
@@ -199,7 +165,7 @@ export interface MemberAction {
         margin: 0 0 16px 0;
         font-size: 1.1rem;
         font-weight: 500;
-        color: var(--mdc-theme-text-primary);
+        color: var(--mat-sys-on-surface, #1d1b20);
       }
       
       .actions-list {
@@ -210,7 +176,7 @@ export interface MemberAction {
           transition: background-color 0.2s ease;
           
           &:hover {
-            background-color: var(--mdc-theme-action-hover);
+            background-color: var(--mat-sys-surface-container-high, #ece6f0);
           }
           
           &.action-warn {
@@ -219,46 +185,38 @@ export interface MemberAction {
             }
             
             mat-icon {
-              color: var(--mdc-theme-warn) !important;
+              color: var(--mat-sys-error, #b3261e) !important;
             }
           }
         }
       }
     }
-    
-    @media (max-width: 768px) {
-      .member-actions-sidebar {
-        width: 100vw;
-      }
-    }
   `]
 })
-export class MemberActionsSidebarComponent implements OnInit, OnChanges {
-  @Input() isOpen = false;
-  @Input() member: User | null = null;
-  @Input() group: Group | null = null;
-  
-  @Output() closeSidebar = new EventEmitter<void>();
-  @Output() actionSelected = new EventEmitter<{ action: MemberAction; member: User; group: Group }>();
-  
+export class MemberActionsSidebarComponent implements OnInit {
+  member: User;
+  group: Group;
   availableActions: MemberAction[] = [];
-  
+
+  constructor(
+    private sidePanelRef: SidePanelRef,
+    @Inject(SIDE_PANEL_DATA) public panelData: MemberActionsPanelData
+  ) {
+    this.member = panelData.member;
+    this.group = panelData.group;
+    this.updateAvailableActions();
+  }
+
   ngOnInit(): void {
     this.updateAvailableActions();
   }
-  
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['member'] || changes['group']) {
-      this.updateAvailableActions();
-    }
-  }
-  
+
   private updateAvailableActions(): void {
     if (!this.member || !this.group) {
       this.availableActions = [];
       return;
     }
-    
+
     this.availableActions = [
       {
         id: 'make-admin',
@@ -276,18 +234,12 @@ export class MemberActionsSidebarComponent implements OnInit, OnChanges {
       }
     ];
   }
-  
+
   onCloseSidebar(): void {
-    this.closeSidebar.emit();
+    this.sidePanelRef.close();
   }
-  
+
   onActionSelected(action: MemberAction): void {
-    if (this.member && this.group) {
-      this.actionSelected.emit({
-        action,
-        member: this.member,
-        group: this.group
-      });
-    }
+    this.sidePanelRef.close({ action, member: this.member, group: this.group });
   }
-} 
+}

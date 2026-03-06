@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, OnInit, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,6 +10,11 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Role, Permission, RoleService } from '../../../services/role.service';
+import { SidePanelRef, SIDE_PANEL_DATA } from '../../../shared/components/side-panel';
+
+export interface RoleCreationPanelData {
+  roleData: Role | null;
+}
 
 // Interface to group permissions by resource
 interface PermissionGroup {
@@ -33,178 +38,138 @@ interface PermissionGroup {
     MatTooltipModule
   ],
   template: `
-    <!-- Sidebar Backdrop -->
-    <div class="sidebar-backdrop" 
-         [class.backdrop-visible]="isOpen" 
-         (click)="onCloseSidebar()">
-    </div>
-    
-    <!-- Sidebar -->
-    <div class="role-creation-sidebar" [class.sidebar-open]="isOpen">
-      <div class="sidebar-content">
-        <!-- Header -->
-        <div class="sidebar-header">
-          <div class="header-content">
-            <h2>{{ editMode ? 'Edit Role' : 'Create Role' }}</h2>
-            <p>{{ editMode ? 'Modify role details and permissions' : 'Set up a new role with permissions' }}</p>
-          </div>
-          <button mat-icon-button class="close-button" (click)="onCloseSidebar()">
-            <mat-icon>close</mat-icon>
-          </button>
+    <div class="sidebar-content">
+      <!-- Header -->
+      <div class="sidebar-header">
+        <div class="header-content">
+          <h2>{{ editMode ? 'Edit Role' : 'Create Role' }}</h2>
+          <p>{{ editMode ? 'Modify role details and permissions' : 'Set up a new role with permissions' }}</p>
         </div>
-        
-        <!-- Form Section -->
-        <div class="form-section">
-          <form #roleForm="ngForm" class="role-form">
-            <!-- Basic Information -->
-            <div class="basic-info-section">
-              <h3>Basic Information</h3>
-              
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Role Name</mat-label>
-                <input matInput 
-                       [(ngModel)]="formData.name" 
-                       name="name" 
-                       required
-                       placeholder="Enter role name">
-                <mat-error *ngIf="!formData.name?.trim()">Role name is required</mat-error>
-              </mat-form-field>
+        <button mat-icon-button class="close-button" (click)="onCloseSidebar()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      
+      <!-- Form Section -->
+      <div class="form-section">
+        <form #roleForm="ngForm" class="role-form">
+          <!-- Basic Information -->
+          <div class="basic-info-section">
+            <h3>Basic Information</h3>
+            
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Role Name</mat-label>
+              <input matInput 
+                     [(ngModel)]="formData.name" 
+                     name="name" 
+                     required
+                     placeholder="Enter role name">
+              <mat-error *ngIf="!formData.name?.trim()">Role name is required</mat-error>
+            </mat-form-field>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Description</mat-label>
-                <textarea matInput 
-                          [(ngModel)]="formData.description" 
-                          name="description"
-                          rows="3"
-                          placeholder="Enter role description">
-                </textarea>
-              </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Description</mat-label>
+              <textarea matInput 
+                        [(ngModel)]="formData.description" 
+                        name="description"
+                        rows="3"
+                        placeholder="Enter role description">
+              </textarea>
+            </mat-form-field>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <!-- Permissions Section -->
+          <div class="permissions-section">
+            <h3>Permissions</h3>
+            
+            <!-- Select all checkbox -->
+            <div class="select-all">
+              <mat-checkbox 
+                [checked]="areAllPermissionsSelected()" 
+                [indeterminate]="areSomePermissionsSelected()"
+                (change)="toggleAllPermissions($event.checked)">
+                Select All Permissions
+              </mat-checkbox>
             </div>
-
-            <mat-divider></mat-divider>
-
-            <!-- Permissions Section -->
-            <div class="permissions-section">
-              <h3>Permissions</h3>
-              
-              <!-- Select all checkbox -->
-              <div class="select-all">
-                <mat-checkbox 
-                  [checked]="areAllPermissionsSelected()" 
-                  [indeterminate]="areSomePermissionsSelected()"
-                  (change)="toggleAllPermissions($event.checked)">
-                  Select All Permissions
-                </mat-checkbox>
-              </div>
-              
-              <!-- Grouped permissions accordion -->
-              <div class="permissions-accordion">
-                <mat-accordion>
-                  <mat-expansion-panel *ngFor="let group of permissionGroups">
-                    <mat-expansion-panel-header>
-                      <mat-panel-title>
-                        {{ group.resource | titlecase }} Permissions
-                      </mat-panel-title>
-                      <mat-panel-description>
-                        {{ getSelectedPermissionCountForResource(group.resource) }}/{{ group.permissions.length }} selected
-                      </mat-panel-description>
-                    </mat-expansion-panel-header>
-                    
-                    <!-- Resource-level select all -->
-                    <div class="resource-select-all">
+            
+            <!-- Grouped permissions accordion -->
+            <div class="permissions-accordion">
+              <mat-accordion>
+                <mat-expansion-panel *ngFor="let group of permissionGroups">
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>
+                      {{ group.resource | titlecase }} Permissions
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      {{ getSelectedPermissionCountForResource(group.resource) }}/{{ group.permissions.length }} selected
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+                  
+                  <!-- Resource-level select all -->
+                  <div class="resource-select-all">
+                    <mat-checkbox 
+                      [checked]="areAllResourcePermissionsSelected(group.resource)" 
+                      [indeterminate]="areSomeResourcePermissionsSelected(group.resource)"
+                      (change)="toggleResourcePermissions(group.resource, $event.checked)">
+                      Select All {{ group.resource | titlecase }} Permissions
+                    </mat-checkbox>
+                  </div>
+                  
+                  <!-- Individual permissions -->
+                  <div class="permissions-grid">
+                    <div *ngFor="let permission of group.permissions" class="permission-item">
                       <mat-checkbox 
-                        [checked]="areAllResourcePermissionsSelected(group.resource)" 
-                        [indeterminate]="areSomeResourcePermissionsSelected(group.resource)"
-                        (change)="toggleResourcePermissions(group.resource, $event.checked)">
-                        Select All {{ group.resource | titlecase }} Permissions
+                        [checked]="isPermissionSelected(permission)" 
+                        (change)="togglePermission(permission, $event.checked)">
+                        {{ formatPermissionName(permission) }}
                       </mat-checkbox>
-                    </div>
-                    
-                    <!-- Individual permissions -->
-                    <div class="permissions-grid">
-                      <div *ngFor="let permission of group.permissions" class="permission-item">
-                        <mat-checkbox 
-                          [checked]="isPermissionSelected(permission)" 
-                          (change)="togglePermission(permission, $event.checked)">
-                          {{ formatPermissionName(permission) }}
-                        </mat-checkbox>
-                        <div class="permission-description" 
-                             [matTooltip]="permission.description">
-                          {{ permission.description }}
-                        </div>
+                      <div class="permission-description" 
+                           [matTooltip]="permission.description">
+                        {{ permission.description }}
                       </div>
                     </div>
-                  </mat-expansion-panel>
-                </mat-accordion>
-              </div>
+                  </div>
+                </mat-expansion-panel>
+              </mat-accordion>
             </div>
-            
-            <!-- Form Validation -->
-            <div class="form-validation" *ngIf="!formData.name?.trim()">
-              <mat-icon class="warning-icon">warning</mat-icon>
-              <span>Role name is required</span>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="action-buttons">
-              <button mat-button 
-                      class="cancel-button"
-                      (click)="onCloseSidebar()">
-                Cancel
-              </button>
-              <button mat-raised-button 
-                      color="primary"
-                      class="save-button"
-                      [disabled]="!formData.name?.trim()"
-                      (click)="onSave()">
-                {{ editMode ? 'Update Role' : 'Create Role' }}
-              </button>
-            </div>
-          </form>
-        </div>
-        
-        <!-- Spacer for better scrolling -->
-        <div class="bottom-spacer"></div>
+          </div>
+          
+          <!-- Form Validation -->
+          <div class="form-validation" *ngIf="!formData.name?.trim()">
+            <mat-icon class="warning-icon">warning</mat-icon>
+            <span>Role name is required</span>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="action-buttons">
+            <button mat-button 
+                    class="cancel-button"
+                    (click)="onCloseSidebar()">
+              Cancel
+            </button>
+            <button mat-raised-button 
+                    color="primary"
+                    class="save-button"
+                    [disabled]="!formData.name?.trim()"
+                    (click)="onSave()">
+              {{ editMode ? 'Update Role' : 'Create Role' }}
+            </button>
+          </div>
+        </form>
       </div>
+      
+      <!-- Spacer for better scrolling -->
+      <div class="bottom-spacer"></div>
     </div>
   `,
   styles: [`
-    .role-creation-sidebar {
-      position: fixed;
-      top: 0;
-      right: 0;
-      width: 600px;
-      height: 100vh;
-      background-color: #ffffff;
-      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
-      transform: translateX(100%);
-      transition: transform 0.3s ease-in-out;
-      z-index: 1100;
-      overflow-y: auto;
+    :host {
       display: flex;
       flex-direction: column;
-      
-      &.sidebar-open {
-        transform: translateX(0);
-      }
-    }
-    
-    .sidebar-backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
       height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 1099;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-      
-      &.backdrop-visible {
-        opacity: 1;
-        visibility: visible;
-      }
+      overflow-y: auto;
     }
     
     .sidebar-content {
@@ -337,37 +302,33 @@ interface PermissionGroup {
     }
   `]
 })
-export class RoleCreationSidebarComponent implements OnInit, OnChanges {
-  @Input() isOpen = false;
-  @Input() roleData: Role | null = null; // For edit mode
-  
-  @Output() closeSidebar = new EventEmitter<void>();
-  @Output() roleSaved = new EventEmitter<Partial<Role>>();
-  
+export class RoleCreationSidebarComponent implements OnInit {
+  roleData: Role | null = null;
   editMode = false;
   formData: Partial<Role> = {
     name: '',
     description: '',
     permissions: []
   };
-  
+
   availablePermissions: Permission[] = [];
   permissionGroups: PermissionGroup[] = [];
   selectedPermissions: Set<number> = new Set();
-  
-  constructor(private roleService: RoleService) {}
+
+  constructor(
+    private roleService: RoleService,
+    private sidePanelRef: SidePanelRef,
+    @Inject(SIDE_PANEL_DATA) public panelData: RoleCreationPanelData
+  ) {
+    this.roleData = panelData.roleData;
+    this.editMode = !!this.roleData;
+    this.resetForm();
+  }
 
   ngOnInit(): void {
     this.loadPermissions();
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['roleData'] || changes['isOpen']) {
-      this.editMode = !!this.roleData;
-      this.resetForm();
-    }
-  }
-  
   private resetForm(): void {
     if (this.editMode && this.roleData) {
       // Edit mode - populate with existing data
@@ -376,7 +337,7 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
         description: this.roleData.description || '',
         permissions: this.roleData.permissions || []
       };
-      
+
       // Initialize selected permissions from role
       if (this.roleData.permissions) {
         this.selectedPermissions = new Set(this.roleData.permissions.map(p => p.id));
@@ -391,7 +352,7 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
       this.selectedPermissions = new Set();
     }
   }
-  
+
   loadPermissions(): void {
     this.roleService.getPermissions().subscribe({
       next: (permissions: Permission[]) => {
@@ -403,31 +364,31 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
       }
     });
   }
-  
+
   /**
    * Group permissions by resource type
    */
   groupPermissionsByResource(): void {
     // Create a map of resource to permissions
     const groupMap = new Map<string, Permission[]>();
-    
+
     this.availablePermissions.forEach(permission => {
       // Extract resource from permission name (format: 'resource:action')
       const resource = this.getResourceFromPermission(permission);
-      
+
       if (!groupMap.has(resource)) {
         groupMap.set(resource, []);
       }
-      
+
       groupMap.get(resource)?.push(permission);
     });
-    
+
     // Convert map to array for template
     this.permissionGroups = Array.from(groupMap.entries())
       .map(([resource, permissions]) => ({ resource, permissions }))
       .sort((a, b) => a.resource.localeCompare(b.resource));
   }
-  
+
   /**
    * Extract resource part from permission
    */
@@ -442,7 +403,7 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
     }
     return 'other';
   }
-  
+
   /**
    * Format permission name for display
    */
@@ -450,14 +411,14 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
     // Use permission.name which is the formatted permission string
     return permission.name || `${permission.resourceName}:${permission.actionName}`;
   }
-  
+
   /**
    * Check if a specific permission is selected
    */
   isPermissionSelected(permission: Permission): boolean {
     return this.selectedPermissions.has(permission.id);
   }
-  
+
   /**
    * Toggle a permission selection
    */
@@ -468,7 +429,7 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
       this.selectedPermissions.delete(permission.id);
     }
   }
-  
+
   /**
    * Toggle all permissions for a resource
    */
@@ -485,7 +446,7 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
       }
     });
   }
-  
+
   /**
    * Toggle all permissions
    */
@@ -498,23 +459,23 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
       }
     });
   }
-  
+
   /**
    * Check if all permissions are selected
    */
   areAllPermissionsSelected(): boolean {
-    return this.availablePermissions.length > 0 && 
-           this.availablePermissions.every(p => this.selectedPermissions.has(p.id));
+    return this.availablePermissions.length > 0 &&
+      this.availablePermissions.every(p => this.selectedPermissions.has(p.id));
   }
-  
+
   /**
    * Check if some but not all permissions are selected
    */
   areSomePermissionsSelected(): boolean {
-    return this.availablePermissions.some(p => this.selectedPermissions.has(p.id)) && 
-           !this.areAllPermissionsSelected();
+    return this.availablePermissions.some(p => this.selectedPermissions.has(p.id)) &&
+      !this.areAllPermissionsSelected();
   }
-  
+
   /**
    * Check if all permissions for a specific resource are selected
    */
@@ -522,11 +483,11 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
     const resourcePermissions = this.permissionGroups
       .find(group => group.resource === resource)
       ?.permissions || [];
-    
-    return resourcePermissions.length > 0 && 
-           resourcePermissions.every(p => this.selectedPermissions.has(p.id));
+
+    return resourcePermissions.length > 0 &&
+      resourcePermissions.every(p => this.selectedPermissions.has(p.id));
   }
-  
+
   /**
    * Check if some but not all permissions for a specific resource are selected
    */
@@ -534,11 +495,11 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
     const resourcePermissions = this.permissionGroups
       .find(group => group.resource === resource)
       ?.permissions || [];
-    
-    return resourcePermissions.some(p => this.selectedPermissions.has(p.id)) && 
-           !this.areAllResourcePermissionsSelected(resource);
+
+    return resourcePermissions.some(p => this.selectedPermissions.has(p.id)) &&
+      !this.areAllResourcePermissionsSelected(resource);
   }
-  
+
   /**
    * Get the count of selected permissions for a resource
    */
@@ -546,19 +507,19 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
     const resourcePermissions = this.permissionGroups
       .find(group => group.resource === resource)
       ?.permissions || [];
-    
+
     return resourcePermissions.filter(p => this.selectedPermissions.has(p.id)).length;
   }
-  
+
   onCloseSidebar(): void {
-    this.closeSidebar.emit();
+    this.sidePanelRef.close();
   }
-  
+
   onSave(): void {
     if (this.formData.name && this.formData.name.trim()) {
       // Convert selected permission IDs to permission names for backend compatibility
       const selectedPermissionNames: string[] = [];
-      
+
       // Look up each selected permission ID in availablePermissions and get the name
       Array.from(this.selectedPermissions).forEach(permissionId => {
         const permission = this.availablePermissions.find(p => p.id === permissionId);
@@ -566,19 +527,19 @@ export class RoleCreationSidebarComponent implements OnInit, OnChanges {
           selectedPermissionNames.push(permission.name);
         }
       });
-      
+
       const roleToSave: any = {
         name: this.formData.name.trim(),
         description: this.formData.description?.trim() || '',
         permissions: selectedPermissionNames // Send as permission names array to match backend DTO
       };
-      
+
       // Include ID if editing
       if (this.editMode && this.roleData?.id) {
         roleToSave.id = this.roleData.id;
       }
-      
-      this.roleSaved.emit(roleToSave);
+
+      this.sidePanelRef.close(roleToSave);
     }
   }
-} 
+}

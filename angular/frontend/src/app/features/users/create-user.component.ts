@@ -20,6 +20,7 @@ import { PasswordGeneratorService, PasswordStrengthResult } from '../../core/ser
 import { LoggerService } from '../../services/logging/logger.service';
 import { RoleSelectorSidebarComponent } from './role-selector-sidebar/role-selector-sidebar.component';
 import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-selector-sidebar.component';
+import { SidePanelService } from '../../shared/components/side-panel';
 
 @Component({
   selector: 'app-create-user',
@@ -34,9 +35,7 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
     MatIconModule,
     MatProgressBarModule,
     MatTooltipModule,
-    MatChipsModule,
-    RoleSelectorSidebarComponent,
-    GroupSelectorSidebarComponent
+    MatChipsModule
   ],
   template: `
     <div class="create-user-container">
@@ -218,21 +217,6 @@ import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-se
       </form>
     </div>
 
-    <!-- Role Selector Sidebar -->
-    <app-role-selector-sidebar
-      [isOpen]="isRoleSelectorOpen"
-      [selectedRoleIds]="selectedRoleIds"
-      (roleSelectionChange)="onRoleSelectionChange($event)"
-      (closeSidebar)="closeRoleSelector()"
-    ></app-role-selector-sidebar>
-
-    <!-- Group Selector Sidebar -->
-    <app-group-selector-sidebar
-      [isOpen]="isGroupSelectorOpen"
-      [selectedGroupIds]="selectedGroupIds"
-      (groupSelectionChange)="onGroupSelectionChange($event)"
-      (closeSidebar)="closeGroupSelector()"
-    ></app-group-selector-sidebar>
   `,
   styles: [`
     .create-user-container {
@@ -446,8 +430,6 @@ export class CreateUserComponent implements OnInit {
   showRequirements = false;
   generatedPassword: string | null = null;
   hidePassword = true;
-  isRoleSelectorOpen = false;
-  isGroupSelectorOpen = false;
 
   private snackBar = inject(MatSnackBar);
 
@@ -461,7 +443,8 @@ export class CreateUserComponent implements OnInit {
     private permissionService: PermissionService,
     private passwordGeneratorService: PasswordGeneratorService,
     private router: Router,
-    private logger: LoggerService
+    private logger: LoggerService,
+    private sidePanelService: SidePanelService
   ) {
     this.userForm = this.formBuilder.group({
       username: ['', [Validators.required]],
@@ -516,15 +499,15 @@ export class CreateUserComponent implements OnInit {
 
   // Role selection methods
   openRoleSelector(): void {
-    this.isRoleSelectorOpen = true;
-  }
-
-  closeRoleSelector(): void {
-    this.isRoleSelectorOpen = false;
-  }
-
-  onRoleSelectionChange(roleIds: number[]): void {
-    this.selectedRoleIds = roleIds;
+    const ref = this.sidePanelService.open(RoleSelectorSidebarComponent, {
+      data: { selectedRoleIds: [...this.selectedRoleIds] },
+      width: '400px'
+    });
+    ref.afterClosed().subscribe(result => {
+      if (result) {
+        this.selectedRoleIds = result;
+      }
+    });
   }
 
   removeRole(roleId: number): void {
@@ -538,15 +521,15 @@ export class CreateUserComponent implements OnInit {
 
   // Group selection methods
   openGroupSelector(): void {
-    this.isGroupSelectorOpen = true;
-  }
-
-  closeGroupSelector(): void {
-    this.isGroupSelectorOpen = false;
-  }
-
-  onGroupSelectionChange(groupIds: number[]): void {
-    this.selectedGroupIds = groupIds;
+    const ref = this.sidePanelService.open(GroupSelectorSidebarComponent, {
+      data: { selectedGroupIds: [...this.selectedGroupIds] },
+      width: '400px'
+    });
+    ref.afterClosed().subscribe(result => {
+      if (result) {
+        this.selectedGroupIds = result;
+      }
+    });
   }
 
   removeGroup(groupId: number): void {
@@ -579,7 +562,7 @@ export class CreateUserComponent implements OnInit {
 
   getStrengthClass(): string {
     if (!this.passwordStrength) return '';
-    
+
     if (this.passwordStrength.score >= 80) return 'strong';
     if (this.passwordStrength.score >= 60) return 'good';
     if (this.passwordStrength.score >= 40) return 'fair';
@@ -588,7 +571,7 @@ export class CreateUserComponent implements OnInit {
 
   getRequirementClass(index: number): string {
     if (!this.passwordStrength) return 'unmet';
-    
+
     const details = this.passwordStrength.details;
     const requirements = [
       details.hasMinLength,
@@ -599,13 +582,13 @@ export class CreateUserComponent implements OnInit {
       details.noRepeatedChars,
       details.noCommonPatterns
     ];
-    
+
     return requirements[index] ? 'met' : 'unmet';
   }
 
   getRequirementIcon(index: number): string {
     if (!this.passwordStrength) return 'radio_button_unchecked';
-    
+
     const details = this.passwordStrength.details;
     const requirements = [
       details.hasMinLength,
@@ -616,14 +599,14 @@ export class CreateUserComponent implements OnInit {
       details.noRepeatedChars,
       details.noCommonPatterns
     ];
-    
+
     return requirements[index] ? 'check_circle' : 'radio_button_unchecked';
   }
 
   onSubmit(): void {
     if (this.userForm.valid && this.selectedRoleIds.length > 0) {
       this.loading = true;
-      
+
       const userData = {
         ...this.userForm.value,
         roleIds: this.selectedRoleIds,

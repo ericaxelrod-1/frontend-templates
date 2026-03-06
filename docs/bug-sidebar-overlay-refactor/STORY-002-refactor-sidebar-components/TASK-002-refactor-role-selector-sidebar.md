@@ -1,3 +1,33 @@
+# TASK-002: Refactor role-selector-sidebar → RoleSelectorPanelComponent
+
+| Field | Value |
+|-------|-------|
+| **Task ID** | STORY-002 / TASK-002 |
+| **Status** | Open |
+| **Story** | STORY-002: Refactor Sidebar Components to Use SidePanelService |
+| **Description** | Refactor `role-selector-sidebar.component.ts` to be a CDK Overlay panel component, and update `create-user.component.ts` to open it via `SidePanelService` |
+| **Estimated Effort** | 30 minutes |
+| **Dependencies** | STORY-001 must be completed first |
+
+---
+
+## Context
+
+This is nearly identical to TASK-001 (group-selector-sidebar). The `RoleSelectorSidebarComponent` uses `position: fixed` CSS with a custom backdrop. It's embedded in `create-user.component.ts` with `[isOpen]`, `(roleSelectionChange)`, and `(closeSidebar)` bindings. Selections are applied live as checkboxes are toggled.
+
+After refactoring: The component receives data via `SIDE_PANEL_DATA` and returns the selection via `SidePanelRef.close(result)`.
+
+---
+
+## Files to Modify
+
+### File 1: Refactor the sidebar component
+
+**File**: `/home/eaxelrod/GitHub/frontend-templates/angular/frontend/src/app/features/users/role-selector-sidebar/role-selector-sidebar.component.ts`
+
+Replace the entire file contents with the following:
+
+```typescript
 import { Component, OnInit, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
@@ -180,3 +210,45 @@ export class RoleSelectorSidebarComponent implements OnInit {
 
   close(): void { this.sidePanelRef.close(); }
 }
+```
+
+---
+
+### File 2: Update create-user.component.ts
+
+**File**: `/home/eaxelrod/GitHub/frontend-templates/angular/frontend/src/app/features/users/create-user.component.ts`
+
+Apply the same pattern as TASK-001:
+
+1. **Import**: `SidePanelService` (if not already added in TASK-001)
+2. **Remove** `RoleSelectorSidebarComponent` from the `imports` array
+3. **Remove** the `<app-role-selector-sidebar>` element from the template
+4. **Inject** `SidePanelService` in the constructor (if not already done in TASK-001)
+5. **Update** the method that opens the role selector:
+
+```typescript
+openRoleSelector(): void {
+  const ref = this.sidePanelService.open(RoleSelectorSidebarComponent, {
+    data: { selectedRoleIds: [...this.selectedRoleIds] },
+    width: '400px'
+  });
+  ref.afterClosed().subscribe(result => {
+    if (result) {
+      this.selectedRoleIds = result;
+    }
+  });
+}
+```
+
+6. **Remove** `isRoleSelectorOpen`, `closeRoleSelector()`, and `onRoleSelectionChange()` if they only manage the old sidebar state.
+
+---
+
+## Acceptance Criteria
+
+- [ ] `RoleSelectorSidebarComponent` no longer has `position: fixed` or z-index CSS
+- [ ] `RoleSelectorSidebarComponent` uses `SidePanelRef` and `SIDE_PANEL_DATA`
+- [ ] `create-user.component.ts` opens the panel via `SidePanelService.open()`
+- [ ] `create-user.component.ts` template does not contain `<app-role-selector-sidebar>`
+- [ ] Role selection still works: open panel, check roles, click Apply, selections are preserved
+- [ ] No compilation errors

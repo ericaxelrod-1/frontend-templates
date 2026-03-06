@@ -19,6 +19,7 @@ import { Role } from '../../services/role.service';
 import { PermissionsModule } from '../../shared/modules/permissions.module';
 import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-selector-sidebar.component';
 import { RoleSelectorSidebarComponent } from './role-selector-sidebar/role-selector-sidebar.component';
+import { SidePanelService } from '../../shared/components/side-panel';
 
 @Component({
   selector: 'app-users',
@@ -29,9 +30,7 @@ import { RoleSelectorSidebarComponent } from './role-selector-sidebar/role-selec
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    PermissionsModule,
-    GroupSelectorSidebarComponent,
-    RoleSelectorSidebarComponent
+    PermissionsModule
   ],
   template: `
     <div class="users-container">
@@ -149,22 +148,6 @@ import { RoleSelectorSidebarComponent } from './role-selector-sidebar/role-selec
         </table>
       </ng-container>
     </div>
-    
-    <!-- Group Selector Sidebar -->
-    <app-group-selector-sidebar
-      [isOpen]="isGroupSelectorOpen"
-      [selectedGroupIds]="getSelectedGroupIds()"
-      (groupSelectionChange)="onGroupSelectionChange($event)"
-      (closeSidebar)="closeGroupSelector()">
-    </app-group-selector-sidebar>
-
-    <!-- Role Selector Sidebar -->
-    <app-role-selector-sidebar
-      [isOpen]="isRoleSelectorOpen"
-      [selectedRoleIds]="getSelectedRoleIds()"
-      (roleSelectionChange)="onRoleSelectionChange($event)"
-      (closeSidebar)="closeRoleSelector()">
-    </app-role-selector-sidebar>
   `,
   styles: [`
     .users-container {
@@ -251,7 +234,7 @@ export class UsersComponent implements OnInit {
   hasManageUsersPermission = false;
   hasManageGroupsPermission = false;
   hasManageRolesPermission = false;
-  
+
   // Group selector sidebar state
   isGroupSelectorOpen = false;
   selectedUserForGroup: User | null = null;
@@ -271,8 +254,9 @@ export class UsersComponent implements OnInit {
     private logger: LoggerService,
     private permissionService: PermissionService,
     private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
-  ) {}
+    private ngZone: NgZone,
+    private sidePanelService: SidePanelService
+  ) { }
 
   ngOnInit(): void {
     this.loadData();
@@ -304,16 +288,16 @@ export class UsersComponent implements OnInit {
     const hasAsyncPermission = this.hasManageGroupsPermission;
     const hasSyncPermission = this.permissionService.hasPermissionSync('groups:manage');
     const hasPermission = hasAsyncPermission || hasSyncPermission;
-    
+
     // Don't allow users to manage their own groups
     const isNotSelf = user.id !== this.currentUser?.id;
-    
+
     return hasPermission && isNotSelf;
   }
 
   loadData(): void {
     this.loading = true;
-    
+
     // Load permissions first
     forkJoin({
       manageUsers: this.permissionService.hasPermission('users:update'),
@@ -324,10 +308,10 @@ export class UsersComponent implements OnInit {
         this.hasManageUsersPermission = permissions.manageUsers;
         this.hasManageGroupsPermission = permissions.manageGroups;
         this.hasManageRolesPermission = permissions.manageRoles;
-        
+
         // Load data - get current user synchronously and load other data
         this.currentUser = this.authService.currentUser;
-        
+
         forkJoin({
           users: this.userService.getUsers(),
           groups: this.groupService.getGroups(),
@@ -355,7 +339,7 @@ export class UsersComponent implements OnInit {
       }
     });
   }
-  
+
   // Load user's groups if not included in profile
   loadUserGroups(): void {
     if (!this.currentUser) {
@@ -377,7 +361,7 @@ export class UsersComponent implements OnInit {
       }
     });
   }
-  
+
   // Load members from user's groups
   loadGroupMembers(): void {
     if (!this.currentUser || !this.currentUserGroups.length) {
@@ -457,7 +441,7 @@ export class UsersComponent implements OnInit {
       this.logger.error('Cannot add user to group: group.id is undefined', { group });
       return;
     }
-    
+
     // Use incremental API endpoint with meaningful response handling
     this.userService.addUserToGroup(user.id, group.id).subscribe({
       next: (result) => {
@@ -511,12 +495,12 @@ export class UsersComponent implements OnInit {
 
   removeFromGroup(user: User, group: Group): void {
     if (!group.id) {
-      this.logger.error('Cannot remove user from group: missing group ID', { 
-        groupId: group.id 
+      this.logger.error('Cannot remove user from group: missing group ID', {
+        groupId: group.id
       });
       return;
     }
-    
+
     // Use incremental API endpoint with meaningful response handling
     this.userService.removeUserFromGroup(user.id, group.id).subscribe({
       next: (result) => {
@@ -575,7 +559,7 @@ export class UsersComponent implements OnInit {
   trackByGroupId(index: number, group: Group): number {
     return group.id;
   }
-  
+
   openGroupSelector(user: User): void {
     // Fetch fresh user data to ensure we have current group memberships
     this.userService.getUser(user.id).subscribe({
@@ -583,12 +567,21 @@ export class UsersComponent implements OnInit {
         this.selectedUserForGroup = freshUser;
         // Store original group IDs as baseline for change detection
         this.originalGroupIds = freshUser.groups?.map(g => g.id).filter((id): id is number => id !== undefined) || [];
-        this.isGroupSelectorOpen = true;
-        
+
         this.logger.debug('Opened group selector with fresh user data', {
           userId: freshUser.id,
           currentGroups: this.originalGroupIds,
           groupNames: freshUser.groups?.map(g => g.name) || []
+        });
+
+        const ref = this.sidePanelService.open(GroupSelectorSidebarComponent, {
+          data: { selectedGroupIds: [...this.originalGroupIds] },
+          width: '400px'
+        });
+        ref.afterClosed().subscribe(result => {
+          if (result) {
+            this.onGroupSelectionChange(result);
+          }
         });
       },
       error: (error) => {
@@ -599,12 +592,12 @@ export class UsersComponent implements OnInit {
       }
     });
   }
-  
+
   closeGroupSelector(): void {
     this.isGroupSelectorOpen = false;
     this.selectedUserForGroup = null;
   }
-  
+
   onGroupSelectionChange(groupIds: number[]): void {
     if (!this.selectedUserForGroup) {
       return;
@@ -613,7 +606,7 @@ export class UsersComponent implements OnInit {
     // Calculate changes from the original baseline
     const addedGroupIds = groupIds.filter(groupId => !this.originalGroupIds.includes(groupId));
     const removedGroupIds = this.originalGroupIds.filter(groupId => !groupIds.includes(groupId));
-    
+
     this.logger.debug('Group selection change detected', {
       userId: this.selectedUserForGroup.id,
       originalGroups: this.originalGroupIds,
@@ -674,14 +667,14 @@ export class UsersComponent implements OnInit {
     if (!user.roles) {
       return this.availableRoles;
     }
-    
+
     const userRoleIds = user.roles.map(role => role.id).filter((id): id is number => id !== undefined);
     return this.availableRoles.filter(role => role.id && !userRoleIds.includes(role.id));
   }
 
   addToRole(user: User, role: Role): void {
     if (!role.id) return;
-    
+
     this.userService.addUserToRole(user.id, role.id).subscribe({
       next: (result) => {
         if (result.success) {
@@ -697,7 +690,7 @@ export class UsersComponent implements OnInit {
               this.cdr.detectChanges();
             }
           });
-          
+
           this.snackBar.open(result.message, 'Close', {
             duration: 3000
           });
@@ -719,7 +712,7 @@ export class UsersComponent implements OnInit {
 
   removeFromRole(user: User, role: Role): void {
     if (!role.id) return;
-    
+
     this.userService.removeUserFromRole(user.id, role.id).subscribe({
       next: (result) => {
         if (result.success) {
@@ -735,7 +728,7 @@ export class UsersComponent implements OnInit {
               this.cdr.detectChanges();
             }
           });
-          
+
           this.snackBar.open(result.message, 'Close', {
             duration: 3000
           });
@@ -757,7 +750,17 @@ export class UsersComponent implements OnInit {
 
   openRoleSelector(user: User): void {
     this.selectedUserForRole = user;
-    this.isRoleSelectorOpen = true;
+    const selectedRoleIds = user.roles?.map(r => r.id).filter((id): id is number => id !== undefined) || [];
+
+    const ref = this.sidePanelService.open(RoleSelectorSidebarComponent, {
+      data: { selectedRoleIds: [...selectedRoleIds] },
+      width: '400px'
+    });
+    ref.afterClosed().subscribe(result => {
+      if (result) {
+        this.onRoleSelectionChange(result);
+      }
+    });
   }
 
   closeRoleSelector(): void {
@@ -770,7 +773,7 @@ export class UsersComponent implements OnInit {
 
     const user = this.selectedUserForRole;
     const currentRoleIds = user.roles?.map(r => r.id).filter((id): id is number => id !== undefined) || [];
-    
+
     // Calculate which roles to add and which to remove
     const addedRoleIds = selectedRoleIds.filter(roleId => !currentRoleIds.includes(roleId));
     const removedRoleIds = currentRoleIds.filter(roleId => !selectedRoleIds.includes(roleId));

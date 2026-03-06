@@ -11,6 +11,7 @@ import { RoleCreationSidebarComponent } from './role-creation-sidebar/role-creat
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
+import { SidePanelService } from '../../shared/components/side-panel';
 
 @Component({
   selector: 'app-roles',
@@ -21,8 +22,7 @@ import { PermissionService } from '../../core/services/permission.service';
     MatButtonModule,
     MatIconModule,
     MatTableModule,
-    MatChipsModule,
-    RoleCreationSidebarComponent
+    MatChipsModule
   ],
   template: `
     <div class="roles-container">
@@ -103,14 +103,6 @@ import { PermissionService } from '../../core/services/permission.service';
           <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
         </table>
       </ng-container>
-      
-      <!-- Role Creation Sidebar -->
-      <app-role-creation-sidebar
-        [isOpen]="isRoleCreationOpen"
-        [roleData]="selectedRoleForEdit"
-        (closeSidebar)="closeRoleCreation()"
-        (roleSaved)="onRoleSaved($event)">
-      </app-role-creation-sidebar>
     </div>
   `,
   styles: [`
@@ -149,28 +141,25 @@ export class RolesComponent implements OnInit {
   roles: Role[] = [];
   hasPermission = false;
   loading = true;
-  
-  // Role creation sidebar state
-  isRoleCreationOpen = false;
-  selectedRoleForEdit: Role | null = null;
-  
+
   // Make Array available in the template
   protected Array = Array;
-  
+
   constructor(
     private roleService: RoleService,
     private authService: AuthService,
     private snackBar: MatSnackBar,
     private router: Router,
-    private permissionService: PermissionService
-  ) {}
+    private permissionService: PermissionService,
+    private sidePanelService: SidePanelService
+  ) { }
 
   ngOnInit(): void {
     // Check permission to view roles using resource:action format
     this.permissionService.hasPermission('roles:view').subscribe(hasPermission => {
       console.log('[RolesComponent] Permission check result:', hasPermission);
       this.hasPermission = hasPermission;
-      
+
       if (hasPermission) {
         this.loadRoles();
       } else {
@@ -205,8 +194,7 @@ export class RolesComponent implements OnInit {
   }
 
   createRole(): void {
-    this.selectedRoleForEdit = null;
-    this.isRoleCreationOpen = true;
+    this.openRolePanel(null);
   }
 
   editRole(role: Role): void {
@@ -214,23 +202,27 @@ export class RolesComponent implements OnInit {
       this.snackBar.open('Cannot edit role without an ID', 'Close', { duration: 3000 });
       return;
     }
-    
-    this.selectedRoleForEdit = role;
-    this.isRoleCreationOpen = true;
+    this.openRolePanel(role);
   }
-  
-  closeRoleCreation(): void {
-    this.isRoleCreationOpen = false;
-    this.selectedRoleForEdit = null;
+
+  private openRolePanel(roleData: Role | null): void {
+    const ref = this.sidePanelService.open(RoleCreationSidebarComponent, {
+      data: { roleData },
+      width: '600px'
+    });
+    ref.afterClosed().subscribe(result => {
+      if (result) {
+        this.onRoleSaved(result, roleData?.id);
+      }
+    });
   }
-  
-  onRoleSaved(roleData: Partial<Role>): void {
-    if (this.selectedRoleForEdit?.id) {
+
+  onRoleSaved(roleData: Partial<Role>, roleId?: number): void {
+    if (roleId) {
       // Edit mode - update existing role
-      this.roleService.updateRole(this.selectedRoleForEdit.id, roleData).subscribe({
+      this.roleService.updateRole(roleId, roleData).subscribe({
         next: () => {
           this.snackBar.open('Role updated successfully', 'Close', { duration: 3000 });
-          this.closeRoleCreation();
           // Reload the entire roles list to ensure data consistency
           this.loadRoles();
         },
@@ -244,7 +236,6 @@ export class RolesComponent implements OnInit {
       this.roleService.createRole(roleData).subscribe({
         next: (role) => {
           this.snackBar.open('Role created successfully', 'Close', { duration: 3000 });
-          this.closeRoleCreation();
           // Reload the entire roles list to ensure the new role appears with all data
           this.loadRoles();
         },

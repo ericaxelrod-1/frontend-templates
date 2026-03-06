@@ -16,6 +16,7 @@ import { GroupCreationSidebarComponent } from './group-creation-sidebar/group-cr
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
+import { SidePanelService } from '../../shared/components/side-panel';
 
 @Component({
   selector: 'app-groups',
@@ -26,10 +27,7 @@ import { PermissionService } from '../../core/services/permission.service';
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatListModule,
-    UserSelectorSidebarComponent,
-    MemberActionsSidebarComponent,
-    GroupCreationSidebarComponent
+    MatListModule
   ],
   template: `
     <div class="groups-container">
@@ -94,31 +92,6 @@ import { PermissionService } from '../../core/services/permission.service';
         </div>
       </ng-container>
       
-      <!-- User Selector Sidebar -->
-      <app-user-selector-sidebar
-        [isOpen]="isUserSelectorOpen"
-        [group]="selectedGroupForUser"
-        [availableUsers]="availableUsers"
-        (closeSidebar)="closeUserSelector()"
-        (userSelected)="onUserSelected($event)">
-      </app-user-selector-sidebar>
-      
-      <!-- Member Actions Sidebar -->
-      <app-member-actions-sidebar
-        [isOpen]="isMemberActionsOpen"
-        [member]="selectedMember"
-        [group]="selectedGroupForMember"
-        (closeSidebar)="closeMemberActions()"
-        (actionSelected)="onMemberActionSelected($event)">
-      </app-member-actions-sidebar>
-      
-      <!-- Group Creation Sidebar -->
-      <app-group-creation-sidebar
-        [isOpen]="isGroupCreationOpen"
-        [groupData]="selectedGroupForEdit"
-        (closeSidebar)="closeGroupCreation()"
-        (groupSaved)="onGroupSaved($event)">
-      </app-group-creation-sidebar>
     </div>
   `,
   styles: [`
@@ -173,15 +146,9 @@ import { PermissionService } from '../../core/services/permission.service';
     }
     
     .add-member-button {
-      z-index: 10;
-      position: relative;
-      pointer-events: auto;
     }
     
     .member-actions-button {
-      z-index: 10;
-      position: relative;
-      pointer-events: auto;
     }
   `]
 })
@@ -189,36 +156,23 @@ export class GroupsComponent implements OnInit {
   groups: Group[] = [];
   hasPermission = false;
   loading = true;
-  
-  // Sidebar state management
-  isUserSelectorOpen = false;
-  selectedGroupForUser: Group | null = null;
-  availableUsers: User[] = [];
-  
-  // Member actions sidebar state
-  isMemberActionsOpen = false;
-  selectedMember: User | null = null;
-  selectedGroupForMember: Group | null = null;
-  
-  // Group creation sidebar state
-  isGroupCreationOpen = false;
-  selectedGroupForEdit: Group | null = null;
-  
+
   constructor(
     private groupService: GroupService,
     private userService: UserService,
     private snackBar: MatSnackBar,
     private authService: AuthService,
     private router: Router,
-    private permissionService: PermissionService
-  ) {}
+    private permissionService: PermissionService,
+    private sidePanelService: SidePanelService
+  ) { }
 
   ngOnInit(): void {
     // Check permission to view groups using resource:action format
     this.permissionService.hasPermission('groups:view').subscribe(hasPermission => {
       console.log('[GroupsComponent] Permission check result:', hasPermission);
       this.hasPermission = hasPermission;
-      
+
       if (hasPermission) {
         this.loadGroups();
       } else {
@@ -255,28 +209,32 @@ export class GroupsComponent implements OnInit {
   }
 
   createGroup(): void {
-    this.selectedGroupForEdit = null; // Create mode
-    this.isGroupCreationOpen = true;
+    this.openGroupPanel(null);
   }
 
   editGroup(group: Group): void {
-    this.selectedGroupForEdit = group; // Edit mode
-    this.isGroupCreationOpen = true;
+    this.openGroupPanel(group);
   }
-  
-  closeGroupCreation(): void {
-    this.isGroupCreationOpen = false;
-    this.selectedGroupForEdit = null;
+
+  private openGroupPanel(groupData: Group | null): void {
+    const ref = this.sidePanelService.open(GroupCreationSidebarComponent, {
+      data: { groupData },
+      width: '400px'
+    });
+    ref.afterClosed().subscribe(result => {
+      if (result) {
+        this.onGroupSaved(result, groupData);
+      }
+    });
   }
-  
-  onGroupSaved(groupData: Partial<Group>): void {
-    if (this.selectedGroupForEdit) {
+
+  onGroupSaved(groupData: Partial<Group>, originalGroup: Group | null): void {
+    if (originalGroup) {
       // Edit mode
-      this.groupService.updateGroup(this.selectedGroupForEdit.id, groupData).subscribe({
+      this.groupService.updateGroup(originalGroup.id, groupData).subscribe({
         next: () => {
-          Object.assign(this.selectedGroupForEdit!, groupData);
+          Object.assign(originalGroup, groupData);
           this.snackBar.open('Group updated successfully', 'Close', { duration: 3000 });
-          this.closeGroupCreation();
         },
         error: (error) => {
           console.error('Error updating group:', error);
@@ -292,7 +250,6 @@ export class GroupsComponent implements OnInit {
           }
           this.groups.push(group);
           this.snackBar.open('Group created successfully', 'Close', { duration: 3000 });
-          this.closeGroupCreation();
         },
         error: (error) => {
           console.error('Error creating group:', error);
@@ -322,42 +279,39 @@ export class GroupsComponent implements OnInit {
   }
 
   addMember(group: Group): void {
-    this.selectedGroupForUser = group;
-    this.loadAvailableUsers(group);
-    this.isUserSelectorOpen = true;
-  }
-  
-  private loadAvailableUsers(group: Group): void {
+    // Load available users, then open the panel
     this.userService.getUsers().subscribe({
       next: (users) => {
-        // Filter out users who are already members of the group
         const memberIds = group.users?.map(user => user.id) || [];
-        this.availableUsers = users.filter(user => !memberIds.includes(user.id));
+        const availableUsers = users.filter(user => !memberIds.includes(user.id));
+
+        const ref = this.sidePanelService.open(UserSelectorSidebarComponent, {
+          data: { group, availableUsers },
+          width: '400px'
+        });
+        ref.afterClosed().subscribe(result => {
+          if (result) {
+            this.onUserSelected(result);
+          }
+        });
       },
       error: (error) => {
         console.error('Error loading available users:', error);
         this.snackBar.open('Error loading available users', 'Close', { duration: 3000 });
-        this.availableUsers = [];
       }
     });
   }
-  
-  closeUserSelector(): void {
-    this.isUserSelectorOpen = false;
-    this.selectedGroupForUser = null;
-    this.availableUsers = [];
-  }
-  
+
+
   onUserSelected(event: { user: User; group: Group }): void {
     const { user, group } = event;
-    
+
     // Use non-deprecated method with default member permissions
     const defaultPermissions: Permission[] = GROUP_PERMISSION_SETS['MEMBER'];
     this.groupService.addMemberWithPermissions(group.id, user.id, defaultPermissions).subscribe({
       next: () => {
         this.loadGroups(); // Reload to get updated member list
         this.snackBar.open(`${user.firstName} ${user.lastName} added to ${group.name} successfully`, 'Close', { duration: 3000 });
-        this.closeUserSelector();
       },
       error: (error) => {
         console.error('Error adding member:', error);
@@ -402,22 +356,21 @@ export class GroupsComponent implements OnInit {
   }
 
   openMemberActions(group: Group, member: User): void {
-    console.log('[GroupsComponent] Opening member actions for:', (member.firstName || '') + ' ' + (member.lastName || '') || member.email, 'in group:', group.name);
-    this.selectedMember = member;
-    this.selectedGroupForMember = group;
-    this.isMemberActionsOpen = true;
+    const ref = this.sidePanelService.open(MemberActionsSidebarComponent, {
+      data: { member, group },
+      width: '400px'
+    });
+    ref.afterClosed().subscribe(result => {
+      if (result) {
+        this.onMemberActionSelected(result);
+      }
+    });
   }
-  
-  closeMemberActions(): void {
-    console.log('[GroupsComponent] Closing member actions sidebar');
-    this.isMemberActionsOpen = false;
-    this.selectedMember = null;
-    this.selectedGroupForMember = null;
-  }
-  
+
+
   onMemberActionSelected(event: { action: MemberAction; member: User; group: Group }): void {
     console.log('[GroupsComponent] Member action selected:', event.action.id, 'for member:', (event.member.firstName || '') + ' ' + (event.member.lastName || '') || event.member.email);
-    
+
     switch (event.action.id) {
       case 'make-admin':
         this.makeAdmin(event.group, event.member);
@@ -428,8 +381,6 @@ export class GroupsComponent implements OnInit {
       default:
         console.warn('[GroupsComponent] Unknown action:', event.action.id);
     }
-    
-    this.closeMemberActions();
   }
 
   goToDashboard(): void {

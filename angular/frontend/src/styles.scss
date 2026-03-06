@@ -29,37 +29,37 @@
   --mat-sys-on-primary: #ffffff;
   --mat-sys-primary-container: #eaddff;
   --mat-sys-on-primary-container: #21005d;
-  
+
   --mat-sys-secondary: #625b71;
   --mat-sys-on-secondary: #ffffff;
   --mat-sys-secondary-container: #e8def8;
   --mat-sys-on-secondary-container: #1d192b;
-  
+
   --mat-sys-tertiary: #7d5260;
   --mat-sys-on-tertiary: #ffffff;
   --mat-sys-tertiary-container: #ffd8e4;
   --mat-sys-on-tertiary-container: #31111d;
-  
+
   --mat-sys-error: #ba1a1a;
   --mat-sys-on-error: #ffffff;
   --mat-sys-error-container: #ffdad6;
   --mat-sys-on-error-container: #410002;
-  
+
   --mat-sys-surface: #fffbfe;
   --mat-sys-on-surface: #1c1b1f;
   --mat-sys-surface-variant: #e7e0ec;
   --mat-sys-on-surface-variant: #49454f;
-  
+
   --mat-sys-outline: #79747e;
   --mat-sys-outline-variant: #cac4d0;
   --mat-sys-shadow: #000000;
   --mat-sys-scrim: #000000;
-  
+
   /* Semantic color mappings for application use */
   --app-success: #4caf50;
   --app-warning: #ff9800;
   --app-info: #2196f3;
-  
+
   /* Spacing system - Material Design 8dp grid */
   --mat-sys-spacing-xs: 4px;
   --mat-sys-spacing-sm: 8px;
@@ -72,32 +72,32 @@
 .dark-theme,
 [data-mat-theme="dark"] {
   color-scheme: dark;
-  
+
   --mat-sys-primary: #d0bcff;
   --mat-sys-on-primary: #381e72;
   --mat-sys-primary-container: #4f378b;
   --mat-sys-on-primary-container: #eaddff;
-  
+
   --mat-sys-secondary: #ccc2dc;
   --mat-sys-on-secondary: #332d41;
   --mat-sys-secondary-container: #4a4458;
   --mat-sys-on-secondary-container: #e8def8;
-  
+
   --mat-sys-tertiary: #efb8c8;
   --mat-sys-on-tertiary: #492532;
   --mat-sys-tertiary-container: #633b48;
   --mat-sys-on-tertiary-container: #ffd8e4;
-  
+
   --mat-sys-error: #ffb4ab;
   --mat-sys-on-error: #690005;
   --mat-sys-error-container: #93000a;
   --mat-sys-on-error-container: #ffdad6;
-  
+
   --mat-sys-surface: #10080e;
   --mat-sys-on-surface: #e6e1e5;
   --mat-sys-surface-variant: #49454f;
   --mat-sys-on-surface-variant: #cac4d0;
-  
+
   --mat-sys-outline: #938f99;
   --mat-sys-outline-variant: #49454f;
 }
@@ -111,7 +111,7 @@
   --fluid-text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
   --fluid-text-xl: clamp(1.5rem, 1.25rem + 1vw, 2rem);
   --fluid-text-2xl: clamp(2rem, 1.5rem + 1.5vw, 3rem);
-  
+
   /* Fluid spacing using clamp() */
   --fluid-spacing-xs: clamp(0.25rem, 0.5vw, 0.5rem);
   --fluid-spacing-sm: clamp(0.5rem, 1vw, 1rem);
@@ -121,13 +121,15 @@
 }
 
 /* Base HTML/Body setup with fluid typography */
-html, body { 
-  height: 100%; 
+html,
+body {
+  height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
-  font-size: var(--fluid-text-base); /* Fluid base font size */
+  font-size: var(--fluid-text-base);
+  /* Fluid base font size */
   background-color: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
   overflow-x: hidden;
@@ -168,6 +170,7 @@ html, body {
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -186,10 +189,21 @@ html, body {
  */
 
 /* Application-specific semantic color utilities */
-.text-success { color: var(--app-success) !important; }
-.text-warning { color: var(--app-warning) !important; }
-.text-info { color: var(--app-info) !important; }
-.text-error { color: var(--mat-sys-error) !important; }
+.text-success {
+  color: var(--app-success) !important;
+}
+
+.text-warning {
+  color: var(--app-warning) !important;
+}
+
+.text-info {
+  color: var(--app-info) !important;
+}
+
+.text-error {
+  color: var(--mat-sys-error) !important;
+}
 
 /* Status indicator utilities - Use Material 3 tokens */
 .status-success {
@@ -259,6 +273,7 @@ html, body {
  * PRINT STYLES
  */
 @media print {
+
   .mat-drawer,
   .mat-sidenav,
   .mat-toolbar,
@@ -266,8 +281,26 @@ html, body {
   .mat-mini-fab {
     display: none !important;
   }
-  
+
   .mat-drawer-content {
     margin: 0 !important;
   }
-} 
+}
+
+// ============================================
+// Side Panel Overlay Styles (CDK Overlay)
+// ============================================
+// These styles are global because CDK Overlay
+// renders content outside component boundaries.
+
+.side-panel-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.side-panel-overlay {
+  background-color: var(--mat-sys-surface, #ffffff);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}

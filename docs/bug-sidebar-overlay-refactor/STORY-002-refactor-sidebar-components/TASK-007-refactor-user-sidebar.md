@@ -1,3 +1,33 @@
+# TASK-007: Refactor user-sidebar → UserProfilePanelComponent
+
+| Field | Value |
+|-------|-------|
+| **Task ID** | STORY-002 / TASK-007 |
+| **Status** | Open |
+| **Story** | STORY-002: Refactor Sidebar Components to Use SidePanelService |
+| **Description** | Refactor `user-sidebar.component.ts` (layout-level profile sidebar) to be opened via `SidePanelService`, and update `custom-layout.component.ts` |
+| **Estimated Effort** | 30 minutes |
+| **Dependencies** | STORY-001 must be completed first |
+
+---
+
+## Context
+
+`UserSidebarComponent` is the user profile menu in the header (Profile, Account Settings, Change Password, Logout). It's currently rendered outside `mat-sidenav-content` in `custom-layout.component.ts`, so it doesn't have the stacking context issue — but it has a **focus management issue** because it uses raw CSS without CDK focus trapping.
+
+After refactoring: CDK Overlay provides automatic focus trapping, backdrop handling, and Escape key support.
+
+---
+
+## Files to Modify
+
+### File 1: Refactor user-sidebar.component.ts
+
+**File**: `/home/eaxelrod/GitHub/frontend-templates/angular/frontend/src/app/layouts/user-sidebar/user-sidebar.component.ts`
+
+Replace the entire file:
+
+```typescript
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
@@ -90,32 +120,25 @@ import { SidePanelRef } from '../../shared/components/side-panel';
       font-size: 40px;
       width: 40px;
       height: 40px;
-      color: var(--mat-sys-primary, #6750a4);
+      color: var(--mdc-theme-primary);
     }
 
     .user-details h3 {
       margin: 0;
       font-size: 16px;
       font-weight: 500;
-      color: var(--mat-sys-on-surface, #1d1b20);
     }
 
     .user-email {
       margin: 4px 0 0;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant, #49454f);
-    }
-    
-    mat-nav-list {
-      a {
-        cursor: pointer;
-      }
+      color: #666;
     }
   `]
 })
 export class UserSidebarComponent implements OnInit, OnDestroy {
   currentUser$: Observable<User | null>;
-
+  
   constructor(
     private store: Store,
     private router: Router,
@@ -125,44 +148,42 @@ export class UserSidebarComponent implements OnInit, OnDestroy {
   ) {
     this.currentUser$ = this.authService.currentUser$;
   }
-
-  ngOnInit(): void { }
-
-  ngOnDestroy(): void { }
-
+  
+  ngOnInit(): void {}
+  
+  ngOnDestroy(): void {}
+  
   close(): void {
     this.sidePanelRef.close();
   }
-
+  
   navigateToProfile(): void {
     this.router.navigate(['/app/profile']);
     this.close();
   }
-
+  
   navigateToSettings(): void {
     this.router.navigate(['/app/settings']);
     this.close();
   }
-
+  
   navigateToChangePassword(): void {
     this.router.navigate(['/app/profile/change-password']);
     this.close();
   }
-
+  
   logout(): void {
     this.store.dispatch(new AuthActions.Logout()).subscribe({
       next: () => {
         this.router.navigate(['/login']);
-        this.close();
       },
       error: (error) => {
         this.logger.error('Error during logout:', error);
         this.router.navigate(['/login']);
-        this.close();
       }
     });
   }
-
+  
   getDisplayName(user: User | null): string {
     if (!user) return '';
     if (user.firstName || user.lastName) {
@@ -171,3 +192,52 @@ export class UserSidebarComponent implements OnInit, OnDestroy {
     return user.email;
   }
 }
+```
+
+### Key changes
+- **Removed**: `@Input() isOpen`, `@Input() currentUser`, `@Output() closeSidebar`
+- **Removed**: `.user-sidebar` and `.sidebar-backdrop` wrapper divs with `position: fixed` CSS
+- **Added**: `SidePanelRef` injection for closing
+- **Kept**: Same template content, navigation methods, and user display logic
+
+---
+
+### File 2: Update custom-layout.component.ts
+
+**File**: `/home/eaxelrod/GitHub/frontend-templates/angular/frontend/src/app/layouts/custom-layout/custom-layout.component.ts`
+
+1. **Add import**:
+   ```typescript
+   import { SidePanelService } from '../../shared/components/side-panel';
+   ```
+
+2. **Remove** `UserSidebarComponent` from the `imports` array
+
+3. **Remove** the `<app-user-sidebar>` element from the template (it's outside the grid layout div, near the end of the template)
+
+4. **Inject** `SidePanelService` in the constructor
+
+5. **Update** `openUserSidebar()`:
+   ```typescript
+   openUserSidebar(): void {
+     this.sidePanelService.open(UserSidebarComponent, {
+       width: '320px'
+     });
+   }
+   ```
+   Note: No data needs to be passed — the component gets user data from `AuthService` directly.
+
+6. **Remove**: `isUserSidebarOpen`, `closeUserSidebar()`, `currentUser` property (if only used for the sidebar)
+
+---
+
+## Acceptance Criteria
+
+- [ ] `UserSidebarComponent` no longer has `position: fixed` or z-index CSS
+- [ ] `UserSidebarComponent` uses `SidePanelRef` for closing
+- [ ] Focus is properly trapped inside the panel when open
+- [ ] Clicking backdrop closes the panel
+- [ ] Escape key closes the panel
+- [ ] Navigation links and Logout still work
+- [ ] `custom-layout.component.ts` template does not contain `<app-user-sidebar>`
+- [ ] No compilation errors
