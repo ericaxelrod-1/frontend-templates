@@ -79,13 +79,7 @@ import { SidePanelService } from '../../shared/components/side-panel';
           <!-- Sidenav Content - Main content area -->
           <mat-sidenav-content class="sidenav-content">
             <main class="main-content">
-              <!-- Admin breadcrumb when in admin context -->
-              <div *ngIf="isAdminContext" class="admin-breadcrumb">
-                <mat-icon>admin_panel_settings</mat-icon>
-                <span>Administration</span>
-                <mat-icon>chevron_right</mat-icon>
-                <span>{{ getAdminPageTitle() }}</span>
-              </div>
+              <!-- Admin breadcrumb moved to header -->
               
               <!-- Content wrapper for proper centering -->
               <div class="content-wrapper">
