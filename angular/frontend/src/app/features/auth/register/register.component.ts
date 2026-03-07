@@ -8,6 +8,9 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { AppConfigService } from '../../../core/services';
 import { AuthService } from '../../../core/services/auth.service';
 import { CaptchaSelectorComponent } from '../../../shared/components/captcha/advanced/captcha-selector.component';
@@ -21,18 +24,18 @@ import { AuthResponse } from '../../../models';
 export function passwordStrengthValidator(): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     const value = control.value;
-    
+
     if (!value) {
       return null;
     }
-    
+
     const hasUpperCase = /[A-Z]+/.test(value);
     const hasLowerCase = /[a-z]+/.test(value);
     const hasNumeric = /[0-9]+/.test(value);
     const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(value);
-    
+
     const passwordValid = hasUpperCase && hasLowerCase && hasNumeric && hasSpecial;
-    
+
     return !passwordValid ? { passwordStrength: true } : null;
   };
 }
@@ -42,9 +45,9 @@ export function passwordMatchValidator(): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     const password = control.get('password');
     const confirmPassword = control.get('confirmPassword');
-    
-    return password && confirmPassword && password.value !== confirmPassword.value 
-      ? { passwordMismatch: true } 
+
+    return password && confirmPassword && password.value !== confirmPassword.value
+      ? { passwordMismatch: true }
       : null;
   };
 }
@@ -55,22 +58,25 @@ export function passwordMatchValidator(): ValidatorFn {
   styleUrls: ['./register.component.scss'],
   standalone: true,
   imports: [
-    CommonModule, 
-    ReactiveFormsModule, 
+    CommonModule,
+    ReactiveFormsModule,
     RouterModule,
     MatTooltipModule,
     MatIconModule,
     MatProgressBarModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
     CaptchaSelectorComponent
   ]
 })
 export class RegisterComponent implements OnInit, OnDestroy {
   @ViewChild('captchaSelector') captchaSelector!: CaptchaSelectorComponent;
-  
+
   // Pre-initialize all properties to avoid undefined issues
   registerForm: FormGroup;
   verificationForm: FormGroup;
-  
+
   private subscription: Subscription = new Subscription();
   private platformId = inject(PLATFORM_ID);
 
@@ -87,28 +93,28 @@ export class RegisterComponent implements OnInit, OnDestroy {
   registrationSuccess = false;
   passwordVisible = false;
   confirmPasswordVisible = false;
-  
+
   // Development-only for testing email verification
   testVerificationToken: string | null = null;
   emailSender: string | null = null;
-  
+
   // Verification form variables
   verificationLoading = false;
   verificationSubmitted = false;
   verificationError = '';
   registeredEmail = ''; // Store the email used for registration
-  
+
   // Password strength calculation
   passwordStrength = 0;
   passwordMessage = '';
-  
+
   // App configuration properties
   appName = 'Angular Template';
   landingLogo = 'assets/logos/logo-large.svg';
-  
+
   // Add emailExists property to the class
   emailExists = false;
-  
+
   constructor(
     private formBuilder: FormBuilder,
     private router: Router,
@@ -126,7 +132,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       lastName: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [
-        Validators.required, 
+        Validators.required,
         Validators.minLength(8),
         passwordStrengthValidator()
       ]],
@@ -136,12 +142,12 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }, {
       validators: passwordMatchValidator()
     });
-    
+
     // Initialize verification form
     this.verificationForm = this.formBuilder.group({
       verificationToken: ['', [Validators.required]]
     });
-    
+
     console.log('RegisterComponent constructor called');
     console.log('Component element:', this.el.nativeElement);
     try {
@@ -151,12 +157,12 @@ export class RegisterComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error loading app config in RegisterComponent constructor:', error);
     }
-    
+
     // Check for persisted registration state
     if (isPlatformBrowser(this.platformId)) {
       this.checkPersistedState();
     }
-    
+
     // Initialize selectors directly in constructor
     if (isPlatformBrowser(this.platformId)) {
       this.loading$ = this.store.select(AuthState.loading);
@@ -174,7 +180,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       lastName: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [
-        Validators.required, 
+        Validators.required,
         Validators.minLength(8),
         passwordStrengthValidator()
       ]],
@@ -184,7 +190,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }, {
       validators: passwordMatchValidator()
     });
-    
+
     // Initialize verification form
     this.verificationForm = this.formBuilder.group({
       verificationToken: ['', [Validators.required]]
@@ -201,7 +207,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     // Only subscribe to observables in browser environment
     if (isPlatformBrowser(this.platformId)) {
       console.log('Browser environment detected, subscribing to state changes');
-      
+
       // Safe subscription to loading state
       this.subscription.add(
         this.loading$.subscribe(loading => {
@@ -227,7 +233,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
           }
         })
       );
-      
+
       // Safe subscription to registration success state
       this.subscription.add(
         this.registrationSuccess$.subscribe(success => {
@@ -240,13 +246,13 @@ export class RegisterComponent implements OnInit, OnDestroy {
           }
         })
       );
-      
+
       // Subscribe to test verification token (development-only)
       this.subscription.add(
         this.authService.testVerificationToken$.subscribe(token => {
           console.log('Test verification token updated:', token ? '********' : null);
           this.testVerificationToken = token;
-          
+
           // Try to get debug info from localStorage
           try {
             const debugInfoString = localStorage.getItem('authDebugInfo');
@@ -261,7 +267,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
           }
         })
       );
-      
+
       // Check for persisted registration state
       this.checkPersistedState();
     }
@@ -272,16 +278,16 @@ export class RegisterComponent implements OnInit, OnDestroy {
     if (!element || !isPlatformBrowser(this.platformId)) {
       return false;
     }
-    
+
     // Check if getBoundingClientRect is available (browser environment)
     if (typeof element.getBoundingClientRect !== 'function') {
       return false;
     }
-    
+
     const rect = element.getBoundingClientRect();
     const windowHeight = window.innerHeight || document.documentElement.clientHeight;
     const windowWidth = window.innerWidth || document.documentElement.clientWidth;
-    
+
     // Return true if any part of the element is visible
     return (
       rect.top < windowHeight &&
@@ -304,40 +310,40 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   // Convenience getter for easy access to form fields
   get f() { return this.registerForm.controls; }
-  
+
   // Convenience getter for verification form fields
   get v() { return this.verificationForm.controls; }
-  
+
   togglePasswordVisibility() {
     this.passwordVisible = !this.passwordVisible;
   }
-  
+
   toggleConfirmPasswordVisibility() {
     this.confirmPasswordVisible = !this.confirmPasswordVisible;
   }
-  
+
   calculatePasswordStrength(password: string) {
     if (!password) {
       this.passwordStrength = 0;
       this.passwordMessage = '';
       return;
     }
-    
+
     let score = 0;
-    
+
     // Length check
     if (password.length >= 8) score += 1;
     if (password.length >= 12) score += 1;
-    
+
     // Character type checks
     if (/[A-Z]/.test(password)) score += 1;
     if (/[a-z]/.test(password)) score += 1;
     if (/[0-9]/.test(password)) score += 1;
     if (/[^A-Za-z0-9]/.test(password)) score += 1;
-    
+
     // Set normalized strength (0-100)
     this.passwordStrength = Math.min(100, Math.round((score / 6) * 100));
-    
+
     // Set message based on strength
     if (this.passwordStrength < 40) {
       this.passwordMessage = 'Weak password';
@@ -351,7 +357,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
   onSubmit(): void {
     console.log('Form submitted');
     this.submitted = true;
-    
+
     // Stop here if form is invalid
     if (this.registerForm.invalid) {
       console.warn('Form is invalid. Validation errors:');
@@ -361,17 +367,17 @@ export class RegisterComponent implements OnInit, OnDestroy {
           console.warn(`Control ${key} is invalid:`, control.errors);
         }
       });
-      
+
       // Scroll to the first invalid element
       const firstInvalidElement = this.el.nativeElement.querySelector('.ng-invalid');
       if (firstInvalidElement) {
         console.log('Scrolling to first invalid element:', firstInvalidElement);
         firstInvalidElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-      
+
       return;
     }
-    
+
     // Get CAPTCHA data directly from the selector component
     const captchaData = this.captchaSelector.getCaptchaData();
     if (!captchaData) {
@@ -385,9 +391,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
     // Determine CAPTCHA type and verify with the appropriate service
     const captchaType = this.determineCaptchaType(captchaData);
-    
+
     this.advancedCaptchaService.verifyAdvancedCaptcha(
-      captchaData.challengeId, 
+      captchaData.challengeId,
       captchaData.selectedAnswer,
       captchaType
     ).subscribe({
@@ -419,7 +425,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   // Determine the CAPTCHA type based on the captcha data structure
   private determineCaptchaType(captchaData: any): string {
     if (captchaData.challengeId && captchaData.challengeId.startsWith('vr_')) {
@@ -429,7 +435,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }
     return 'visual-reasoning'; // Default to visual-reasoning captcha
   }
-  
+
   private handleRegistration() {
     // Set loading state
     this.loading = true;
@@ -454,22 +460,22 @@ export class RegisterComponent implements OnInit, OnDestroy {
         next: (response: AuthResponse) => {
           this.loading = false;
           this.logger.info('Registration successful');
-          
+
           // If verification is required, show verification message
           if (response.requiresVerification) {
-            this.router.navigate(['/verify-email'], { 
-              queryParams: { 
+            this.router.navigate(['/verify-email'], {
+              queryParams: {
                 email: this.f['email'].value,
                 showInstructions: true
-              } 
+              }
             });
           } else {
             // If no verification required, redirect to login with message
-            this.router.navigate(['/login'], { 
-              queryParams: { 
+            this.router.navigate(['/login'], {
+              queryParams: {
                 registered: 'true',
                 email: this.f['email'].value
-              } 
+              }
             });
           }
         },
@@ -477,7 +483,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
           this.loading = false;
           this.error = error?.error?.message || 'Registration failed. Please try again.';
           this.logger.error('Registration failed', { error });
-          
+
           // Refresh the captcha
           if (this.captchaSelector?.getActiveCaptchaComponent()?.refreshChallenge) {
             this.captchaSelector.getActiveCaptchaComponent().refreshChallenge();
@@ -485,36 +491,36 @@ export class RegisterComponent implements OnInit, OnDestroy {
         }
       });
   }
-  
+
   // Handle manual email verification
   verifyEmail(): void {
     console.log('VerifyEmail called');
     this.verificationSubmitted = true;
-    
+
     // Stop here if form is invalid
     if (this.verificationForm.invalid) {
       console.log('Verification form is invalid');
       return;
     }
-    
+
     const token = this.v['verificationToken'].value;
     console.log('Verifying email with token:', token);
-    
+
     this.verificationLoading = true;
     this.verificationError = '';
-    
+
     this.authService.verifyEmail(token, this.registeredEmail)
       .subscribe({
         next: (response) => {
           console.log('Email verification successful:', response);
           this.verificationLoading = false;
-          
+
           // Update user in state
           this.store.dispatch(new AuthActions.VerifyEmailSuccess(response.user));
-          
+
           // Clear persisted registration state
           this.clearPersistedState();
-          
+
           // Navigate to dashboard/home
           setTimeout(() => {
             this.router.navigate(['/']);
@@ -539,18 +545,18 @@ export class RegisterComponent implements OnInit, OnDestroy {
   private checkPersistedState(): void {
     const persistedEmail = localStorage.getItem('registeredEmail');
     const persistedSuccess = localStorage.getItem('registrationSuccess');
-    
+
     if (persistedEmail) {
       this.registeredEmail = persistedEmail;
       console.log('Restored registered email from storage:', this.registeredEmail);
     }
-    
+
     if (persistedSuccess === 'true') {
       this.registrationSuccess = true;
       console.log('Restored registration success state from storage');
     }
   }
-  
+
   // Save registration state to local storage
   private persistRegistrationState(): void {
     if (isPlatformBrowser(this.platformId)) {
@@ -559,7 +565,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
       console.log('Saved registration state to localStorage');
     }
   }
-  
+
   // Clear registration state from local storage
   private clearPersistedState(): void {
     if (isPlatformBrowser(this.platformId)) {
@@ -572,7 +578,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
   // Copy verification token to clipboard
   copyTokenToClipboard(): void {
     if (!this.testVerificationToken) return;
-    
+
     if (isPlatformBrowser(this.platformId) && navigator.clipboard) {
       navigator.clipboard.writeText(this.testVerificationToken)
         .then(() => {

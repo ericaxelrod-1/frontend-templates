@@ -1,78 +1,65 @@
 <div class="login-container">
   <div class="login-card">
-    <div class="logo-container">
-      <img [src]="landingLogo" [alt]="appName + ' Logo'" class="logo-image">
-    </div>
     <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login-form">
-      
-      <!-- Email Field -->
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input 
-          type="email" 
-          formControlName="email" 
-          id="email" 
-          class="form-control" 
-          [ngClass]="{ 'is-invalid': submitted && f['email'].errors }"
-          placeholder="Enter your email address"
-          autocomplete="email">
-        <div *ngIf="submitted && f['email'].errors" class="invalid-feedback">
-          <div *ngIf="f['email'].errors['required']">Email is required</div>
-          <div *ngIf="f['email'].errors['email']">Please enter a valid email address</div>
+
+      <div class="login-content-wrapper">
+        <!-- Main Login Section: Logo, Fields, and Actions -->
+        <div class="login-main-section">
+          <div class="logo-container">
+            <img [src]="landingLogo" [alt]="appName + ' Logo'" class="logo-image">
+          </div>
+
+          <!-- Credentials -->
+          <mat-form-field appearance="outline" class="full-width-field">
+            <mat-label>Email</mat-label>
+            <input matInput type="email" formControlName="email" id="email" placeholder="Enter your email address"
+              autocomplete="email">
+            <mat-error *ngIf="f['email'].errors?.['required']">Email is required</mat-error>
+            <mat-error *ngIf="f['email'].errors?.['email']">Please enter a valid email address</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width-field">
+            <mat-label>Password</mat-label>
+            <input matInput type="password" formControlName="password" id="password" placeholder="Enter your password"
+              autocomplete="current-password">
+            <mat-error *ngIf="f['password'].errors?.['required']">Password is required</mat-error>
+          </mat-form-field>
+
+          <!-- Error Alert -->
+          <div *ngIf="error" class="alert alert-danger">
+            {{ error }}
+          </div>
+
+          <!-- Submit Action -->
+          <div class="form-group submit-action">
+            <button type="submit" mat-flat-button color="primary" class="full-width-btn" [disabled]="loading">
+              <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
+              Sign In
+            </button>
+          </div>
+
+          <!-- Help Links -->
+          <div class="help-links">
+            <button type="button" mat-button color="primary" (click)="navigateToForgotPassword()">Forgot
+              Password?</button>
+            <button type="button" mat-button color="primary" (click)="navigateToRegister()">Create an Account</button>
+          </div>
+        </div>
+
+        <!-- Security Section: CAPTCHA -->
+        <div class="login-security-section" *ngIf="captchaEnabled">
+          <div class="form-group captcha-container">
+            <label>Verify you're human</label>
+            <app-captcha-selector #captchaSelector formControlName="captcha"
+              [ngClass]="{ 'is-invalid': submitted && f['captcha'].errors }">
+            </app-captcha-selector>
+            <div *ngIf="submitted && f['captcha'].errors" class="invalid-feedback">
+              <div *ngIf="f['captcha'].errors['required']">CAPTCHA verification is required</div>
+            </div>
+          </div>
         </div>
       </div>
-      
-      <!-- Password Field -->
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input 
-          type="password" 
-          formControlName="password" 
-          id="password" 
-          class="form-control" 
-          [ngClass]="{ 'is-invalid': submitted && f['password'].errors }"
-          placeholder="Enter your password"
-          autocomplete="current-password">
-        <div *ngIf="submitted && f['password'].errors" class="invalid-feedback">
-          <div *ngIf="f['password'].errors['required']">Password is required</div>
-        </div>
-      </div>
-      
-      <!-- CAPTCHA -->
-      <div class="form-group captcha-container" *ngIf="captchaEnabled">
-        <label>Verify you're human</label>
-        <app-captcha-selector 
-          #captchaSelector
-          formControlName="captcha"
-          [ngClass]="{ 'is-invalid': submitted && f['captcha'].errors }">
-        </app-captcha-selector>
-        <div *ngIf="submitted && f['captcha'].errors" class="invalid-feedback">
-          <div *ngIf="f['captcha'].errors['required']">CAPTCHA verification is required</div>
-        </div>
-      </div>
-      
-      <!-- Error Alert -->
-      <div *ngIf="error" class="alert alert-danger">
-        {{ error }}
-      </div>
-      
-      <!-- Sign In Button -->
-      <div class="form-group">
-        <button 
-          type="submit" 
-          class="btn btn-primary btn-block" 
-          [disabled]="loading">
-          <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
-          Sign In
-        </button>
-      </div>
-      
-      <!-- Help Links -->
-      <div class="help-links">
-        <button type="button" class="btn btn-link" (click)="navigateToForgotPassword()">Forgot Password?</button>
-        <button type="button" class="btn btn-link" (click)="navigateToRegister()">Create an Account</button>
-      </div>
-      
+
     </form>
   </div>
-</div> 
+</div>

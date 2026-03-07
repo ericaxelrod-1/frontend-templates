@@ -11,17 +11,21 @@ import { CaptchaService } from '../../../core/services/captcha.service';
 import { CaptchaSelectorComponent } from '../../../shared/components/captcha/advanced/captcha-selector.component';
 import { AdvancedCaptchaService } from '../../../core/services/advanced-captcha.service';
 import { environment } from '../../../../environments/environment';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, CaptchaSelectorComponent]
+  imports: [CommonModule, ReactiveFormsModule, CaptchaSelectorComponent, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule]
 })
 export class LoginComponent implements OnInit, OnDestroy {
   @ViewChild('captchaSelector') captchaSelector!: CaptchaSelectorComponent;
-  
+
   loginForm!: FormGroup;
   returnUrl = '/';
   private subscription = new Subscription();
@@ -31,7 +35,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   submitted = false;
   error = '';
   captchaEnabled = environment.captcha.enabled && !environment.captcha.skipForDevelopment;
-  
+
   // App configuration properties
   appName = 'Angular Template';
   landingLogo = 'assets/logos/logo-large.svg';
@@ -89,7 +93,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     // Only subscribe to observables in browser environment
     if (isPlatformBrowser(this.platformId)) {
       this.logger.debug('Browser environment detected, subscribing to state changes');
-      
+
       // Subscribe to loading state
       this.subscription.add(
         this.loading$.subscribe(loading => {
@@ -129,7 +133,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   onSubmit(): void {
     this.logger.info('LoginComponent onSubmit called');
     this.submitted = true;
-    
+
     // Mark fields as touched for validation
     this.loginForm.markAllAsTouched();
     if (this.captchaEnabled && this.captchaSelector) {
@@ -139,7 +143,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     // Stop here if form is invalid
     if (this.loginForm.invalid) {
       this.logger.warn('Form is invalid');
-      
+
       // Log which controls are invalid and why
       Object.keys(this.loginForm.controls).forEach(key => {
         const control = this.loginForm.get(key);
@@ -147,7 +151,7 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.logger.warn(`Control ${key} is invalid:`, control.errors);
         }
       });
-      
+
       return;
     }
 
@@ -165,9 +169,9 @@ export class LoginComponent implements OnInit, OnDestroy {
 
       // Determine CAPTCHA type and verify with the appropriate service
       const captchaType = this.determineCaptchaType(captchaData);
-      
+
       this.advancedCaptchaService.verifyAdvancedCaptcha(
-        captchaData.challengeId, 
+        captchaData.challengeId,
         captchaData.selectedAnswer,
         captchaType
       ).subscribe({
@@ -218,33 +222,33 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   private dispatchLogin(): void {
     this.logger.info('Dispatching Login action');
-    
+
     // Create a structured data object for better code clarity
     const loginData = {
       email: this.f['email'].value,
       password: this.f['password'].value,
       recaptchaToken: this.captchaEnabled ? 'verified-via-advanced-captcha' : 'captcha-disabled'
     };
-    
+
     this.logger.debug('About to dispatch login action');
-    
+
     // Dispatch login action - NgRx actions don't return results, they update state
     this.store.dispatch(new AuthActions.Login(
       loginData.email,
       loginData.password,
       loginData.recaptchaToken
     ));
-    
+
     // Error handling is done via the error$ observable subscription in ngOnInit
     // Loading state is handled via the loading$ observable subscription in ngOnInit
   }
-  
+
   // Navigate to forgot password page
   navigateToForgotPassword(): void {
     this.logger.debug('NavigateToForgotPassword called');
     this.router.navigate(['/forgot-password']);
   }
-  
+
   // Navigate to register page
   navigateToRegister(): void {
     this.logger.debug('NavigateToRegister called');
