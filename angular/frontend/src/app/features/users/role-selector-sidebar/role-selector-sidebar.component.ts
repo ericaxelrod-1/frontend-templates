@@ -156,7 +156,7 @@ export class RoleSelectorSidebarComponent implements OnInit {
 
   loadRoles(): void {
     this.roleService.getRoles().subscribe({
-      next: (roles) => { this.availableRoles = roles; },
+      next: (response) => { this.availableRoles = response.items; },
       error: (error) => { console.error('Error loading roles:', error); }
     });
   }

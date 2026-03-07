@@ -12,6 +12,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatCardModule } from '@angular/material/card';
 import { IpReputationService } from './shared/ip-reputation.service';
+import { PageTitleService } from '../../../core/services/page-title.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { IPReputation } from '../login-monitoring/shared/login-monitoring.models';
 
@@ -38,24 +39,26 @@ export class IpReputationComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   private destroy$ = new Subject<void>();
-  
+
   // Permission management
   hasPermission = false;
   loading = false;
-  
+
   // Data properties
   selectedIpReputation: IPReputation | null = null;
   ipReputations: IPReputation[] = [];
-  
+
   // Display columns for table
   displayedColumns: string[] = ['ipAddress', 'failedAttempts', 'reputation', 'status', 'lastAttempt', 'actions'];
 
   constructor(
     private ipReputationService: IpReputationService,
+    private pageTitleService: PageTitleService,
     private permissionService: PermissionService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
+    this.pageTitleService.setTitle('IP Reputation');
     this.checkPermissions();
   }
 

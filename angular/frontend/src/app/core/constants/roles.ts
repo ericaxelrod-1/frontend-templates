@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { map, shareReplay, tap, catchError } from 'rxjs/operators';
+import { ServerResponse } from '../../models/server-response.model';
 
 /**
  * Type definition for roles in the system
@@ -42,12 +43,12 @@ export class RolesConstantsService {
   private rolesSubject = new BehaviorSubject<Record<string, string>>({});
   private isInitialized = false;
   private initializeInProgress = false;
-  
+
   // Expose roles as an observable
   public roles$ = this.rolesSubject.asObservable();
-  
-  constructor(private http: HttpClient) {}
-  
+
+  constructor(private http: HttpClient) { }
+
   /**
    * Initialize by loading roles from the backend
    * Returns an observable that completes when roles are loaded
@@ -58,48 +59,49 @@ export class RolesConstantsService {
       console.log('RolesConstantsService: Already initialized, skipping fetch');
       return of(void 0);
     }
-    
+
     // If initialization is already in progress, return the observable that will complete when done
     if (this.initializeInProgress) {
       console.log('RolesConstantsService: Initialization already in progress, waiting for completion');
       return this.roles$.pipe(map(() => void 0));
     }
-    
+
     console.log('RolesConstantsService: Starting role initialization');
     this.initializeInProgress = true;
-    
-    return this.http.get<SystemRole[]>(this.apiUrl).pipe(
-      tap(roles => {
+
+    return this.http.get<ServerResponse<SystemRole>>(this.apiUrl).pipe(
+      tap(response => {
+        const roles = response.items;
         console.log('RolesConstantsService: Received roles from backend:', roles);
-        
+
         // Reset the SystemRoles object
         Object.keys(SystemRoles).forEach(key => {
           delete SystemRoles[key];
         });
-        
+
         // Populate SystemRoles with values from API
         const rolesMap: Record<string, string> = {};
         roles.forEach(role => {
           // Generate normalizedName from name if not provided
           const normalizedName = role.normalizedName || role.name.toLowerCase().replace(/\s+/g, '');
-          
+
           if (role && normalizedName) {
             // Store both uppercase and original case versions for maximum compatibility
             const upperKey = normalizedName.toUpperCase();
             const lowerKey = normalizedName.toLowerCase();
-            
+
             // Add uppercase key for backward compatibility
             SystemRoles[upperKey] = normalizedName;
             rolesMap[upperKey] = normalizedName;
-            
+
             // Add lowercase key for direct matches
             SystemRoles[lowerKey] = normalizedName;
             rolesMap[lowerKey] = normalizedName;
-            
+
             // Also add the normalized name directly as a key
             SystemRoles[normalizedName] = normalizedName;
             rolesMap[normalizedName] = normalizedName;
-            
+
             // Also add the original name as a key for direct lookups
             SystemRoles[role.name] = normalizedName;
             rolesMap[role.name] = normalizedName;
@@ -107,7 +109,7 @@ export class RolesConstantsService {
             console.warn('RolesConstantsService: Received a role with missing name:', role);
           }
         });
-        
+
         this.rolesSubject.next(rolesMap);
         this.isInitialized = true;
         this.initializeInProgress = false;
@@ -116,7 +118,7 @@ export class RolesConstantsService {
       catchError(error => {
         console.error('RolesConstantsService: Failed to load system roles:', error);
         this.initializeInProgress = false;
-        
+
         // Create fallback values for critical system roles to prevent total failure
         console.warn('RolesConstantsService: Using fallback role values due to loading failure');
         const fallbackRoles = {
@@ -129,31 +131,31 @@ export class RolesConstantsService {
           'superuser': 'superuser',
           'superadmin': 'superadmin'
         };
-        
+
         // Populate with fallback values
         Object.keys(fallbackRoles).forEach(key => {
           if (key) {
             SystemRoles[key] = fallbackRoles[key as keyof typeof fallbackRoles];
           }
         });
-        
+
         this.rolesSubject.next(fallbackRoles);
         this.isInitialized = true; // Still mark as initialized with fallback values
-        
+
         return of(void 0);
       }),
       map(() => void 0),
       shareReplay(1)
     );
   }
-  
+
   /**
    * Check if roles have been loaded
    */
   isLoaded(): boolean {
     return this.isInitialized;
   }
-  
+
   /**
    * Reset roles to uninitialized state
    * Used when logging out
@@ -165,7 +167,7 @@ export class RolesConstantsService {
         delete SystemRoles[key];
       }
     });
-    
+
     this.rolesSubject.next({});
     this.isInitialized = false;
     this.initializeInProgress = false;

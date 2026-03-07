@@ -16,6 +16,11 @@
              class="header-logo" 
              *ngIf="headerLogo">
         <h1 class="app-name" [attr.aria-label]="appName + ' Application'">{{ appName }}</h1>
+        
+        <ng-container *ngIf="pageTitle$ | async as pageTitle">
+          <span class="title-separator" *ngIf="pageTitle">|</span>
+          <span class="page-title" *ngIf="pageTitle">{{ pageTitle }}</span>
+        </ng-container>
       </div>
     </div>
 

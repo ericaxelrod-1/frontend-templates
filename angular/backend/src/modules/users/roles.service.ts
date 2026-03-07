@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { Role } from './entities/role.entity';
 import { User } from './entities/user.entity';
 import { PermissionsService } from '../permissions/services/permissions.service';
@@ -18,7 +18,7 @@ export class RolesService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private permissionsService: PermissionsService,
-  ) {}
+  ) { }
 
   // Helper method to simplify permission checks
   private async hasPermission(
@@ -257,13 +257,38 @@ export class RolesService {
     return role;
   }
 
-  async findAll(): Promise<Role[]> {
-    const roles = await this.rolesRepository.find({
+  async findAll(
+    page = 0,
+    pageSize = 10,
+    sortBy = 'name',
+    sortDirection: 'ASC' | 'DESC' = 'ASC',
+    search = '',
+  ): Promise<{ items: Role[]; total: number; page: number; pageSize: number }> {
+    const skip = page * pageSize;
+    const take = pageSize;
+
+    const [items, total] = await this.rolesRepository.findAndCount({
+      where: search
+        ? [
+          { name: ILike(`%${search}%`) },
+          { description: ILike(`%${search}%`) },
+        ]
+        : {},
       relations: ['rolePermissions', 'rolePermissions.permission'],
+      order: { [sortBy]: sortDirection },
+      skip,
+      take,
     });
 
     // Transform roles to match frontend expectations
-    return roles.map((role) => this.transformRoleForFrontend(role));
+    const transformedItems = items.map((role) => this.transformRoleForFrontend(role));
+
+    return {
+      items: transformedItems,
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async findOne(id: number): Promise<Role> {

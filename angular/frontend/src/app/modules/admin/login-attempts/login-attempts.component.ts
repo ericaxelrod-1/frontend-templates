@@ -12,6 +12,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatCardModule } from '@angular/material/card';
 import { LoginAttemptsService } from './shared/login-attempts.service';
+import { PageTitleService } from '../../../core/services/page-title.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { StatisticsDashboardComponent } from '../login-monitoring/statistics-dashboard/statistics-dashboard.component';
 import { LoginAttemptsTableComponent } from '../login-monitoring/login-attempts-table/login-attempts-table.component';
@@ -44,16 +45,16 @@ export class LoginAttemptsComponent implements OnInit, OnDestroy, AfterViewInit 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   private destroy$ = new Subject<void>();
-  
+
   // Permission management
   hasPermission = false;
   loading = false;
   isCreatingTestData = false;
-  
+
   // Data properties
   loginAttempts: LoginAttempt[] = [];
   statistics: Statistics | null = null;
-  
+
   // Filter state and form
   filterState: LoginMonitoringFilters = {
     email: '',
@@ -62,15 +63,17 @@ export class LoginAttemptsComponent implements OnInit, OnDestroy, AfterViewInit 
     dateFrom: undefined,
     dateTo: undefined
   };
-  
+
   filterForm: FormGroup | null = null;
 
   constructor(
     private loginAttemptsService: LoginAttemptsService,
+    private pageTitleService: PageTitleService,
     private permissionService: PermissionService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
+    this.pageTitleService.setTitle('Login Attempts');
     this.checkPermissions();
   }
 
@@ -117,7 +120,7 @@ export class LoginAttemptsComponent implements OnInit, OnDestroy, AfterViewInit 
     console.log('[LoginAttemptsComponent] onFiltersChanged called');
     console.log('[LoginAttemptsComponent] filterForm:', filterForm);
     console.log('[LoginAttemptsComponent] filterForm.value:', filterForm.value);
-    
+
     this.filterForm = filterForm;
     // Convert FormGroup to LoginMonitoringFilters
     this.filterState = {
@@ -127,9 +130,9 @@ export class LoginAttemptsComponent implements OnInit, OnDestroy, AfterViewInit 
       dateFrom: filterForm.value.dateFrom,
       dateTo: filterForm.value.dateTo
     };
-    
+
     console.log('[LoginAttemptsComponent] filterState:', this.filterState);
-    
+
     // BUG-FIX: Explicitly call the table's refresh method with ViewChild check
     console.log('[LoginAttemptsComponent] Calling table refreshWithFilters');
     this.ensureTableRefreshes();
@@ -137,7 +140,7 @@ export class LoginAttemptsComponent implements OnInit, OnDestroy, AfterViewInit 
 
   onFiltersReset(): void {
     console.log('[LoginAttemptsComponent] onFiltersReset called');
-    
+
     this.filterState = {
       email: '',
       ipAddress: '',
@@ -146,7 +149,7 @@ export class LoginAttemptsComponent implements OnInit, OnDestroy, AfterViewInit 
       dateTo: undefined
     };
     this.filterForm = null;
-    
+
     // BUG-FIX: Explicitly call the table's refresh method with ViewChild check
     console.log('[LoginAttemptsComponent] Calling table refreshWithFilters for reset');
     this.ensureTableRefreshes();

@@ -6,7 +6,17 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSortModule, MatSort } from '@angular/material/sort';
+import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { ViewChild, AfterViewInit } from '@angular/core';
+import { merge, of } from 'rxjs';
+import { startWith, switchMap, catchError, map, debounceTime, tap } from 'rxjs/operators';
 import { RoleService, Role } from '../../services/role.service';
+import { PageTitleService } from '../../core/services/page-title.service';
 import { RoleCreationSidebarComponent } from './role-creation-sidebar/role-creation-sidebar.component';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
@@ -22,12 +32,16 @@ import { SidePanelService } from '../../shared/components/side-panel';
     MatButtonModule,
     MatIconModule,
     MatTableModule,
-    MatChipsModule
+    MatChipsModule,
+    MatSortModule,
+    MatPaginatorModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatProgressSpinnerModule,
+    ReactiveFormsModule
   ],
   template: `
     <div class="roles-container">
-      <h1>Roles</h1>
-
       <div *ngIf="!hasPermission" class="permission-error">
         <p>You do not have permission to view this page.</p>
         <button mat-raised-button color="primary" (click)="goToDashboard()">Go to Dashboard</button>
@@ -35,25 +49,32 @@ import { SidePanelService } from '../../shared/components/side-panel';
 
       <ng-container *ngIf="hasPermission">
         <div class="actions-bar">
-          <button mat-raised-button color="primary" (click)="createRole()">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Search roles</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput [formControl]="searchControl" placeholder="Search by name or description">
+          </mat-form-field>
+
+          <button mat-raised-button color="primary" (click)="createRole()" class="create-button">
             <mat-icon>add</mat-icon> Create Role
           </button>
         </div>
 
-        <div *ngIf="loading" class="loading">
-          Loading roles...
-        </div>
+        <div class="table-container">
+          <div *ngIf="loading" class="loading-overlay">
+            <mat-spinner diameter="40"></mat-spinner>
+          </div>
 
-        <table *ngIf="!loading" mat-table [dataSource]="roles" class="roles-table">
+          <table mat-table [dataSource]="dataSource" class="roles-table" matSort matSortActive="name" matSortDirection="asc">
           <!-- Name Column -->
           <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
             <td mat-cell *matCellDef="let role">{{ role.name }}</td>
           </ng-container>
 
           <!-- Description Column -->
           <ng-container matColumnDef="description">
-            <th mat-header-cell *matHeaderCellDef>Description</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
             <td mat-cell *matCellDef="let role">{{ role.description }}</td>
           </ng-container>
 
@@ -101,7 +122,23 @@ import { SidePanelService } from '../../shared/components/side-panel';
 
           <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
           <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          
+          <tr class="mat-row empty-state-row" *matNoDataRow>
+            <td class="mat-cell" colspan="5" *ngIf="!loading">
+              <div class="empty-state-content">
+                 <p *ngIf="searchControl.value">No roles found matching "{{searchControl.value}}"</p>
+                 <p *ngIf="!searchControl.value">No roles available</p>
+              </div>
+            </td>
+          </tr>
         </table>
+        
+        <mat-paginator [length]="totalCount"
+                       [pageSize]="pageSize"
+                       [pageSizeOptions]="[5, 10, 25, 100]"
+                       aria-label="Select page of roles">
+        </mat-paginator>
+        </div>
       </ng-container>
     </div>
   `,
@@ -112,35 +149,84 @@ import { SidePanelService } from '../../shared/components/side-panel';
 
     .actions-bar {
       margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .search-field {
+      flex: 1;
+      max-width: 400px;
+    }
+
+    .create-button {
+      height: 48px; /* Match form field height */
+    }
+
+    .table-container {
+      position: relative;
+      background: white;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.7);
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .empty-state-row td {
+      text-align: center;
+      padding: 40px !important;
+    }
+
+    .empty-state-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #666;
     }
 
     .roles-table {
       width: 100%;
     }
 
+    .roles-table .mat-cell,
+    .roles-table .mat-header-cell {
+      padding-top: 16px;
+      padding-bottom: 16px;
+    }
+
     .mat-column-actions {
       width: 100px;
     }
-
-    .permission-error {
-      text-align: center;
-      padding: 20px;
-      background-color: #f5f5f5;
-      border-radius: 4px;
-      margin: 20px 0;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 20px;
-    }
   `]
 })
-export class RolesComponent implements OnInit {
+export class RolesComponent implements OnInit, AfterViewInit {
   displayedColumns: string[] = ['name', 'description', 'permissions', 'users', 'actions'];
-  roles: Role[] = [];
-  hasPermission = false;
+
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild(MatSort) sort!: MatSort;
+
+  dataSource: Role[] = [];
+  totalCount = 0;
+  pageSize = 10;
   loading = true;
+  hasPermission = false;
+  searchControl = new FormControl('');
+
+  private reactivePatternInitialized = false;
+  private shouldInitializeReactivePattern = false;
 
   // Make Array available in the template
   protected Array = Array;
@@ -151,17 +237,21 @@ export class RolesComponent implements OnInit {
     private snackBar: MatSnackBar,
     private router: Router,
     private permissionService: PermissionService,
-    private sidePanelService: SidePanelService
+    private sidePanelService: SidePanelService,
+    private pageTitleService: PageTitleService
   ) { }
 
   ngOnInit(): void {
+    this.pageTitleService.setTitle('Roles');
+
     // Check permission to view roles using resource:action format
     this.permissionService.hasPermission('roles:view').subscribe(hasPermission => {
       console.log('[RolesComponent] Permission check result:', hasPermission);
       this.hasPermission = hasPermission;
 
       if (hasPermission) {
-        this.loadRoles();
+        this.shouldInitializeReactivePattern = true;
+        this.tryInitializeReactivePattern();
       } else {
         this.loading = false;
         this.snackBar.open('You do not have permission to access this page', 'Close', { duration: 5000 });
@@ -169,24 +259,70 @@ export class RolesComponent implements OnInit {
     });
   }
 
+  ngAfterViewInit() {
+    this.tryInitializeReactivePattern();
+  }
+
+  private tryInitializeReactivePattern() {
+    if (this.shouldInitializeReactivePattern && this.sort && this.paginator && !this.reactivePatternInitialized) {
+      this.initializeReactivePattern();
+    }
+  }
+
+  private initializeReactivePattern() {
+    this.reactivePatternInitialized = true;
+
+    // Sort change will reset the paginator
+    this.sort.sortChange.subscribe(() => this.paginator.pageIndex = 0);
+
+    merge(
+      this.sort.sortChange,
+      this.paginator.page,
+      this.searchControl.valueChanges.pipe(
+        debounceTime(300),
+        tap(() => {
+          this.paginator.pageIndex = 0;
+        })
+      )
+    )
+      .pipe(
+        startWith({}),
+        switchMap(() => {
+          this.loading = true;
+          return this.roleService.getRoles({
+            page: this.paginator.pageIndex,
+            pageSize: this.paginator.pageSize,
+            sortBy: this.sort.active,
+            sortDirection: this.sort.direction,
+            search: this.searchControl.value || ''
+          }).pipe(
+            catchError(error => {
+              console.error('Error loading roles:', error);
+              if (error.status === 403) {
+                this.hasPermission = false;
+                this.snackBar.open('You do not have permission to view roles', 'Close', { duration: 5000 });
+              } else {
+                this.snackBar.open('Error loading roles', 'Close', { duration: 3000 });
+              }
+              return of({ items: [], total: 0, page: 0, pageSize: 10 });
+            })
+          );
+        }),
+        map(response => {
+          this.loading = false;
+          this.totalCount = response.total;
+          return response.items;
+        })
+      )
+      .subscribe(data => {
+        this.dataSource = data;
+      });
+  }
+
   loadRoles(): void {
-    this.loading = true;
-    this.roleService.getRoles().subscribe({
-      next: (roles) => {
-        this.roles = roles;
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error loading roles:', error);
-        this.loading = false;
-        if (error.status === 403) {
-          this.hasPermission = false;
-          this.snackBar.open('You do not have permission to view roles', 'Close', { duration: 5000 });
-        } else {
-          this.snackBar.open('Error loading roles', 'Close', { duration: 3000 });
-        }
-      }
-    });
+    if (this.paginator) {
+      this.paginator.page.emit();
+    }
   }
 
   goToDashboard(): void {
@@ -261,7 +397,7 @@ export class RolesComponent implements OnInit {
     if (confirm(`Are you sure you want to delete the role "${role.name}"?`)) {
       this.roleService.deleteRole(role.id!).subscribe({
         next: () => {
-          this.roles = this.roles.filter(r => r.id !== role.id);
+          this.loadRoles();
           this.snackBar.open('Role deleted successfully', 'Close', { duration: 3000 });
         },
         error: (error) => {

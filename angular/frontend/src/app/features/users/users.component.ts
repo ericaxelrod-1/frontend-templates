@@ -7,6 +7,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { UserService, UpdateUserRequest } from '../../services/user.service';
 import { GroupService } from '../../services/group.service';
+import { PageTitleService } from '../../core/services/page-title.service';
 import { RoleService } from '../../services/role.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
@@ -34,7 +35,6 @@ import { SidePanelService } from '../../shared/components/side-panel';
   ],
   template: `
     <div class="users-container">
-      <h1>Users</h1>
       
       <div *ngIf="loading" class="loading">
         Loading users...
@@ -255,10 +255,12 @@ export class UsersComponent implements OnInit {
     private permissionService: PermissionService,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone,
-    private sidePanelService: SidePanelService
+    private sidePanelService: SidePanelService,
+    private pageTitleService: PageTitleService
   ) { }
 
   ngOnInit(): void {
+    this.pageTitleService.setTitle('Users');
     this.loadData();
   }
 
@@ -320,7 +322,7 @@ export class UsersComponent implements OnInit {
           next: (data) => {
             this.users = data.users;
             this.availableGroups = data.groups.items;
-            this.availableRoles = data.roles;
+            this.availableRoles = data.roles.items;
             this.loading = false;
             this.cdr.detectChanges();
           },

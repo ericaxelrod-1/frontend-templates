@@ -24,6 +24,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { PermissionService } from '../../core/services/permission.service';
 import { SidePanelService } from '../../shared/components/side-panel';
+import { PageTitleService } from '../../core/services/page-title.service';
 import { merge, startWith, switchMap, debounceTime, tap, catchError, of } from 'rxjs';
 
 @Component({
@@ -46,8 +47,6 @@ import { merge, startWith, switchMap, debounceTime, tap, catchError, of } from '
   ],
   template: `
     <div class="groups-container">
-      <h1>Groups</h1>
-      
       <div *ngIf="!hasPermission" class="permission-error">
         <p>You do not have permission to view this page.</p>
         <button mat-raised-button color="primary" (click)="goToDashboard()">Go to Dashboard</button>
@@ -173,6 +172,12 @@ import { merge, startWith, switchMap, debounceTime, tap, catchError, of } from '
       width: 100%;
     }
 
+    .groups-table .mat-cell,
+    .groups-table .mat-header-cell {
+      padding-top: 16px;
+      padding-bottom: 16px;
+    }
+
     .loading-overlay {
       position: absolute;
       top: 0;
@@ -231,10 +236,13 @@ export class GroupsComponent implements OnInit, AfterViewInit {
     private authService: AuthService,
     private router: Router,
     private permissionService: PermissionService,
-    private sidePanelService: SidePanelService
+    private sidePanelService: SidePanelService,
+    private pageTitleService: PageTitleService
   ) { }
 
   ngOnInit(): void {
+    this.pageTitleService.setTitle('Groups');
+
     // Check permission to view groups using resource:action format
     this.permissionService.hasPermission('groups:view').subscribe(hasPermission => {
       console.log('[GroupsComponent] Permission check result:', hasPermission);

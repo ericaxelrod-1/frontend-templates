@@ -12,6 +12,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatCardModule } from '@angular/material/card';
 import { SecurityAlertsService } from './shared/security-alerts.service';
+import { PageTitleService } from '../../../core/services/page-title.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { SecurityAlertsFiltersComponent } from '../login-monitoring/security-alerts-filters/security-alerts-filters.component';
 import { SecurityAlert, SecurityAlertsFilters } from '../login-monitoring/shared/login-monitoring.models';
@@ -40,16 +41,16 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   private destroy$ = new Subject<void>();
-  
+
   // Permission management
   hasPermission = false;
   loading = false;
-  
+
   // Data properties
   securityAlerts: SecurityAlert[] = [];
   securityAlertsTotalCount = 0;
   securityAlertsPageSize = 10;
-  
+
   // Filter state
   filterState: SecurityAlertsFilters = {
     status: '',
@@ -59,22 +60,24 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
     dateTo: undefined,
     search: ''
   };
-  
+
   // Sorting state
   securityAlertsCurrentSort = {
     column: 'createdAt',
     direction: 'desc' as 'asc' | 'desc'
   };
-  
+
   // Test data state
   isCreatingTestData = false;
 
   constructor(
     private securityAlertsService: SecurityAlertsService,
+    private pageTitleService: PageTitleService,
     private permissionService: PermissionService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
+    this.pageTitleService.setTitle('Security Alerts');
     this.checkPermissions();
   }
 
@@ -113,17 +116,17 @@ export class SecurityAlertsComponent implements OnInit, OnDestroy, AfterViewInit
       this.securityAlertsCurrentSort.column,
       this.securityAlertsCurrentSort.direction
     ).pipe(takeUntil(this.destroy$))
-    .subscribe({
-      next: (response: any) => {
-        this.securityAlerts = response.data || response;
-        this.securityAlertsTotalCount = response.total || response.length;
-        this.loading = false;
-      },
-      error: (error: any) => {
-        console.error('Error loading security alerts:', error);
-        this.loading = false;
-      }
-    });
+      .subscribe({
+        next: (response: any) => {
+          this.securityAlerts = response.data || response;
+          this.securityAlertsTotalCount = response.total || response.length;
+          this.loading = false;
+        },
+        error: (error: any) => {
+          console.error('Error loading security alerts:', error);
+          this.loading = false;
+        }
+      });
   }
 
   // Event handlers

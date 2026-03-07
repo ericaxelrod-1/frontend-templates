@@ -21,6 +21,7 @@ import { LoggerService } from '../../services/logging/logger.service';
 import { RoleSelectorSidebarComponent } from './role-selector-sidebar/role-selector-sidebar.component';
 import { GroupSelectorSidebarComponent } from './group-selector-sidebar/group-selector-sidebar.component';
 import { SidePanelService } from '../../shared/components/side-panel';
+import { PageTitleService } from '../../core/services/page-title.service';
 
 @Component({
   selector: 'app-create-user',
@@ -39,182 +40,182 @@ import { SidePanelService } from '../../shared/components/side-panel';
   ],
   template: `
     <div class="create-user-container">
-      <h1>Create New User</h1>
+      <div class="form-container">
+        <div *ngIf="!hasPermission" class="permission-error">
+          <p>You do not have permission to create users.</p>
+          <button mat-raised-button color="primary" (click)="cancel()">Back to Users</button>
+        </div>
 
-      <div *ngIf="!hasPermission" class="permission-error">
-        <p>You do not have permission to create users.</p>
-        <button mat-raised-button color="primary" (click)="cancel()">Back to Users</button>
-      </div>
-
-      <form [formGroup]="userForm" (ngSubmit)="onSubmit()" *ngIf="hasPermission">
-        <mat-form-field class="form-field" appearance="outline">
-          <mat-label>Username</mat-label>
-          <input matInput formControlName="username" required>
-          <mat-error *ngIf="f['username'].hasError('required')">Username is required</mat-error>
-        </mat-form-field>
-
-        <mat-form-field class="form-field" appearance="outline">
-          <mat-label>Email</mat-label>
-          <input matInput type="email" formControlName="email" required>
-          <mat-error *ngIf="f['email'].hasError('required')">Email is required</mat-error>
-          <mat-error *ngIf="f['email'].hasError('email')">Please enter a valid email</mat-error>
-        </mat-form-field>
-
-        <mat-form-field class="form-field" appearance="outline">
-          <mat-label>First Name</mat-label>
-          <input matInput formControlName="firstName">
-        </mat-form-field>
-
-        <mat-form-field class="form-field" appearance="outline">
-          <mat-label>Last Name</mat-label>
-          <input matInput formControlName="lastName">
-        </mat-form-field>
-
-        <!-- Password Generation Section -->
-        <div class="password-section">
-          <mat-form-field class="form-field password-field" appearance="outline">
-            <mat-label>Password</mat-label>
-            <input 
-              matInput 
-              [type]="hidePassword ? 'password' : 'text'" 
-              formControlName="password" 
-              required
-              (input)="onPasswordChange()"
-            >
-            <button 
-              mat-icon-button 
-              matSuffix 
-              type="button"
-              (click)="togglePasswordVisibility()"
-              [attr.aria-label]="'Hide password'"
-              [attr.aria-pressed]="!hidePassword"
-            >
-              <mat-icon>{{hidePassword ? 'visibility' : 'visibility_off'}}</mat-icon>
-            </button>
-            <mat-error *ngIf="f['password'].hasError('required')">Password is required</mat-error>
-            <mat-error *ngIf="f['password'].hasError('minlength')">Password must be at least 8 characters</mat-error>
+        <form [formGroup]="userForm" (ngSubmit)="onSubmit()" *ngIf="hasPermission">
+          <mat-form-field class="form-field" appearance="outline">
+            <mat-label>Username</mat-label>
+            <input matInput formControlName="username" required>
+            <mat-error *ngIf="f['username'].hasError('required')">Username is required</mat-error>
           </mat-form-field>
 
-          <div class="password-actions">
-            <button 
-              type="button" 
-              mat-raised-button 
-              color="accent" 
-              (click)="generatePassword()"
-              matTooltip="Generate a secure password"
-            >
-              <mat-icon>refresh</mat-icon>
-              Generate Password
-            </button>
-          </div>
+          <mat-form-field class="form-field" appearance="outline">
+            <mat-label>Email</mat-label>
+            <input matInput type="email" formControlName="email" required>
+            <mat-error *ngIf="f['email'].hasError('required')">Email is required</mat-error>
+            <mat-error *ngIf="f['email'].hasError('email')">Please enter a valid email</mat-error>
+          </mat-form-field>
 
-          <!-- Password Strength Indicator -->
-          <div class="password-strength" *ngIf="passwordStrength">
-            <div class="strength-header">
-              <span class="strength-label">Password Strength: </span>
-              <span class="strength-value" [ngClass]="getStrengthClass()">
-                {{passwordStrength.message}}
-              </span>
-            </div>
-            <mat-progress-bar 
-              [value]="passwordStrength.score" 
-              [ngClass]="getStrengthClass()"
-            ></mat-progress-bar>
-          </div>
+          <mat-form-field class="form-field" appearance="outline">
+            <mat-label>First Name</mat-label>
+            <input matInput formControlName="firstName">
+          </mat-form-field>
 
-          <!-- Password Requirements -->
-          <div class="password-requirements" *ngIf="showRequirements">
-            <h4>Password Requirements:</h4>
-            <ul class="requirements-list">
-              <li 
-                *ngFor="let requirement of passwordRequirements; let i = index"
-                [ngClass]="getRequirementClass(i)"
+          <mat-form-field class="form-field" appearance="outline">
+            <mat-label>Last Name</mat-label>
+            <input matInput formControlName="lastName">
+          </mat-form-field>
+
+          <!-- Password Generation Section -->
+          <div class="password-section">
+            <mat-form-field class="form-field password-field" appearance="outline">
+              <mat-label>Password</mat-label>
+              <input 
+                matInput 
+                [type]="hidePassword ? 'password' : 'text'" 
+                formControlName="password" 
+                required
+                (input)="onPasswordChange()"
               >
-                <mat-icon class="requirement-icon">
-                  {{getRequirementIcon(i)}}
-                </mat-icon>
-                {{requirement}}
-              </li>
-            </ul>
-          </div>
-        </div>
+              <button 
+                mat-icon-button 
+                matSuffix 
+                type="button"
+                (click)="togglePasswordVisibility()"
+                [attr.aria-label]="'Hide password'"
+                [attr.aria-pressed]="!hidePassword"
+              >
+                <mat-icon>{{hidePassword ? 'visibility' : 'visibility_off'}}</mat-icon>
+              </button>
+              <mat-error *ngIf="f['password'].hasError('required')">Password is required</mat-error>
+              <mat-error *ngIf="f['password'].hasError('minlength')">Password must be at least 8 characters</mat-error>
+            </mat-form-field>
 
-        <!-- Roles Selection -->
-        <div class="selection-field">
-          <label class="selection-label">Roles</label>
-          <div class="selection-content">
-            <div class="selected-items" *ngIf="selectedRoleIds.length > 0">
-              <mat-chip-set>
-                <mat-chip *ngFor="let roleId of selectedRoleIds" [removable]="true" (removed)="removeRole(roleId)">
-                  {{ getRoleName(roleId) }}
-                  <mat-icon matChipRemove>cancel</mat-icon>
-                </mat-chip>
-              </mat-chip-set>
+            <div class="password-actions">
+              <button 
+                type="button" 
+                mat-raised-button 
+                color="accent" 
+                (click)="generatePassword()"
+                matTooltip="Generate a secure password"
+              >
+                <mat-icon>refresh</mat-icon>
+                Generate Password
+              </button>
             </div>
-            <div class="no-selection" *ngIf="selectedRoleIds.length === 0">
-              <span class="placeholder-text">No roles selected</span>
+
+            <!-- Password Strength Indicator -->
+            <div class="password-strength" *ngIf="passwordStrength">
+              <div class="strength-header">
+                <span class="strength-label">Password Strength: </span>
+                <span class="strength-value" [ngClass]="getStrengthClass()">
+                  {{passwordStrength.message}}
+                </span>
+              </div>
+              <mat-progress-bar 
+                [value]="passwordStrength.score" 
+                [ngClass]="getStrengthClass()"
+              ></mat-progress-bar>
             </div>
+
+            <!-- Password Requirements -->
+            <div class="password-requirements" *ngIf="showRequirements">
+              <h4>Password Requirements:</h4>
+              <ul class="requirements-list">
+                <li 
+                  *ngFor="let requirement of passwordRequirements; let i = index"
+                  [ngClass]="getRequirementClass(i)"
+                >
+                  <mat-icon class="requirement-icon">
+                    {{getRequirementIcon(i)}}
+                  </mat-icon>
+                  {{requirement}}
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Roles Selection -->
+          <div class="selection-field">
+            <label class="selection-label">Roles</label>
+            <div class="selection-content">
+              <div class="selected-items" *ngIf="selectedRoleIds.length > 0">
+                <mat-chip-set>
+                  <mat-chip *ngFor="let roleId of selectedRoleIds" [removable]="true" (removed)="removeRole(roleId)">
+                    {{ getRoleName(roleId) }}
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                  </mat-chip>
+                </mat-chip-set>
+              </div>
+              <div class="no-selection" *ngIf="selectedRoleIds.length === 0">
+                <span class="placeholder-text">No roles selected</span>
+              </div>
+              <button 
+                type="button" 
+                mat-raised-button 
+                color="primary" 
+                (click)="openRoleSelector()"
+                class="selector-button"
+              >
+                <mat-icon>person_add</mat-icon>
+                Select Roles
+              </button>
+            </div>
+            <div class="selection-hint">Select one or more roles for the user</div>
+          </div>
+
+          <!-- Groups Selection -->
+          <div class="selection-field">
+            <label class="selection-label">Groups</label>
+            <div class="selection-content">
+              <div class="selected-items" *ngIf="selectedGroupIds.length > 0">
+                <mat-chip-set>
+                  <mat-chip *ngFor="let groupId of selectedGroupIds" [removable]="true" (removed)="removeGroup(groupId)">
+                    {{ getGroupName(groupId) }}
+                    <mat-icon matChipRemove>cancel</mat-icon>
+                  </mat-chip>
+                </mat-chip-set>
+              </div>
+              <div class="no-selection" *ngIf="selectedGroupIds.length === 0">
+                <span class="placeholder-text">No groups selected</span>
+              </div>
+              <button 
+                type="button" 
+                mat-raised-button 
+                color="accent" 
+                (click)="openGroupSelector()"
+                class="selector-button"
+              >
+                <mat-icon>group_add</mat-icon>
+                Select Groups
+              </button>
+            </div>
+            <div class="selection-hint">Select groups to add the user to (optional)</div>
+          </div>
+
+          <div class="checkbox-field">
+            <mat-checkbox formControlName="requiresPasswordChange" [checked]="true">
+              Require password change on first login
+            </mat-checkbox>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" mat-button (click)="cancel()">Cancel</button>
             <button 
-              type="button" 
+              type="submit" 
               mat-raised-button 
               color="primary" 
-              (click)="openRoleSelector()"
-              class="selector-button"
+              [disabled]="userForm.invalid || loading || selectedRoleIds.length === 0"
             >
-              <mat-icon>person_add</mat-icon>
-              Select Roles
+              {{ loading ? 'Creating...' : 'Create User' }}
             </button>
           </div>
-          <div class="selection-hint">Select one or more roles for the user</div>
-        </div>
-
-        <!-- Groups Selection -->
-        <div class="selection-field">
-          <label class="selection-label">Groups</label>
-          <div class="selection-content">
-            <div class="selected-items" *ngIf="selectedGroupIds.length > 0">
-              <mat-chip-set>
-                <mat-chip *ngFor="let groupId of selectedGroupIds" [removable]="true" (removed)="removeGroup(groupId)">
-                  {{ getGroupName(groupId) }}
-                  <mat-icon matChipRemove>cancel</mat-icon>
-                </mat-chip>
-              </mat-chip-set>
-            </div>
-            <div class="no-selection" *ngIf="selectedGroupIds.length === 0">
-              <span class="placeholder-text">No groups selected</span>
-            </div>
-            <button 
-              type="button" 
-              mat-raised-button 
-              color="accent" 
-              (click)="openGroupSelector()"
-              class="selector-button"
-            >
-              <mat-icon>group_add</mat-icon>
-              Select Groups
-            </button>
-          </div>
-          <div class="selection-hint">Select groups to add the user to (optional)</div>
-        </div>
-
-        <div class="checkbox-field">
-          <mat-checkbox formControlName="requiresPasswordChange" [checked]="true">
-            Require password change on first login
-          </mat-checkbox>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" mat-button (click)="cancel()">Cancel</button>
-          <button 
-            type="submit" 
-            mat-raised-button 
-            color="primary" 
-            [disabled]="userForm.invalid || loading || selectedRoleIds.length === 0"
-          >
-            {{ loading ? 'Creating...' : 'Create User' }}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
 
   `,
@@ -444,7 +445,8 @@ export class CreateUserComponent implements OnInit {
     private passwordGeneratorService: PasswordGeneratorService,
     private router: Router,
     private logger: LoggerService,
-    private sidePanelService: SidePanelService
+    private sidePanelService: SidePanelService,
+    private pageTitleService: PageTitleService
   ) {
     this.userForm = this.formBuilder.group({
       username: ['', [Validators.required]],
@@ -460,6 +462,7 @@ export class CreateUserComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.pageTitleService.setTitle('Create User');
     this.checkPermissions();
     this.loadRoles();
     this.loadGroups();
@@ -473,9 +476,9 @@ export class CreateUserComponent implements OnInit {
 
   loadRoles(): void {
     this.roleService.getRoles().subscribe({
-      next: (roles) => {
-        this.availableRoles = roles;
-        this.logger.info('CreateUserComponent', 'Roles loaded successfully', { count: roles.length });
+      next: (response) => {
+        this.availableRoles = response.items;
+        this.logger.info('CreateUserComponent', 'Roles loaded successfully', { count: response.items.length });
       },
       error: (error) => {
         this.logger.error('CreateUserComponent', 'Error loading roles', error);

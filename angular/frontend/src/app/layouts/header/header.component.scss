@@ -85,6 +85,27 @@
   min-width: 0;
 }
 
+.title-separator {
+  margin: 0 abstracts.$spacing-sm;
+  font-size: 1.5rem;
+  font-weight: 300;
+  opacity: 0.5;
+  color: var(--mdc-theme-on-primary);
+  flex-shrink: 0;
+  line-height: normal;
+}
+
+.page-title {
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--mdc-theme-on-primary);
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .right-section {
   display: flex;
   align-items: center;
