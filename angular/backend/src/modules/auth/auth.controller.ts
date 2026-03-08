@@ -31,7 +31,7 @@ import {
   ResetPasswordDto,
 } from './dto';
 import { CurrentUser } from './current-user.decorator';
-import { Request as ExpressRequest } from 'express';
+import { FastifyRequest } from 'fastify';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { UsersService } from '../users/users.service';
 
@@ -44,7 +44,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly permissionsService: PermissionsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   @ApiOperation({ summary: 'Login user and get token' })
   @ApiBody({ type: LoginDto })
@@ -53,11 +53,11 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(200)
-  async login(@Body() loginDto: LoginDto, @Req() request: ExpressRequest) {
+  async login(@Body() loginDto: LoginDto, @Req() request: FastifyRequest) {
     try {
       this.logger.log(`Login attempt for user: ${loginDto.email}`);
       const ipAddress = request.ip;
-      const userAgent = request.headers['user-agent'];
+      const userAgent = request.headers['user-agent'] as string;
 
       const result = await this.authService.login(
         loginDto.email,

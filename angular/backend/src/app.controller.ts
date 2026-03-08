@@ -1,15 +1,15 @@
 import { Controller, Get, Res } from '@nestjs/common';
-import { Response } from 'express';
+import { FastifyReply } from 'fastify';
 import { AppService } from './app.service';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly appService: AppService) { }
 
   @Get()
-  redirect(@Res() res: Response) {
-    return res.redirect('/api');
+  redirect(@Res() res: FastifyReply) {
+    return res.status(302).header('Location', '/api').send('');
   }
 
   @Get('health')
