@@ -4,7 +4,6 @@ import { RouterModule } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { LandingHeaderComponent } from './components/landing-header.component';
 
 interface Feature {
   title: string;
@@ -30,8 +29,7 @@ interface TechCategory {
     RouterModule,
     MatButtonModule,
     MatCardModule,
-    MatIconModule,
-    LandingHeaderComponent
+    MatIconModule
   ],
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.scss']
@@ -39,34 +37,44 @@ interface TechCategory {
 export class LandingComponent {
   features: Feature[] = [
     {
-      title: 'Authentication',
-      description: 'Complete authentication system with login, registration, password reset, and email verification',
-      icon: 'shield'
+      title: 'Enterprise RBAC & GBAC',
+      description: 'Highly robust Role and Group based access control. Apply any permission set to achieve row-based security (Groups) and object-based security (Roles).',
+      icon: 'admin_panel_settings'
     },
     {
-      title: 'Responsive Design',
-      description: 'Fully responsive design that works on all devices and screen sizes',
-      icon: 'devices'
+      title: 'No-Dependency Auth',
+      description: 'Complete, standalone authentication system including login, registration, and session management without relying on external dependencies.',
+      icon: 'lock'
+    },
+    {
+      title: 'Granular Event Logging',
+      description: 'Comprehensive event logging for all application functions, ensuring you have a complete audit trail for compliance and debugging.',
+      icon: 'receipt_long'
+    },
+    {
+      title: 'Built-in Security Suite',
+      description: 'Actively prevent attacks and view security risks with a robust, integrated security monitoring suite.',
+      icon: 'security'
+    },
+    {
+      title: 'Built-in Admin Suite',
+      description: 'Comprehensive administration tools including login audits, security management, and full user control.',
+      icon: 'supervisor_account'
+    },
+    {
+      title: 'Agentic Engineering Ready',
+      description: 'A platform built from the ground up to support and accelerate AI-driven, agentic software engineering patterns.',
+      icon: 'smart_toy'
     },
     {
       title: 'Theme Customization',
-      description: 'Easily customize colors, branding, and UI components to match your company identity',
+      description: 'Easily customize colors, branding, and UI components to match your company identity.',
       icon: 'palette'
     },
     {
       title: 'NGXS State Management',
-      description: 'Robust state management with NGXS for predictable state transitions',
+      description: 'Robust state management with NGXS for predictable state transitions.',
       icon: 'sync_alt'
-    },
-    {
-      title: 'Angular Material',
-      description: 'Built with Angular Material components for a polished, modern UI',
-      icon: 'dashboard'
-    },
-    {
-      title: 'Server-Side Rendering',
-      description: 'Optional server-side rendering for improved SEO and performance',
-      icon: 'speed'
     }
   ];
 

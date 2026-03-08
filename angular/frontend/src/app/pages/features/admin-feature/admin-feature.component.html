@@ -1,0 +1,53 @@
+<div class="landing-container">
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">Powerful Admin Suite</h1>
+            <p class="hero-subtitle">Total oversight of your application with centralized user, role, and security
+                management tools.</p>
+            <div class="hero-buttons">
+                <a mat-raised-button color="primary" href="https://github.com/ericaxelrod-1/frontend-templates"
+                    target="_blank">Clone Template</a>
+                <a mat-stroked-button color="primary" routerLink="/">Back to Home</a>
+            </div>
+        </div>
+        <div class="hero-image">
+            <div class="placeholder-image">
+                <h3>Master Console</h3>
+                <div class="shield">⚙️</div>
+                <p>Centralized Platform Control</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Details Section -->
+    <section class="features-section">
+        <div class="section-header">
+            <h2>Complete Oversight</h2>
+            <p>Manage every aspect of your application with our integrated administrative suite.</p>
+        </div>
+        <div class="features-grid">
+            <mat-card class="feature-card" *ngFor="let feature of features">
+                <mat-card-header>
+                    <div class="feature-icon">
+                        <mat-icon>{{ feature.icon }}</mat-icon>
+                    </div>
+                    <mat-card-title>{{ feature.title }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                    <p>{{ feature.description }}</p>
+                </mat-card-content>
+            </mat-card>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2>Take full control</h2>
+            <p>Streamline operations and enhance security with a foundation built for administrative excellence.</p>
+            <a mat-raised-button color="primary" href="https://github.com/ericaxelrod-1/frontend-templates"
+                target="_blank">View on GitHub</a>
+        </div>
+    </section>
+</div>

@@ -360,6 +360,7 @@ The cookie consent system optionally integrates with user accounts. To enable th
 ### Legal Compliance Considerations
 
 - Include links to your Privacy Policy and Terms of Service
+- Replace the sample placeholder Privacy Policy (src/app/features/legal/privacy-policy) with a legally valid policy for your production deployment
 - Update the cookie banner text to accurately reflect your cookie usage
 - Adapt the cookie categories based on what your site actually uses
 - Test the consent mechanism thoroughly before deployment

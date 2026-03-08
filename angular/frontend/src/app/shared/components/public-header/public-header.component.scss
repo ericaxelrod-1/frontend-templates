@@ -1,0 +1,102 @@
+.spacer {
+    flex: 1 1 auto;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    color: #f8fafc;
+}
+
+.logo-container:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-title {
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: #f8fafc;
+}
+
+.nav-links {
+    margin-left: 32px;
+    display: flex;
+    align-items: center;
+
+    .nav-button {
+        color: #f8fafc;
+        font-weight: 400;
+        font-size: 1rem;
+
+        mat-icon {
+            margin-left: 4px;
+            font-size: 20px;
+            width: 20px;
+            height: 20px;
+        }
+    }
+}
+
+.auth-buttons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .login-button {
+        color: #f8fafc;
+    }
+
+    .signup-button {
+        background-color: #3b82f6 !important;
+        color: white !important;
+        border-radius: 6px;
+        font-weight: 500;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+
+        &:hover {
+            background-color: #2563eb !important;
+        }
+    }
+}
+
+.public-header-toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: rgba(15, 23, 42, 0.8) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #f8fafc !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    height: 64px;
+    display: flex;
+    align-items: center;
+}
+
+// Global menu overrides for glassmorphism
+::ng-deep .public-nav-menu {
+    background: rgba(15, 23, 42, 0.95) !important;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px !important;
+    margin-top: 8px;
+
+    .mat-mdc-menu-item {
+        color: #f8fafc !important;
+
+        mat-icon {
+            color: #3b82f6 !important;
+            margin-right: 12px;
+        }
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.05) !important;
+        }
+    }
+}

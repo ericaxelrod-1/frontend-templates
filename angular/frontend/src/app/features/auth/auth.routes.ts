@@ -21,9 +21,4 @@ export const routes: Routes = [
     path: 'verify-email',
     loadComponent: () => import('./verify-email/verify-email.component').then(c => c.VerifyEmailComponent),
   },
-  {
-    path: '',
-    redirectTo: 'login',
-    pathMatch: 'full'
-  }
-]; 
+];

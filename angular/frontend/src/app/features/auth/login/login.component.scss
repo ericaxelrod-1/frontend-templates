@@ -113,33 +113,33 @@
 
   ::ng-deep {
     .mdc-text-field--outlined {
-      --mdc-outlined-text-field-container-shape: 12px;
-      --mdc-outlined-text-field-outline-color: rgba(255, 255, 255, 0.1);
-      --mdc-outlined-text-field-hover-outline-color: rgba(255, 255, 255, 0.3);
-      --mdc-outlined-text-field-focus-outline-color: var(--mdc-theme-primary);
-      --mdc-outlined-text-field-caret-color: var(--mdc-theme-primary);
-      --mdc-outlined-text-field-input-text-color: #f8fafc;
-      --mdc-outlined-text-field-label-text-color: #94a3b8;
+      --mdc-outlined-text-field-container-shape: 12px !important;
+      --mdc-outlined-text-field-outline-color: rgba(255, 255, 255, 0.1) !important;
+      --mdc-outlined-text-field-hover-outline-color: rgba(255, 255, 255, 0.3) !important;
+      --mdc-outlined-text-field-focus-outline-color: var(--mdc-theme-primary) !important;
+      --mdc-outlined-text-field-caret-color: var(--mdc-theme-primary) !important;
+      --mdc-outlined-text-field-input-text-color: #f8fafc !important;
+      --mdc-outlined-text-field-label-text-color: #94a3b8 !important;
 
       .mdc-notched-outline {
         border-radius: 12px;
       }
 
       .mat-mdc-text-field-wrapper {
-        background: rgba(15, 23, 42, 0.3);
+        background: rgba(15, 23, 42, 0.3) !important;
         border-radius: 12px;
         transition: background 0.2s ease;
       }
 
       &.mdc-text-field--focused .mat-mdc-text-field-wrapper {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.1) !important;
       }
     }
 
     // Autofill fix
     input:-webkit-autofill {
-      -webkit-box-shadow: 0 0 0 100px #0f172a inset;
-      -webkit-text-fill-color: #f8fafc;
+      -webkit-box-shadow: 0 0 0 100px #0f172a inset !important;
+      -webkit-text-fill-color: #f8fafc !important;
       border-radius: 12px;
     }
   }
