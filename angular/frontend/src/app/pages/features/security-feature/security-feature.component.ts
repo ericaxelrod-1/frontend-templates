@@ -15,24 +15,24 @@ import { RouterModule } from '@angular/router';
 export class SecurityFeatureComponent {
   features = [
     {
-      title: 'Brute Force Prevention',
-      description: 'Native protection against automated credential attacks with dynamic rate limiting and account lockout logic.',
-      icon: 'gpp_maybe'
+      title: 'Unified Risk Scoring',
+      description: 'A dynamic risk engine evaluating logins against geolocation data, network reputation, device fingerprints, and user history.',
+      icon: 'policy'
     },
     {
-      title: 'Pattern Detection',
-      description: 'Advanced algorithms to identify suspicious behavior patterns and potential security risks before they escalate.',
-      icon: 'psychology_alt'
+      title: 'Behavioral Baselines',
+      description: 'Tracks user habits like typical login hours and known devices to immediately identify and block anomalous activity.',
+      icon: 'psychology'
     },
     {
-      title: 'Security Alerts',
-      description: 'Instant notifications for high-priority security events, allowing for rapid response and mitigation.',
-      icon: 'notification_important'
+      title: 'Offline Geolocation',
+      description: 'Privacy-first, blazing fast IP geolocation built directly into the server, requiring no external API dependencies.',
+      icon: 'map'
     },
     {
-      title: 'IP Reputation',
-      description: 'Block malicious actors based on IP reputation scoring and geographical risk assessment.',
-      icon: 'public_off'
+      title: 'Smart Rate Limiting',
+      description: 'Lightweight, database-optimized rate limiting designed specifically to stop brute force and credential stuffing attacks instantly.',
+      icon: 'speed'
     }
   ];
 }

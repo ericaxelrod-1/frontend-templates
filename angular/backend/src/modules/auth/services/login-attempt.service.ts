@@ -4,6 +4,8 @@ import { Repository, Between, LessThan, MoreThan } from 'typeorm';
 import { LoginAttempt } from '../entities/login-attempt.entity';
 import { User } from '../../users/entities/user.entity';
 import { IPReputationService } from './ip-reputation.service';
+import { PatternDetectionService } from './pattern-detection.service';
+import { forwardRef, Inject } from '@nestjs/common';
 
 // Define status types for login attempts
 type LoginStatus =
@@ -19,7 +21,9 @@ export class LoginAttemptService {
     @InjectRepository(LoginAttempt)
     private readonly loginAttemptRepository: Repository<LoginAttempt>,
     private readonly ipReputationService: IPReputationService,
-  ) {}
+    @Inject(forwardRef(() => PatternDetectionService))
+    private readonly patternDetectionService: PatternDetectionService,
+  ) { }
 
   async create(data: {
     ipAddress: string;
@@ -37,10 +41,19 @@ export class LoginAttemptService {
       status: data.status,
       user: data.user,
       failureReason: data.failureReason,
-      metadata: data.metadata ? JSON.stringify(data.metadata) : null,
     });
 
+    // 1. Evaluate Contextual Risk Score in real time before saving
+    const riskScore = await this.patternDetectionService.evaluateRiskScore(loginAttempt);
+
+    // Explicitly add riskScore to metadata to retain it
+    const metadataWithRisk = { ...(data.metadata || {}), riskScore };
+    loginAttempt.metadata = JSON.stringify(metadataWithRisk);
+
     await this.loginAttemptRepository.save(loginAttempt);
+
+    // 2. Track the attempt in fast SQLite counters
+    await this.patternDetectionService.trackLoginAttempt(loginAttempt);
 
     // Update IP reputation based on login attempt
     if (data.status === 'failed') {

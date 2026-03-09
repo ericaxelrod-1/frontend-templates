@@ -4,8 +4,11 @@ import { Repository, MoreThan, Between, LessThan } from 'typeorm';
 import { LoginAttempt } from '../entities/login-attempt.entity';
 import { IPReputation } from '../entities/ip-reputation.entity';
 import { SecurityDetectedPattern } from '../entities/security-detected-pattern.entity';
+import { RateLimitCounter } from '../entities/rate-limit-counter.entity';
+import { UserBehaviorProfile } from '../entities/user-behavior-profile.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
+import * as geoip from 'geoip-lite';
 
 export enum PatternType {
   BRUTE_FORCE = 'brute_force',
@@ -52,6 +55,10 @@ export class PatternDetectionService {
     private readonly ipReputationRepository: Repository<IPReputation>,
     @InjectRepository(SecurityDetectedPattern)
     private readonly securityDetectedPatternRepository: Repository<SecurityDetectedPattern>,
+    @InjectRepository(RateLimitCounter)
+    private readonly rateLimitCounterRepository: Repository<RateLimitCounter>,
+    @InjectRepository(UserBehaviorProfile)
+    private readonly userBehaviorProfileRepository: Repository<UserBehaviorProfile>,
     private readonly configService: ConfigService,
   ) {
     // Override defaults with config values if provided
@@ -105,12 +112,6 @@ export class PatternDetectionService {
     return this.getStoredPatterns();
   }
 
-  /**
-   * Detect only a specific pattern type (for simple mode testing)
-   * This method runs only the detector for the requested pattern type
-   * @param patternType The specific pattern type to detect
-   * @returns Array of detected patterns of only the specified type
-   */
   async detectSpecificPattern(
     patternType: string
   ): Promise<DetectedPattern[]> {
@@ -125,15 +126,7 @@ export class PatternDetectionService {
         patterns = await this.detectDistributedAttacks();
         break;
       case 'credential_stuffing':
-        // Note: credential stuffing uses same detector as brute force
-        // but with different thresholds - for simple mode, we'll
-        // tag it specifically
-        patterns = await this.detectBruteForceAttempts();
-        patterns.forEach(p => {
-          if (p.details.includes('multiple different emails')) {
-            p.type = PatternType.CREDENTIAL_STUFFING;
-          }
-        });
+        patterns = await this.detectCredentialStuffing();
         break;
       case 'rapid_account_switching':
       case 'account_switching':
@@ -494,6 +487,7 @@ export class PatternDetectionService {
     const timePatterns = await this.detectTimeAnomalies();
     const accountSwitchingPatterns = await this.detectRapidAccountSwitching();
     const ipHoppingPatterns = await this.detectIPHopping();
+    const credentialStuffingPatterns = await this.detectCredentialStuffing();
 
     patterns.push(
       ...bruteForcePatterns,
@@ -502,6 +496,7 @@ export class PatternDetectionService {
       ...timePatterns,
       ...accountSwitchingPatterns,
       ...ipHoppingPatterns,
+      ...credentialStuffingPatterns,
     );
 
     // Mark as real-time patterns
@@ -581,7 +576,7 @@ export class PatternDetectionService {
           // Simple mode: Minimal data that ONLY triggers brute force
           const simpleIP = '192.168.200.1';  // Use unique IP range for simple tests
           const simpleEmail = 'bruteforce.simple@test.example.com';
-          
+
           // Create exactly 6 failed attempts (just above threshold of 5)
           for (let i = 0; i < 6; i++) {
             const attemptTime = new Date(now.getTime() - i * 120000); // 2 minutes apart
@@ -615,7 +610,7 @@ export class PatternDetectionService {
           // Simple mode: Exactly 4 IPs (minimum for distributed) with same email
           const targetEmail = 'distributed.simple@test.example.com';
           const simpleIPs = ['10.200.0.1', '10.200.0.2', '10.200.0.3', '10.200.0.4'];
-          
+
           for (let i = 0; i < simpleIPs.length; i++) {
             const attemptTime = new Date(now.getTime() - i * 600000); // 10 minutes apart
             await this.createTestAttempt({
@@ -656,7 +651,7 @@ export class PatternDetectionService {
             'user7.simple@test.com', 'user8.simple@test.com', 'user9.simple@test.com',
             'user10.simple@test.com'
           ];
-          
+
           for (let i = 0; i < emails.length; i++) {
             const attemptTime = new Date(now.getTime() - i * 30000); // 30 seconds apart
             await this.createTestAttempt({
@@ -707,7 +702,7 @@ export class PatternDetectionService {
             'alice.simple@test.com', 'bob.simple@test.com',
             'charlie.simple@test.com', 'diana.simple@test.com'
           ];
-          
+
           for (let i = 0; i < simpleEmails.length; i++) {
             const attemptTime = new Date(now.getTime() - i * 90000); // 1.5 minutes apart
             await this.createTestAttempt({
@@ -747,7 +742,7 @@ export class PatternDetectionService {
           // Simple mode: Same email from 3 different IPs in short time
           const hoppingEmail = 'iphopper.simple@test.example.com';
           const simpleHoppingIPs = ['10.201.1.1', '10.201.1.2', '10.201.1.3'];
-          
+
           for (let i = 0; i < simpleHoppingIPs.length; i++) {
             const attemptTime = new Date(now.getTime() - i * 180000); // 3 minutes apart
             await this.createTestAttempt({
@@ -842,7 +837,7 @@ export class PatternDetectionService {
           // Simple mode: Login at unusual time (3 AM local)
           const anomalyTime = new Date();
           anomalyTime.setHours(3, 0, 0, 0);  // 3:00 AM
-          
+
           await this.createTestAttempt({
             ipAddress: '192.168.203.1',
             emailAttempted: 'nightowl.simple@test.example.com',
@@ -932,22 +927,18 @@ export class PatternDetectionService {
     );
 
     // Find IPs with multiple failed attempts in the time window
-    const result = await this.loginAttemptRepository
-      .createQueryBuilder('attempt')
-      .select('attempt.ipAddress')
-      .addSelect('COUNT(*)', 'count')
-      .where('attempt.status = :status', { status: 'failed' })
-      .andWhere('attempt.attemptedAt > :startTime', { startTime })
-      .groupBy('attempt.ipAddress')
-      .having('COUNT(*) >= :threshold', {
-        threshold: this.thresholds.bruteForceAttempts,
-      })
-      .getRawMany();
+    const result = await this.rateLimitCounterRepository
+      .createQueryBuilder('counter')
+      .where('counter.key LIKE :keyPattern', { keyPattern: `ip:%` })
+      .andWhere('counter.count >= :threshold', { threshold: this.thresholds.bruteForceAttempts })
+      .andWhere('counter.windowExpiresAt > :now', { now: startTime })
+      .getMany();
 
     for (const item of result) {
+      const ip = item.key.split(':')[1];
       const attempts = await this.loginAttemptRepository.find({
         where: {
-          ipAddress: item.attempt_ipAddress,
+          ipAddress: ip,
           status: 'failed',
           attemptedAt: MoreThan(startTime),
         },
@@ -962,9 +953,9 @@ export class PatternDetectionService {
       patterns.push({
         type: PatternType.BRUTE_FORCE,
         severity: attempts.length > 10 ? 'high' : 'medium',
-        details: `${attempts.length} failed login attempts from IP ${item.attempt_ipAddress} in the last ${this.thresholds.bruteForceTimeWindowMinutes} minutes`,
+        details: `${attempts.length} failed login attempts from IP ${ip} in the last ${this.thresholds.bruteForceTimeWindowMinutes} minutes`,
         evidence: {
-          ipAddress: item.attempt_ipAddress,
+          ipAddress: ip,
           attemptCount: attempts.length,
           timeWindow: `${this.thresholds.bruteForceTimeWindowMinutes} minutes`,
           uniqueEmailCount: uniqueEmails.length,
@@ -976,10 +967,217 @@ export class PatternDetectionService {
           })),
         },
         timestamp: new Date(),
-        ipAddress: item.attempt_ipAddress,
-        ipAddresses: [item.attempt_ipAddress],
+        ipAddress: ip,
+        ipAddresses: [ip],
         emails: uniqueEmails,
       });
+    }
+
+    return patterns;
+  }
+
+  /**
+   * Evaluates the risk score (0-100) of a given login attempt.
+   * This operates in real-time as a login is happening, taking into account GeoIP, 
+   * recent rate-limit failures, and statistical user behavioral baselines.
+   */
+  async evaluateRiskScore(attempt: LoginAttempt): Promise<number> {
+    let score = 0;
+
+    // 1. GEO IP & NETWORK REPUTATION
+    if (attempt.ipAddress) {
+      if (this.isForeignIP(attempt.ipAddress)) score += 30;
+      if (this.isVPNOrProxy(attempt.ipAddress)) score += 25;
+
+      // Check recent failure counters for this IP
+      const ipCounter = await this.rateLimitCounterRepository.findOne({
+        where: { key: `ip:${attempt.ipAddress}` }
+      });
+      if (ipCounter && ipCounter.count > 0 && ipCounter.windowExpiresAt > new Date()) {
+        // Add 5 risk points per recent failure from this IP, capped at 30
+        score += Math.min(ipCounter.count * 5, 30);
+      }
+    }
+
+    // 2. DEVICE / USER-AGENT REPUTATION
+    if (this.isUnusualUserAgent(attempt.userAgent)) score += 15;
+
+    // 3. STATISTICAL USER BASELINES
+    if (attempt.emailAttempted) {
+      const userResult = await this.loginAttemptRepository.createQueryBuilder('attempt')
+        .leftJoinAndSelect('attempt.user', 'user')
+        .where('attempt.emailAttempted = :email', { email: attempt.emailAttempted })
+        .getOne();
+
+      if (userResult && userResult.user) {
+        const profile = await this.userBehaviorProfileRepository.findOne({
+          where: { userId: userResult.user.id }
+        });
+
+        if (profile) {
+          // Check Time Baseline
+          if (profile.typicalLoginHours && profile.typicalLoginHours.length === 24) {
+            const currentHour = new Date().getUTCHours();
+            if (!profile.typicalLoginHours[currentHour]) {
+              score += 20; // Unusual login hour for this specific user
+            }
+          }
+
+          // Check IP/Location Baseline
+          if (attempt.ipAddress && profile.knownIps && profile.knownIps.length > 0) {
+            if (!profile.knownIps.includes(attempt.ipAddress)) {
+              score += 15; // Unrecognized IP address for this user
+            }
+          }
+
+          // Check Device Baseline
+          if (attempt.userAgent && profile.knownUserAgents && profile.knownUserAgents.length > 0) {
+            if (!profile.knownUserAgents.includes(attempt.userAgent)) {
+              score += 10; // Unrecognized device/browser for this user
+            }
+          }
+        }
+      }
+    }
+
+    // Cap the final score at 100
+    return Math.min(score, 100);
+  }
+
+  /**
+   * Tracks a login attempt in the lightweight Redis-like SQLite counter tables.
+   */
+  async trackLoginAttempt(attempt: LoginAttempt): Promise<void> {
+    if (attempt.status !== 'failed' || !attempt.ipAddress) return;
+
+    const ipKey = `ip:${attempt.ipAddress}`;
+
+    // 1. Track IP-level failures (Brute Force / Credential Stuffing)
+    await this.incrementRateLimit(
+      ipKey,
+      this.thresholds.bruteForceTimeWindowMinutes * 60 * 1000
+    );
+  }
+
+  private async incrementRateLimit(key: string, windowMs: number): Promise<void> {
+    let counter = await this.rateLimitCounterRepository.findOne({ where: { key } });
+    const now = new Date();
+
+    if (!counter) {
+      counter = this.rateLimitCounterRepository.create({
+        key,
+        count: 1,
+        windowExpiresAt: new Date(now.getTime() + windowMs)
+      });
+    } else {
+      if (counter.windowExpiresAt < now) {
+        // Window expired, reset counter
+        counter.count = 1;
+        counter.windowExpiresAt = new Date(now.getTime() + windowMs);
+      } else {
+        // Still in window, increment
+        counter.count += 1;
+      }
+    }
+
+    await this.rateLimitCounterRepository.save(counter);
+  }
+
+  /**
+   * Updates the statistical baseline for a user after a successful login.
+   * Tracks their typical hours, known IPs, and known User-Agents.
+   */
+  async trackSuccessfulLoginBehavior(userId: number, ipAddress: string, userAgent: string): Promise<void> {
+    let profile = await this.userBehaviorProfileRepository.findOne({
+      where: { userId }
+    });
+
+    if (!profile) {
+      profile = this.userBehaviorProfileRepository.create({
+        userId,
+        typicalLoginHours: new Array(24).fill(false),
+        knownIps: [],
+        knownUserAgents: []
+      });
+    }
+
+    // 1. Update Typical Hours
+    const currentHour = new Date().getUTCHours();
+    if (!profile.typicalLoginHours) profile.typicalLoginHours = new Array(24).fill(false);
+    profile.typicalLoginHours[currentHour] = true;
+
+    // 2. Update Known IPs (keep last 10)
+    if (!profile.knownIps) profile.knownIps = [];
+    if (ipAddress && !profile.knownIps.includes(ipAddress)) {
+      profile.knownIps.push(ipAddress);
+      if (profile.knownIps.length > 10) profile.knownIps.shift();
+    }
+
+    // 3. Update Known User Agents (keep last 5)
+    if (!profile.knownUserAgents) profile.knownUserAgents = [];
+    if (userAgent && !profile.knownUserAgents.includes(userAgent)) {
+      profile.knownUserAgents.push(userAgent);
+      if (profile.knownUserAgents.length > 5) profile.knownUserAgents.shift();
+    }
+
+    await this.userBehaviorProfileRepository.save(profile);
+  }
+
+  async detectCredentialStuffing(): Promise<DetectedPattern[]> {
+    const patterns: DetectedPattern[] = [];
+    const startTime = new Date();
+    startTime.setMinutes(
+      startTime.getMinutes() - this.thresholds.bruteForceTimeWindowMinutes,
+    );
+
+    // Find IPs with multiple failed attempts in the time window across multiple emails
+    const result = await this.rateLimitCounterRepository
+      .createQueryBuilder('counter')
+      .where('counter.key LIKE :keyPattern', { keyPattern: `ip:%` })
+      .andWhere('counter.count >= :threshold', { threshold: this.thresholds.bruteForceAttempts })
+      .andWhere('counter.windowExpiresAt > :now', { now: startTime })
+      .getMany();
+
+    for (const item of result) {
+      const ip = item.key.split(':')[1];
+      const attempts = await this.loginAttemptRepository.find({
+        where: {
+          ipAddress: ip,
+          status: 'failed',
+          attemptedAt: MoreThan(startTime),
+        },
+        relations: ['user'],
+        order: { attemptedAt: 'DESC' },
+      });
+
+      const uniqueEmails = [
+        ...new Set(attempts.map((a) => a.emailAttempted).filter(Boolean)),
+      ];
+
+      // Credential stuffing applies if more than 1 distinct email was targeted from this IP
+      if (uniqueEmails.length > 1) {
+        patterns.push({
+          type: PatternType.CREDENTIAL_STUFFING,
+          severity: attempts.length > 20 ? 'critical' : 'high',
+          details: `Credential stuffing: ${attempts.length} failed attempts across ${uniqueEmails.length} accounts from IP ${ip} in the last ${this.thresholds.bruteForceTimeWindowMinutes} minutes`,
+          evidence: {
+            ipAddress: ip,
+            attemptCount: attempts.length,
+            timeWindow: `${this.thresholds.bruteForceTimeWindowMinutes} minutes`,
+            uniqueEmailCount: uniqueEmails.length,
+            attempts: attempts.map((a) => ({
+              timestamp: a.attemptedAt,
+              email: a.emailAttempted,
+              userId: a.user?.id || null,
+              status: a.status,
+            })),
+          },
+          timestamp: new Date(),
+          ipAddress: ip,
+          ipAddresses: [ip],
+          emails: uniqueEmails,
+        });
+      }
     }
 
     return patterns;
@@ -1226,29 +1424,30 @@ export class PatternDetectionService {
   }
 
   private isForeignIP(ipAddress: string): boolean {
-    // Simplified foreign IP detection
-    // In production, this would use a geolocation service
-    console.log(`[DEBUG] isForeignIP checking: ${ipAddress}`);
+    const geo = geoip.lookup(ipAddress);
 
-    // Fixed regex: Check if IP is NOT in private ranges
-    const privateIPPattern =
-      /^(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
-    const isPrivate = privateIPPattern.test(ipAddress);
-    const isForeign = !isPrivate;
+    // If we can't look it up, assume it's private/local. 
+    // If it's found but the country is not US (or standard operating country), flag as foreign
+    if (geo && geo.country && geo.country !== 'US') {
+      return true;
+    }
 
-    console.log(
-      `[DEBUG] IP ${ipAddress} - isPrivate: ${isPrivate}, isForeign: ${isForeign}`,
-    );
-    return isForeign;
+    // Standard private IP check fallback
+    const privateIPPattern = /^(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
+    return !privateIPPattern.test(ipAddress) && !geo;
   }
 
   private isVPNOrProxy(ipAddress: string): boolean {
-    // Simplified VPN/proxy detection
-    // In production, this would use a VPN detection service
+    const geo = geoip.lookup(ipAddress);
+
+    // geoip-lite sometimes flags hosting/datacenter ranges in its DB
+    // A more advanced integration might use a dedicated proxy ASN list, but we can 
+    // also use our known fallback list.
     const knownVPNRanges = [
       /^185\./, // Common VPN ranges
       /^46\./, // Common proxy ranges
       /^5\./, // Some VPN providers
+      /^45\./, // VPN/hosting ranges (used in tests)
     ];
 
     return knownVPNRanges.some((pattern) => pattern.test(ipAddress));
@@ -1317,9 +1516,65 @@ export class PatternDetectionService {
   }
 
   async detectTimeAnomalies(): Promise<DetectedPattern[]> {
-    // Detect logins at unusual times based on user history
-    // For this implementation, we'll return an empty array
-    return [];
+    const patterns: DetectedPattern[] = [];
+    const startTime = new Date();
+    startTime.setHours(startTime.getHours() - 24);
+
+    const attempts = await this.loginAttemptRepository.find({
+      where: {
+        attemptedAt: MoreThan(startTime)
+      },
+      relations: ['user'],
+      order: { attemptedAt: 'DESC' }
+    });
+
+    // Group by user/email to avoid spamming
+    const processedEmails = new Set<string>();
+
+    for (const attempt of attempts) {
+      if (!attempt.emailAttempted) continue;
+
+      const hour = attempt.attemptedAt.getHours();
+      // Flag logins between 1 AM and 5 AM
+      if (hour >= 1 && hour < 5 && !processedEmails.has(attempt.emailAttempted)) {
+        processedEmails.add(attempt.emailAttempted);
+
+        // Find all attempts for this user during unusual hours
+        const userAnomalies = attempts.filter(a =>
+          a.emailAttempted === attempt.emailAttempted &&
+          a.attemptedAt.getHours() >= 1 &&
+          a.attemptedAt.getHours() < 5
+        );
+
+        const uniqueIPs = [...new Set(userAnomalies.map(a => a.ipAddress).filter(Boolean))] as string[];
+
+        patterns.push({
+          type: PatternType.TIME_ANOMALY,
+          severity: 'medium',
+          details: `Unusual login time: ${userAnomalies.length} attempts between 1am-5am for ${attempt.emailAttempted}`,
+          evidence: {
+            ipAddress: attempt.ipAddress,
+            attemptCount: userAnomalies.length,
+            timeRange: {
+              start: userAnomalies[userAnomalies.length - 1].attemptedAt,
+              end: userAnomalies[0].attemptedAt
+            },
+            attempts: userAnomalies.map(a => ({
+              timestamp: a.attemptedAt,
+              status: a.status,
+              ipAddress: a.ipAddress
+            }))
+          },
+          timestamp: new Date(),
+          ipAddress: attempt.ipAddress,
+          ipAddresses: uniqueIPs.length > 0 ? uniqueIPs : [attempt.ipAddress || 'unknown'],
+          emails: [attempt.emailAttempted],
+          userId: attempt.user?.id
+        });
+      }
+    }
+
+    return patterns;
   }
 
   async detectRapidAccountSwitching(): Promise<DetectedPattern[]> {

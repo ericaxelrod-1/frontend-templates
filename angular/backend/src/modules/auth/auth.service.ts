@@ -227,6 +227,8 @@ export class AuthService {
       await this.usersService.updateLastLogin(user.id);
 
       // Run pattern detection after successful login to look for anomalies
+      // Also update the Statistical User Baseline
+      await this.patternDetectionService.trackSuccessfulLoginBehavior(user.id, ipAddress, userAgent);
       this.detectLoginPatterns(user.id, email, ipAddress, userAgent).catch(
         (err) => {
           console.error('Error in pattern detection:', err);
