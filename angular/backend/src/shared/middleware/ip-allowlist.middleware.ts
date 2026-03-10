@@ -1,14 +1,13 @@
 import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
 import { IPAllowlistService } from '../services/ip-allowlist.service';
 
 @Injectable()
 export class IPAllowlistMiddleware implements NestMiddleware {
   private readonly logger = new Logger(IPAllowlistMiddleware.name);
 
-  constructor(private readonly ipAllowlistService: IPAllowlistService) {}
+  constructor(private readonly ipAllowlistService: IPAllowlistService) { }
 
-  use(req: Request, res: Response, next: NextFunction) {
+  use(req: any, res: any, next: () => void) {
     const ip = this.getClientIp(req);
 
     // Add the client IP to request for use in controllers/services
@@ -30,7 +29,7 @@ export class IPAllowlistMiddleware implements NestMiddleware {
    * Extract the client IP address from the request
    * Handles various proxy scenarios and X-Forwarded-For headers
    */
-  private getClientIp(req: Request): string {
+  private getClientIp(req: any): string {
     // If using a proxy like Nginx or CloudFlare, use X-Forwarded-For
     const xForwardedFor = req.headers['x-forwarded-for'] as string;
     if (xForwardedFor) {
@@ -40,6 +39,6 @@ export class IPAllowlistMiddleware implements NestMiddleware {
     }
 
     // If no X-Forwarded-For, use the direct connection IP
-    return req.ip || req.connection.remoteAddress || '0.0.0.0';
+    return req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || '0.0.0.0';
   }
 }

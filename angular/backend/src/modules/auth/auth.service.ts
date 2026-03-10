@@ -12,7 +12,7 @@ import { UsersService } from '../users/users.service';
 import { PasswordValidationService } from './password-validation.service';
 import { RegisterDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
 import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
@@ -51,7 +51,7 @@ export class AuthService {
     private readonly alertService: AlertService,
     @Inject(forwardRef(() => PermissionsService))
     private readonly permissionsService: PermissionsService,
-  ) {}
+  ) { }
 
   /**
    * Validates a user's credentials
@@ -227,6 +227,8 @@ export class AuthService {
       await this.usersService.updateLastLogin(user.id);
 
       // Run pattern detection after successful login to look for anomalies
+      // Also update the Statistical User Baseline
+      await this.patternDetectionService.trackSuccessfulLoginBehavior(user.id, ipAddress, userAgent);
       this.detectLoginPatterns(user.id, email, ipAddress, userAgent).catch(
         (err) => {
           console.error('Error in pattern detection:', err);
@@ -450,7 +452,7 @@ export class AuthService {
       };
 
       // Generate a new CSRF token as well
-      const csrfToken = uuidv4();
+      const csrfToken = crypto.randomUUID();
 
       return {
         accessToken: this.jwtService.sign(newPayload),
@@ -573,7 +575,7 @@ export class AuthService {
       };
 
       // Generate refresh token with UUID for tracking
-      const refreshTokenId = uuidv4();
+      const refreshTokenId = crypto.randomUUID();
       const refreshTokenExpiry = this.configService.get(
         'JWT_REFRESH_EXPIRES_IN',
         '30d',
@@ -602,7 +604,7 @@ export class AuthService {
       });
 
       // Generate CSRF token for CSRF protection
-      const csrfToken = uuidv4();
+      const csrfToken = crypto.randomUUID();
 
       // Clean up expired tokens from memory periodically
       this.cleanupExpiredTokens();

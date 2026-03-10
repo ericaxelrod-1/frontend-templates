@@ -17,6 +17,8 @@ import { Captcha } from './entities/captcha.entity';
 import { SecurityAlert } from './entities/security-alert.entity';
 import { SecurityDetectedPattern } from './entities/security-detected-pattern.entity';
 import { PatternLoginAttempt } from './entities/pattern-login-attempt.entity';
+import { RateLimitCounter } from './entities/rate-limit-counter.entity';
+import { UserBehaviorProfile } from './entities/user-behavior-profile.entity';
 import { LoginAttemptService } from './services/login-attempt.service';
 import { IPReputationService } from './services/ip-reputation.service';
 import { CaptchaService } from './services/captcha.service';
@@ -46,6 +48,8 @@ import { User } from '../users/entities/user.entity';
       SecurityAlert,
       SecurityDetectedPattern,
       PatternLoginAttempt,
+      RateLimitCounter,
+      UserBehaviorProfile,
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -92,4 +96,4 @@ import { User } from '../users/entities/user.entity';
     SecurityAlertService,
   ],
 })
-export class AuthModule {}
+export class AuthModule { }

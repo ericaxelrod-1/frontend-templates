@@ -222,7 +222,31 @@ The application implements a comprehensive login monitoring and security system,
      - Suspicious timing patterns
      - Known malicious IP addresses
 
-3. **Progressive Security Response**:
+### Advanced Pattern Detection Features
+
+1. **Lightweight Rate Limiting**:
+   - The application utilizes a Redis-like, fast-clearing `rate_limit_counter` SQLite table to track and calculate rapid authentication failures in real time. 
+   - This ensures rapid brute force and credential stuffing attacks are detected without introducing massive overhead from `GROUP BY` database queries on large history tables.
+
+2. **Offline Geo-IP Lookup (`geoip-lite`)**:
+   - The system validates geographic location mapping and identifies suspicious IP ranges using the `geoip-lite` library.
+   - This provides real-time geographic metadata (like Country and ASN proxy status) strictly through offline, local memory lookups, ensuring zero network latency and no external API reliance.
+   - *Maintenance Tip*: The internal IP mapping database can be updated at any time by running `npm run update-geoip` in the backend directory.
+
+3. **Unified Risk Scoring Engine**:
+   - Every login attempt runs through an evaluation engine to generate a Contextual Risk Score (0-100) before processing.
+   - Points are derived and accumulated from negative security indicators:
+     - Is the IP from a Foreign Country? (+30 points)
+     - Is the connection routing through a known VPN/Datacenter Proxy? (+25 points)
+     - Are there recent brute-force failures originating from this IP? (Up to +30 points)
+     - Is the User-Agent highly unusual (e.g., Python/Curl)? (+15 points)
+
+4. **Statistical User Behavior Baselines**:
+   - Rather than relying on rigid, global time anomaly rules (i.e. "alert on any login at 3 AM"), the system builds statistical baselines per user in the `user_behavior_profile` table.
+   - Every successful login updates a rolling profile tracking the user's specific known active hours (Time Baseline), known User-Agents (Device Baseline), and known subnets (Location Baseline).
+   - If a login succeeds but heavily deviates from a user's *individual* behavioral baseline, their Risk Score is elevated, and silent alerts are raised on the Activity dashboard.
+
+5. **Progressive Security Response**:
    - Graduated security measures based on threat level:
      - ALLOW: Normal login process
      - CAPTCHA: Self-hosted image verification

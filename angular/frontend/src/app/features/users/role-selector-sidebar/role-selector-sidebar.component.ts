@@ -1,10 +1,15 @@
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import { Component, OnInit, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
 import { RoleService, Role } from '../../../services/role.service';
+import { SidePanelRef, SIDE_PANEL_DATA } from '../../../shared/components/side-panel';
+
+export interface RoleSelectorPanelData {
+  selectedRoleIds: number[];
+}
 
 @Component({
   selector: 'app-role-selector-sidebar',
@@ -17,92 +22,58 @@ import { RoleService, Role } from '../../../services/role.service';
     MatDividerModule
   ],
   template: `
-    <div class="sidebar-backdrop" [class.backdrop-visible]="isOpen" (click)="close()"></div>
-    
-    <div class="sidebar" [class.sidebar-open]="isOpen">
-      <div class="sidebar-header">
-        <h3>Select Roles</h3>
-        <button mat-icon-button (click)="close()" class="close-button">
-          <mat-icon>close</mat-icon>
-        </button>
+    <div class="sidebar-header">
+      <h3>Select Roles</h3>
+      <button mat-icon-button (click)="close()" class="close-button">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <div class="sidebar-content">
+      <div class="selection-info">
+        <p>{{ selectedRoleIds.length }} role(s) selected</p>
       </div>
 
-      <mat-divider></mat-divider>
-
-      <div class="sidebar-content">
-        <div class="selection-info">
-          <p>{{ selectedRoleIds.length }} role(s) selected</p>
-        </div>
-
-        <div class="roles-list">
-          <div 
-            *ngFor="let role of availableRoles" 
-            class="role-item"
-            [class.selected]="role.id && isRoleSelected(role.id)"
+      <div class="roles-list">
+        <div 
+          *ngFor="let role of availableRoles" 
+          class="role-item"
+          [class.selected]="role.id && isRoleSelected(role.id)"
+        >
+          <mat-checkbox 
+            [checked]="role.id && isRoleSelected(role.id)"
+            (change)="role.id && toggleRole(role.id)"
+            class="role-checkbox"
           >
-            <mat-checkbox 
-              [checked]="role.id && isRoleSelected(role.id)"
-              (change)="role.id && toggleRole(role.id)"
-              class="role-checkbox"
-            >
-              <div class="role-info">
-                <div class="role-name">{{ role.name }}</div>
-                <div class="role-description" *ngIf="role.description">
-                  {{ role.description }}
-                </div>
+            <div class="role-info">
+              <div class="role-name">{{ role.name }}</div>
+              <div class="role-description" *ngIf="role.description">
+                {{ role.description }}
               </div>
-            </mat-checkbox>
-          </div>
+            </div>
+          </mat-checkbox>
         </div>
       </div>
+    </div>
 
-      <mat-divider></mat-divider>
+    <mat-divider></mat-divider>
 
-      <div class="sidebar-actions">
-        <button mat-button (click)="clearAll()" [disabled]="selectedRoleIds.length === 0">
-          Clear All
-        </button>
-        <button mat-raised-button color="primary" (click)="apply()">
-          Apply Selection
-        </button>
-      </div>
+    <div class="sidebar-actions">
+      <button mat-button (click)="clearAll()" [disabled]="selectedRoleIds.length === 0">
+        Clear All
+      </button>
+      <button mat-raised-button color="primary" (click)="apply()">
+        Apply Selection
+      </button>
     </div>
   `,
   styles: [`
-    .sidebar-backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
-    }
-
-    .sidebar-backdrop.backdrop-visible {
-      opacity: 1;
-      visibility: visible;
-    }
-
-    .sidebar {
-      position: fixed;
-      top: 0;
-      right: -400px;
-      width: 400px;
-      height: 100vh;
-      background-color: white;
-      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
-      z-index: 1001;
+    :host {
       display: flex;
       flex-direction: column;
-      transition: right 0.3s ease;
-    }
-
-    .sidebar.sidebar-open {
-      right: 0;
+      height: 100%;
     }
 
     .sidebar-header {
@@ -119,9 +90,7 @@ import { RoleService, Role } from '../../../services/role.service';
       font-weight: 500;
     }
 
-    .close-button {
-      color: #666;
-    }
+    .close-button { color: #666; }
 
     .sidebar-content {
       flex: 1;
@@ -152,35 +121,13 @@ import { RoleService, Role } from '../../../services/role.service';
       cursor: pointer;
     }
 
-    .role-item:hover {
-      background-color: #f5f5f5;
-      border-color: #ccc;
-    }
+    .role-item:hover { background-color: #f5f5f5; border-color: #ccc; }
+    .role-item.selected { background-color: #e3f2fd; border-color: #2196f3; }
 
-    .role-item.selected {
-      background-color: #e3f2fd;
-      border-color: #2196f3;
-    }
-
-    .role-checkbox {
-      width: 100%;
-    }
-
-    .role-info {
-      margin-left: 8px;
-    }
-
-    .role-name {
-      font-weight: 500;
-      color: #333;
-      margin-bottom: 4px;
-    }
-
-    .role-description {
-      font-size: 12px;
-      color: #666;
-      line-height: 1.4;
-    }
+    .role-checkbox { width: 100%; }
+    .role-info { margin-left: 8px; }
+    .role-name { font-weight: 500; color: #333; margin-bottom: 4px; }
+    .role-description { font-size: 12px; color: #666; line-height: 1.4; }
 
     .sidebar-actions {
       padding: 16px 20px;
@@ -189,24 +136,19 @@ import { RoleService, Role } from '../../../services/role.service';
       gap: 12px;
       justify-content: flex-end;
     }
-
-    @media (max-width: 768px) {
-      .sidebar {
-        width: 100vw;
-        right: -100vw;
-      }
-    }
   `]
 })
 export class RoleSelectorSidebarComponent implements OnInit {
-  @Input() isOpen = false;
-  @Input() selectedRoleIds: number[] = [];
-  @Output() roleSelectionChange = new EventEmitter<number[]>();
-  @Output() closeSidebar = new EventEmitter<void>();
-
+  selectedRoleIds: number[] = [];
   availableRoles: Role[] = [];
 
-  constructor(private roleService: RoleService) {}
+  constructor(
+    private roleService: RoleService,
+    private sidePanelRef: SidePanelRef,
+    @Inject(SIDE_PANEL_DATA) public data: RoleSelectorPanelData
+  ) {
+    this.selectedRoleIds = [...(data.selectedRoleIds || [])];
+  }
 
   ngOnInit(): void {
     this.loadRoles();
@@ -214,12 +156,8 @@ export class RoleSelectorSidebarComponent implements OnInit {
 
   loadRoles(): void {
     this.roleService.getRoles().subscribe({
-      next: (roles) => {
-        this.availableRoles = roles;
-      },
-      error: (error) => {
-        console.error('Error loading roles:', error);
-      }
+      next: (response) => { this.availableRoles = response.items; },
+      error: (error) => { console.error('Error loading roles:', error); }
     });
   }
 
@@ -228,27 +166,17 @@ export class RoleSelectorSidebarComponent implements OnInit {
   }
 
   toggleRole(roleId: number): void {
-    const currentSelection = [...this.selectedRoleIds];
-    const index = currentSelection.indexOf(roleId);
-    
+    const index = this.selectedRoleIds.indexOf(roleId);
     if (index > -1) {
-      currentSelection.splice(index, 1);
+      this.selectedRoleIds.splice(index, 1);
     } else {
-      currentSelection.push(roleId);
+      this.selectedRoleIds.push(roleId);
     }
-    
-    this.roleSelectionChange.emit(currentSelection);
   }
 
-  clearAll(): void {
-    this.roleSelectionChange.emit([]);
-  }
+  clearAll(): void { this.selectedRoleIds = []; }
 
-  apply(): void {
-    this.close();
-  }
+  apply(): void { this.sidePanelRef.close(this.selectedRoleIds); }
 
-  close(): void {
-    this.closeSidebar.emit();
-  }
-} 
+  close(): void { this.sidePanelRef.close(); }
+}

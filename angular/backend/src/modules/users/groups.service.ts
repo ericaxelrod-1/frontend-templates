@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Group } from '../permissions/entities/group.entity';
 import { GroupMembershipResult } from './dto/group-membership-result.dto';
@@ -17,13 +17,37 @@ export class GroupsService {
   constructor(
     @InjectRepository(User) private userRepository: Repository<User>,
     @InjectRepository(Group) private groupRepository: Repository<Group>,
-  ) {}
+  ) { }
 
-  async findAll(): Promise<Group[]> {
-    return this.groupRepository.find({
-      relations: ['users'],
-      order: { name: 'ASC' },
+  async findAll(
+    page = 0,
+    pageSize = 10,
+    sortBy = 'name',
+    sortDirection: 'ASC' | 'DESC' = 'ASC',
+    search = '',
+  ): Promise<{ items: Group[]; total: number; page: number; pageSize: number }> {
+    const skip = page * pageSize;
+    const take = pageSize;
+
+    const [items, total] = await this.groupRepository.findAndCount({
+      where: search
+        ? [
+          { name: ILike(`%${search}%`) },
+          { description: ILike(`%${search}%`) },
+        ]
+        : {},
+      relations: ['users', 'owner'],
+      order: { [sortBy]: sortDirection },
+      skip,
+      take,
     });
+
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async findOne(id: number): Promise<Group> {

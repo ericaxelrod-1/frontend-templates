@@ -1,0 +1,16 @@
+.public-layout-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+
+    // Base background for all public pages to ensure visual consistency
+    background-color: #0f172a;
+}
+
+.public-main-content {
+    flex: 1 0 auto;
+    // Offset for fixed header from public-header
+    padding-top: 64px;
+    display: flex;
+    flex-direction: column;
+}

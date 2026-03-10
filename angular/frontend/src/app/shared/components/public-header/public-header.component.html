@@ -1,0 +1,31 @@
+<mat-toolbar color="primary" class="public-header-toolbar">
+    <div class="logo-container" (click)="logoClick($event)">
+        <span class="app-title">Angular Frontend Template</span>
+    </div>
+
+    <div class="nav-links">
+        <button mat-button [matMenuTriggerFor]="featuresMenu" class="nav-button">
+            <span>Features</span>
+            <mat-icon>expand_more</mat-icon>
+        </button>
+        <mat-menu #featuresMenu="matMenu" class="public-nav-menu">
+            <button mat-menu-item *ngFor="let page of featurePages" (click)="navigateTo(page.route)">
+                <mat-icon>{{ page.icon }}</mat-icon>
+                <span>{{ page.label }}</span>
+            </button>
+        </mat-menu>
+    </div>
+
+    <span class="spacer"></span>
+
+    <div class="auth-buttons">
+        <a mat-button (click)="loginClick($event)" class="login-button">
+            <mat-icon>login</mat-icon>
+            <span>Login</span>
+        </a>
+        <a mat-flat-button color="primary" class="signup-button" (click)="registerClick($event)">
+            <mat-icon>person_add</mat-icon>
+            <span>View on GitHub</span>
+        </a>
+    </div>
+</mat-toolbar>

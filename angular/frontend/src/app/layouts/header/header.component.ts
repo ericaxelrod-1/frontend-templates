@@ -5,7 +5,8 @@ import { Store } from '@ngxs/store';
 import { Observable, Subscription, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { AppConfigService } from '../../core/services/app-config.service';
-import { User } from '../../models';
+import { PageTitleService } from '../../core/services/page-title.service';
+import { User } from '../../models/user.model';
 import { AuthActions } from '../../store/auth/auth.state';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -47,14 +48,15 @@ export class HeaderComponent implements OnInit, OnDestroy {
   @Input() isAdminContext = false;
   @Output() sidebarToggle = new EventEmitter<void>();
   @Output() userMenuToggle = new EventEmitter<void>();
-  
+
   isAuthenticated$: Observable<boolean>;
   currentUser$: Observable<User | null>;
-  
+  pageTitle$: Observable<string>;
+
   isAuthenticated = false;
   user: User | null = null;
   private subscription = new Subscription();
-  
+
   appName: string;
   headerLogo: string;
 
@@ -62,19 +64,21 @@ export class HeaderComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private store: Store,
     private appConfig: AppConfigService,
+    private pageTitleService: PageTitleService,
     private router: Router,
     private logger: LoggerService,
     private cdr: ChangeDetectorRef
   ) {
     this.appName = this.appConfig.appName;
     this.headerLogo = this.appConfig.headerLogo;
-    
+
+    this.pageTitle$ = this.pageTitleService.title$;
     this.currentUser$ = this.authService.currentUser$;
     this.isAuthenticated$ = this.authService.currentUser$.pipe(
       map(user => !!user)
     );
   }
-  
+
   ngOnInit(): void {
     this.subscription.add(
       this.authService.currentUser$.subscribe(user => {
@@ -87,11 +91,11 @@ export class HeaderComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.subscription.unsubscribe();
   }
-  
+
   toggleSidebar(): void {
     this.sidebarToggle.emit();
   }
-  
+
   logout(): void {
     this.store.dispatch(new AuthActions.Logout()).subscribe({
       next: () => {
@@ -123,7 +127,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   getDisplayName(user: User | null): string {
     if (!user) return '';
     if (user.firstName || user.lastName) {
-      return `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      return `${user.firstName || ''} ${user.lastName || ''} `.trim();
     }
     return user.email;
   }

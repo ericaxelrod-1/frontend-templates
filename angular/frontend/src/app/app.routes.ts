@@ -5,6 +5,8 @@ import { PermissionGuard } from './core/guards/permission.guard';
 // Layout components
 import { CustomLayoutComponent } from './layouts/custom-layout/custom-layout.component';
 
+import { PublicLayoutComponent } from './layouts/public-layout/public-layout.component';
+
 /**
  * Main application routes
  * 
@@ -47,7 +49,7 @@ export const routes: Routes = [
         path: 'users',
         loadChildren: () => import('./features/users/users.routes').then(m => m.routes),
         canActivate: [PermissionGuard],
-        data: { 
+        data: {
           permissions: 'users:view'
         }
       },
@@ -55,7 +57,7 @@ export const routes: Routes = [
         path: 'groups',
         loadComponent: () => import('./features/groups/groups.component').then(c => c.GroupsComponent),
         canActivate: [PermissionGuard],
-        data: { 
+        data: {
           permissions: 'groups:view'
         }
       },
@@ -63,14 +65,14 @@ export const routes: Routes = [
         path: 'roles',
         loadComponent: () => import('./features/roles/roles.component').then(c => c.RolesComponent),
         canActivate: [PermissionGuard],
-        data: { 
+        data: {
           permissions: 'roles:view'
         }
       },
       {
         path: 'admin',
         canActivate: [PasswordChangeGuard, PermissionGuard],
-        data: { 
+        data: {
           permissions: 'system:admin'
         },
         children: [
@@ -125,10 +127,49 @@ export const routes: Routes = [
   },
   {
     path: '',
-    loadChildren: () => import('./features/auth/auth.routes').then(m => m.routes)
+    component: PublicLayoutComponent,
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./pages/landing/landing.component').then(c => c.LandingComponent),
+        pathMatch: 'full'
+      },
+      {
+        path: '',
+        loadChildren: () => import('./features/auth/auth.routes').then(m => m.routes)
+      },
+      {
+        path: 'features/rbac',
+        loadComponent: () => import('./pages/features/rbac-feature/rbac-feature.component').then(c => c.RbacFeatureComponent)
+      },
+      {
+        path: 'features/auth',
+        loadComponent: () => import('./pages/features/auth-feature/auth-feature.component').then(c => c.AuthFeatureComponent)
+      },
+      {
+        path: 'features/logging',
+        loadComponent: () => import('./pages/features/logging-feature/logging-feature.component').then(c => c.LoggingFeatureComponent)
+      },
+      {
+        path: 'features/security',
+        loadComponent: () => import('./pages/features/security-feature/security-feature.component').then(c => c.SecurityFeatureComponent)
+      },
+      {
+        path: 'features/admin',
+        loadComponent: () => import('./pages/features/admin-feature/admin-feature.component').then(c => c.AdminFeatureComponent)
+      },
+      {
+        path: 'terms-of-service',
+        loadComponent: () => import('./features/legal/terms-of-service/terms-of-service.component').then(c => c.TermsOfServiceComponent)
+      },
+      {
+        path: 'privacy-policy',
+        loadComponent: () => import('./features/legal/privacy-policy/privacy-policy.component').then(c => c.PrivacyPolicyComponent)
+      }
+    ]
   },
   {
     path: '**',
-    redirectTo: '/login'
+    redirectTo: '/'
   }
 ];

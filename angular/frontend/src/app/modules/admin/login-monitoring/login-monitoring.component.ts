@@ -18,6 +18,7 @@ import { FormGroup } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { LoginMonitoringService } from './shared/login-monitoring.service';
 import { PermissionService } from '../../../core/services/permission.service';
+import { PageTitleService } from '../../../core/services/page-title.service';
 import { ResponsiveLayoutService } from '../../../shared/services/responsive-layout.service';
 import { LoginAttemptsTableComponent } from './login-attempts-table/login-attempts-table.component';
 import { StatisticsDashboardComponent } from './statistics-dashboard/statistics-dashboard.component';
@@ -26,9 +27,9 @@ import { PatternDetectionFiltersComponent } from './pattern-detection-filters/pa
 import { SecurityAlertsFiltersComponent } from './security-alerts-filters/security-alerts-filters.component';
 import { FiltersComponent } from './filters/filters.component';
 
-import { 
-  LoginAttempt, 
-  SecurityAlert, 
+import {
+  LoginAttempt,
+  SecurityAlert,
   Pattern,
   Statistics,
   PatternDetectionFilters,
@@ -46,7 +47,7 @@ interface CircuitBreaker {
   timestamps: Map<string, number>;
   maxCalls: number;
   timeWindow: number;
-  
+
   checkLoop(method: string): boolean;
   reset(): void;
 }
@@ -60,32 +61,32 @@ class InfiniteLoopDetector implements CircuitBreaker {
   checkLoop(method: string): boolean {
     const now = Date.now();
     const lastTimestamp = this.timestamps.get(method) || 0;
-    
+
     // Reset counter if time window has passed
     if (now - lastTimestamp > this.timeWindow) {
       this.calls.set(method, 1);
       this.timestamps.set(method, now);
       return true;
     }
-    
+
     // Increment call count
     const callCount = (this.calls.get(method) || 0) + 1;
     this.calls.set(method, callCount);
     this.timestamps.set(method, now);
-    
+
     if (callCount > this.maxCalls) {
       console.error(`🚨 INFINITE LOOP DETECTED in ${method}! Calls: ${callCount} in ${this.timeWindow}ms`);
       console.error('🛑 STOPPING EXECUTION to prevent browser crash');
       return false;
     }
-    
+
     if (callCount > 5) {
       console.warn(`⚠️ High call frequency detected in ${method}: ${callCount} calls`);
     }
-    
+
     return true;
   }
-  
+
   reset(): void {
     this.calls.clear();
     this.timestamps.clear();
@@ -104,28 +105,28 @@ interface FilterState {
 class LoadingManager {
   private operations = new Set<string>();
   private onStateChange: (isLoading: boolean) => void;
-  
+
   constructor(onStateChange: (isLoading: boolean) => void) {
     this.onStateChange = onStateChange;
   }
-  
+
   startOperation(name: string): void {
     this.operations.add(name);
     this.onStateChange(true);
     console.log(`[LoadingManager] Started: ${name}, Active operations:`, Array.from(this.operations));
   }
-  
+
   endOperation(name: string): void {
     this.operations.delete(name);
     const isLoading = this.operations.size > 0;
     this.onStateChange(isLoading);
     console.log(`[LoadingManager] Completed: ${name}, Active operations:`, Array.from(this.operations));
   }
-  
+
   isOperationActive(name: string): boolean {
     return this.operations.has(name);
   }
-  
+
   getActiveOperations(): string[] {
     return Array.from(this.operations);
   }
@@ -160,7 +161,7 @@ class LoadingManager {
 export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewInit {
   // BUG-124.19 FIX: Circuit Breaker for Infinite Loop Prevention
   private circuitBreaker = new InfiniteLoopDetector();
-  
+
   // BUG-124.19 FIX: Centralized Filter State
   public filterState: FilterState = {
     timeRange: '30d',
@@ -168,7 +169,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     securityFilters: null,
     lastUpdated: Date.now()
   };
-  
+
   // BUG-124.19 FIX: Loading State Coordination
   private loadingManager = new LoadingManager((isLoading: boolean) => {
     // Update the main loading state when any operation changes
@@ -184,20 +185,20 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   // BUG-113: Enhanced Responsive Design Support
   private destroy$ = new Subject<void>();
-  
+
   // BUG-124.19 FIX: Computed Responsive Properties (No more template method calls)
   private _responsiveClass = '';
   private _responsiveIconSize = '24px';
   private _statsGridColumns = 4;
   private _patternTilesColumns = 3;
   private _showCompactView = false;
-  
+
   // Responsive state - will be computed, not called from template
   isMobile = false;
   isTablet = false;
   isDesktop = false;
   isLargeDesktop = false;
-  
+
   // Modern breakpoint detection following 2024 standards
   private customBreakpoints = {
     mobile: '(max-width: 575.98px)',
@@ -205,14 +206,14 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     desktop: '(min-width: 1024px) and (max-width: 1279.98px)',
     largeDesktop: '(min-width: 1280px)'
   };
-  
+
   // Data properties
   statistics: Statistics | null = null;
   recentAttempts: LoginAttempt[] = [];
   securityAlerts: SecurityAlert[] = [];
   patterns: Pattern[] = [];
   patternSummary: PatternSummary[] = [];
-  
+
   // State properties
   loading = {
     patternSummary: false,
@@ -230,37 +231,37 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   selectedIpReputation: IPReputation | null = null;
   filterForm: FormGroup | null = null;
   patternDetectionFilters: PatternDetectionFilters | null = null;
-  
+
   // Pattern table properties
   patternDisplayedColumns: string[] = ['timestamp', 'type', 'severity', 'ipAddresses', 'details', 'groupCount', 'actions'];
   patternPageSize = 10;
   patternCurrentPage = 0;
-  
+
   // Pattern sorting properties for server-side sorting
   patternCurrentSort: { active: string; direction: 'asc' | 'desc' } = {
     active: 'detectionTimestamp',
     direction: 'desc'
   };
-  
+
   // Security alerts table properties
   securityAlertsDisplayedColumns: string[] = ['timestamp', 'title', 'type', 'severity', 'message', 'status', 'actions'];
   securityAlertsPageSize = 10;
   securityAlertsCurrentPage = 0;
   securityAlertsTotalCount = 0;
   securityAlertsFilters: SecurityAlertsFilters | null = null;
-  
+
   // Security alerts sorting properties for server-side sorting
   securityAlertsCurrentSort: { active: string; direction: 'asc' | 'desc' } = {
     active: 'createdAt',
     direction: 'desc'
   };
-  
+
   // Test data creation state
   isCreatingTestData = false;
 
   // ViewChild for tab navigation
   @ViewChild(MatTabGroup) tabGroup!: MatTabGroup;
-  
+
   // ViewChild for login attempts table to trigger filter updates
   @ViewChild(LoginAttemptsTableComponent) loginAttemptsTable!: LoginAttemptsTableComponent;
 
@@ -284,7 +285,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-124.6: Dynamic component loading for performance optimization
   async loadTabComponent(tabIndex: number) {
     if (!this.circuitBreaker.checkLoop('loadTabComponent')) return;
-    
+
     switch (tabIndex) {
       case 0: // Login Attempts
         if (!this.loginAttemptsTableLoaded) {
@@ -323,13 +324,15 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     private authService: AuthService,
     private loginMonitoringService: LoginMonitoringService,
     private permissionService: PermissionService,
+    private pageTitleService: PageTitleService,
     private breakpointObserver: BreakpointObserver,
     private responsiveLayout: ResponsiveLayoutService
-  ) {}
+  ) { }
 
   ngOnInit() {
+    this.pageTitleService.setTitle('Login Monitoring');
     if (!this.circuitBreaker.checkLoop('ngOnInit')) return;
-    
+
     console.log('[LoginMonitoring] Component initializing with circuit breaker protection');
     this.initializeResponsiveDesign();
     this.checkPermissions(); // This handles loadData() asynchronously when permission is granted
@@ -354,7 +357,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
           'type': 'patternType',
           'severity': 'severity'
         };
-        
+
         const activeColumn = this.patternSort.active || 'timestamp';
         this.patternCurrentSort.active = columnToFieldMap[activeColumn] || 'detectionTimestamp';
         this.patternCurrentSort.direction = this.patternSort.direction || 'desc';
@@ -381,7 +384,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-113: Modern Responsive Design Initialization
   private initializeResponsiveDesign() {
     if (!this.circuitBreaker.checkLoop('initializeResponsiveDesign')) return;
-    
+
     // Monitor breakpoint changes for responsive behavior
     this.breakpointObserver.observe([
       this.customBreakpoints.mobile,
@@ -398,15 +401,15 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-113: Update responsive state based on breakpoint matches
   private updateResponsiveState(): void {
     if (!this.circuitBreaker.checkLoop('updateResponsiveState')) return;
-    
+
     this.isMobile = this.breakpointObserver.isMatched(this.customBreakpoints.mobile);
     this.isTablet = this.breakpointObserver.isMatched(this.customBreakpoints.tablet);
     this.isDesktop = this.breakpointObserver.isMatched(this.customBreakpoints.desktop);
     this.isLargeDesktop = this.breakpointObserver.isMatched(this.customBreakpoints.largeDesktop);
-    
+
     // BUG-124.19 FIX: Compute responsive properties once, use getters in template
     this.computeResponsiveProperties();
-    
+
     // Trigger responsive layout adjustments
     this.onBreakpointChange();
   }
@@ -439,7 +442,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       this._patternTilesColumns = 4;
       this._showCompactView = false;
     }
-    
+
     console.log('[LoginMonitoring] Responsive properties computed:', {
       class: this._responsiveClass,
       iconSize: this._responsiveIconSize,
@@ -452,10 +455,10 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-113: Handle responsive layout changes
   private onBreakpointChange() {
     if (!this.circuitBreaker.checkLoop('onBreakpointChange')) return;
-    
+
     // Responsive behavior can be implemented here
     // For example: adjust grid columns, table display mode, etc.
-    
+
     if (this.isMobile) {
       // Mobile-specific adjustments
       console.log('[LoginMonitoring] Mobile view active');
@@ -495,14 +498,14 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-124.7.1: Updated to use ResponsiveLayoutService for consistent breakpoint management
   private _cachedResponsiveClass = '';
   private _lastResponsiveState = '';
-  
+
   getResponsiveSpacingClass(): string {
     // BUG-124.18 FIX: Cache result to prevent excessive console logging during change detection
     const currentState = `${this.isMobile}-${this.isTablet}-${this.isDesktop}-${this.isLargeDesktop}`;
-    
+
     if (this._lastResponsiveState !== currentState) {
       this._lastResponsiveState = currentState;
-      
+
       // Keep existing logic for backward compatibility during transition
       if (this.isMobile) {
         this._cachedResponsiveClass = 'mobile-spacing';
@@ -513,7 +516,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       } else {
         this._cachedResponsiveClass = 'large-desktop-spacing';
       }
-      
+
       // Only log when state actually changes, not on every change detection cycle
       console.log('[DEBUG] Responsive class changed:', this._cachedResponsiveClass, {
         isMobile: this.isMobile,
@@ -522,13 +525,13 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
         isLargeDesktop: this.isLargeDesktop
       });
     }
-    
+
     return this._cachedResponsiveClass;
   }
 
   private checkPermissions() {
     if (!this.circuitBreaker.checkLoop('checkPermissions')) return;
-    
+
     this.permissionService.hasPermission('login-monitoring:read')
       .pipe(takeUntil(this.destroy$))
       .subscribe(hasPermission => {
@@ -541,13 +544,13 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   private loadData() {
     if (!this.circuitBreaker.checkLoop('loadData')) return;
-    
+
     // BUG-124.12 FIX: Prevent infinite loop
     if (this.loadingManager.isOperationActive('loadData')) {
       console.log('[DEBUG] LoadData already in progress, skipping to prevent infinite loop');
       return;
     }
-    
+
     this.loadingManager.startOperation('loadData');
     this.error = null;
 
@@ -579,7 +582,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loadingManager.startOperation('alerts');
     console.log('[DEBUG] Loading security alerts with filters:', this.securityAlertsFilters);
     console.log('[DEBUG] Loading security alerts with sorting:', this.securityAlertsCurrentSort);
-    
+
     this.loginMonitoringService.getSecurityAlerts(
       this.securityAlertsFilters || {},
       this.securityAlertsCurrentPage,
@@ -605,12 +608,12 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loadingManager.startOperation('patterns');
     console.log('[DEBUG] Loading patterns with filters:', this.patternDetectionFilters);
     console.log('[DEBUG] Loading patterns with sorting:', this.patternCurrentSort);
-    
+
     this.loginMonitoringService.getPatterns(
-      this.patternDetectionFilters || {}, 
-      this.patternCurrentPage, 
-      this.patternPageSize, 
-      this.getPatternSortField(this.patternCurrentSort.active), 
+      this.patternDetectionFilters || {},
+      this.patternCurrentPage,
+      this.patternPageSize,
+      this.getPatternSortField(this.patternCurrentSort.active),
       this.patternCurrentSort.direction
     ).subscribe({
       next: (patternResults) => {
@@ -628,7 +631,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
     // BUG-113: Load pattern summary for dashboard tiles
     this.loadPatternSummary();
-    
+
     // BUG-124.12 FIX: Reset loading flag after all data loading is initiated
     setTimeout(() => {
       this.loadingManager.endOperation('loadData');
@@ -638,19 +641,19 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-113: Load pattern summary data for dashboard tiles
   private loadPatternSummary() {
     if (!this.circuitBreaker.checkLoop('loadPatternSummary')) return;
-    
+
     this.loadingManager.startOperation('patternSummary');
-    
+
     // DEBUG: Add mock data to test grid layout
     console.log('[DEBUG] Loading pattern summary...');
-    
+
     console.log('[DEBUG] Loading pattern summary with time filter:', this.filterState.timeRange);
     const timeFilter = { timeRange: this.filterState.timeRange as '30d' | '24h' | '7d' | '90d' | 'all' };
     this.loginMonitoringService.getPatternSummary(timeFilter).subscribe({
       next: (summary) => {
         console.log('[DEBUG] Pattern summary loaded:', summary);
         this.patternSummary = summary;
-        
+
         // DEBUG: If no data, create mock data for testing
         if (!summary || summary.length === 0) {
           console.log('[DEBUG] No pattern summary data, creating mock data for testing...');
@@ -714,13 +717,13 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
           ];
           console.log('[DEBUG] Mock pattern summary created:', this.patternSummary);
         }
-        
+
         this.loadingManager.endOperation('patternSummary');
       },
       error: (err) => {
         console.error('Error loading pattern summary:', err);
         console.log('[DEBUG] Error occurred, creating mock data for testing...');
-        
+
         // Create mock data on error for testing
         this.patternSummary = [
           {
@@ -756,7 +759,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
             percentage: 45
           }
         ];
-        
+
         this.loadingManager.endOperation('patternSummary');
       }
     });
@@ -765,15 +768,15 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-113: Handle pattern tile click with responsive navigation
   onPatternTileClick(patternType: string) {
     if (!this.circuitBreaker.checkLoop('onPatternTileClick')) return;
-    
+
     // Navigate to pattern detection tab (index 1) with filter applied
     console.log('Pattern tile clicked:', patternType);
-    
+
     // Navigate to the pattern detection tab
     if (this.tabGroup) {
       this.tabGroup.selectedIndex = 1;
     }
-    
+
     // Apply the pattern type filter
     this.applyPatternTypeFilter(patternType);
   }
@@ -781,24 +784,24 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-113: Apply pattern type filter
   private applyPatternTypeFilter(patternType: string) {
     if (!this.circuitBreaker.checkLoop('applyPatternTypeFilter')) return;
-    
+
     // BUG-124.12 FIX: Prevent infinite loop when applying pattern filter
     if (this.loadingManager.isOperationActive('applyPatternTypeFilter')) {
       console.log('[DEBUG] Pattern filter already being applied, skipping to prevent infinite loop');
       return;
     }
-    
+
     this.loadingManager.startOperation('applyPatternTypeFilter');
     console.log('Applying pattern type filter:', patternType);
-    
+
     // Store the filter in component state - use proper type casting
     this.patternDetectionFilters = {
       patternType: patternType as '' | 'brute_force' | 'distributed_attack' | 'credential_stuffing' | 'rapid_account_switching' | 'ip_hopping' | 'suspicious_location' | 'time_anomaly'
     };
-    
+
     // Trigger data reload for pattern detection
     this.loadPatternSummary();
-    
+
     // Reset the flag after a brief delay
     setTimeout(() => {
       this.loadingManager.endOperation('applyPatternTypeFilter');
@@ -992,24 +995,24 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   onTimeFilterChange(timeFilter: unknown): void {
     if (!this.circuitBreaker.checkLoop('onTimeFilterChange')) return;
-    
+
     // BUG-124.19 FIX: Use centralized filter state
-    this.filterState.timeRange = typeof timeFilter === 'object' && timeFilter !== null 
-      ? JSON.stringify(timeFilter) 
+    this.filterState.timeRange = typeof timeFilter === 'object' && timeFilter !== null
+      ? JSON.stringify(timeFilter)
       : String(timeFilter);
     this.filterState.lastUpdated = Date.now();
-    
+
     console.log('[LoginMonitoring] Time filter changed:', timeFilter, 'State:', this.filterState);
-    
+
     // BUG-124.16 FIX: Prevent infinite loop from time filter changes during component initialization
     if (this.loadingManager.isOperationActive('onTimeFilterChange')) {
       console.log('[DEBUG] Time filter change ignored - already loading data');
       return;
     }
-    
+
     this.loadingManager.startOperation('onTimeFilterChange');
     this.loadPatternSummary();
-    
+
     setTimeout(() => {
       this.loadingManager.endOperation('onTimeFilterChange');
     }, 100);
@@ -1017,10 +1020,10 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   onFiltersChanged(filterForm: FormGroup): void {
     if (!this.circuitBreaker.checkLoop('onFiltersChanged')) return;
-    
+
     console.log('[LoginMonitoring] Filters changed:', filterForm.value);
     this.filterForm = filterForm;
-    
+
     // Trigger filter updates on child table
     if (this.loginAttemptsTable) {
       this.loginAttemptsTable.applyFilters();
@@ -1029,9 +1032,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   onFiltersReset(): void {
     if (!this.circuitBreaker.checkLoop('onFiltersReset')) return;
-    
+
     console.log('[LoginMonitoring] Filters reset');
-    
+
     // Reset the filter form and trigger reload
     if (this.loginAttemptsTable) {
       this.loginAttemptsTable.applyFilters();
@@ -1040,12 +1043,12 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   onPatternDetectionFiltersChanged(filters: PatternDetectionFilters): void {
     if (!this.circuitBreaker.checkLoop('onPatternDetectionFiltersChanged')) return;
-    
+
     console.log('[LoginMonitoring] Pattern detection filters changed:', filters);
-    
+
     // Store filters in component for data loading
     this.patternDetectionFilters = filters;
-    
+
     // BUG-FIX: Explicitly call the pattern detection component's refresh method
     if (this.patternDetectionFiltersComponent) {
       console.log('[LoginMonitoring] Calling pattern detection refreshWithFilters');
@@ -1053,19 +1056,19 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     } else {
       console.log('[LoginMonitoring] patternDetectionFiltersComponent not available yet');
     }
-    
+
     // Reload data with new filters
     this.loadData();
   }
 
   onPatternDetectionFiltersReset() {
     if (!this.circuitBreaker.checkLoop('onPatternDetectionFiltersReset')) return;
-    
+
     console.log('[LoginMonitoring] Pattern detection filters reset');
-    
+
     // Clear stored filters
     this.patternDetectionFilters = null;
-    
+
     // BUG-FIX: Explicitly call the pattern detection component's refresh method
     if (this.patternDetectionFiltersComponent) {
       console.log('[LoginMonitoring] Calling pattern detection refreshWithFilters for reset');
@@ -1073,7 +1076,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     } else {
       console.log('[LoginMonitoring] patternDetectionFiltersComponent not available yet for reset');
     }
-    
+
     // Reload data without filters
     this.loadData();
   }
@@ -1126,11 +1129,11 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   onIPReputationRequested(ip: string): void {
     if (!this.circuitBreaker.checkLoop('onIPReputationRequested')) return;
-    
+
     console.log('[LoginMonitoring] IP reputation requested for:', ip);
-    
+
     this.loadingManager.startOperation('ipReputation');
-    
+
     // Load IP reputation data
     this.loginMonitoringService.getIPReputation(ip).subscribe({
       next: (reputation) => {
@@ -1188,34 +1191,34 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   onPatternPageChange(event: { pageIndex: number; pageSize: number }): void {
     if (!this.circuitBreaker.checkLoop('onPatternPageChange')) return;
-    
+
     this.patternCurrentPage = event.pageIndex;
     this.patternPageSize = event.pageSize;
     console.log('[LoginMonitoring] Pattern page changed:', event);
-    
+
     // Reload data with new pagination parameters
     this.loadData();
   }
 
   onSecurityAlertsPageChange(event: { pageIndex: number; pageSize: number }): void {
     if (!this.circuitBreaker.checkLoop('onSecurityAlertsPageChange')) return;
-    
+
     this.securityAlertsCurrentPage = event.pageIndex;
     this.securityAlertsPageSize = event.pageSize;
     console.log('[LoginMonitoring] Security alerts page changed:', event);
-    
+
     // Reload data with new pagination parameters
     this.loadData();
   }
 
   onSecurityAlertsFiltersChanged(filters: SecurityAlertsFilters): void {
     if (!this.circuitBreaker.checkLoop('onSecurityAlertsFiltersChanged')) return;
-    
+
     console.log('[LoginMonitoring] Security alerts filters changed:', filters);
-    
+
     // Store filters for API calls
     this.securityAlertsFilters = filters;
-    
+
     // BUG-FIX: Explicitly call the security alerts component's refresh method
     if (this.securityAlertsFiltersComponent) {
       console.log('[LoginMonitoring] Calling security alerts refreshWithFilters');
@@ -1223,19 +1226,19 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     } else {
       console.log('[LoginMonitoring] securityAlertsFiltersComponent not available yet');
     }
-    
+
     // Reload data with new filters
     this.loadData();
   }
 
   onSecurityAlertsFiltersReset(): void {
     if (!this.circuitBreaker.checkLoop('onSecurityAlertsFiltersReset')) return;
-    
+
     console.log('[LoginMonitoring] Security alerts filters reset');
-    
+
     // Clear stored filters
     this.securityAlertsFilters = null;
-    
+
     // BUG-FIX: Explicitly call the security alerts component's refresh method
     if (this.securityAlertsFiltersComponent) {
       console.log('[LoginMonitoring] Calling security alerts refreshWithFilters for reset');
@@ -1243,17 +1246,17 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     } else {
       console.log('[LoginMonitoring] securityAlertsFiltersComponent not available yet for reset');
     }
-    
+
     // Reload data without filters
     this.loadData();
   }
 
   sendTestAlert(): void {
     if (!this.circuitBreaker.checkLoop('sendTestAlert')) return;
-    
+
     console.log('[LoginMonitoring] Sending test alert to backend...');
     this.isCreatingTestData = true;
-    
+
     this.loginMonitoringService.sendTestAlert().subscribe({
       next: (result) => {
         console.log('Test alert sent successfully:', result);
@@ -1265,8 +1268,8 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
         this.isCreatingTestData = false;
       }
     });
-  } 
-} 
+  }
+}
 
 
 

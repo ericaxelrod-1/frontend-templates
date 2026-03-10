@@ -28,14 +28,14 @@
 // CSS Grid Layout Container
 .app-layout {
   display: grid;
-  grid-template-areas: 
+  grid-template-areas:
     "header"
     "main"
     "footer";
   grid-template-rows: auto 1fr auto; // Header auto, main flexible, footer auto
   height: 100vh; // Full viewport height
   width: 100%;
-  
+
   // Admin context modifications
   &.admin-context {
     .sidenav-container {
@@ -72,19 +72,19 @@
   width: 280px; // Default expanded width
   overflow-y: auto; // Enable scrolling for long navigation menus
   overflow-x: hidden; // Prevent horizontal scroll
-  
+
   // Collapsed state for desktop (icons only)
   &:not(.expanded) {
     @media screen and (min-width: 600px) {
       width: 64px; // Collapsed width for icons only
     }
   }
-  
+
   // Expanded state for desktop
   &.expanded {
     width: 280px; // Full width with text
   }
-  
+
   // Mobile behavior - full width when open
   @media screen and (max-width: 599px) {
     width: 280px;
@@ -92,41 +92,6 @@
 }
 
 
-
-// Admin Breadcrumb
-.admin-breadcrumb {
-  display: flex;
-  align-items: center;
-  padding: $spacing-md $spacing-lg;
-  background-color: var(--mat-sys-surface-variant);
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.9rem;
-  
-  mat-icon {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-    margin-right: $spacing-xs;
-    
-    &:not(:first-child) {
-      margin-left: $spacing-xs;
-    }
-  }
-  
-  span {
-    font-weight: 500;
-    
-    &:last-child {
-      color: var(--mdc-theme-primary);
-    }
-  }
-  
-  // Mobile adjustments
-  @media screen and (max-width: 599px) {
-    padding: $spacing-sm $spacing-md;
-    font-size: 0.8rem;
-  }
-}
 
 // Sidenav Content - main content area
 .sidenav-content {
@@ -141,22 +106,22 @@
   display: flex;
   flex-direction: column;
   min-height: 0; // Important for proper flex behavior
-  
+
   // Content wrapper - fluid design (no max-width constraints)
   .content-wrapper {
     flex: 1;
     width: 100%;
     // REMOVED: max-width: 1200px; // Enable full-width layouts on large screens
     box-sizing: border-box;
-    
+
     // Mobile-first responsive padding
     padding: $spacing-sm;
-    
+
     // Tablet and up
     @media (min-width: 768px) {
       padding: $spacing-md;
     }
-    
+
     // Desktop and up
     @media (min-width: 1024px) {
       padding: $spacing-lg;
@@ -184,7 +149,7 @@
   .sidenav {
     transition: none;
   }
-  
+
   .main-content {
     scroll-behavior: auto;
   }
@@ -195,21 +160,18 @@
  */
 @media print {
   .app-layout {
-    grid-template-areas: 
+    grid-template-areas:
       "header"
       "main";
     grid-template-rows: auto 1fr;
   }
-  
+
   .layout-footer {
     display: none;
   }
-  
+
   .sidenav {
     display: none;
   }
-  
-  .admin-breadcrumb {
-    display: none;
-  }
-} 
+
+}

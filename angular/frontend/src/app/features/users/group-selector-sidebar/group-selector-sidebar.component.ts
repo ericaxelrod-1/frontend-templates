@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import { Component, OnInit, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -6,6 +6,11 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
 import { GroupService } from '../../../services/group.service';
 import { Group } from '../../../models/group.model';
+import { SidePanelRef, SIDE_PANEL_DATA } from '../../../shared/components/side-panel';
+
+export interface GroupSelectorPanelData {
+  selectedGroupIds: number[];
+}
 
 @Component({
   selector: 'app-group-selector-sidebar',
@@ -18,97 +23,63 @@ import { Group } from '../../../models/group.model';
     MatDividerModule
   ],
   template: `
-    <div class="sidebar-backdrop" [class.backdrop-visible]="isOpen" (click)="close()"></div>
-    
-    <div class="sidebar" [class.sidebar-open]="isOpen">
-      <div class="sidebar-header">
-        <h3>Select Groups</h3>
-        <button mat-icon-button (click)="close()" class="close-button">
-          <mat-icon>close</mat-icon>
-        </button>
+    <div class="sidebar-header">
+      <h3>Select Groups</h3>
+      <button mat-icon-button (click)="close()" class="close-button">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <div class="sidebar-content">
+      <div class="selection-info">
+        <p>{{ selectedGroupIds.length }} group(s) selected</p>
       </div>
 
-      <mat-divider></mat-divider>
-
-      <div class="sidebar-content">
-        <div class="selection-info">
-          <p>{{ selectedGroupIds.length }} group(s) selected</p>
-        </div>
-
-        <div class="groups-list">
-          <div 
-            *ngFor="let group of availableGroups" 
-            class="group-item"
-            [class.selected]="isGroupSelected(group.id)"
+      <div class="groups-list">
+        <div 
+          *ngFor="let group of availableGroups" 
+          class="group-item"
+          [class.selected]="isGroupSelected(group.id)"
+        >
+          <mat-checkbox 
+            [checked]="isGroupSelected(group.id)"
+            (change)="toggleGroup(group.id)"
+            class="group-checkbox"
           >
-            <mat-checkbox 
-              [checked]="isGroupSelected(group.id)"
-              (change)="toggleGroup(group.id)"
-              class="group-checkbox"
-            >
-              <div class="group-info">
-                <div class="group-name">{{ group.name }}</div>
-                <div class="group-description" *ngIf="group.description">
-                  {{ group.description }}
-                </div>
+            <div class="group-info">
+              <div class="group-name">{{ group.name }}</div>
+              <div class="group-description" *ngIf="group.description">
+                {{ group.description }}
               </div>
-            </mat-checkbox>
-          </div>
-        </div>
-
-        <div class="empty-state" *ngIf="availableGroups.length === 0">
-          <mat-icon>group</mat-icon>
-          <p>No groups available</p>
+            </div>
+          </mat-checkbox>
         </div>
       </div>
 
-      <mat-divider></mat-divider>
-
-      <div class="sidebar-actions">
-        <button mat-button (click)="clearAll()" [disabled]="selectedGroupIds.length === 0">
-          Clear All
-        </button>
-        <button mat-raised-button color="primary" (click)="apply()">
-          Apply Selection
-        </button>
+      <div class="empty-state" *ngIf="availableGroups.length === 0">
+        <mat-icon>group</mat-icon>
+        <p>No groups available</p>
       </div>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <div class="sidebar-actions">
+      <button mat-button (click)="clearAll()" [disabled]="selectedGroupIds.length === 0">
+        Clear All
+      </button>
+      <button mat-raised-button color="primary" (click)="apply()">
+        Apply Selection
+      </button>
     </div>
   `,
   styles: [`
-    .sidebar-backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
-    }
-
-    .sidebar-backdrop.backdrop-visible {
-      opacity: 1;
-      visibility: visible;
-    }
-
-    .sidebar {
-      position: fixed;
-      top: 0;
-      right: -400px;
-      width: 400px;
-      height: 100vh;
-      background-color: white;
-      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
-      z-index: 1001;
+    :host {
       display: flex;
       flex-direction: column;
-      transition: right 0.3s ease;
-    }
-
-    .sidebar.sidebar-open {
-      right: 0;
+      height: 100%;
     }
 
     .sidebar-header {
@@ -209,24 +180,19 @@ import { Group } from '../../../models/group.model';
       gap: 12px;
       justify-content: flex-end;
     }
-
-    @media (max-width: 768px) {
-      .sidebar {
-        width: 100vw;
-        right: -100vw;
-      }
-    }
   `]
 })
 export class GroupSelectorSidebarComponent implements OnInit {
-  @Input() isOpen = false;
-  @Input() selectedGroupIds: number[] = [];
-  @Output() groupSelectionChange = new EventEmitter<number[]>();
-  @Output() closeSidebar = new EventEmitter<void>();
-
+  selectedGroupIds: number[] = [];
   availableGroups: Group[] = [];
 
-  constructor(private groupService: GroupService) {}
+  constructor(
+    private groupService: GroupService,
+    private sidePanelRef: SidePanelRef,
+    @Inject(SIDE_PANEL_DATA) public data: GroupSelectorPanelData
+  ) {
+    this.selectedGroupIds = [...(data.selectedGroupIds || [])];
+  }
 
   ngOnInit(): void {
     this.loadGroups();
@@ -234,8 +200,8 @@ export class GroupSelectorSidebarComponent implements OnInit {
 
   loadGroups(): void {
     this.groupService.getGroups().subscribe({
-      next: (groups) => {
-        this.availableGroups = groups;
+      next: (response) => {
+        this.availableGroups = response.items;
       },
       error: (error) => {
         console.error('Error loading groups:', error);
@@ -248,27 +214,23 @@ export class GroupSelectorSidebarComponent implements OnInit {
   }
 
   toggleGroup(groupId: number): void {
-    const currentSelection = [...this.selectedGroupIds];
-    const index = currentSelection.indexOf(groupId);
-    
+    const index = this.selectedGroupIds.indexOf(groupId);
     if (index > -1) {
-      currentSelection.splice(index, 1);
+      this.selectedGroupIds.splice(index, 1);
     } else {
-      currentSelection.push(groupId);
+      this.selectedGroupIds.push(groupId);
     }
-    
-    this.groupSelectionChange.emit(currentSelection);
   }
 
   clearAll(): void {
-    this.groupSelectionChange.emit([]);
+    this.selectedGroupIds = [];
   }
 
   apply(): void {
-    this.close();
+    this.sidePanelRef.close(this.selectedGroupIds);
   }
 
   close(): void {
-    this.closeSidebar.emit();
+    this.sidePanelRef.close();
   }
-} 
+}

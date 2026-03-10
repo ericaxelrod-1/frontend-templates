@@ -1,0 +1,76 @@
+<div class="landing-container">
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">Enterprise-Grade Access Control</h1>
+            <p class="hero-subtitle">A rock-solid foundation for vibe coders. Start your next on-prem application with
+                group and role-based access control out of the box.</p>
+            <div class="hero-buttons">
+                <a mat-raised-button color="primary" href="https://github.com/ericaxelrod-1/frontend-templates"
+                    target="_blank">View on GitHub</a>
+                <a mat-stroked-button color="primary" routerLink="/">Back to Home</a>
+            </div>
+        </div>
+        <div class="hero-image">
+            <div class="placeholder-image">
+                <h3>RBAC / GBAC</h3>
+                <div class="shield">🛡️</div>
+                <p>Object & Row-Level Security</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Details Section -->
+    <section class="features-section">
+        <div class="section-header">
+            <h2>Why Access Control Matters</h2>
+            <p>It's not just about security—it's about clarity, safety, and operational excellence.</p>
+        </div>
+        <div class="features-grid">
+            <mat-card class="feature-card" *ngFor="let feature of features">
+                <mat-card-header>
+                    <div class="feature-icon">
+                        <mat-icon>{{ feature.icon }}</mat-icon>
+                    </div>
+                    <mat-card-title>{{ feature.title }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                    <p>{{ feature.description }}</p>
+                </mat-card-content>
+            </mat-card>
+        </div>
+    </section>
+
+    <!-- Deep Dive -->
+    <section class="deep-dive">
+        <div class="section-content">
+            <div class="text">
+                <h2>A Working Base for Vibe Coders</h2>
+                <p>Don't waste time building plumbing. This template gives agentic engineers and vibe coders a
+                    completely functional, on-prem ready system with Role-Based and Group-Based Access Control built
+                    right in.</p>
+                <p>The system is designed as a secure single-tenant environment. Data is segregated by Groups and Roles,
+                    ensuring users only see what they are authorized to see without the overhead of complex
+                    multi-tenancy.</p>
+
+                <h2 style="margin-top: 64px;">Centralized Governance</h2>
+                <p>Why is management restricted to Admins? Because stability depends on intentional control. By
+                    centralizing permissions, the platform provides an <strong>Audit-Safe</strong> environment where
+                    every access change is precise, tracked, and reversible.</p>
+                <p>With this foundation, AI tools and engineers can confidently build complex, customized on-prem
+                    features without
+                    compromising the underlying security architecture of your application.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2>Ready to start building?</h2>
+            <p>Clone the repository and get your on-prem environment running today.</p>
+            <a mat-raised-button color="primary" href="https://github.com/ericaxelrod-1/frontend-templates"
+                target="_blank">View on GitHub</a>
+        </div>
+    </section>
+</div>

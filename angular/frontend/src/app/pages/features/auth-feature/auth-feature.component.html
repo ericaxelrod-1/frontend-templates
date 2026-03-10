@@ -1,0 +1,53 @@
+<div class="landing-container">
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">No-Dependency Authentication</h1>
+            <p class="hero-subtitle">High-performance, standalone authentication built directly into your core platform.
+            </p>
+            <div class="hero-buttons">
+                <a mat-raised-button color="primary" href="https://github.com/ericaxelrod-1/frontend-templates"
+                    target="_blank">Clone Template</a>
+                <a mat-stroked-button color="primary" routerLink="/">Back to Home</a>
+            </div>
+        </div>
+        <div class="hero-image">
+            <div class="placeholder-image">
+                <h3>Native Auth</h3>
+                <div class="shield">🔑</div>
+                <p>No Third-Party Dependencies</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Details Section -->
+    <section class="features-section">
+        <div class="section-header">
+            <h2>Native Security</h2>
+            <p>Total ownership of your authentication data without the overhead of external providers.</p>
+        </div>
+        <div class="features-grid">
+            <mat-card class="feature-card" *ngFor="let feature of features">
+                <mat-card-header>
+                    <div class="feature-icon">
+                        <mat-icon>{{ feature.icon }}</mat-icon>
+                    </div>
+                    <mat-card-title>{{ feature.title }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                    <p>{{ feature.description }}</p>
+                </mat-card-content>
+            </mat-card>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2>Take control of user identity</h2>
+            <p>Secure, scalable, and fully integrated from the first line of code.</p>
+            <a mat-raised-button color="primary" href="https://github.com/ericaxelrod-1/frontend-templates"
+                target="_blank">View on GitHub</a>
+        </div>
+    </section>
+</div>

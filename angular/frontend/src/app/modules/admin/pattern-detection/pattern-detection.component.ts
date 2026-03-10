@@ -16,6 +16,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatCardModule } from '@angular/material/card';
 import { PatternDetectionService } from './shared/pattern-detection.service';
+import { PageTitleService } from '../../../core/services/page-title.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { PatternDetectionFiltersComponent } from '../login-monitoring/pattern-detection-filters/pattern-detection-filters.component';
 import { TimeFilter, PatternSummary } from '../../../models/pattern-summary.interface';
@@ -49,17 +50,17 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   private destroy$ = new Subject<void>();
-  
+
   // Permission management
   hasPermission = false;
   loading = false;
-  
+
   // Data properties
   detectedPatterns: Pattern[] = [];
   patternSummary: PatternSummary[] = [];
   patternTotalCount = 0;
   patternPageSize = 10;
-  
+
   // Filter state
   filterState: PatternDetectionFilters = {
     status: '',
@@ -69,19 +70,19 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
     dateTo: undefined,
     search: ''
   };
-  
+
   // Sorting state
   patternCurrentSort = {
     column: 'detectionTimestamp',
     direction: 'desc' as 'asc' | 'desc'
   };
-  
+
   // Test data state
   isCreatingTestData = false;
-  
+
   // Test mode state - controls whether to use simple or enhanced test data
   testMode: 'simple' | 'enhanced' = 'simple';
-  
+
   // Expected test results for tooltips - maps each test type to expected patterns
   testExpectations = {
     simple: {
@@ -133,10 +134,12 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   constructor(
     private patternDetectionService: PatternDetectionService,
+    private pageTitleService: PageTitleService,
     private permissionService: PermissionService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
+    this.pageTitleService.setTitle('Pattern Detection');
     this.checkPermissions();
   }
 
@@ -181,7 +184,7 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
 
   private loadData(): void {
     this.loading = true;
-    
+
     this.patternDetectionService.getPatterns(
       this.filterState,
       0,
@@ -189,17 +192,17 @@ export class PatternDetectionComponent implements OnInit, OnDestroy, AfterViewIn
       this.patternCurrentSort.column,
       this.patternCurrentSort.direction
     ).pipe(takeUntil(this.destroy$))
-    .subscribe({
-      next: (response: PaginatedResponse<Pattern>) => {
-        this.detectedPatterns = response.items;
-        this.patternTotalCount = response.total;
-        this.loading = false;
-      },
-      error: (error: any) => {
-        console.error('Error loading patterns:', error);
-        this.loading = false;
-      }
-    });
+      .subscribe({
+        next: (response: PaginatedResponse<Pattern>) => {
+          this.detectedPatterns = response.items;
+          this.patternTotalCount = response.total;
+          this.loading = false;
+        },
+        error: (error: any) => {
+          console.error('Error loading patterns:', error);
+          this.loading = false;
+        }
+      });
   }
 
 

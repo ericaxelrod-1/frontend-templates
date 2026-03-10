@@ -18,6 +18,11 @@ import { Resource } from '../modules/permissions/entities/resource.entity';
 import { LoginAttempt } from '../modules/auth/entities/login-attempt.entity';
 import { IPReputation } from '../modules/auth/entities/ip-reputation.entity';
 import { Captcha } from '../modules/auth/entities/captcha.entity';
+import { RateLimitCounter } from '../modules/auth/entities/rate-limit-counter.entity';
+import { UserBehaviorProfile } from '../modules/auth/entities/user-behavior-profile.entity';
+import { SecurityAlert } from '../modules/auth/entities/security-alert.entity';
+import { SecurityDetectedPattern } from '../modules/auth/entities/security-detected-pattern.entity';
+import { PatternLoginAttempt } from '../modules/auth/entities/pattern-login-attempt.entity';
 
 // Load environment variables from .env file
 config();
@@ -42,6 +47,11 @@ export const dataSourceOptions: DataSourceOptions = {
     LoginAttempt,
     IPReputation,
     Captcha,
+    RateLimitCounter,
+    UserBehaviorProfile,
+    SecurityAlert,
+    SecurityDetectedPattern,
+    PatternLoginAttempt,
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false, // Disable synchronize as we're handling schema manually

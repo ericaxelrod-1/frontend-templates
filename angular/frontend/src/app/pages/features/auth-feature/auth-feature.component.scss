@@ -1,0 +1,209 @@
+@use '../../../../styles/abstracts' as *;
+
+.landing-container {
+    max-width: 100%;
+    overflow-x: hidden;
+    padding-top: 64px;
+
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --background-dark: transparent;
+    --text-on-primary: #ffffff;
+}
+
+.hero-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 80px 32px;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: var(--text-on-primary);
+    min-height: 400px;
+
+    @media (max-width: 768px) {
+        flex-direction: column;
+        text-align: center;
+        padding: 48px 16px;
+    }
+}
+
+.hero-content {
+    flex: 1;
+    max-width: 600px;
+}
+
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 24px;
+    line-height: 1.1;
+    background: linear-gradient(to right, #00d2ff, #3a7bd5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    margin-bottom: 40px;
+    color: #94a3b8;
+    line-height: 1.6;
+}
+
+.hero-buttons {
+    display: flex;
+    gap: 16px;
+
+    @media (max-width: 768px) {
+        justify-content: center;
+    }
+}
+
+.hero-image {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+
+    .placeholder-image {
+        text-align: center;
+        background: rgba(255, 255, 255, 0.03);
+        padding: 60px;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(12px);
+
+        h3 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #00d2ff;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .shield {
+            font-size: 100px;
+            margin: 20px 0;
+            filter: drop-shadow(0 0 20px rgba(0, 210, 255, 0.4));
+        }
+
+        p {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+    }
+}
+
+section {
+    padding: 100px 32px;
+
+    @media (max-width: 768px) {
+        padding: 60px 16px;
+    }
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 64px;
+
+    h2 {
+        font-size: 2.5rem;
+        margin-bottom: 20px;
+        color: #f8fafc;
+        font-weight: 700;
+    }
+
+    p {
+        font-size: 1.25rem;
+        color: #94a3b8;
+        max-width: 800px;
+        margin: 0 auto;
+        line-height: 1.6;
+    }
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 32px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.feature-card {
+    height: 100%;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+    padding: 32px;
+
+    &:hover {
+        transform: translateY(-8px);
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(0, 210, 255, 0.3);
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    }
+
+    mat-card-header {
+        margin-bottom: 24px;
+        padding: 0;
+    }
+
+    .feature-icon {
+        background-color: rgba(0, 210, 255, 0.1);
+        color: #00d2ff;
+        width: 64px;
+        height: 64px;
+        border-radius: 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 0;
+        font-size: 32px;
+    }
+
+    mat-card-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #f8fafc;
+        margin-top: 16px;
+    }
+
+    mat-card-content {
+        padding: 0;
+
+        p {
+            color: #94a3b8;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+    }
+}
+
+.cta-section {
+    padding: 100px 32px;
+    background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+    color: white;
+    text-align: center;
+
+    .cta-content {
+        max-width: 700px;
+        margin: 0 auto;
+
+        h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        p {
+            font-size: 1.25rem;
+            margin-bottom: 48px;
+            opacity: 0.9;
+        }
+    }
+}

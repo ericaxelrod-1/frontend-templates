@@ -41,7 +41,7 @@ import { ComponentScannerService } from '../scanners/component-scanner.service';
 import { RouteScannerService } from '../scanners/route-scanner.service';
 import { EndpointScannerService } from '../scanners/endpoint-scanner.service';
 import { CacheSyncService } from '../../cache/cache-sync.service';
-import { Request } from 'express';
+import { FastifyRequest } from 'fastify';
 import { RequirePermissions } from '../decorators/require-permissions.decorator';
 import { UiComponent } from '../entities/ui-component.entity';
 import { FrontendRoute } from '../entities/frontend-route.entity';
@@ -89,7 +89,7 @@ export class PermissionsController {
     private readonly routeScannerService: RouteScannerService,
     private readonly endpointScannerService: EndpointScannerService,
     private readonly cacheSyncService: CacheSyncService,
-  ) {}
+  ) { }
 
   // Permission check endpoint
   @Get('check/:resource/:action')
@@ -111,11 +111,11 @@ export class PermissionsController {
     @Param('resource') resource: string,
     @Param('action') action: string,
     @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
-    @Req() req?: Request,
+    @Req() req?: FastifyRequest,
   ): Promise<PermissionCheckResponseDto> {
     // If userId is not provided, use the authenticated user
-    if (!userId && req?.user) {
-      userId = req.user['id'];
+    if (!userId && (req as any)?.user) {
+      userId = (req as any).user['id'];
     }
 
     if (!userId) {
@@ -158,9 +158,9 @@ export class PermissionsController {
     type: [String],
   })
   @ApiResponse({ status: 401, description: 'User not authenticated' })
-  async getUserPermissions(@Req() req?: Request): Promise<string[]> {
+  async getUserPermissions(@Req() req?: FastifyRequest): Promise<string[]> {
     // Get userId from authenticated user
-    const userId = req?.user?.['id'];
+    const userId = (req as any)?.user?.['id'];
     if (!userId) {
       throw new UnauthorizedException('User not authenticated');
     }
@@ -440,8 +440,8 @@ export class PermissionsController {
    */
   @Get('route-access-test/:id')
   @UseGuards(JwtAuthGuard)
-  async testRouteAccess(@Param('id') id: string, @Req() req: Request) {
-    const userId = req.user['id'];
+  async testRouteAccess(@Param('id') id: string, @Req() req: FastifyRequest) {
+    const userId = (req as any).user['id'];
     return {
       hasAccess: await this.permissionsService.canUserAccessRoute(userId, id),
     };
@@ -504,9 +504,9 @@ export class PermissionsController {
   async testEndpointAccess(
     @Param('id') id: string,
     @Query('method') method: string = 'GET',
-    @Req() req: Request,
+    @Req() req: FastifyRequest,
   ) {
-    const userId = req.user['id'];
+    const userId = (req as any).user['id'];
     return {
       hasAccess: await this.permissionsService.canUserAccessEndpoint(
         userId,

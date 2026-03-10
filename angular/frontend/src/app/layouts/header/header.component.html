@@ -3,19 +3,25 @@
   <div class="header-container">
     <!-- Left side -->
     <div class="left-section">
-      <button mat-icon-button 
-              (click)="onSidebarToggle()" 
-              aria-label="Toggle navigation menu"
-              [attr.aria-expanded]="sidebarOpened"
-              aria-controls="main-sidebar">
+      <button mat-icon-button (click)="onSidebarToggle()" aria-label="Toggle navigation menu"
+        [attr.aria-expanded]="sidebarOpened" aria-controls="main-sidebar">
         <mat-icon>{{ sidebarOpened ? 'close' : 'menu' }}</mat-icon>
       </button>
       <div class="logo-container">
-        <img [src]="headerLogo" 
-             [alt]="appName + ' Logo'" 
-             class="header-logo" 
-             *ngIf="headerLogo">
+        <img [src]="headerLogo" [alt]="appName + ' Logo'" class="header-logo" *ngIf="headerLogo">
         <h1 class="app-name" [attr.aria-label]="appName + ' Application'">{{ appName }}</h1>
+
+        <ng-container *ngIf="pageTitle$ | async as pageTitle">
+          <span class="title-separator" *ngIf="pageTitle">|</span>
+          <div class="header-titles" *ngIf="pageTitle">
+            <!-- Breadcrumb for Admin Context -->
+            <ng-container *ngIf="isAdminContext">
+              <span class="breadcrumb-text">Administration</span>
+              <mat-icon class="breadcrumb-icon">chevron_right</mat-icon>
+            </ng-container>
+            <span class="page-title">{{ pageTitle }}</span>
+          </div>
+        </ng-container>
       </div>
     </div>
 
@@ -23,22 +29,17 @@
     <div class="right-section">
       <ng-container *ngIf="isAuthenticated$ | async; else loginButton">
         <ng-container *ngIf="currentUser$ | async as currentUser">
-        <button mat-button 
-                  type="button"
-                class="user-menu-button"
-                  (click)="onUserMenuToggle()"
-                  [attr.aria-label]="'User menu for ' + getDisplayName(currentUser)">
+          <button mat-button type="button" class="user-menu-button" (click)="onUserMenuToggle()"
+            [attr.aria-label]="'User menu for ' + getDisplayName(currentUser)">
             <mat-icon>account_circle</mat-icon>
             <span class="user-name-text">{{ getDisplayName(currentUser) }}</span>
             <mat-icon class="dropdown-icon">arrow_drop_down</mat-icon>
           </button>
         </ng-container>
       </ng-container>
-      
+
       <ng-template #loginButton>
-        <button mat-button 
-                routerLink="/login"
-                aria-label="Go to login page">
+        <button mat-button routerLink="/login" aria-label="Go to login page">
           <mat-icon aria-hidden="true">login</mat-icon>
           <span>Login</span>
         </button>

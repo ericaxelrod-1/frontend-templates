@@ -3,6 +3,10 @@ import 'reflect-metadata';
 console.log('\n💡 main.ts file loaded - starting application bootstrap');
 
 import { NestFactory } from '@nestjs/core';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -129,10 +133,14 @@ async function bootstrap() {
       );
     }
 
-    const app = await NestFactory.create(AppModule, {
-      logger: new LoggerService(),
-      cors: true,
-    });
+    const app = await NestFactory.create<NestFastifyApplication>(
+      AppModule,
+      new FastifyAdapter(),
+      {
+        logger: new LoggerService(),
+        cors: true,
+      },
+    );
 
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ValidationPipe());

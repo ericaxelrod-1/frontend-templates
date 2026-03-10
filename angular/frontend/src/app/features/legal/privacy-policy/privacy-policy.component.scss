@@ -1,0 +1,129 @@
+@use '@angular/material' as mat;
+@use '../../../../styles/abstracts' as *;
+
+.privacy-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    padding: $spacing-xl $spacing-lg;
+    position: relative;
+    overflow-y: auto;
+    z-index: 1000;
+    // Rich Mesh Gradient Background matching Auth Pages
+    background:
+        radial-gradient(at 0% 0%, rgba(var(--mdc-theme-primary-rgb, 59, 130, 246), 0.3) 0, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(var(--mdc-theme-primary-rgb, 59, 130, 246), 0.3) 0, transparent 50%),
+        linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    background-attachment: fixed;
+}
+
+.privacy-card {
+    width: 100%;
+    max-width: 800px;
+    background: rgba(255, 255, 255, 0.05); // Very transparent base
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    color: #f8fafc;
+    margin: auto; // Ensures centering and scrollability
+    display: flex;
+    flex-direction: column;
+}
+
+.privacy-header {
+    display: flex;
+    align-items: center;
+    padding: $spacing-xl $spacing-xl $spacing-md;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+
+
+
+    h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #f8fafc;
+    }
+}
+
+.privacy-content {
+    padding: $spacing-xl;
+    line-height: 1.6;
+    color: #cbd5e1;
+
+    section {
+        margin-bottom: $spacing-xl;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #f8fafc;
+        margin-bottom: $spacing-md;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        padding-bottom: $spacing-sm;
+    }
+
+    p {
+        margin-bottom: $spacing-md;
+    }
+
+    ul {
+        margin-bottom: $spacing-md;
+        padding-left: 20px;
+
+        li {
+            margin-bottom: $spacing-sm;
+
+            strong {
+                color: #f8fafc;
+            }
+        }
+    }
+
+    .alert-warning {
+        display: flex;
+        align-items: flex-start;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+        padding: $spacing-md;
+        border-radius: 12px;
+        margin-bottom: $spacing-xl;
+
+        mat-icon {
+            margin-right: $spacing-md;
+            margin-top: 2px;
+        }
+
+        strong {
+            margin-right: 4px;
+        }
+    }
+}
+
+
+
+@media (max-width: 599px) {
+    .privacy-container {
+        padding: $spacing-md;
+    }
+
+    .privacy-header,
+    .privacy-content {
+        padding: $spacing-lg;
+    }
+
+    .privacy-header h1 {
+        font-size: 1.5rem;
+    }
+}

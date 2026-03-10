@@ -184,7 +184,81 @@ The `--configuration` flag in Angular determines which environment settings to u
 - Source maps: disabled
 - Use when: Testing production builds
 
-### 4. Access Points
+### 4. Serving the Application in Production (Nginx vs SSR)
+
+When deploying to a physical server or VM, you have two primary strategies for serving the frontend:
+
+#### A. Static Nginx Hosting (Recommended for lowest memory footprint)
+If your application is heavily authenticated (like this dashboard) and does not require Search Engine Optimization (SEO) crawling, **do not run an SSR process**. Instead, use a static web server like Nginx or Apache to serve the static frontend files directly. This drops the frontend Node.js memory footprint to 0 MB.
+
+To do this, you simply need to point your web server's document root to the `dist/frontend/browser` folder generated after running `npm run build:prod`. You must also configure the web server to always fall back to `index.html` for any unmatched routes so that Angular's client-side router can handle page navigation. Finally, set up a reverse proxy rule in your web server to forward any requests that start with `/api` directly to your running backend Node.js API.
+
+**Example Nginx Configuration (`nginx.conf`):**
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    # Point this to your built frontend folder
+    root /path/to/angular/frontend/dist/frontend/browser;
+    index index.html;
+
+    # Fallback all unknown routes to index.html for Angular routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy all API requests to the running backend Node.js server
+    location /api/ {
+        proxy_pass http://localhost:3000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+#### B. Prerendering (Static Site Generation - SSG)
+If you have a hybrid app with public marketing pages that require SEO crawling (like `/login` or `/about`) but you still want the **0 MB Node.js footprint** of Static Hosting, you can use Angular Prerendering.
+
+During the `npm run build:prod` step, Angular automatically crawls your application and resolves the routing tree. For every static route it finds, it generates a physical HTML file (like `dist/frontend/browser/login/index.html`). 
+
+Once the prerendering completes, you deploy this exactly the same way as **A. Static Nginx Hosting** mentioned above. Nginx will naturally serve those fully-rendered HTML files to Google search crawlers, providing perfect SEO without ever needing to run an active Node.js server.
+
+#### C. Server-Side Rendering (SSR)
+If you are exposing public pages (like blogs or marketing sites) that must be aggressively crawled by search engines, you should run the Node.js SSR runtime footprint. This launches a persistent Node.js process that renders the pages on the server before sending them to the user. Turn this on only when necessary for production apps, as it consumes more memory to run.
+
+You can boot up the production Server-Side Rendering process by navigating to the frontend directory and running:
+
+```bash
+cd angular/frontend
+npm run serve:ssr:frontend
+```
+
+To deploy this securely, you should place Nginx in front of your Node.js processes. Nginx will act as a "reverse proxy"—it will listen for public traffic on port 80/443, and then secretly forward the traffic to your Angular Node.js app (running on port 4000) or your NestJS API (running on port 3000).
+
+**Example Nginx SSR Reverse Proxy Configuration:**
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # Proxy all API requests to the backend (NestJS)
+    location /api/ {
+        proxy_pass http://localhost:3000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Proxy all other requests to the frontend (Angular SSR Node.js)
+    location / {
+        proxy_pass http://localhost:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### 5. Access Points
 
 - Frontend: http://localhost:4200
 - Backend: http://localhost:3000
@@ -229,6 +303,22 @@ The `--configuration` flag in Angular determines which environment settings to u
    ```
    
    This command creates a production build with optimized assets in the `dist/frontend` directory.
+
+### Node.js Memory Tuning (`--max-old-space-size`)
+By default, Node.js (V8) is very lazy about garbage collection and will allow memory to climb to 2GB-4GB before aggressively cleaning the heap. In constrained production environments, you **must** configure the max heap size to prevent out-of-memory crashes.
+
+When executing the backend or SSR frontend in production, append the `--max-old-space-size` flag to strictly define the ceiling of the Node.js memory footprint.
+
+**Example (Capping memory at 256 MB or 512 MB):**
+```bash
+# 256MB footprint
+node --max-old-space-size=256 dist/main
+
+# 512MB footprint
+node --max-old-space-size=512 dist/frontend/server/server.mjs
+```
+
+Always test your specific environment under load to determine the lowest safe ceiling for your application before it throws a `JavaScript heap out of memory` exception.
 
 ## Running Automated Tests
 
@@ -360,6 +450,7 @@ The cookie consent system optionally integrates with user accounts. To enable th
 ### Legal Compliance Considerations
 
 - Include links to your Privacy Policy and Terms of Service
+- Replace the sample placeholder Privacy Policy (src/app/features/legal/privacy-policy) with a legally valid policy for your production deployment
 - Update the cookie banner text to accurately reflect your cookie usage
 - Adapt the cookie categories based on what your site actually uses
 - Test the consent mechanism thoroughly before deployment

@@ -9,6 +9,7 @@ import {
   Body,
   UseGuards,
   Logger,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -37,16 +38,28 @@ import { RequirePermission } from '../permissions/decorators/require-permission.
 export class RolesController {
   private readonly logger = new Logger(RolesController.name);
 
-  constructor(private readonly rolesService: RolesService) {}
+  constructor(private readonly rolesService: RolesService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all roles' })
-  @ApiResponse({ status: 200, description: 'List of all roles', type: [Role] })
+  @ApiResponse({ status: 200, description: 'List of all roles (paginated)' })
   @UseGuards(PermissionGuard)
   @RequirePermission('roles:view')
-  findAll(): Promise<Role[]> {
+  findAll(
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDirection') sortDirection?: 'asc' | 'desc',
+    @Query('search') search?: string,
+  ): Promise<{ items: Role[]; total: number; page: number; pageSize: number }> {
     this.logger.debug('Getting all roles');
-    return this.rolesService.findAll();
+    return this.rolesService.findAll(
+      page ? +page : 0,
+      pageSize ? +pageSize : 10,
+      sortBy || 'name',
+      (sortDirection?.toUpperCase() as 'ASC' | 'DESC') || 'ASC',
+      search || '',
+    );
   }
 
   @Get(':id')

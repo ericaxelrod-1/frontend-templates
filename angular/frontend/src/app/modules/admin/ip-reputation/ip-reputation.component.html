@@ -1,148 +1,140 @@
 <!-- IP Reputation Dashboard -->
 <div class="ip-reputation-container">
-  <!-- Page Header -->
-  <div class="page-header">
-    <h2>IP Reputation</h2>
-    <p>Monitor and manage IP address reputation and blocking</p>
-  </div>
-
   <!-- Loading State -->
   @if (loading) {
-    <div class="loading-container">
-      <mat-spinner diameter="40"></mat-spinner>
-      <p>Loading IP reputation data...</p>
-    </div>
+  <div class="loading-container">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Loading IP reputation data...</p>
+  </div>
   }
 
   <!-- IP Reputation Table -->
   @if (!loading && ipReputations && ipReputations.length > 0) {
-    <div class="table-container">
-      <mat-table [dataSource]="ipReputations" matSort>
-        <!-- IP Address Column -->
-        <ng-container matColumnDef="ipAddress">
-          <mat-header-cell *matHeaderCellDef mat-sort-header>IP Address</mat-header-cell>
-          <mat-cell *matCellDef="let ip">
-            <button mat-button (click)="onIPSelected(ip.ipAddress)">
-              {{ ip.ipAddress }}
-            </button>
-          </mat-cell>
-        </ng-container>
+  <div class="table-container">
+    <mat-table [dataSource]="ipReputations" matSort>
+      <!-- IP Address Column -->
+      <ng-container matColumnDef="ipAddress">
+        <mat-header-cell *matHeaderCellDef mat-sort-header>IP Address</mat-header-cell>
+        <mat-cell *matCellDef="let ip">
+          <button mat-button (click)="onIPSelected(ip.ipAddress)">
+            {{ ip.ipAddress }}
+          </button>
+        </mat-cell>
+      </ng-container>
 
-        <!-- Failed Attempts Column -->
-        <ng-container matColumnDef="failedAttempts">
-          <mat-header-cell *matHeaderCellDef mat-sort-header>Failed Attempts</mat-header-cell>
-          <mat-cell *matCellDef="let ip">{{ ip.failedAttempts }}</mat-cell>
-        </ng-container>
+      <!-- Failed Attempts Column -->
+      <ng-container matColumnDef="failedAttempts">
+        <mat-header-cell *matHeaderCellDef mat-sort-header>Failed Attempts</mat-header-cell>
+        <mat-cell *matCellDef="let ip">{{ ip.failedAttempts }}</mat-cell>
+      </ng-container>
 
-        <!-- Reputation Column -->
-        <ng-container matColumnDef="reputation">
-          <mat-header-cell *matHeaderCellDef mat-sort-header>Reputation</mat-header-cell>
-          <mat-cell *matCellDef="let ip">
-            <div class="reputation-score" [class]="getReputationClass(ip.reputation)">
-              {{ formatReputationScore(ip.reputation) }}
-            </div>
-          </mat-cell>
-        </ng-container>
+      <!-- Reputation Column -->
+      <ng-container matColumnDef="reputation">
+        <mat-header-cell *matHeaderCellDef mat-sort-header>Reputation</mat-header-cell>
+        <mat-cell *matCellDef="let ip">
+          <div class="reputation-score" [class]="getReputationClass(ip.reputation)">
+            {{ formatReputationScore(ip.reputation) }}
+          </div>
+        </mat-cell>
+      </ng-container>
 
-        <!-- Status Column -->
-        <ng-container matColumnDef="status">
-          <mat-header-cell *matHeaderCellDef>Status</mat-header-cell>
-          <mat-cell *matCellDef="let ip">
-            <span class="status-badge" [class]="getStatusClass(ip.isBlocked)">
-              {{ ip.isBlocked ? 'BLOCKED' : 'ACTIVE' }}
-            </span>
-          </mat-cell>
-        </ng-container>
+      <!-- Status Column -->
+      <ng-container matColumnDef="status">
+        <mat-header-cell *matHeaderCellDef>Status</mat-header-cell>
+        <mat-cell *matCellDef="let ip">
+          <span class="status-badge" [class]="getStatusClass(ip.isBlocked)">
+            {{ ip.isBlocked ? 'BLOCKED' : 'ACTIVE' }}
+          </span>
+        </mat-cell>
+      </ng-container>
 
-        <!-- Last Attempt Column -->
-        <ng-container matColumnDef="lastAttempt">
-          <mat-header-cell *matHeaderCellDef mat-sort-header>Last Attempt</mat-header-cell>
-          <mat-cell *matCellDef="let ip">
-            {{ ip.lastFailedAttempt | date:'medium' }}
-          </mat-cell>
-        </ng-container>
+      <!-- Last Attempt Column -->
+      <ng-container matColumnDef="lastAttempt">
+        <mat-header-cell *matHeaderCellDef mat-sort-header>Last Attempt</mat-header-cell>
+        <mat-cell *matCellDef="let ip">
+          {{ ip.lastFailedAttempt | date:'medium' }}
+        </mat-cell>
+      </ng-container>
 
-        <!-- Actions Column -->
-        <ng-container matColumnDef="actions">
-          <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
-          <mat-cell *matCellDef="let ip">
-            @if (ip.isBlocked) {
-              <button mat-button color="primary" (click)="unblockIP(ip.ipAddress)">
-                <mat-icon>check_circle</mat-icon>
-                Unblock
-              </button>
-            } @else {
-              <button mat-button color="warn" (click)="blockIP(ip.ipAddress)">
-                <mat-icon>block</mat-icon>
-                Block
-              </button>
-            }
-          </mat-cell>
-        </ng-container>
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <mat-header-cell *matHeaderCellDef>Actions</mat-header-cell>
+        <mat-cell *matCellDef="let ip">
+          @if (ip.isBlocked) {
+          <button mat-button color="primary" (click)="unblockIP(ip.ipAddress)">
+            <mat-icon>check_circle</mat-icon>
+            Unblock
+          </button>
+          } @else {
+          <button mat-button color="warn" (click)="blockIP(ip.ipAddress)">
+            <mat-icon>block</mat-icon>
+            Block
+          </button>
+          }
+        </mat-cell>
+      </ng-container>
 
-        <!-- Table Headers and Rows -->
-        <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
-        <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
-      </mat-table>
-    </div>
+      <!-- Table Headers and Rows -->
+      <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+      <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
+    </mat-table>
+  </div>
   }
 
   <!-- Selected IP Details -->
   @if (selectedIpReputation) {
-    <div class="ip-details-section">
-      <h3>IP Details: {{ selectedIpReputation.ipAddress }}</h3>
-      <div class="ip-details-grid">
-        <div class="detail-item">
-          <strong>Failed Attempts:</strong> {{ selectedIpReputation.failedAttempts }}
-        </div>
-        <div class="detail-item">
-          <strong>Blocked:</strong> {{ selectedIpReputation.isBlocked ? 'Yes' : 'No' }}
-        </div>
-        @if (selectedIpReputation.lastFailedAttempt) {
-          <div class="detail-item">
-            <strong>Last Failed Attempt:</strong> {{ selectedIpReputation.lastFailedAttempt | date:'medium' }}
-          </div>
-        }
-        @if (selectedIpReputation.blockedUntil) {
-          <div class="detail-item">
-            <strong>Blocked Until:</strong> {{ selectedIpReputation.blockedUntil | date:'medium' }}
-          </div>
-        }
-        <div class="detail-item">
-          <strong>Reputation Score:</strong> {{ formatReputationScore(selectedIpReputation.reputation) }}
-        </div>
+  <div class="ip-details-section">
+    <h3>IP Details: {{ selectedIpReputation.ipAddress }}</h3>
+    <div class="ip-details-grid">
+      <div class="detail-item">
+        <strong>Failed Attempts:</strong> {{ selectedIpReputation.failedAttempts }}
+      </div>
+      <div class="detail-item">
+        <strong>Blocked:</strong> {{ selectedIpReputation.isBlocked ? 'Yes' : 'No' }}
+      </div>
+      @if (selectedIpReputation.lastFailedAttempt) {
+      <div class="detail-item">
+        <strong>Last Failed Attempt:</strong> {{ selectedIpReputation.lastFailedAttempt | date:'medium' }}
+      </div>
+      }
+      @if (selectedIpReputation.blockedUntil) {
+      <div class="detail-item">
+        <strong>Blocked Until:</strong> {{ selectedIpReputation.blockedUntil | date:'medium' }}
+      </div>
+      }
+      <div class="detail-item">
+        <strong>Reputation Score:</strong> {{ formatReputationScore(selectedIpReputation.reputation) }}
       </div>
     </div>
+  </div>
   }
 
   <!-- No Data State -->
   @if (!loading && (!ipReputations || ipReputations.length === 0)) {
-    <div class="no-data-container">
-      <mat-icon class="no-data-icon">info</mat-icon>
-      <h3>No IP Selected</h3>
-      <p>Select an IP address from the login attempts to view its reputation details.</p>
-    </div>
+  <div class="no-data-container">
+    <mat-icon class="no-data-icon">info</mat-icon>
+    <h3>No IP Selected</h3>
+    <p>Select an IP address from the login attempts to view its reputation details.</p>
+  </div>
   }
 
   <!-- Test Data Section -->
   @if (hasPermission) {
-    <div class="test-data-section">
-      <h3>Test Data Generation</h3>
-      <div class="test-buttons">
-        <button mat-raised-button color="accent" 
-                (click)="createTestIPData()">
-          <mat-icon>add</mat-icon>
-          Create Test IP Data
-        </button>
-        
-        <mat-divider></mat-divider>
-        
-        <button mat-raised-button color="warn"
-                (click)="clearAllData()">
-          <mat-icon>delete_sweep</mat-icon>
-          Clear All Data
-        </button>
-      </div>
+  <div class="test-data-section">
+    <h3>Test Data Generation</h3>
+    <div class="test-buttons">
+      <button mat-raised-button color="accent" (click)="createTestIPData()">
+        <mat-icon>add</mat-icon>
+        Create Test IP Data
+      </button>
+
+      <mat-divider></mat-divider>
+
+      <button mat-raised-button color="warn" (click)="clearAllData()">
+        <mat-icon>delete_sweep</mat-icon>
+        Clear All Data
+      </button>
     </div>
+  </div>
   }
-</div> 
+</div>

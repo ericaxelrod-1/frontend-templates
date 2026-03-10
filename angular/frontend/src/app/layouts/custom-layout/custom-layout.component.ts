@@ -12,6 +12,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/services/auth.service';
 import { User } from '../../models';
 import { filter } from 'rxjs/operators';
+import { SidePanelService } from '../../shared/components/side-panel';
 
 /**
  * Custom Layout Component - CSS Grid Layout Implementation
@@ -40,7 +41,6 @@ import { filter } from 'rxjs/operators';
     HeaderComponent,
     SidebarComponent,
     FooterComponent,
-    UserSidebarComponent,
     MatSidenavModule,
     MatIconModule
   ],
@@ -79,13 +79,7 @@ import { filter } from 'rxjs/operators';
           <!-- Sidenav Content - Main content area -->
           <mat-sidenav-content class="sidenav-content">
             <main class="main-content">
-              <!-- Admin breadcrumb when in admin context -->
-              <div *ngIf="isAdminContext" class="admin-breadcrumb">
-                <mat-icon>admin_panel_settings</mat-icon>
-                <span>Administration</span>
-                <mat-icon>chevron_right</mat-icon>
-                <span>{{ getAdminPageTitle() }}</span>
-              </div>
+              <!-- Admin breadcrumb moved to header -->
               
               <!-- Content wrapper for proper centering -->
               <div class="content-wrapper">
@@ -96,45 +90,34 @@ import { filter } from 'rxjs/operators';
         </mat-sidenav-container>
       </div>
       
-      <!-- Footer: Fixed at bottom, full viewport width -->
       <app-footer class="layout-footer"></app-footer>
     </div>
-    
-    <!-- User Sidebar: Right-side collapsible menu -->
-    <app-user-sidebar 
-      [isOpen]="isUserSidebarOpen"
-      [currentUser]="currentUser$ | async"
-      (closeSidebar)="closeUserSidebar()">
-    </app-user-sidebar>
   `,
   styleUrls: ['./custom-layout.component.scss']
 })
 export class CustomLayoutComponent implements OnInit, OnDestroy {
   @ViewChild('sidenav') sidenav!: MatSidenav;
-  
+
   private destroy$ = new Subject<void>();
-  
+
   /**
    * Responsive state management
    */
   isMobile = false;
   isCollapsed = false;
-  
+
   /**
    * Admin context detection
    */
   isAdminContext = false;
-  
-  /**
-   * User sidebar state management
-   */
-  isUserSidebarOpen = false;
+
   currentUser$: Observable<User | null>;
 
   constructor(
     private breakpointObserver: BreakpointObserver,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private sidePanelService: SidePanelService
   ) {
     this.currentUser$ = this.authService.currentUser$;
   }
@@ -154,7 +137,7 @@ export class CustomLayoutComponent implements OnInit, OnDestroy {
           this.isAdminContext = navEnd.url.includes('/app/admin');
         }, 0);
       });
-    
+
     // Monitor mobile breakpoint
     this.breakpointObserver
       .observe([Breakpoints.Handset])
@@ -165,10 +148,10 @@ export class CustomLayoutComponent implements OnInit, OnDestroy {
           this.isCollapsed = false; // On mobile, the menu can never be collapsed
         }
       });
-      
+
     // Load sidebar state from localStorage for persistence
     this.loadSidebarState();
-    
+
     // Subscribe to currentUser$ Observable
     this.currentUser$.pipe(
       takeUntil(this.destroy$)
@@ -238,27 +221,17 @@ export class CustomLayoutComponent implements OnInit, OnDestroy {
       localStorage.setItem('sidebarCollapsed', JSON.stringify(this.isCollapsed));
     }
   }
-  
-  /**
-   * Open user sidebar
-   * Called from header component when user button is clicked
-   */
+
   openUserSidebar(): void {
-    this.isUserSidebarOpen = true;
-  }
-  
-  /**
-   * Close user sidebar
-   * Called from user sidebar component when close is triggered
-   */
-  closeUserSidebar(): void {
-    this.isUserSidebarOpen = false;
+    this.sidePanelService.open(UserSidebarComponent, {
+      width: '320px'
+    });
   }
 
   private handleLoggedInUser(user: User): void {
     // Add your logged in user logic here
   }
-  
+
   private handleLoggedOutUser(): void {
     // Add your logged out user logic here
   }
