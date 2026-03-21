@@ -75,11 +75,32 @@ RlsModule.forRootAsync({
 ```
 
 **Important Notes on Exemptions:**
-1. **The `groups` table is NOT exempt:** When a user queries the `groups` table, they do not see all tenants. The RLS system ensures they only see:
-   - Groups they are DIRECTLY assigned to.
-   - All CHILD groups (because children inherit visibility).
-   - They CANNOT see PARENT or sibling groups.
-2. **Securing `rls_rules`:** The `rls_rules` and `rls_join_paths` tables are exempt so the system can bootstrap itself without circular dependencies. Because these tables bypass RLS, they must be strictly protected by standard **Role-Based Access Control (RBAC)**. Only users with the `SUPERADMIN` role (or the `rls_rules:manage` permission) are allowed to access the Admin API endpoints that create or modify rules. **RLS secures tenant data; RBAC secures system configuration.**
+ 1. **The `groups` table is NOT exempt:** When a user queries the `groups` table, they do not see all tenants. The RLS system ensures they only see:
+    - Groups they are DIRECTLY assigned to.
+    - All CHILD groups (because children inherit visibility).
+    - They CANNOT see PARENT or sibling groups.
+ 2. **Securing `rls_rules`:** The `rls_rules` and `rls_join_paths` tables are exempt so the system can bootstrap itself without circular dependencies. Because these tables bypass RLS, they must be strictly protected by standard **Role-Based Access Control (RBAC)**. Only users with the `SUPERADMIN` role (or the `rls_rules:manage` permission) are allowed to access the Admin API endpoints that create or modify rules. **RLS secures tenant data; RBAC secures system configuration.**
+
+### DataSource Configuration Requirement
+
+The RlsModule creates its own TypeORM `DataSource` instance because it runs in a separate NestJS dependency injection context from `TypeOrmModule.forRootAsync()`. You must pass the database configuration via `dataSourceOptions`:
+
+```typescript
+// app.module.ts
+RlsModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService) => {
+    const dbConfig = configService.get('database');
+    return {
+      enabled: process.env.NODE_ENV !== 'test',
+      exemptTables: ['rls_rules', 'rls_join_paths', 'rls_join_conditions', 'rls_scope_templates'],
+      fallbackBehavior: 'deny',
+      dataSourceOptions: dbConfig, // Required: pass the same DB config used by TypeOrmModule
+    };
+  },
+}),
+```
 
 ---
 
