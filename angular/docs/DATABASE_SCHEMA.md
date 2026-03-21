@@ -63,6 +63,7 @@ This document outlines the database schema design for the Angular Template Appli
 [login_attempt] (login_attempts)
 [ip_reputation]
 [captcha]
+[rate_limit_counter]
 ```
 *(Note: The ASCII ERD above is a high-level conceptual representation and may require updates to fully detail all explicit join entities and foreign key names accurately based on the table specifications below. Table and column names here are illustrative and will follow `snake_case` in the specifications.)*
 
@@ -360,8 +361,22 @@ Stores CAPTCHA challenge data.
 | `metadata`   | TEXT     | NULL                               | Additional JSON metadata           |
 | `created_at` | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Record creation timestamp          |
 | `updated_at` | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Record last update timestamp       |
-
+ 
 Indexes: `token` (UNIQUE), `expires_at`.
+
+### `rate_limit_counter` Table
+Stores rate limiting counters for throttling repeated requests. Corresponds to `RateLimitCounter` entity.
+
+| Column               | Type     | Constraints                        | Description                                      |
+|----------------------|----------|------------------------------------|--------------------------------------------------|
+| `id`                 | TEXT     | PRIMARY KEY                        | UUID identifier                                  |
+| `key`                | TEXT     | NOT NULL, UNIQUE                   | Universal key (e.g., 'ip:192.168.1.1', 'email:user@example.com') |
+| `count`              | INTEGER  | NOT NULL, DEFAULT 0                | Number of occurrences within current window       |
+| `window_expires_at`  | DATETIME | NOT NULL                           | When this rate limit window expires             |
+| `created_at`         | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Record creation timestamp                        |
+| `updated_at`         | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Record last update timestamp                    |
+
+Indexes: `key` (UNIQUE), `window_expires_at`.
 
 ### `resources` Table
 Corresponds to `Resource` entity. (A lookup/definition table for resource types).
