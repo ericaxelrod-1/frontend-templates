@@ -104,6 +104,9 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
             return value.apply(target, args);
           }
 
+          // Reset bypass logging flag for new queries
+          target.__rlsBypassLogged = false;
+
           if (target.__rlsApplied) {
             return value.apply(target, args);
           }

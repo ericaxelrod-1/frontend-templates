@@ -5,6 +5,7 @@ declare module 'nestjs-cls' {
   interface ClsStore {
     __rlsBypass?: boolean;
     activeGroupIds?: number[];
+    primaryGroupId?: number;
   }
 }
 

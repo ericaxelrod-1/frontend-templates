@@ -65,7 +65,13 @@ export class RlsModule {
         RlsInsertSubscriber,
         entityManagerProvider,
       ],
-      exports: [RlsService, RlsSystemBypassService, RlsMetricsService, getEntityManagerToken(options.connectionName)],
+      exports: [
+      RlsService,
+      RlsSystemBypassService,
+      RlsMetricsService,
+      getEntityManagerToken(options.connectionName),
+      'RLS_CONFIG_OPTIONS',
+    ],
     };
   }
 

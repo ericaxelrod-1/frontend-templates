@@ -18,15 +18,20 @@ export class RlsInsertSubscriber implements EntitySubscriberInterface {
     }
 
     const activeGroupIds = this.cls.get('activeGroupIds');
-    if (activeGroupIds && activeGroupIds.length > 0) {
-      // Very basic auto-assignment logic.
-      // In a real app, you might want to look up the specific column name
-      // or rely on the developer to assign it explicitly.
-      // If the entity has a groupId, group_id, or customer_id, we can auto-populate it.
+    const primaryGroupId = this.cls.get('primaryGroupId');
+
+    // Use primaryGroupId if set, otherwise fall back to first activeGroupId
+    const effectiveGroupId = primaryGroupId ?? activeGroupIds?.[0];
+
+    if (effectiveGroupId !== undefined) {
       const entity = event.entity;
       if (entity) {
-         if ('groupId' in entity && !entity.groupId) entity.groupId = activeGroupIds[0];
-         if ('customer_id' in entity && !entity.customer_id) entity.customer_id = activeGroupIds[0];
+        if ('groupId' in entity && (entity.groupId === undefined || entity.groupId === null)) {
+          entity.groupId = effectiveGroupId;
+        }
+        if ('customer_id' in entity && (entity.customer_id === undefined || entity.customer_id === null)) {
+          entity.customer_id = effectiveGroupId;
+        }
       }
     }
   }
