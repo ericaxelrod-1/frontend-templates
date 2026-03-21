@@ -128,6 +128,30 @@ export const routes: Routes = [
             data: {
               permissions: 'rls:admin'
             }
+          },
+          {
+            path: 'join-paths',
+            loadComponent: () => import('./features/admin/rls-management/join-paths-admin.component').then(c => c.JoinPathsAdminComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'rls:admin'
+            }
+          },
+          {
+            path: 'scope-templates',
+            loadComponent: () => import('./features/admin/rls-management/scope-templates-admin.component').then(c => c.ScopeTemplatesAdminComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'rls:admin'
+            }
+          },
+          {
+            path: 'permission-inspector',
+            loadComponent: () => import('./features/admin/rls-management/permission-inspector.component').then(c => c.PermissionInspectorComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'rls:admin'
+            }
           }
         ]
       }

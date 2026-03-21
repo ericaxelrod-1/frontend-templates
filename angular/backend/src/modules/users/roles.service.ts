@@ -532,4 +532,83 @@ export class RolesService {
       await queryRunner.release();
     }
   }
+
+  async getAncestors(roleId: number): Promise<Role[]> {
+    const ancestors: Role[] = [];
+    let currentRole = await this.rolesRepository.findOne({
+      where: { id: roleId },
+      relations: ['parent'],
+    });
+
+    while (currentRole?.parent) {
+      ancestors.push(currentRole.parent);
+      currentRole = await this.rolesRepository.findOne({
+        where: { id: currentRole.parent.id },
+        relations: ['parent'],
+      });
+    }
+
+    return ancestors;
+  }
+
+  async getDescendants(roleId: number): Promise<Role[]> {
+    const descendants: Role[] = [];
+    const queue = [roleId];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      const children = await this.rolesRepository.find({
+        where: { parentId: currentId },
+      });
+
+      for (const child of children) {
+        descendants.push(child);
+        queue.push(child.id);
+      }
+    }
+
+    return descendants;
+  }
+
+  async getEffectivePermissions(
+    roleId: number,
+  ): Promise<{ permission: string; isGranted: boolean; source: string }[]> {
+    const role = await this.findOne(roleId);
+    const hierarchyPath = [role, ...(await this.getAncestors(roleId)).reverse()];
+
+    const permissionMap = new Map<string, { isGranted: boolean; source: string }>();
+
+    for (const r of hierarchyPath) {
+      if (!r.rolePermissions) continue;
+
+      for (const rp of r.rolePermissions) {
+        const permName = rp.permission?.name;
+        if (!permName) continue;
+
+        if (!permissionMap.has(permName)) {
+          permissionMap.set(permName, {
+            isGranted: rp.isGranted ?? false,
+            source: r.name,
+          });
+        } else {
+          const existing = permissionMap.get(permName)!;
+          if (rp.isGranted !== null && rp.isGranted !== undefined) {
+            if (existing.isGranted === null || existing.isGranted === undefined) {
+              existing.isGranted = rp.isGranted;
+              existing.source = r.name;
+            } else if (!rp.isGranted) {
+              existing.isGranted = false;
+              existing.source = r.name;
+            }
+          }
+        }
+      }
+    }
+
+    return Array.from(permissionMap.entries()).map(([permission, value]) => ({
+      permission,
+      isGranted: value.isGranted,
+      source: value.source,
+    }));
+  }
 }

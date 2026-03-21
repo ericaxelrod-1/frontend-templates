@@ -91,6 +91,24 @@ export class SidebarComponent implements OnInit, OnDestroy {
       icon: 'rule', 
       route: '/app/admin/rls-rules', 
       permission: 'rls:admin'
+    },
+    { 
+      label: 'Join Paths', 
+      icon: 'account_tree', 
+      route: '/app/admin/join-paths', 
+      permission: 'rls:admin'
+    },
+    { 
+      label: 'Scope Templates', 
+      icon: 'layers', 
+      route: '/app/admin/scope-templates', 
+      permission: 'rls:admin'
+    },
+    { 
+      label: 'Permission Inspector', 
+      icon: 'search', 
+      route: '/app/admin/permission-inspector', 
+      permission: 'rls:admin'
     }
   ];
   
