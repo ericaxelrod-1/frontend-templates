@@ -367,6 +367,11 @@ Run a comprehensive security audit before deployment:
    npm run security-test
    ```
 
+### Row-Level Security (RLS)
+
+If your application handles multi-tenant data, ensure you have properly configured the global Row-Level Security (RLS) interceptor to prevent cross-tenant data leaks.
+For detailed implementation and configuration instructions, refer to the [Row-Level Security (RLS) Architecture Guide](./row-level-security.md).
+
 ### Security Checklist
 
 Ensure the following security measures are in place:
@@ -375,6 +380,7 @@ Ensure the following security measures are in place:
 - [ ] Proper CSP (Content Security Policy) headers are configured
 - [ ] HTTPS is enforced
 - [ ] Authentication mechanisms are robust
+- [ ] Row-Level Security (RLS) interceptor is enabled and tested
 - [ ] Input validation is thorough
 - [ ] Email templates are sanitized against injection attacks
 - [ ] API endpoints implement rate limiting
