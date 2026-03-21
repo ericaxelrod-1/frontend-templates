@@ -556,27 +556,31 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
     // Load statistics
     this.loadingManager.startOperation('statistics');
-    this.loginMonitoringService.getStatistics().subscribe({
-      next: (stats) => {
-        this.statistics = stats;
-        this.loadingManager.endOperation('statistics');
-      },
-      error: (err) => {
-        this.error = 'Failed to load statistics';
-        this.loadingManager.endOperation('statistics');
-        console.error('Error loading statistics:', err);
-      }
-    });
+    this.loginMonitoringService.getStatistics()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (stats) => {
+          this.statistics = stats;
+          this.loadingManager.endOperation('statistics');
+        },
+        error: (err) => {
+          this.error = 'Failed to load statistics';
+          this.loadingManager.endOperation('statistics');
+          console.error('Error loading statistics:', err);
+        }
+      });
 
     // Load recent attempts
-    this.loginMonitoringService.getRecentAttempts().subscribe({
-      next: (attempts) => {
-        this.recentAttempts = attempts.items;
-      },
-      error: (err) => {
-        console.error('Error loading recent attempts:', err);
-      }
-    });
+    this.loginMonitoringService.getRecentAttempts()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (attempts) => {
+          this.recentAttempts = attempts.items;
+        },
+        error: (err) => {
+          console.error('Error loading recent attempts:', err);
+        }
+      });
 
     // Load security alerts with filters, sorting, and pagination
     this.loadingManager.startOperation('alerts');
@@ -589,7 +593,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       this.securityAlertsPageSize,
       this.getSecurityAlertsSortField(this.securityAlertsCurrentSort.active),
       this.securityAlertsCurrentSort.direction
-    ).subscribe({
+    ).pipe(takeUntil(this.destroy$)).subscribe({
       next: (alerts) => {
         this.securityAlerts = alerts;
         // Note: If the service returns a paginated response with total count, we would set it here
@@ -615,7 +619,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
       this.patternPageSize,
       this.getPatternSortField(this.patternCurrentSort.active),
       this.patternCurrentSort.direction
-    ).subscribe({
+    ).pipe(takeUntil(this.destroy$)).subscribe({
       next: (patternResults) => {
         this.patterns = patternResults.items;
         this.detectedPatterns = patternResults.items; // Populate detectedPatterns for template
@@ -649,7 +653,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
     console.log('[DEBUG] Loading pattern summary with time filter:', this.filterState.timeRange);
     const timeFilter = { timeRange: this.filterState.timeRange as '30d' | '24h' | '7d' | '90d' | 'all' };
-    this.loginMonitoringService.getPatternSummary(timeFilter).subscribe({
+    this.loginMonitoringService.getPatternSummary(timeFilter)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
       next: (summary) => {
         console.log('[DEBUG] Pattern summary loaded:', summary);
         this.patternSummary = summary;
@@ -1135,7 +1141,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     this.loadingManager.startOperation('ipReputation');
 
     // Load IP reputation data
-    this.loginMonitoringService.getIPReputation(ip).subscribe({
+    this.loginMonitoringService.getIPReputation(ip)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
       next: (reputation) => {
         this.selectedIpReputation = reputation;
         this.loadingManager.endOperation('ipReputation');
@@ -1257,7 +1265,9 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
     console.log('[LoginMonitoring] Sending test alert to backend...');
     this.isCreatingTestData = true;
 
-    this.loginMonitoringService.sendTestAlert().subscribe({
+    this.loginMonitoringService.sendTestAlert()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
       next: (result) => {
         console.log('Test alert sent successfully:', result);
         // Test alert will appear when filters are refreshed (same pattern as test patterns)

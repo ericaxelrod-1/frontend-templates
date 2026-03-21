@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, OnInit, Input } from '@angular/core';
+import { Component, EventEmitter, Output, OnInit, Input, OnDestroy } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -7,6 +7,8 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatInputModule } from '@angular/material/input';
 import { MatNativeDateModule } from '@angular/material/core';
 import { TimeFilter } from '../../../../../models/pattern-summary.interface';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-time-filter',
@@ -23,7 +25,7 @@ import { TimeFilter } from '../../../../../models/pattern-summary.interface';
   templateUrl: './time-filter.component.html',
   styleUrls: ['./time-filter.component.scss']
 })
-export class TimeFilterComponent implements OnInit {
+export class TimeFilterComponent implements OnInit, OnDestroy {
   @Input() hasPermission = false;
   @Input() initialTimeRange = '30d'; // BUG-124.19 FIX: Accept initial value from parent
   @Input() preventInitialEmission = true; // BUG-124.19 FIX: Allow parent to control initial emission
@@ -32,6 +34,7 @@ export class TimeFilterComponent implements OnInit {
   timeFilterForm: FormGroup;
   private isInitialized = false;
   private componentReady = false; // BUG-124.19 FIX: Track when component is fully ready
+  private destroy$ = new Subject<void>();
   
   predefinedRanges = [
     { value: '24h', label: 'Last 24 Hours' },
@@ -83,26 +86,37 @@ export class TimeFilterComponent implements OnInit {
     }, 100);
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   private setupSubscriptions(): void {
     // Listen for time range changes
-    this.timeFilterForm.get('timeRange')?.valueChanges.subscribe(() => {
-      if (this.componentReady) { // BUG-124.19 FIX: Only emit when component is ready
-        this.onTimeRangeChange();
-      }
-    });
+    this.timeFilterForm.get('timeRange')?.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        if (this.componentReady) { // BUG-124.19 FIX: Only emit when component is ready
+          this.onTimeRangeChange();
+        }
+      });
 
     // Listen for custom date changes
-    this.timeFilterForm.get('dateFrom')?.valueChanges.subscribe(() => {
-      if (this.componentReady && this.timeFilterForm.get('timeRange')?.value === 'custom') {
-        this.emitTimeFilter();
-      }
-    });
+    this.timeFilterForm.get('dateFrom')?.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        if (this.componentReady && this.timeFilterForm.get('timeRange')?.value === 'custom') {
+          this.emitTimeFilter();
+        }
+      });
 
-    this.timeFilterForm.get('dateTo')?.valueChanges.subscribe(() => {
-      if (this.componentReady && this.timeFilterForm.get('timeRange')?.value === 'custom') {
-        this.emitTimeFilter();
-      }
-    });
+    this.timeFilterForm.get('dateTo')?.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        if (this.componentReady && this.timeFilterForm.get('timeRange')?.value === 'custom') {
+          this.emitTimeFilter();
+        }
+      });
   }
 
   onTimeRangeChange(): void {
