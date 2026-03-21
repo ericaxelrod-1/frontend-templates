@@ -52,8 +52,8 @@ export interface PermissionInspection {
   directRoles?: { id: number; name: string }[];
   directGroups?: { id: number; name: string }[];
   hierarchy?: {
-    ancestors: { id: number; name: string }[];
-    descendants: { id: number; name: string }[];
+    ancestors?: { id: number; name: string }[];
+    descendants?: { id: number; name: string }[];
   };
   directPermissions?: { permission: string; isGranted: boolean; source?: string }[];
   effectivePermissions?: { permission: string; isGranted: boolean; inheritedFrom?: string }[];

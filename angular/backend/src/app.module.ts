@@ -31,12 +31,6 @@ import { RlsRule } from './modules/permissions/entities/rls-rule.entity';
 import { RlsJoinPath } from './modules/permissions/entities/rls-join-path.entity';
 import { RlsJoinCondition } from './modules/permissions/entities/rls-join-condition.entity';
 import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-template.entity';
-import { DataSource } from 'typeorm';
-
-declare global {
-  // eslint-disable-next-line no-var
-  var __RLS_NESTJS_DATASOURCE__: DataSource | undefined;
-}
 
 @Module({
   imports: [
