@@ -67,4 +67,17 @@ export class Group {
 
   @ManyToMany(() => User, (user) => user.groups)
   users: User[];
+
+  @Column({ nullable: true })
+  parentId: number;
+
+  @ManyToOne(() => Group, (group) => group.children, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'parent_id' })
+  parent: Group;
+
+  @OneToMany(() => Group, (group) => group.parent)
+  children: Group[];
+
+  @Column({ nullable: true })
+  priority: number;
 }

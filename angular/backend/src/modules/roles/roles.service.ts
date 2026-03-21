@@ -195,23 +195,158 @@ export class RolesService {
     );
   }
 
+  async getAncestors(roleId: number): Promise<Role[]> {
+    const ancestors: Role[] = [];
+    let currentRole = await this.roleRepository.findOne({
+      where: { id: roleId },
+      relations: ['parent'],
+    });
+
+    while (currentRole?.parent) {
+      ancestors.push(currentRole.parent);
+      currentRole = await this.roleRepository.findOne({
+        where: { id: currentRole.parent.id },
+        relations: ['parent'],
+      });
+    }
+
+    return ancestors;
+  }
+
+  async getDescendants(roleId: number): Promise<Role[]> {
+    const descendants: Role[] = [];
+    const queue = [roleId];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      const children = await this.roleRepository.find({
+        where: { parentId: currentId },
+      });
+
+      for (const child of children) {
+        descendants.push(child);
+        queue.push(child.id);
+      }
+    }
+
+    return descendants;
+  }
+
+  async validateNoCircularReference(
+    roleId: number,
+    newParentId: number,
+  ): Promise<boolean> {
+    if (roleId === newParentId) {
+      throw new Error('A role cannot be its own parent');
+    }
+
+    let currentId: number | null = newParentId;
+    const visited = new Set<number>([roleId]);
+
+    while (currentId !== null) {
+      if (visited.has(currentId)) {
+        throw new Error('Setting this parent would create a circular reference');
+      }
+
+      visited.add(currentId);
+      const parent = await this.roleRepository.findOne({
+        where: { id: currentId },
+        relations: ['parent'],
+      });
+
+      currentId = parent?.parent?.id ?? null;
+    }
+
+    return true;
+  }
+
+  async getEffectivePermissions(
+    roleId: number,
+  ): Promise<{ permission: string; isGranted: boolean; source: string }[]> {
+    const role = await this.findOne(roleId);
+    const hierarchyPath = [role, ...(await this.getAncestors(roleId)).reverse()];
+
+    const permissionMap = new Map<string, { isGranted: boolean; source: string }>();
+
+    for (const r of hierarchyPath) {
+      if (!r.rolePermissions) continue;
+
+      for (const rp of r.rolePermissions) {
+        const permName = rp.permission?.name;
+        if (!permName) continue;
+
+        if (!permissionMap.has(permName)) {
+          permissionMap.set(permName, {
+            isGranted: rp.isGranted,
+            source: r.name,
+          });
+        } else {
+          const existing = permissionMap.get(permName)!;
+          if (rp.isGranted !== null && rp.isGranted !== undefined) {
+            if (existing.isGranted === null || existing.isGranted === undefined) {
+              existing.isGranted = rp.isGranted;
+              existing.source = r.name;
+            } else if (!rp.isGranted) {
+              existing.isGranted = false;
+              existing.source = r.name;
+            }
+          }
+        }
+      }
+    }
+
+    return Array.from(permissionMap.entries()).map(([permission, value]) => ({
+      permission,
+      isGranted: value.isGranted,
+      source: value.source,
+    }));
+  }
+
+  async validatePermissionConstraints(
+    childRoleId: number,
+    newPermissions: { permissionId: number; isGranted: boolean }[],
+  ): Promise<{ valid: boolean; violations: string[] }> {
+    const childRole = await this.findOne(childRoleId);
+    const violations: string[] = [];
+
+    if (!childRole.parentId) {
+      return { valid: true, violations: [] };
+    }
+
+    const parentPermissions = await this.getEffectivePermissions(childRole.parentId);
+    const parentPermMap = new Map(parentPermissions.map((p) => [p.permission, p.isGranted]));
+
+    for (const newPerm of newPermissions) {
+      const permission = await this.permissionRepository.findOne({
+        where: { id: newPerm.permissionId },
+      });
+
+      if (!permission) continue;
+
+      const parentValue = parentPermMap.get(permission.name);
+
+      if (parentValue === false && newPerm.isGranted === true) {
+        violations.push(
+          `Permission "${permission.name}" is denied in parent but would be granted in child`,
+        );
+      }
+    }
+
+    return {
+      valid: violations.length === 0,
+      violations,
+    };
+  }
+
   // Clear all permission-related caches
   private async clearPermissionCaches(): Promise<void> {
-    // Since Cache interface doesn't have a keys method, we'll delete known patterns
-    // This is a workaround since we can't directly get all matching keys
-
-    // Delete common cache keys related to permissions
     await this.cacheManager.del('all_permissions');
     await this.cacheManager.del('all_role_permissions');
 
-    // For user-specific permissions, we would need to implement a more
-    // sophisticated tracking mechanism in a production environment.
-    // Here we're directly clearing specific cache keys we know about.
-
-    // For demo purposes, we'll clear some example keys:
-    const exampleUserRoleIds = [1, 2, 3]; // Common user role IDs
+    const exampleUserRoleIds = [1, 2, 3];
     for (const roleId of exampleUserRoleIds) {
       await this.cacheManager.del(`user_permission:${roleId}`);
     }
   }
 }
+

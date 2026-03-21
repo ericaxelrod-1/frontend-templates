@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { PermissionsService } from './services/permissions.service';
 import { Permission } from './entities/permission.entity';
 import { RolePermission } from './entities/role-permission.entity';
@@ -12,8 +12,11 @@ import { User } from '../users/entities/user.entity';
 import { UiComponent } from './entities/ui-component.entity';
 import { FrontendRoute } from './entities/frontend-route.entity';
 import { ApiEndpoint } from './entities/api-endpoint.entity';
+import { Resource } from './entities/resource.entity';
+import { Action } from './entities/action.entity';
 import { CacheService } from '../cache/cache.service';
 import { ManifestService } from './scanners/manifest.service';
+import { CacheSyncService } from '../cache/cache-sync.service';
 import { ModuleRef } from '@nestjs/core';
 
 type MockRepository<T = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
@@ -39,13 +42,20 @@ describe('PermissionsService', () => {
   let componentRepository: MockRepository<UiComponent>;
   let routeRepository: MockRepository<FrontendRoute>;
   let endpointRepository: MockRepository<ApiEndpoint>;
+  let resourceRepository: MockRepository<Resource>;
+  let actionRepository: MockRepository<Action>;
   let cacheService: Partial<CacheService>;
+  let cacheSyncService: Partial<CacheSyncService>;
   let manifestService: ManifestService;
 
   beforeEach(async () => {
     cacheService = {
       getUserPermissions: jest.fn(),
       cacheUserPermissions: jest.fn(),
+    };
+
+    cacheSyncService = {
+      syncPermissions: jest.fn(),
     };
 
     manifestService = {
@@ -60,6 +70,10 @@ describe('PermissionsService', () => {
           useValue: {
             get: jest.fn(),
           },
+        },
+        {
+          provide: EntityManager,
+          useValue: {},
         },
         {
           provide: getRepositoryToken(Permission),
@@ -95,8 +109,17 @@ describe('PermissionsService', () => {
           provide: getRepositoryToken(ApiEndpoint),
           useFactory: createMockRepository,
         },
+        {
+          provide: getRepositoryToken(Resource),
+          useFactory: createMockRepository,
+        },
+        {
+          provide: getRepositoryToken(Action),
+          useFactory: createMockRepository,
+        },
         { provide: CacheService, useValue: cacheService },
         { provide: ManifestService, useValue: manifestService },
+        { provide: CacheSyncService, useValue: cacheSyncService },
       ],
     }).compile();
 

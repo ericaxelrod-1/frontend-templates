@@ -6,30 +6,17 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard, PERMISSIONS_KEY } from './permission.guard';
-
-// Create a mock interface to prevent direct import of PermissionsService
-interface MockPermissionsService {
-  checkUserPermission: jest.Mock;
-  getRoleNamesForUser: jest.Mock;
-}
+import { PermissionsService } from '../services/permissions.service';
 
 describe('PermissionGuard', () => {
   let guard: PermissionGuard;
   let reflector: Reflector;
-  let permissionsService: MockPermissionsService;
+  let permissionsService: PermissionsService;
 
-  // Mocks
-  const mockRequest = {
-    user: { id: 1 },
+  const mockPermissionsService = {
+    checkUserPermission: jest.fn(),
+    getRoleNamesForUser: jest.fn().mockReturnValue(['user']),
   };
-
-  const mockExecutionContext = {
-    getHandler: jest.fn(),
-    getClass: jest.fn(),
-    switchToHttp: jest.fn().mockReturnValue({
-      getRequest: jest.fn().mockReturnValue(mockRequest),
-    }),
-  } as unknown as ExecutionContext;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -42,20 +29,15 @@ describe('PermissionGuard', () => {
           },
         },
         {
-          provide: 'PermissionsService',
-          useValue: {
-            checkUserPermission: jest.fn(),
-            getRoleNamesForUser: jest.fn().mockReturnValue(['user']),
-          },
+          provide: PermissionsService,
+          useValue: mockPermissionsService,
         },
       ],
     }).compile();
 
     guard = module.get<PermissionGuard>(PermissionGuard);
     reflector = module.get<Reflector>(Reflector);
-    permissionsService = module.get(
-      'PermissionsService',
-    ) as MockPermissionsService;
+    permissionsService = module.get<PermissionsService>(PermissionsService);
   });
 
   it('should be defined', () => {

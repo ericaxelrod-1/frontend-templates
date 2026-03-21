@@ -19,19 +19,23 @@
     "test": "jest"
   },
   "dependencies": {
-    "nestjs-cls": "^3.6.0"
+    "nestjs-cls": "^4.0.0 || ^5.0.0"
   },
   "peerDependencies": {
-    "@nestjs/common": "^9.0.0 || ^10.0.0",
-    "@nestjs/core": "^9.0.0 || ^10.0.0",
-    "@nestjs/typeorm": "^9.0.0 || ^10.0.0",
+    "@nestjs/common": "^9.0.0 || ^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^9.0.0 || ^10.0.0 || ^11.0.0",
+    "@nestjs/typeorm": "^9.0.0 || ^10.0.0 || ^11.0.0",
     "typeorm": "^0.3.0"
   },
   "devDependencies": {
-    "@nestjs/testing": "^10.4.22",
+    "@nestjs/common": "^11.0.20",
+    "@nestjs/core": "^11.0.20",
+    "@nestjs/testing": "^11.0.20",
+    "@nestjs/typeorm": "^11.0.0",
     "@types/jest": "^30.0.0",
     "jest": "^30.3.0",
     "ts-jest": "^29.4.6",
+    "typeorm": "^0.3.0",
     "typescript": "^5.0.0"
   }
 }

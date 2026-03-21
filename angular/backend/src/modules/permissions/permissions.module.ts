@@ -5,6 +5,7 @@ import { PermissionCheckerService } from './services/permission-checker.service'
 import { PermissionsController } from './controllers/permissions.controller';
 import { ResourcesController } from './controllers/resources.controller';
 import { ActionsController } from './controllers/actions.controller';
+import { RlsRulesController } from './controllers/rls-rules.controller';
 import { Permission } from './entities/permission.entity';
 import { Role } from './entities/role.entity';
 import { RolePermission } from './entities/role-permission.entity';
@@ -23,6 +24,9 @@ import { UserPermission } from './entities/user-permission.entity';
 import { Group } from './entities/group.entity';
 import { User } from '../users/entities/user.entity';
 import { PermissionSeedsService } from '../../../src/database/seeds/permission-seeds.service';
+import { RlsRule } from './entities/rls-rule.entity';
+import { RlsContextGuard } from './guards/rls-context.guard';
+import { RlsService } from '@our-org/nestjs-typeorm-rls';
 
 @Module({
   imports: [
@@ -39,13 +43,14 @@ import { PermissionSeedsService } from '../../../src/database/seeds/permission-s
       UserPermission,
       Group,
       User,
+      RlsRule,
     ]),
     forwardRef(() => UsersModule),
     forwardRef(() => ScannersModule),
     forwardRef(() => PermissionsSharedModule),
     forwardRef(() => CacheModule),
   ],
-  controllers: [PermissionsController, ResourcesController, ActionsController],
+  controllers: [PermissionsController, ResourcesController, ActionsController, RlsRulesController],
   providers: [
     PermissionsService,
     {
@@ -53,12 +58,16 @@ import { PermissionSeedsService } from '../../../src/database/seeds/permission-s
       useClass: PermissionCheckerService,
     },
     PermissionSeedsService,
+    RlsContextGuard,
+    RlsService,
   ],
   exports: [
     PermissionsService,
     PermissionCheckerService,
     TypeOrmModule,
     PermissionSeedsService,
+    RlsContextGuard,
+    RlsService,
   ],
 })
 export class PermissionsModule {}

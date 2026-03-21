@@ -7,6 +7,7 @@ import {
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ClsModule } from 'nestjs-cls';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { User } from './modules/users/entities/user.entity';
@@ -25,12 +26,20 @@ import { Logger } from '@nestjs/common';
 import { UsersSharedModule } from './modules/users/shared/users-shared.module';
 import { PermissionsSharedModule } from './modules/permissions/shared/permissions-shared.module';
 import { AuthSharedModule } from './modules/auth/shared/auth-shared.module';
+import { RlsModule } from '../packages/nestjs-typeorm-rls';
+import { RlsRule } from './modules/permissions/entities/rls-rule.entity';
+import { RlsJoinPath } from './modules/permissions/entities/rls-join-path.entity';
+import { RlsJoinCondition } from './modules/permissions/entities/rls-join-condition.entity';
+import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-template.entity';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [environmentConfig, databaseConfig],
+    }),
+    ClsModule.forRoot({
+      global: true,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -41,11 +50,16 @@ import { AuthSharedModule } from './modules/auth/shared/auth-shared.module';
     ScheduleModule.forRoot(),
     LoggerModule,
     SharedModule,
-    // Import shared modules first to make interfaces available
     UsersSharedModule,
     PermissionsSharedModule,
     AuthSharedModule,
-    // Then import feature modules
+    RlsModule.forRootAsync({
+      useFactory: () => ({
+        enabled: process.env.NODE_ENV !== 'test',
+        exemptTables: ['rls_rules', 'rls_join_paths', 'rls_join_conditions', 'rls_scope_templates'],
+        fallbackBehavior: 'deny',
+      }),
+    }),
     AuthModule,
     UsersModule,
     CaptchaModule,
@@ -61,14 +75,12 @@ export class AppModule implements NestModule, OnModuleInit {
   ) {}
 
   configure(consumer: MiddlewareConsumer) {
-    // Apply IP allowlist middleware to all routes
     consumer.apply(IPAllowlistMiddleware).forRoutes('*path');
   }
 
   async onModuleInit() {
     const environment = this.configService.get('NODE_ENV', 'development');
 
-    // Only seed permissions in development environment by default
     if (environment === 'development') {
       this.logger.log(
         'Development environment detected, seeding default permissions...',

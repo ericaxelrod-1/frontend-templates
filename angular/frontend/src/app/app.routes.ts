@@ -120,6 +120,14 @@ export const routes: Routes = [
             data: {
               permissions: 'login-monitoring:read'
             }
+          },
+          {
+            path: 'rls-rules',
+            loadComponent: () => import('./features/admin/rls-management/rls-admin.component').then(c => c.RlsAdminComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'rls:admin'
+            }
           }
         ]
       }

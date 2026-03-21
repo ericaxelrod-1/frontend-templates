@@ -751,4 +751,20 @@ export class UsersService {
 
     return true;
   }
+
+  /**
+   * Get all group IDs for a user (including inherited from group hierarchy)
+   */
+  async getUserGroupIds(userId: number): Promise<number[]> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['groups'],
+    });
+
+    if (!user || !user.groups) {
+      return [];
+    }
+
+    return user.groups.map((g) => g.id);
+  }
 }

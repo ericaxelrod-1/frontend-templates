@@ -12,6 +12,10 @@ import { UserPermission } from '../modules/permissions/entities/user-permission.
 import { RolePermission } from '../modules/roles/entities/role-permission.entity';
 import { User } from '../modules/users/entities/user.entity';
 import { Group } from '../modules/permissions/entities/group.entity';
+import { RlsRule } from '../modules/permissions/entities/rls-rule.entity';
+import { RlsJoinPath } from '../modules/permissions/entities/rls-join-path.entity';
+import { RlsJoinCondition } from '../modules/permissions/entities/rls-join-condition.entity';
+import { RlsScopeTemplate } from '../modules/permissions/entities/rls-scope-template.entity';
 
 import { Action } from '../modules/permissions/entities/action.entity';
 import { Resource } from '../modules/permissions/entities/resource.entity';
@@ -52,6 +56,10 @@ export const dataSourceOptions: DataSourceOptions = {
     SecurityAlert,
     SecurityDetectedPattern,
     PatternLoginAttempt,
+    RlsRule,
+    RlsJoinPath,
+    RlsJoinCondition,
+    RlsScopeTemplate,
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false, // Disable synchronize as we're handling schema manually

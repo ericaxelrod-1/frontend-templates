@@ -42,6 +42,8 @@ export class RlsModule {
         metrics: RlsMetricsService,
         config: RlsModuleOptions,
       ) => {
+        rlsService.setDataSource(dataSource);
+
         if (!config.enabled || process.argv.includes('migration:run')) {
           return dataSource.createEntityManager();
         }
@@ -66,12 +68,12 @@ export class RlsModule {
         entityManagerProvider,
       ],
       exports: [
-      RlsService,
-      RlsSystemBypassService,
-      RlsMetricsService,
-      getEntityManagerToken(options.connectionName),
-      'RLS_CONFIG_OPTIONS',
-    ],
+        RlsService,
+        RlsSystemBypassService,
+        RlsMetricsService,
+        getEntityManagerToken(options.connectionName),
+        'RLS_CONFIG_OPTIONS',
+      ],
     };
   }
 

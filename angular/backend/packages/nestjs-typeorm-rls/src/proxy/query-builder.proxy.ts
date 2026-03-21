@@ -25,7 +25,7 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
       ];
       
       if (typeof prop === 'string' && joinMethods.includes(prop)) {
-        return function (entity: string | Function, alias: string, condition?: string, parameters?: any) {
+        return async function (entity: string | Function, alias: string, condition?: string, parameters?: any) {
           if (cls.get('__rlsBypass')) {
             metrics.recordBypass();
             return value.call(target, entity, alias, condition, parameters);
@@ -60,7 +60,7 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
           }
 
           const groupIds = cls.get('activeGroupIds') || [];
-          const rlsRules = rlsService.getRulesForTable(resolvedTableName, groupIds);
+          const rlsRules = await rlsService.getRulesForTable(resolvedTableName, groupIds);
 
           let securedCondition = condition;
           let mergedParameters = parameters || {};
@@ -112,34 +112,34 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
           }
 
           const queryType = (target as any).expressionMap?.queryType;
-          if (queryType === 'select' || queryType === 'update' || queryType === 'delete') {
-             const mainTableName = (target as any).expressionMap?.mainAlias?.metadata?.tableName;
-             
-             if (mainTableName && !config.exemptTables?.includes(mainTableName)) {
-                const groupIds = cls.get('activeGroupIds') || [];
-                const rlsRules = rlsService.getRulesForTable(mainTableName, groupIds);
-                
-                if (rlsRules) {
-                   let sql = rlsRules.sql;
-                   const params = rlsRules.parameters || {};
-                   
-                   // Namespace parameters
-                   const uniqueParams: Record<string, any> = {};
-                   for (const [key, val] of Object.entries(params)) {
-                      const uniqueKey = `rls_${key}_${Math.random().toString(36).substr(2, 9)}`;
-                      uniqueParams[uniqueKey] = val;
-                      sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
-                   }
+           if (queryType === 'select' || queryType === 'update' || queryType === 'delete') {
+              const mainTableName = (target as any).expressionMap?.mainAlias?.metadata?.tableName;
+              
+              if (mainTableName && !config.exemptTables?.includes(mainTableName)) {
+                 const groupIds = cls.get('activeGroupIds') || [];
+                 const rlsRules = await rlsService.getRulesForTable(mainTableName, groupIds);
+                 
+                 if (rlsRules) {
+                    let sql = rlsRules.sql;
+                    const params = rlsRules.parameters || {};
+                    
+                    // Namespace parameters
+                    const uniqueParams: Record<string, any> = {};
+                    for (const [key, val] of Object.entries(params)) {
+                       const uniqueKey = `rls_${key}_${Math.random().toString(36).substr(2, 9)}`;
+                       uniqueParams[uniqueKey] = val;
+                       sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
+                    }
 
-                   target.andWhere(`(${sql})`, uniqueParams);
-                } else if (config.fallbackBehavior === 'deny') {
-                   target.andWhere('1=0');
-                   metrics.recordBlock(mainTableName);
-                } else {
-                   console.warn(`[RLS WARNING] Table '${mainTableName}' is unprotected!`);
-                }
-             }
-          }
+                    target.andWhere(`(${sql})`, uniqueParams);
+                 } else if (config.fallbackBehavior === 'deny') {
+                    target.andWhere('1=0');
+                    metrics.recordBlock(mainTableName);
+                 } else {
+                    console.warn(`[RLS WARNING] Table '${mainTableName}' is unprotected!`);
+                 }
+              }
+           }
 
           target.__rlsApplied = true;
           return value.apply(target, args);

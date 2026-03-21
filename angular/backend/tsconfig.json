@@ -17,6 +17,10 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@our-org/nestjs-typeorm-rls": ["packages/nestjs-typeorm-rls/src"],
+      "@our-org/nestjs-typeorm-rls/*": ["packages/nestjs-typeorm-rls/src/*"]
+    }
   }
 }
