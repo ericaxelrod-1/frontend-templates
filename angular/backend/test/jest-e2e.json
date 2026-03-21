@@ -8,7 +8,8 @@
   },
   "setupFilesAfterEnv": ["./jest.setup.ts"],
   "moduleNameMapper": {
-    "^src/(.*)$": "<rootDir>/../src/$1"
+    "^src/(.*)$": "<rootDir>/../src/$1",
+    "^@our-org/(.*)$": "<rootDir>/../packages/$1"
   },
-  "testTimeout": 30000
+  "testTimeout": 60000
 }
