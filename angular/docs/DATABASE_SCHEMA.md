@@ -365,13 +365,15 @@ Stores CAPTCHA challenge data.
 Indexes: `token` (UNIQUE), `expires_at`.
 
 ### `rate_limit_counter` Table
-Stores rate limiting counters for throttling repeated requests. Corresponds to `RateLimitCounter` entity.
+Stores rate limiting counters for tracking failed login attempts per IP address, used by the **Pattern Detection Service** (`src/modules/auth/services/pattern-detection.service.ts`) to detect brute force attacks.
+
+The Pattern Detection Service increments counters when login attempts fail, keyed by IP address (`ip:<address>`). A scheduled cron job queries this table every minute to identify IPs with excessive failed attempts (≥5 within 30 minutes) and generates `brute_force` security patterns.
 
 | Column               | Type     | Constraints                        | Description                                      |
 |----------------------|----------|------------------------------------|--------------------------------------------------|
 | `id`                 | TEXT     | PRIMARY KEY                        | UUID identifier                                  |
-| `key`                | TEXT     | NOT NULL, UNIQUE                   | Universal key (e.g., 'ip:192.168.1.1', 'email:user@example.com') |
-| `count`              | INTEGER  | NOT NULL, DEFAULT 0                | Number of occurrences within current window       |
+| `key`                | TEXT     | NOT NULL, UNIQUE                   | Rate limit key (e.g., `ip:192.168.1.1`)          |
+| `count`              | INTEGER  | NOT NULL, DEFAULT 0                | Number of failed attempts in current window      |
 | `window_expires_at`  | DATETIME | NOT NULL                           | When this rate limit window expires             |
 | `created_at`         | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Record creation timestamp                        |
 | `updated_at`         | DATETIME | NOT NULL, DEFAULT (datetime('now')) | Record last update timestamp                    |
