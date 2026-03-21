@@ -28,9 +28,15 @@ TypeORM manages queries through the `EntityManager`. Every `Repository` requests
 
 ```typescript
 // Simplified instantiation logic
+// Note: RlsModule creates its own DataSource from dataSourceOptions to avoid
+// DI context issues with TypeOrmModule.forRootAsync()
 {
   provide: EntityManager,
-  useFactory: (dataSource: DataSource, cls: ClsService) => {
+  useFactory: async (cls: ClsService, config: RlsModuleOptions) => {
+    // Create DataSource from config.dataSourceOptions (passed from ConfigService)
+    const dataSource = new DataSource(config.dataSourceOptions);
+    await dataSource.initialize();
+    
     // To prevent race conditions, the raw DataSource QueryRunner is patched HERE
     patchDataSourceQueryRunner(dataSource);
     
@@ -39,6 +45,9 @@ TypeORM manages queries through the `EntityManager`. Every `Repository` requests
   }
 }
 ```
+
+**Why does RlsModule create its own DataSource?**
+Because `TypeOrmModule.forRootAsync()` creates the DataSource in a separate NestJS DI context, injecting `DataSource` directly into `RlsModule` fails at runtime. The solution is to pass `dataSourceOptions` (the raw configuration object) from `ConfigService` and let RlsModule instantiate its own DataSource.
 
 ### 2.2 The `QueryBuilder` Proxy (Solving Nested Relations)
 TypeORM processes nested relations (e.g., `find({ relations: ['orders'] })`) by silently calling `qb.leftJoin()` under the hood. Our `QueryBuilderProxy` intercepts these public method calls across the entire API surface:

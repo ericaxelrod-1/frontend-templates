@@ -98,6 +98,17 @@ To monitor the health and activity of the RLS system, the library must emit spec
 ### Phase 1: Database & Config 
 1. Create migrations for the required `rls_rules`, `rls_join_paths`, etc., tables.
 2. Integrate `RlsModule.forRootAsync()` into `app.module.ts`.
+   > **Important:** RlsModule creates its own DataSource instance because it runs in a separate NestJS DI context from `TypeOrmModule.forRootAsync()`. Pass `dataSourceOptions` from ConfigService:
+   > ```typescript
+   > RlsModule.forRootAsync({
+   >   imports: [ConfigModule],
+   >   inject: [ConfigService],
+   >   useFactory: (configService: ConfigService) => ({
+   >     dataSourceOptions: configService.get('database'),
+   >     // ... other options
+   >   }),
+   > })
+   > ```
 
 ### Phase 2: Initial Rules Seeding
 Create a TypeORM database seeder script (e.g., `seed-rls.ts`) that runs inside a `runSystemBypass()` block. This script will insert the fundamental rules for core tables (e.g., ensuring users can only see their own `groups`) before the application accepts its first login. 
