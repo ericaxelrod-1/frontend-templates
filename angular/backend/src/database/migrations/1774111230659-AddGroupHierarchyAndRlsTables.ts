@@ -6,20 +6,38 @@ export class AddGroupHierarchyAndRlsTables1774111230659
   name = 'AddGroupHierarchyAndRlsTables1774111230659';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add Group hierarchy columns
+    // For SQLite, we need to recreate the groups table to add parent_id with FK constraint
+    // Step 1: Create new table with the additional columns
     await queryRunner.query(`
-      ALTER TABLE "groups" ADD COLUMN "parent_id" INTEGER
-    `);
-    await queryRunner.query(`
-      ALTER TABLE "groups" ADD COLUMN "priority" INTEGER
+      CREATE TABLE "groups_new" (
+        "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+        "name" VARCHAR(50) UNIQUE NOT NULL,
+        "description" VARCHAR(255),
+        "settings" TEXT,
+        "is_system_group" INTEGER DEFAULT 0,
+        "owner_id" INTEGER,
+        "created_at" DATETIME NOT NULL DEFAULT (datetime('now')),
+        "updated_at" DATETIME NOT NULL DEFAULT (datetime('now')),
+        "parent_id" INTEGER,
+        "priority" INTEGER,
+        FOREIGN KEY ("owner_id") REFERENCES "users" ("id") ON DELETE SET NULL,
+        FOREIGN KEY ("parent_id") REFERENCES "groups" ("id") ON DELETE SET NULL
+      )
     `);
 
+    // Step 2: Copy data from old table to new table
     await queryRunner.query(`
-      ALTER TABLE "groups" ADD CONSTRAINT "FK_groups_parent" 
-      FOREIGN KEY ("parent_id") REFERENCES "groups" ("id") ON DELETE SET NULL
+      INSERT INTO "groups_new" ("id", "name", "description", "settings", "is_system_group", "owner_id", "created_at", "updated_at")
+      SELECT "id", "name", "description", "settings", "is_system_group", "owner_id", "created_at", "updated_at" FROM "groups"
     `);
 
-    // Create index for parent_id on groups
+    // Step 3: Drop old table
+    await queryRunner.query(`DROP TABLE "groups"`);
+
+    // Step 4: Rename new table to original name
+    await queryRunner.query(`ALTER TABLE "groups_new" RENAME TO "groups"`);
+
+    // Step 5: Create index for parent_id
     await queryRunner.query(`
       CREATE INDEX "IDX_groups_parent_id" ON "groups" ("parent_id")
     `);
@@ -28,8 +46,8 @@ export class AddGroupHierarchyAndRlsTables1774111230659
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "rls_join_paths" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-        "name" VARCHAR(255) NOT NULL,
-        "target_table" VARCHAR(255) NOT NULL,
+        "name" VARCHAR NOT NULL,
+        "target_table" VARCHAR NOT NULL,
         "chain" TEXT NOT NULL,
         "created_at" DATETIME NOT NULL DEFAULT (datetime('now')),
         "updated_at" DATETIME NOT NULL DEFAULT (datetime('now'))
@@ -41,14 +59,13 @@ export class AddGroupHierarchyAndRlsTables1774111230659
       CREATE TABLE IF NOT EXISTS "rls_join_conditions" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "join_path_id" INTEGER NOT NULL,
-        "from_table" VARCHAR(255) NOT NULL,
-        "from_column" VARCHAR(255) NOT NULL,
-        "to_table" VARCHAR(255) NOT NULL,
-        "to_column" VARCHAR(255) NOT NULL,
-        "operator" VARCHAR(50) NOT NULL DEFAULT '=',
+        "from_table" VARCHAR NOT NULL,
+        "from_column" VARCHAR NOT NULL,
+        "to_table" VARCHAR NOT NULL,
+        "to_column" VARCHAR NOT NULL,
+        "operator" VARCHAR DEFAULT '=',
         "created_at" DATETIME NOT NULL DEFAULT (datetime('now')),
         "updated_at" DATETIME NOT NULL DEFAULT (datetime('now')),
-        CONSTRAINT "FK_rls_join_conditions_path" 
         FOREIGN KEY ("join_path_id") REFERENCES "rls_join_paths" ("id") ON DELETE CASCADE
       )
     `);
@@ -58,12 +75,11 @@ export class AddGroupHierarchyAndRlsTables1774111230659
       CREATE TABLE IF NOT EXISTS "rls_rules" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "group_id" INTEGER NOT NULL,
-        "target_table" VARCHAR(255) NOT NULL,
+        "target_table" VARCHAR NOT NULL,
         "sql" TEXT NOT NULL,
         "parameters" TEXT,
         "created_at" DATETIME NOT NULL DEFAULT (datetime('now')),
         "updated_at" DATETIME NOT NULL DEFAULT (datetime('now')),
-        CONSTRAINT "FK_rls_rules_group" 
         FOREIGN KEY ("group_id") REFERENCES "groups" ("id") ON DELETE CASCADE
       )
     `);
@@ -72,13 +88,12 @@ export class AddGroupHierarchyAndRlsTables1774111230659
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "rls_scope_templates" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-        "name" VARCHAR(255) NOT NULL,
+        "name" VARCHAR NOT NULL,
         "join_path_id" INTEGER NOT NULL,
-        "target_table" VARCHAR(255) NOT NULL,
+        "target_table" VARCHAR NOT NULL,
         "available_columns" TEXT NOT NULL,
         "created_at" DATETIME NOT NULL DEFAULT (datetime('now')),
         "updated_at" DATETIME NOT NULL DEFAULT (datetime('now')),
-        CONSTRAINT "FK_rls_scope_templates_path" 
         FOREIGN KEY ("join_path_id") REFERENCES "rls_join_paths" ("id") ON DELETE CASCADE
       )
     `);
@@ -104,8 +119,27 @@ export class AddGroupHierarchyAndRlsTables1774111230659
     await queryRunner.query(`DROP TABLE IF EXISTS "rls_join_conditions"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "rls_join_paths"`);
 
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_groups_parent_id"`);
-    await queryRunner.query(`ALTER TABLE "groups" DROP COLUMN "priority"`);
-    await queryRunner.query(`ALTER TABLE "groups" DROP COLUMN "parent_id"`);
+    // For SQLite, recreate groups table without parent_id and priority
+    await queryRunner.query(`
+      CREATE TABLE "groups_old" (
+        "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+        "name" VARCHAR(50) UNIQUE NOT NULL,
+        "description" VARCHAR(255),
+        "settings" TEXT,
+        "is_system_group" INTEGER DEFAULT 0,
+        "owner_id" INTEGER,
+        "created_at" DATETIME NOT NULL DEFAULT (datetime('now')),
+        "updated_at" DATETIME NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY ("owner_id") REFERENCES "users" ("id") ON DELETE SET NULL
+      )
+    `);
+
+    await queryRunner.query(`
+      INSERT INTO "groups_old" ("id", "name", "description", "settings", "is_system_group", "owner_id", "created_at", "updated_at")
+      SELECT "id", "name", "description", "settings", "is_system_group", "owner_id", "created_at", "updated_at" FROM "groups"
+    `);
+
+    await queryRunner.query(`DROP TABLE "groups"`);
+    await queryRunner.query(`ALTER TABLE "groups_old" RENAME TO "groups"`);
   }
 }

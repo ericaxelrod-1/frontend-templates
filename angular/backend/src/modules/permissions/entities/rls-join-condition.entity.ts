@@ -17,19 +17,19 @@ export class RlsJoinCondition {
   @Column({ name: 'join_path_id' })
   joinPathId: number;
 
-  @Column({ name: 'from_table', length: 255 })
+  @Column({ name: 'from_table' })
   fromTable: string;
 
-  @Column({ name: 'from_column', length: 255 })
+  @Column({ name: 'from_column' })
   fromColumn: string;
 
-  @Column({ name: 'to_table', length: 255 })
+  @Column({ name: 'to_table' })
   toTable: string;
 
-  @Column({ name: 'to_column', length: 255 })
+  @Column({ name: 'to_column' })
   toColumn: string;
 
-  @Column({ length: 50, default: '=' })
+  @Column({ default: '=' })
   operator: string;
 
   @ManyToOne(() => RlsJoinPath, (path) => path.conditions, { onDelete: 'CASCADE' })

@@ -17,7 +17,7 @@ export class RlsRule {
   @Column({ name: 'group_id' })
   groupId: number;
 
-  @Column({ name: 'target_table', length: 255 })
+  @Column({ name: 'target_table' })
   targetTable: string;
 
   @Column({ type: 'text' })

@@ -14,10 +14,10 @@ export class RlsJoinPath {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 255 })
+  @Column()
   name: string;
 
-  @Column({ name: 'target_table', length: 255 })
+  @Column({ name: 'target_table' })
   targetTable: string;
 
   @Column({ type: 'text' })

@@ -14,13 +14,13 @@ export class RlsScopeTemplate {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 255 })
-  name: number;
+  @Column()
+  name: string;
 
   @Column({ name: 'join_path_id' })
   joinPathId: number;
 
-  @Column({ name: 'target_table', length: 255 })
+  @Column({ name: 'target_table' })
   targetTable: string;
 
   @Column({ name: 'available_columns', type: 'text' })
