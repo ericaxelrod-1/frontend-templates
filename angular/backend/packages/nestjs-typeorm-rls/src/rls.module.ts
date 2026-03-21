@@ -1,7 +1,7 @@
 import { DynamicModule, Module, Global, Logger, Provider } from '@nestjs/common';
 import { getEntityManagerToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
-import { ClsService } from 'nestjs-cls';
+import { DataSource, DataSourceOptions } from 'typeorm';
+import { ClsModule, ClsService } from 'nestjs-cls';
 import { RlsService } from './rls.service';
 import { RlsSystemBypassService } from './internal/internal-bypass.service';
 import { RlsMetricsService } from './rls-metrics.service';
@@ -14,9 +14,10 @@ export interface RlsModuleOptions {
   systemTableAliases?: Record<string, string>;
   exemptTables?: string[];
   fallbackBehavior?: 'warn' | 'deny';
+  dataSourceOptions?: DataSourceOptions;
+  dataSourceFactory?: () => DataSource | Promise<DataSource>;
 }
 
-@Global()
 @Module({})
 export class RlsModule {
   private static readonly logger = new Logger('RlsModule');
@@ -33,16 +34,40 @@ export class RlsModule {
       inject: options.inject || [],
     };
 
+    let dataSourceInstance: DataSource | null = null;
+
     const entityManagerProvider: Provider = {
       provide: getEntityManagerToken(options.connectionName),
       useFactory: async (
-        dataSource: DataSource,
         cls: ClsService,
         rlsService: RlsService,
         metrics: RlsMetricsService,
         config: RlsModuleOptions,
       ) => {
+        let dataSource: DataSource;
+        
+        if (dataSourceInstance) {
+          dataSource = dataSourceInstance;
+        } else if (config.dataSourceFactory) {
+          dataSource = await config.dataSourceFactory();
+          dataSourceInstance = dataSource;
+        } else if (config.dataSourceOptions) {
+          dataSource = new DataSource(config.dataSourceOptions);
+          if (!dataSource.isInitialized) {
+            await dataSource.initialize();
+          }
+          dataSourceInstance = dataSource;
+        } else {
+          throw new Error(
+            'RlsModule requires dataSourceOptions, dataSourceFactory, or the global __RLS_NESTJS_DATASOURCE__ to be set.'
+          );
+        }
+        
         rlsService.setDataSource(dataSource);
+
+        const subscriber = new RlsInsertSubscriber();
+        subscriber.setCls(cls);
+        subscriber.register(dataSource);
 
         if (!config.enabled || process.argv.includes('migration:run')) {
           return dataSource.createEntityManager();
@@ -53,18 +78,20 @@ export class RlsModule {
         const originalManager = dataSource.createEntityManager();
         return createEntityManagerProxy(originalManager, cls, rlsService, metrics, config);
       },
-      inject: [DataSource, ClsService, RlsService, RlsMetricsService, 'RLS_CONFIG_OPTIONS'],
+      inject: [ClsService, RlsService, RlsMetricsService, 'RLS_CONFIG_OPTIONS'],
     };
 
     return {
       module: RlsModule,
-      imports: options.imports || [],
+      imports: [
+        ClsModule,
+        ...(options.imports || []),
+      ],
       providers: [
         rlsOptionsProvider,
         RlsMetricsService,
         RlsService,
         RlsSystemBypassService,
-        RlsInsertSubscriber,
         entityManagerProvider,
       ],
       exports: [

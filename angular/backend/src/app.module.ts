@@ -26,11 +26,17 @@ import { Logger } from '@nestjs/common';
 import { UsersSharedModule } from './modules/users/shared/users-shared.module';
 import { PermissionsSharedModule } from './modules/permissions/shared/permissions-shared.module';
 import { AuthSharedModule } from './modules/auth/shared/auth-shared.module';
-import { RlsModule } from '../packages/nestjs-typeorm-rls';
+import { RlsModule } from '@our-org/nestjs-typeorm-rls';
 import { RlsRule } from './modules/permissions/entities/rls-rule.entity';
 import { RlsJoinPath } from './modules/permissions/entities/rls-join-path.entity';
 import { RlsJoinCondition } from './modules/permissions/entities/rls-join-condition.entity';
 import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-template.entity';
+import { DataSource } from 'typeorm';
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __RLS_NESTJS_DATASOURCE__: DataSource | undefined;
+}
 
 @Module({
   imports: [
@@ -54,11 +60,17 @@ import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-templ
     PermissionsSharedModule,
     AuthSharedModule,
     RlsModule.forRootAsync({
-      useFactory: () => ({
-        enabled: process.env.NODE_ENV !== 'test',
-        exemptTables: ['rls_rules', 'rls_join_paths', 'rls_join_conditions', 'rls_scope_templates'],
-        fallbackBehavior: 'deny',
-      }),
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const dbConfig = configService.get('database');
+        return {
+          enabled: process.env.NODE_ENV !== 'test',
+          exemptTables: ['rls_rules', 'rls_join_paths', 'rls_join_conditions', 'rls_scope_templates'],
+          fallbackBehavior: 'deny' as const,
+          dataSourceOptions: dbConfig as any,
+        };
+      },
     }),
     AuthModule,
     UsersModule,

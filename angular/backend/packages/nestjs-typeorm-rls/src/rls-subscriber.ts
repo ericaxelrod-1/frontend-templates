@@ -1,15 +1,18 @@
 import { EventSubscriber, EntitySubscriberInterface, InsertEvent, DataSource } from 'typeorm';
 import { ClsService } from 'nestjs-cls';
-import { Injectable } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 
-@Injectable()
-@EventSubscriber()
 export class RlsInsertSubscriber implements EntitySubscriberInterface {
-  constructor(
-    private readonly cls: ClsService,
-    dataSource: DataSource
-  ) {
+  private readonly logger = new Logger('RlsInsertSubscriber');
+  private cls!: ClsService;
+
+  setCls(cls: ClsService) {
+    this.cls = cls;
+  }
+
+  register(dataSource: DataSource) {
     dataSource.subscribers.push(this);
+    this.logger.log('RLS Insert Subscriber registered');
   }
 
   beforeInsert(event: InsertEvent<any>) {
@@ -20,7 +23,6 @@ export class RlsInsertSubscriber implements EntitySubscriberInterface {
     const activeGroupIds = this.cls.get('activeGroupIds');
     const primaryGroupId = this.cls.get('primaryGroupId');
 
-    // Use primaryGroupId if set, otherwise fall back to first activeGroupId
     const effectiveGroupId = primaryGroupId ?? activeGroupIds?.[0];
 
     if (effectiveGroupId !== undefined) {
