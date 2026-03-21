@@ -85,6 +85,12 @@ export class SidebarComponent implements OnInit, OnDestroy {
       icon: 'security', 
       route: '/app/admin/login-monitoring', 
       permission: 'login-monitoring:read'
+    },
+    { 
+      label: 'RLS Rules', 
+      icon: 'rule', 
+      route: '/app/admin/rls-rules', 
+      permission: 'rls:admin'
     }
   ];
   

@@ -64,7 +64,7 @@ export const dataSourceOptions: DataSourceOptions = {
   migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false, // Disable synchronize as we're handling schema manually
   namingStrategy: new SnakeNamingStrategy(),
-  migrationsRun: false, // Disable migrations as we're handling them manually
+  migrationsRun: true, // Run migrations on app startup
 
   logging: ['query', 'error', 'schema'], // Added 'schema' logging
 };

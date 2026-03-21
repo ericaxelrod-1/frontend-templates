@@ -1306,6 +1306,11 @@ export class PermissionsService {
       { resource: 'permissions', action: 'read' },
       { resource: 'permissions', action: 'update' },
       { resource: 'dashboard', action: 'read' },
+      { resource: 'groups', action: 'read' },
+      { resource: 'groups', action: 'create' },
+      { resource: 'groups', action: 'update' },
+      { resource: 'groups', action: 'delete' },
+      { resource: 'rls', action: 'admin' },
     ];
 
     for (const { resource, action } of defaultPermissions) {
