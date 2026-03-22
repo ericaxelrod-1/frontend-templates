@@ -347,7 +347,7 @@ export function createEntityManagerProxy(
         return value;
       }
 
-      if (value === undefined) {
+      if (typeof value === 'function' && !PROXIED_METHODS.has(prop as string) && !SAFE_READ_METHODS.has(prop as string)) {
         throw new RlsSecurityViolationError(`Unrecognized EntityManager method: ${String(prop)}`);
       }
 

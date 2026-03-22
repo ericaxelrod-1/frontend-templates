@@ -10,7 +10,6 @@ export interface RlsRule {
   group?: any;
   targetTable: string;
   scope: ScopeGroup;
-  parameters?: Record<string, any>;
   createdAt?: Date;
   updatedAt?: Date;
 }

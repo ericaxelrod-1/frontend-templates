@@ -17,7 +17,7 @@ export class ScopeCompilerService {
         parts.push(`${condition.columnName} ${condition.operator}`);
       } else if (condition.operator.toUpperCase() === 'IN') {
         // Split comma-separated values into individual params
-        const values = condition.value.split(',').map(v => v.trim());
+        const values = (condition.value || '').split(',').map(v => v.trim()).filter(v => v);
         const placeholders = values.map((_, i) => `:${paramName}_${i}`).join(', ');
         parts.push(`${condition.columnName} IN (${placeholders})`);
         values.forEach((v, i) => params[`${paramName}_${i}`] = v);

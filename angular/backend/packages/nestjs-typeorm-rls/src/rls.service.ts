@@ -215,6 +215,11 @@ export class RlsService {
     return groupMap;
   }
 
+  /**
+   * Compile a condition group tree into parameterized SQL.
+   * NOTE: This logic mirrors ScopeCompilerService.compileGroupRecursive() in the main app.
+   * Keep both in sync when modifying compilation logic.
+   */
   private compileGroupTree(
     group: RlsConditionGroupTree,
     paramPrefix: string = 'p',

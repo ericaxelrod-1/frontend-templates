@@ -21,6 +21,16 @@ export class ScopeGroupDto {
 
   @IsArray()
   @ValidateNested({ each: true })
+  @Type(() => ScopeConditionDto, {
+    discriminator: {
+      property: 'logicalOperator',
+      subTypes: [
+        { value: ScopeGroupDto, name: 'AND' },
+        { value: ScopeGroupDto, name: 'OR' },
+      ],
+    },
+    keepDiscriminatorProperty: true,
+  })
   conditions: (ScopeConditionDto | ScopeGroupDto)[];
 }
 
