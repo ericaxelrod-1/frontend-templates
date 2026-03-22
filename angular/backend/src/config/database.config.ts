@@ -18,9 +18,8 @@ export default registerAs('database', () => {
     type: 'sqlite',
     database: process.env.DATABASE_FILE || 'db.sqlite',
     entities: commonEntities,
-    synchronize: false,
-    logging:
-      nodeEnv === 'development' || nodeEnv === 'test'
+    synchronize: nodeEnv === 'test' || process.env.DB_SYNCHRONIZE === 'true',
+    logging: nodeEnv === 'development'
         ? ['query', 'error', 'schema']
         : ['error'],
     autoLoadEntities: true,
