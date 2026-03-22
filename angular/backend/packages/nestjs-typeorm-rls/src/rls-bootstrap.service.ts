@@ -14,6 +14,8 @@ export class RlsBootstrapService implements OnModuleInit {
   private readonly logger = new Logger(RlsBootstrapService.name);
 
   constructor(
+    // Bootstrap service intentionally bypasses CLS context
+    // to seed fundamental RLS rules during initialization
     private readonly dataSource: DataSource,
     private readonly bypassService: RlsSystemBypassService,
   ) {}

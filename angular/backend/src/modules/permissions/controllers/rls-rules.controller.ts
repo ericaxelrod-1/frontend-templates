@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../guards/permission.guard';
 import { RequirePermission } from '../decorators/require-permission.decorator';
 import { RlsValidationService, ValidationResult } from '../services/rls-validation.service';
+import { CreateRlsRuleDto, UpdateRlsRuleDto, ValidateRlsRuleDto, InvalidateCacheDto } from '../dto/rls-rule.dto';
 
 @Controller('api/rls-rules')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -63,14 +64,7 @@ export class RlsRulesController {
 
   @Post('validate')
   @RequirePermission('rls_rules:manage')
-  async validateRule(
-    @Body()
-    validateDto: {
-      groupId: number;
-      targetTable: string;
-      sql: string;
-    },
-  ): Promise<ValidationResult> {
+  async validateRule(@Body() validateDto: ValidateRlsRuleDto): Promise<ValidationResult> {
     return this.rlsValidationService.validateRule(
       validateDto.groupId,
       validateDto.sql,
@@ -80,16 +74,7 @@ export class RlsRulesController {
 
   @Post()
   @RequirePermission('rls_rules:manage')
-  async create(
-    @Body()
-    createDto: {
-      groupId: number;
-      targetTable: string;
-      sql: string;
-      parameters?: Record<string, any>;
-      skipValidation?: boolean;
-    },
-  ): Promise<{ rule: RlsRule; validation?: ValidationResult }> {
+  async create(@Body() createDto: CreateRlsRuleDto): Promise<{ rule: RlsRule; validation?: ValidationResult }> {
     const validation = await this.rlsValidationService.validateRule(
       createDto.groupId,
       createDto.sql,
@@ -123,13 +108,7 @@ export class RlsRulesController {
   @RequirePermission('rls_rules:manage')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    updateDto: {
-      sql?: string;
-      parameters?: Record<string, any>;
-      skipValidation?: boolean;
-      forceUpdate?: boolean;
-    },
+    @Body() updateDto: UpdateRlsRuleDto,
   ): Promise<{ rule: RlsRule; validation?: ValidationResult }> {
     const rule = await this.rlsRuleRepository.findOne({
       where: { id },
@@ -164,6 +143,18 @@ export class RlsRulesController {
       rule.parameters = JSON.stringify(updateDto.parameters);
     }
 
+    if (updateDto.isActive !== undefined) {
+      rule.isActive = updateDto.isActive;
+    }
+
+    if (updateDto.priority !== undefined) {
+      rule.priority = updateDto.priority;
+    }
+
+    if (updateDto.description !== undefined) {
+      rule.description = updateDto.description;
+    }
+
     const updated = await this.rlsRuleRepository.save(rule);
     this.rlsService.invalidateCache(rule.targetTable);
     return { rule: updated, validation };
@@ -183,8 +174,8 @@ export class RlsRulesController {
 
   @Post('invalidate-cache')
   @RequirePermission('rls_rules:manage')
-  async invalidateCache(@Body() body: { tableName?: string }) {
-    this.rlsService.invalidateCache(body.tableName);
+  async invalidateCache(@Body() invalidateCacheDto: InvalidateCacheDto) {
+    this.rlsService.invalidateCache(invalidateCacheDto.tableName);
     return { success: true };
   }
 }

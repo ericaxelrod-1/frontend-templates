@@ -16,6 +16,7 @@ import { RequirePermission } from '../decorators/require-permission.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RlsScopeTemplate } from '../entities/rls-scope-template.entity';
+import { CreateRlsScopeTemplateDto, UpdateRlsScopeTemplateDto } from '../dto/rls-scope-template.dto';
 
 @Controller('api/rls/scope-templates')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -45,15 +46,7 @@ export class RlsScopeTemplatesController {
 
   @Post()
   @RequirePermission('rls_scope_templates:manage')
-  async create(
-    @Body()
-    createDto: {
-      name: string;
-      joinPathId: number;
-      targetTable: string;
-      availableColumns: string[];
-    },
-  ) {
+  async create(@Body() createDto: CreateRlsScopeTemplateDto) {
     const template = this.scopeTemplateRepository.create({
       name: createDto.name,
       joinPathId: createDto.joinPathId,
@@ -68,13 +61,7 @@ export class RlsScopeTemplatesController {
   @RequirePermission('rls_scope_templates:manage')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    updateDto: {
-      name?: string;
-      joinPathId?: number;
-      targetTable?: string;
-      availableColumns?: string[];
-    },
+    @Body() updateDto: UpdateRlsScopeTemplateDto,
   ) {
     const template = await this.scopeTemplateRepository.findOne({
       where: { id },
@@ -90,6 +77,15 @@ export class RlsScopeTemplatesController {
       template.targetTable = updateDto.targetTable;
     if (updateDto.availableColumns !== undefined) {
       template.availableColumns = JSON.stringify(updateDto.availableColumns);
+    }
+    if (updateDto.description !== undefined) {
+      template.description = updateDto.description;
+    }
+    if (updateDto.scopeSql !== undefined) {
+      template.scopeSql = updateDto.scopeSql;
+    }
+    if (updateDto.parameters !== undefined) {
+      template.parameters = JSON.stringify(updateDto.parameters);
     }
 
     return this.scopeTemplateRepository.save(template);

@@ -17,6 +17,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RlsJoinPath } from '../entities/rls-join-path.entity';
 import { RlsJoinCondition } from '../entities/rls-join-condition.entity';
+import { CreateRlsJoinPathDto, UpdateRlsJoinPathDto } from '../dto/rls-join-path.dto';
 
 @Controller('api/rls/join-paths')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -48,21 +49,7 @@ export class RlsJoinPathsController {
 
   @Post()
   @RequirePermission('rls_join_paths:manage')
-  async create(
-    @Body()
-    createDto: {
-      name: string;
-      targetTable: string;
-      chain: string;
-      conditions?: {
-        fromTable: string;
-        fromColumn: string;
-        toTable: string;
-        toColumn: string;
-        operator?: string;
-      }[];
-    },
-  ) {
+  async create(@Body() createDto: CreateRlsJoinPathDto) {
     const joinPath = this.joinPathRepository.create({
       name: createDto.name,
       targetTable: createDto.targetTable,
@@ -95,19 +82,7 @@ export class RlsJoinPathsController {
   @RequirePermission('rls_join_paths:manage')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    updateDto: {
-      name?: string;
-      targetTable?: string;
-      chain?: string;
-      conditions?: {
-        fromTable: string;
-        fromColumn: string;
-        toTable: string;
-        toColumn: string;
-        operator?: string;
-      }[];
-    },
+    @Body() updateDto: UpdateRlsJoinPathDto,
   ) {
     const joinPath = await this.joinPathRepository.findOne({ where: { id } });
     if (!joinPath) {

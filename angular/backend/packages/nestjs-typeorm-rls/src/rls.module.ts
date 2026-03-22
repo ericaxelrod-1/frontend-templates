@@ -83,6 +83,7 @@ export class RlsModule {
 
     return {
       module: RlsModule,
+      global: true,
       imports: [
         ClsModule,
         ...(options.imports || []),

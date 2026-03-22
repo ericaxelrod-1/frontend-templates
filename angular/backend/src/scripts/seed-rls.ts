@@ -50,6 +50,9 @@ async function bootstrap() {
 
   const mockCls = {
     runWith: async (context: any, callback: () => Promise<any>) => {
+      // Note: This mock CLS does not set __rlsBypass context.
+      // The bypassService.runSystemBypass() directly calls the callback
+      // without using this mock, so this is purely for type compatibility.
       return callback();
     },
   } as unknown as ClsService;

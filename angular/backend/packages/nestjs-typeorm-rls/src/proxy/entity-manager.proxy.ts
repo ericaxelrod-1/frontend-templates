@@ -131,6 +131,17 @@ export function createEntityManagerProxy(
   };
 
   // 4. CRITICAL: Verify-Before-Mutate for save()
+  // 
+  // KNOWN LIMITATION (TOCTOU): This method performs ownership verification by:
+  // 1. Fetching the existing record using the PROXIED manager (enforcing RLS)
+  // 2. Delegating actual save to originalManager.save()
+  //
+  // Step 2 generates its own UPDATE SQL which bypasses the QueryBuilder proxy.
+  // In horizontal scaling with multiple processes/connections, a race condition exists:
+  // Between the ownership check and the actual save, another process could modify the record.
+  // For SQLite (single-process), this is low risk. For multi-process deployments,
+  // consider adding database-level constraints (e.g., CHECK constraints on tenant columns).
+  //
   manager.save = async function (targetOrEntity: any, maybeEntityOrOptions?: any, maybeOptions?: any) {
     if (cls.get('__rlsBypass')) {
       return originalManager.save.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);

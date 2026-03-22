@@ -3,6 +3,7 @@ import { ClsService } from 'nestjs-cls';
 import { RlsService } from '../rls.service';
 import { RlsMetricsService } from '../rls-metrics.service';
 import { RlsModuleOptions } from '../rls.module';
+import { generateUniqueKey } from '../internal/id-generator';
 
 export function createQueryBuilderProxy<T extends ObjectLiteral>(
   originalQb: any,
@@ -112,7 +113,7 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
                   
                   const uniqueParams: Record<string, any> = {};
                   for (const [key, val] of Object.entries(params)) {
-                     const uniqueKey = `rls_${key}_${Math.random().toString(36).substr(2, 9)}`;
+                     const uniqueKey = generateUniqueKey(`rls_${key}`);
                      uniqueParams[uniqueKey] = val;
                      sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
                   }
@@ -147,7 +148,7 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
                     
                     const uniqueParams: Record<string, any> = {};
                     for (const [key, val] of Object.entries(params)) {
-                       const uniqueKey = `rls_${key}_${Math.random().toString(36).substr(2, 9)}`;
+                       const uniqueKey = generateUniqueKey(`rls_${key}`);
                        uniqueParams[uniqueKey] = val;
                        sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
                     }
