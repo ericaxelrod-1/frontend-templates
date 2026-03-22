@@ -60,7 +60,22 @@ import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-templ
         const dbConfig = configService.get('database');
         return {
           enabled: process.env.NODE_ENV !== 'test',
-          exemptTables: ['rls_rules', 'rls_join_paths', 'rls_join_conditions', 'rls_scope_templates'],
+          exemptTables: [
+            'roles',
+            'permissions',
+            'role_permissions',
+            'actions',
+            'resources',
+            'cache_components',
+            'cache_routes',
+            'cache_endpoints',
+            'cache_sync_status',
+            'migrations',
+            'rls_rules',
+            'rls_join_paths',
+            'rls_join_conditions',
+            'rls_scope_templates',
+          ],
           fallbackBehavior: 'deny' as const,
           dataSourceOptions: dbConfig as any,
         };

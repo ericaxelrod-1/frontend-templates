@@ -25,10 +25,11 @@ export class RolePermission {
 
 
   /**
-   * Whether the permission is granted (true) or denied (false)
+   * Whether the permission is granted (true), denied (false), or null (inherit from parent role)
+   * This enables 3-state permissions as specified in HIERARCHICAL_ROLES_GROUPS.md
    */
-  @Column({ default: true })
-  isGranted: boolean;
+  @Column({ type: 'boolean', nullable: true, default: null })
+  isGranted: boolean | null;
 
 
   @CreateDateColumn()

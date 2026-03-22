@@ -44,6 +44,22 @@ export interface JoinPathResult {
   missingTables: string[];
 }
 
+export interface ScopeTemplate {
+  id: number;
+  name: string;
+  joinPathId: number;
+  targetTable: string;
+  availableColumns: string[];
+  joinPath?: JoinPath;
+}
+
+export interface CompiledScopeTemplate {
+  templateId: number;
+  templateName: string;
+  sql: string;
+  parameters: Record<string, any>;
+}
+
 interface CachedRule {
   sql: string;
   parameters?: Record<string, any>;
@@ -421,13 +437,133 @@ export class RlsService {
       .join('\n');
   }
 
-  // eslint-disable-next-line no-unused-vars
-  getScopeTemplate(id: number): any {
-    return null;
+  async getScopeTemplate(id: number): Promise<ScopeTemplate | null> {
+    if (!this.dataSource) {
+      this.logger.warn('DataSource not set, cannot fetch scope template');
+      return null;
+    }
+
+    const results = await this.dataSource.query(
+      `SELECT id, name, join_path_id as "joinPathId", target_table as "targetTable", available_columns as "availableColumns"
+       FROM rls_scope_templates
+       WHERE id = ?`,
+      [id],
+    );
+
+    if (!results || results.length === 0) {
+      return null;
+    }
+
+    const row = results[0];
+    const availableColumns = typeof row.availableColumns === 'string' 
+      ? JSON.parse(row.availableColumns) 
+      : row.availableColumns;
+
+    const joinPath = await this.getJoinPath(row.joinPathId);
+
+    return {
+      id: row.id,
+      name: row.name,
+      joinPathId: row.joinPathId,
+      targetTable: row.targetTable,
+      availableColumns: availableColumns || [],
+      joinPath: joinPath || undefined,
+    };
   }
 
-  getAllScopeTemplates(): any[] {
-    return [];
+  async getAllScopeTemplates(): Promise<ScopeTemplate[]> {
+    if (!this.dataSource) {
+      this.logger.warn('DataSource not set, cannot fetch scope templates');
+      return [];
+    }
+
+    const results = await this.dataSource.query(
+      `SELECT st.id, st.name, st.join_path_id as "joinPathId", st.target_table as "targetTable", st.available_columns as "availableColumns"
+       FROM rls_scope_templates st
+       ORDER BY st.name`,
+    );
+
+    const templates: ScopeTemplate[] = [];
+    for (const row of results) {
+      const availableColumns = typeof row.availableColumns === 'string' 
+        ? JSON.parse(row.availableColumns) 
+        : row.availableColumns;
+
+      templates.push({
+        id: row.id,
+        name: row.name,
+        joinPathId: row.joinPathId,
+        targetTable: row.targetTable,
+        availableColumns: availableColumns || [],
+      });
+    }
+
+    this.logger.debug(`Fetched ${templates.length} scope templates`);
+    return templates;
+  }
+
+  async getScopeTemplatesForTable(tableName: string): Promise<ScopeTemplate[]> {
+    const allTemplates = await this.getAllScopeTemplates();
+    return allTemplates.filter(t => t.targetTable === tableName);
+  }
+
+  compileScopeTemplate(
+    template: ScopeTemplate,
+    conditions: Array<{
+      column: string;
+      operator: string;
+      value: string;
+    }>,
+  ): CompiledScopeTemplate {
+    const sqlParts: string[] = [];
+    const parameters: Record<string, any> = {};
+
+    for (let i = 0; i < conditions.length; i++) {
+      const cond = conditions[i];
+      const paramName = `p${i}`;
+
+      switch (cond.operator.toUpperCase()) {
+        case '=':
+        case '!=':
+        case '<>':
+        case '>':
+        case '<':
+        case '>=':
+        case '<=':
+          sqlParts.push(`${cond.column} ${cond.operator} :${paramName}`);
+          parameters[paramName] = cond.value;
+          break;
+        case 'LIKE':
+        case 'NOT LIKE':
+          sqlParts.push(`${cond.column} ${cond.operator} :${paramName}`);
+          parameters[paramName] = cond.value;
+          break;
+        case 'IN':
+          const values = cond.value.split(',').map(v => v.trim());
+          const placeholders = values.map((_, idx) => `:${paramName}_${idx}`).join(', ');
+          sqlParts.push(`${cond.column} IN (${placeholders})`);
+          values.forEach((v, idx) => {
+            parameters[`${paramName}_${idx}`] = v;
+          });
+          break;
+        case 'IS NULL':
+          sqlParts.push(`${cond.column} IS NULL`);
+          break;
+        case 'IS NOT NULL':
+          sqlParts.push(`${cond.column} IS NOT NULL`);
+          break;
+        default:
+          sqlParts.push(`${cond.column} = :${paramName}`);
+          parameters[paramName] = cond.value;
+      }
+    }
+
+    return {
+      templateId: template.id,
+      templateName: template.name,
+      sql: sqlParts.join(' AND '),
+      parameters,
+    };
   }
 
   invalidateCache(tableName?: string): void {

@@ -1253,5 +1253,53 @@ describe('RLS - Row Level Security (e2e)', () => {
       expect(updateRes.status).toBe(200);
       expect(updateRes.body).toHaveProperty('validation');
     });
+
+    it('should NOT flag valid OR conditions as conflicts', async () => {
+      if (!tokens.test_admin_a) {
+        console.log('Skipping - no token');
+        return;
+      }
+
+      // Valid: status = 'active' OR status = 'pending' should NOT be flagged
+      const res = await request(app.getHttpServer())
+        .post('/api/rls-rules/validate')
+        .set('Authorization', `Bearer ${tokens.test_admin_a}`)
+        .send({
+          groupId: groupIds.company_a,
+          targetTable: 'login_attempts',
+          sql: 'status = \'success\' OR status = \'pending\'',
+        });
+
+      expect(res.status).toBe(200);
+      // Should not have self_conflict errors
+      const selfConflicts = res.body.warnings?.filter(
+        (w: any) => w.type === 'self_conflict' && w.severity === 'error'
+      );
+      expect(selfConflicts).toHaveLength(0);
+    });
+
+    it('should detect actual contradiction: col = X AND col != X', async () => {
+      if (!tokens.test_admin_a) {
+        console.log('Skipping - no token');
+        return;
+      }
+
+      // Invalid: ip_address = '10.0.0.1' AND ip_address != '10.0.0.1' should be flagged
+      const res = await request(app.getHttpServer())
+        .post('/api/rls-rules/validate')
+        .set('Authorization', `Bearer ${tokens.test_admin_a}`)
+        .send({
+          groupId: groupIds.company_a,
+          targetTable: 'login_attempts',
+          sql: 'ip_address = \'10.0.0.1\' AND ip_address != \'10.0.0.1\'',
+        });
+
+      expect(res.status).toBe(200);
+      // Should have self_conflict error
+      const selfConflicts = res.body.warnings?.filter(
+        (w: any) => w.type === 'self_conflict' && w.severity === 'error'
+      );
+      expect(selfConflicts.length).toBeGreaterThan(0);
+    });
   });
 });

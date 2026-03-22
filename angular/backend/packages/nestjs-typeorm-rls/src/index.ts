@@ -7,5 +7,7 @@ export type {
   JoinPath,
   RequiredJoin,
   JoinPathResult,
+  ScopeTemplate,
+  CompiledScopeTemplate,
 } from './rls.service';
 export { RlsInsertSubscriber } from './rls-subscriber';

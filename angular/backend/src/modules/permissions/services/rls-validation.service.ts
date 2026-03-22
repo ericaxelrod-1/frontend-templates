@@ -107,27 +107,101 @@ export class RlsValidationService {
   }
 
   private checkSelfConflict(sql: string): { column: string } | null {
-    const columnPattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|!=|<>|<|>|<=|>=|LIKE|IN)\s*/gi;
-    const columns = new Set<string>();
-    let match;
+    // Parse conditions grouped by AND/OR to detect actual logical contradictions
+    // Only flag: col = X AND col != X (or col = X AND col = Y where X != Y)
+    // NOT flagged: col = X OR col = Y (valid multi-value IN clause)
+    
+    const conditions = this.parseConditions(sql);
+    const columnConditions = new Map<string, Array<{ operator: string; value: string; negated: boolean }>>();
 
-    while ((match = columnPattern.exec(sql)) !== null) {
-      const col = match[1].toLowerCase();
-      if (columns.has(col)) {
-        return { column: col };
+    for (const cond of conditions) {
+      if (!columnConditions.has(cond.column)) {
+        columnConditions.set(cond.column, []);
       }
-      columns.add(col);
+      columnConditions.get(cond.column)!.push(cond);
     }
 
-    const notPattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*<>\s*([^\s,)]+)/gi;
-    while ((match = notPattern.exec(sql)) !== null) {
-      const col = match[1].toLowerCase();
-      if (columns.has(col)) {
-        return { column: col };
+    // Check each column for contradictions
+    for (const [column, conds] of columnConditions) {
+      if (conds.length < 2) {
+        continue; // Need at least 2 conditions on same column
+      }
+
+      // Check for equality contradictions: col = X AND col != X
+      const equals = conds.filter(c => c.operator === '=');
+      const notEquals = conds.filter(c => c.operator === '!=' || c.operator === '<>');
+
+      if (equals.length > 0 && notEquals.length > 0) {
+        return { column };
+      }
+
+      // Check for different equals: col = X AND col = Y where X != Y
+      if (equals.length >= 2) {
+        const values = new Set(equals.map(c => c.value.toLowerCase()));
+        if (values.size > 1) {
+          return { column }; // col = X AND col = Y with X != Y
+        }
+      }
+
+      // Check for range contradictions: col > X AND col < X (or similar)
+      const greaterThan = conds.filter(c => c.operator === '>');
+      const lessThan = conds.filter(c => c.operator === '<');
+      const greaterThanOrEqual = conds.filter(c => c.operator === '>=');
+      const lessThanOrEqual = conds.filter(c => c.operator === '<=');
+
+      if ((greaterThan.length > 0 || greaterThanOrEqual.length > 0) &&
+          (lessThan.length > 0 || lessThanOrEqual.length > 0)) {
+        // Check if ranges don't overlap
+        const maxLower = Math.max(
+          ...greaterThan.map(c => parseFloat(c.value)),
+          ...greaterThanOrEqual.map(c => parseFloat(c.value))
+        );
+        const minUpper = Math.min(
+          ...lessThan.map(c => parseFloat(c.value)),
+          ...lessThanOrEqual.map(c => parseFloat(c.value))
+        );
+
+        if (isNaN(maxLower) || isNaN(minUpper) || maxLower >= minUpper) {
+          return { column }; // Ranges don't overlap or are contradictory
+        }
       }
     }
 
     return null;
+  }
+
+  private parseConditions(sql: string): Array<{ column: string; operator: string; value: string; negated: boolean }> {
+    const conditions: Array<{ column: string; operator: string; value: string; negated: boolean }> = [];
+
+    // Match column operators value patterns
+    // Handles: col = 'value', col != 'value', col LIKE '%value%', col IN (a, b), etc.
+    const pattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*(=|!=|<>|<|>|>=|<=|LIKE|NOT\s+LIKE|IN|NOT\s+IN)\s*\(?['"]?([^'"\s,)(]+)['"]?\)?/gi;
+    let match;
+
+    while ((match = pattern.exec(sql)) !== null) {
+      const column = match[1].toLowerCase();
+      let operator = match[2].toUpperCase();
+      let value = match[3];
+      let negated = false;
+
+      // Normalize operator
+      if (operator === 'NOT LIKE') {
+        operator = '!=';
+        negated = true;
+      } else if (operator === 'NOT IN') {
+        operator = '!=';
+        negated = true;
+      }
+
+      // Skip array/list values (IN clauses with multiple values)
+      if (operator === 'IN' && value.includes(',')) {
+        continue;
+      }
+
+      conditions.push({ column, operator, value, negated });
+    }
+
+    return conditions;
   }
 
   private async checkParentConflict(
