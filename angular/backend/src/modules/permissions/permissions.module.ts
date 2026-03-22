@@ -37,6 +37,7 @@ import { RlsService } from '@our-org/nestjs-typeorm-rls';
 import { RlsConditionGroup } from './entities/rls-condition-group.entity';
 import { RlsRuleCondition } from './entities/rls-rule-condition.entity';
 import { ScopeCompilerService } from './services/scope-compiler.service';
+import { RolesModule } from '../roles/roles.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { ScopeCompilerService } from './services/scope-compiler.service';
     forwardRef(() => ScannersModule),
     forwardRef(() => PermissionsSharedModule),
     forwardRef(() => CacheModule),
+    RolesModule,
   ],
   controllers: [
     PermissionsController,
