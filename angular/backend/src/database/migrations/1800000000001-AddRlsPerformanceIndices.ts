@@ -1,9 +1,21 @@
 import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
 
 export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface {
+  private async createIndexIfNotExists(
+    queryRunner: QueryRunner,
+    tableName: string,
+    index: TableIndex,
+  ): Promise<void> {
+    const table = await queryRunner.getTable(tableName);
+    const exists = table?.indices.some((i) => i.name === index.name);
+    if (!exists) {
+      await queryRunner.createIndex(tableName, index);
+    }
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Performance indices for RLS join paths (skip target_table - no duplicate)
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'rls_join_paths',
       new TableIndex({
         name: 'idx_rls_join_paths_chain',
@@ -11,11 +23,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    // Skip: idx_rls_join_conditions_join_path_id - IDX_rls_join_conditions_path_id already exists
-    // Skip: idx_rls_rules_group_id - IDX_rls_rules_group_id already exists
-    // Skip: idx_rls_rules_target_table - IDX_rls_rules_target_table already exists
-
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'rls_rules',
       new TableIndex({
         name: 'idx_rls_rules_group_target',
@@ -23,8 +32,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    // Performance indices for user-group relationships (common RLS join paths)
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'user_groups',
       new TableIndex({
         name: 'idx_user_groups_user_id',
@@ -32,7 +41,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'user_groups',
       new TableIndex({
         name: 'idx_user_groups_group_id',
@@ -40,8 +50,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    // Performance indices for role hierarchy
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'roles',
       new TableIndex({
         name: 'idx_roles_parent_id',
@@ -49,16 +59,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    // Performance indices for group hierarchy
-    await queryRunner.createIndex(
-      'groups',
-      new TableIndex({
-        name: 'idx_groups_parent_id',
-        columnNames: ['parent_id'],
-      }),
-    );
-
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'groups',
       new TableIndex({
         name: 'idx_groups_priority',
@@ -66,8 +68,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    // Performance indices for permission assignments
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'role_permissions',
       new TableIndex({
         name: 'idx_role_permissions_role_id',
@@ -75,7 +77,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'role_permissions',
       new TableIndex({
         name: 'idx_role_permissions_permission_id',
@@ -83,7 +86,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'group_permissions',
       new TableIndex({
         name: 'idx_group_permissions_group_id',
@@ -91,7 +95,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
       }),
     );
 
-    await queryRunner.createIndex(
+    await this.createIndexIfNotExists(
+      queryRunner,
       'group_permissions',
       new TableIndex({
         name: 'idx_group_permissions_permission_id',
@@ -101,17 +106,23 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropIndex('rls_join_paths', 'idx_rls_join_paths_chain');
-    await queryRunner.dropIndex('rls_rules', 'idx_rls_rules_group_target');
-    await queryRunner.dropIndex('user_groups', 'idx_user_groups_user_id');
-    await queryRunner.dropIndex('user_groups', 'idx_user_groups_group_id');
-    await queryRunner.dropIndex('roles', 'idx_roles_parent_id');
-    // Note: idx_groups_parent_id created by migration 1774111230659 is intentionally
-    // NOT dropped here because it was created earlier and may still be needed.
-    await queryRunner.dropIndex('groups', 'idx_groups_priority');
-    await queryRunner.dropIndex('role_permissions', 'idx_role_permissions_role_id');
-    await queryRunner.dropIndex('role_permissions', 'idx_role_permissions_permission_id');
-    await queryRunner.dropIndex('group_permissions', 'idx_group_permissions_group_id');
-    await queryRunner.dropIndex('group_permissions', 'idx_group_permissions_permission_id');
+    const dropIfExists = async (table: string, indexName: string) => {
+      const tableObj = await queryRunner.getTable(table);
+      const exists = tableObj?.indices.some((i) => i.name === indexName);
+      if (exists) {
+        await queryRunner.dropIndex(table, indexName);
+      }
+    };
+
+    await dropIfExists('rls_join_paths', 'idx_rls_join_paths_chain');
+    await dropIfExists('rls_rules', 'idx_rls_rules_group_target');
+    await dropIfExists('user_groups', 'idx_user_groups_user_id');
+    await dropIfExists('user_groups', 'idx_user_groups_group_id');
+    await dropIfExists('roles', 'idx_roles_parent_id');
+    await dropIfExists('groups', 'idx_groups_priority');
+    await dropIfExists('role_permissions', 'idx_role_permissions_role_id');
+    await dropIfExists('role_permissions', 'idx_role_permissions_permission_id');
+    await dropIfExists('group_permissions', 'idx_group_permissions_group_id');
+    await dropIfExists('group_permissions', 'idx_group_permissions_permission_id');
   }
 }

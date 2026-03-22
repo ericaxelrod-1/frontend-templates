@@ -13,6 +13,8 @@ import { RolePermission } from '../modules/roles/entities/role-permission.entity
 import { User } from '../modules/users/entities/user.entity';
 import { Group } from '../modules/permissions/entities/group.entity';
 import { RlsRule } from '../modules/permissions/entities/rls-rule.entity';
+import { RlsConditionGroup } from '../modules/permissions/entities/rls-condition-group.entity';
+import { RlsRuleCondition } from '../modules/permissions/entities/rls-rule-condition.entity';
 import { RlsJoinPath } from '../modules/permissions/entities/rls-join-path.entity';
 import { RlsJoinCondition } from '../modules/permissions/entities/rls-join-condition.entity';
 import { RlsScopeTemplate } from '../modules/permissions/entities/rls-scope-template.entity';
@@ -57,6 +59,8 @@ export const dataSourceOptions: DataSourceOptions = {
     SecurityDetectedPattern,
     PatternLoginAttempt,
     RlsRule,
+    RlsConditionGroup,
+    RlsRuleCondition,
     RlsJoinPath,
     RlsJoinCondition,
     RlsScopeTemplate,

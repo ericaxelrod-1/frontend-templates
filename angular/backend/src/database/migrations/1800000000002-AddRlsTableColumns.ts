@@ -1,9 +1,33 @@
-import { MigrationInterface, QueryRunner, TableColumn, TableForeignKey } from 'typeorm';
+import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
 export class AddRlsTableColumns1800000000002 implements MigrationInterface {
+  private async addColumnIfNotExists(
+    queryRunner: QueryRunner,
+    tableName: string,
+    column: TableColumn,
+  ): Promise<void> {
+    const table = await queryRunner.getTable(tableName);
+    const exists = table?.columns.some((c) => c.name === column.name);
+    if (!exists) {
+      await queryRunner.addColumn(tableName, column);
+    }
+  }
+
+  private async dropColumnIfExists(
+    queryRunner: QueryRunner,
+    tableName: string,
+    columnName: string,
+  ): Promise<void> {
+    const table = await queryRunner.getTable(tableName);
+    const exists = table?.columns.some((c) => c.name === columnName);
+    if (exists) {
+      await queryRunner.dropColumn(tableName, columnName);
+    }
+  }
+
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add is_active to rls_join_paths
-    await queryRunner.addColumn(
+    await this.addColumnIfNotExists(
+      queryRunner,
       'rls_join_paths',
       new TableColumn({
         name: 'is_active',
@@ -12,8 +36,8 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
       }),
     );
 
-    // Add columns to rls_rules
-    await queryRunner.addColumn(
+    await this.addColumnIfNotExists(
+      queryRunner,
       'rls_rules',
       new TableColumn({
         name: 'is_active',
@@ -22,7 +46,8 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
       }),
     );
 
-    await queryRunner.addColumn(
+    await this.addColumnIfNotExists(
+      queryRunner,
       'rls_rules',
       new TableColumn({
         name: 'priority',
@@ -31,7 +56,8 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
       }),
     );
 
-    await queryRunner.addColumn(
+    await this.addColumnIfNotExists(
+      queryRunner,
       'rls_rules',
       new TableColumn({
         name: 'description',
@@ -40,8 +66,8 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
       }),
     );
 
-    // Add columns to rls_scope_templates
-    await queryRunner.addColumn(
+    await this.addColumnIfNotExists(
+      queryRunner,
       'rls_scope_templates',
       new TableColumn({
         name: 'is_active',
@@ -50,7 +76,8 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
       }),
     );
 
-    await queryRunner.addColumn(
+    await this.addColumnIfNotExists(
+      queryRunner,
       'rls_scope_templates',
       new TableColumn({
         name: 'description',
@@ -59,7 +86,8 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
       }),
     );
 
-    await queryRunner.addColumn(
+    await this.addColumnIfNotExists(
+      queryRunner,
       'rls_scope_templates',
       new TableColumn({
         name: 'scope_sql',
@@ -68,7 +96,8 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
       }),
     );
 
-    await queryRunner.addColumn(
+    await this.addColumnIfNotExists(
+      queryRunner,
       'rls_scope_templates',
       new TableColumn({
         name: 'parameters',
@@ -79,13 +108,13 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropColumn('rls_scope_templates', 'parameters');
-    await queryRunner.dropColumn('rls_scope_templates', 'scope_sql');
-    await queryRunner.dropColumn('rls_scope_templates', 'description');
-    await queryRunner.dropColumn('rls_scope_templates', 'is_active');
-    await queryRunner.dropColumn('rls_rules', 'description');
-    await queryRunner.dropColumn('rls_rules', 'priority');
-    await queryRunner.dropColumn('rls_rules', 'is_active');
-    await queryRunner.dropColumn('rls_join_paths', 'is_active');
+    await this.dropColumnIfExists(queryRunner, 'rls_scope_templates', 'parameters');
+    await this.dropColumnIfExists(queryRunner, 'rls_scope_templates', 'scope_sql');
+    await this.dropColumnIfExists(queryRunner, 'rls_scope_templates', 'description');
+    await this.dropColumnIfExists(queryRunner, 'rls_scope_templates', 'is_active');
+    await this.dropColumnIfExists(queryRunner, 'rls_rules', 'description');
+    await this.dropColumnIfExists(queryRunner, 'rls_rules', 'priority');
+    await this.dropColumnIfExists(queryRunner, 'rls_rules', 'is_active');
+    await this.dropColumnIfExists(queryRunner, 'rls_join_paths', 'is_active');
   }
 }
