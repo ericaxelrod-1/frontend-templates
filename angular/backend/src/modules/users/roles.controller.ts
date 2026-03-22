@@ -232,4 +232,105 @@ export class RolesController {
   ): Promise<void> {
     return this.rolesService.remove(id, currentUser);
   }
+
+  @Get(':id/ancestors')
+  @ApiOperation({ summary: 'Get parent roles in the hierarchy' })
+  @ApiResponse({ status: 200, description: 'List of ancestor roles' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:view')
+  getAncestors(@Param('id') id: number): Promise<Role[]> {
+    return this.rolesService.getAncestors(id);
+  }
+
+  @Get(':id/descendants')
+  @ApiOperation({ summary: 'Get child roles in the hierarchy' })
+  @ApiResponse({ status: 200, description: 'List of descendant roles' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:view')
+  getDescendants(@Param('id') id: number): Promise<Role[]> {
+    return this.rolesService.getDescendants(id);
+  }
+
+  @Get(':id/effective-permissions')
+  @ApiOperation({ summary: 'Get resolved permissions with inheritance chain' })
+  @ApiResponse({
+    status: 200,
+    description: 'Effective permissions with source information',
+  })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:view')
+  getEffectivePermissions(@Param('id') id: number): Promise<
+    Array<{
+      permission: string;
+      isGranted: boolean;
+      source: string;
+    }>
+  > {
+    return this.rolesService.getEffectivePermissions(id);
+  }
+
+  @Post(':id/validate-circular')
+  @ApiOperation({
+    summary: 'Validate that setting a new parent won\'t create circular reference',
+  })
+  @ApiResponse({ status: 200, description: 'Validation result' })
+  @ApiResponse({ status: 400, description: 'Circular reference would be created' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:update')
+  validateCircular(
+    @Param('id') id: number,
+    @Body() body: { newParentId: number },
+  ): Promise<{ valid: boolean; message?: string }> {
+    return this.rolesService
+      .validateNoCircularReference(id, body.newParentId)
+      .then(() => ({ valid: true }))
+      .catch((error) => ({ valid: false, message: error.message }));
+  }
+
+  @Post(':id/validate-permissions')
+  @ApiOperation({
+    summary: 'Validate permission constraints before making changes',
+  })
+  @ApiResponse({ status: 200, description: 'Validation result with warnings' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:update')
+  validatePermissions(
+    @Param('id') id: number,
+    @Body() body: { permissions: string[] },
+  ): Promise<{ valid: boolean; warnings: string[] }> {
+    return this.rolesService.validatePermissionConstraints(id, body.permissions);
+  }
+
+  @Get(':id/hierarchy')
+  @ApiOperation({ summary: 'Get complete role hierarchy path' })
+  @ApiResponse({ status: 200, description: 'Hierarchy path from root to role' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('roles:view')
+  async getHierarchy(@Param('id') id: number): Promise<{
+    ancestors: Role[];
+    current: Role;
+    descendants: Role[];
+    effectivePermissions: Array<{ permission: string; isGranted: boolean; source: string }>;
+  }> {
+    const [ancestors, descendants, effectivePermissions] = await Promise.all([
+      this.rolesService.getAncestors(id),
+      this.rolesService.getDescendants(id),
+      this.rolesService.getEffectivePermissions(id),
+    ]);
+
+    const current = await this.rolesService.findOne(id);
+
+    return {
+      ancestors,
+      current,
+      descendants,
+      effectivePermissions,
+    };
+  }
 }

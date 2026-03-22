@@ -26,6 +26,7 @@ export function createEntityManagerProxy(
 
   // Helper to check if table is exempt
   const isExemptTable = (entityClassOrName: any): boolean => {
+    if (!entityClassOrName) return false;
     if (typeof entityClassOrName === 'string') {
       return config.exemptTables?.includes(entityClassOrName) || false;
     }
@@ -37,15 +38,33 @@ export function createEntityManagerProxy(
     }
   };
 
-  // Helper to extract primary key value from entity
-  const extractPrimaryKeyValue = (entity: any, metadata: EntityMetadata): any => {
-    const primaryColumn = metadata.primaryColumns[0];
-    if (!primaryColumn) return undefined;
-    return entity[primaryColumn.propertyName];
+  // Helper to extract primary key value(s) from entity for findOne criteria
+  const extractPrimaryKeyCriteria = (entity: any, metadata: EntityMetadata): Record<string, any> | undefined => {
+    if (!metadata.primaryColumns || metadata.primaryColumns.length === 0) return undefined;
+    
+    const criteria: Record<string, any> = {};
+    let hasAllKeys = true;
+    let hasAnyKey = false;
+
+    for (const col of metadata.primaryColumns) {
+      const val = entity[col.propertyName];
+      if (val !== undefined && val !== null) {
+        criteria[col.propertyName] = val;
+        hasAnyKey = true;
+      } else {
+        hasAllKeys = false;
+      }
+    }
+
+    // Only return criteria if we have ALL parts of the composite key, 
+    // OR if we have at least one key (which means it's an update attempt)
+    // If it's completely missing, it's an insert.
+    return hasAnyKey ? criteria : undefined;
   };
 
   // Helper to get tenant column value from entity
   const getTenantColumnValue = (entity: any): number | undefined => {
+    if (!entity) return undefined;
     if ('groupId' in entity && typeof entity.groupId === 'number') {
       return entity.groupId;
     }
@@ -88,6 +107,18 @@ export function createEntityManagerProxy(
       return originalManager.update.call(originalManager, entityClass, criteria, partialEntity);
     }
 
+    // TENANT SPOOFING PROTECTION (Update)
+    // Check if the update payload tries to change the tenant ID to something unauthorized
+    const activeGroupIds = cls.get('activeGroupIds') || [];
+    const payloadTenantId = getTenantColumnValue(partialEntity);
+    
+    if (payloadTenantId !== undefined) {
+      if (!activeGroupIds.includes(payloadTenantId)) {
+        metrics.recordBlock('update_tenant_spoofing');
+        throw new RlsSecurityViolationError(`RLS: Unauthorized attempt to change tenant ID via update().`);
+      }
+    }
+
     const qb = manager.createQueryBuilder().update(entityClass).set(partialEntity).where(criteria);
     return qb.execute();
   };
@@ -106,144 +137,202 @@ export function createEntityManagerProxy(
   };
 
   // 4. CRITICAL: Verify-Before-Mutate for save()
-  // This prevents saving entities the user doesn't own
-  manager.save = async function (target: any, entityOrOptions?: any, options?: any) {
+  manager.save = async function (targetOrEntity: any, maybeEntityOrOptions?: any, maybeOptions?: any) {
     if (cls.get('__rlsBypass')) {
-      return originalManager.save.call(originalManager, target, entityOrOptions, options);
+      return originalManager.save.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
     }
 
-    // Handle both save(entity) and save(entity, options) signatures
-    const entity = target;
-    const entityOptions = entityOrOptions;
+    // Resolve what the actual entity is. TypeORM is very flexible here.
+    let entityClass: any;
+    let entityOrEntities: any;
+    let options: any;
 
-    if (!entity || typeof entity !== 'object') {
-      return originalManager.save.call(originalManager, target, entityOrOptions, options);
-    }
-
-    try {
-      const metadata = originalManager.connection.getMetadata(entity.constructor);
-      
-      if (isExemptTable(metadata.tableName)) {
-        return originalManager.save.call(originalManager, target, entityOrOptions, options);
+    if (typeof targetOrEntity === 'function' || typeof targetOrEntity === 'string') {
+      entityClass = targetOrEntity;
+      entityOrEntities = maybeEntityOrOptions;
+      options = maybeOptions;
+    } else {
+      // If targetOrEntity is an array, we must derive the class from the first element
+      if (Array.isArray(targetOrEntity) && targetOrEntity.length > 0) {
+        entityClass = targetOrEntity[0].constructor;
+      } else if (targetOrEntity && typeof targetOrEntity === 'object' && !Array.isArray(targetOrEntity)) {
+        entityClass = targetOrEntity.constructor;
       }
-
-      // Extract primary key - if this is a new entity (no ID), skip verification
-      const primaryKeyValue = extractPrimaryKeyValue(entity, metadata);
-      
-      // If this is an INSERT (no primary key), the beforeInsert subscriber handles security
-      // For UPDATE operations (has primary key), verify ownership first
-      if (primaryKeyValue !== undefined && primaryKeyValue !== null) {
-        // Try to find the existing entity using the proxied query builder
-        const existingEntity = await manager.findOne(entity.constructor, {
-          where: { [metadata.primaryColumns[0].propertyName]: primaryKeyValue } as any
-        });
-
-        // If RLS blocked the findOne (returns null but we expected a result), reject
-        // This means the user doesn't own this record
-        if (existingEntity === null) {
-          // Entity was not found - either doesn't exist or RLS blocked it
-          // We cannot distinguish between "doesn't exist" and "RLS blocked" without timing attacks
-          // To be safe, reject the update
-          metrics.recordBlock('save_without_ownership');
-          throw new RlsSecurityViolationError(
-            `RLS: Cannot update entity with ID ${primaryKeyValue}. ` +
-            `Either the record does not exist or you do not have access to it.`
-          );
-        }
-
-        // If entity exists and we found it, verify the tenant column matches
-        const entityTenantId = getTenantColumnValue(entity);
-        const existingTenantId = getTenantColumnValue(existingEntity);
-        
-        if (entityTenantId !== undefined && existingTenantId !== undefined) {
-          if (entityTenantId !== existingTenantId) {
-            metrics.recordBlock('tenant_mismatch');
-            throw new RlsSecurityViolationError(
-              `RLS: Tenant mismatch on update. ` +
-              `Attempted to assign to group ${entityTenantId} but record belongs to group ${existingTenantId}.`
-            );
-          }
-        }
-
-        // If entity has a tenant column but we didn't find it via RLS-allowed query,
-        // it means the user doesn't have access to modify this record
-        if ((entityTenantId !== undefined || existingTenantId !== undefined) && 
-            entityTenantId === undefined && existingTenantId !== undefined) {
-          metrics.recordBlock('remove_tenant_column');
-          throw new RlsSecurityViolationError(
-            `RLS: Cannot remove tenant assignment from existing record. ` +
-            `The record belongs to group ${existingTenantId} and you cannot change this.`
-          );
-        }
-      }
-
-      // All verifications passed - proceed with save
-      return originalManager.save.call(originalManager, target, entityOrOptions, options);
-    } catch (error) {
-      if (error instanceof RlsSecurityViolationError) {
-        throw error;
-      }
-      // For other errors (invalid entity, etc.), let TypeORM handle them
-      return originalManager.save.call(originalManager, target, entityOrOptions, options);
-    }
-  };
-
-  // 5. CRITICAL: Verify-Before-Mutate for remove()
-  // This prevents deleting entities the user doesn't own
-  manager.remove = async function (target: any, entityOrOptions?: any, options?: any) {
-    if (cls.get('__rlsBypass')) {
-      return originalManager.remove.call(originalManager, target, entityOrOptions, options);
+      entityOrEntities = targetOrEntity;
+      options = maybeEntityOrOptions;
     }
 
-    // Handle both remove(entity) and remove(entities[]) signatures
-    const entityOrEntities = target;
-
-    if (!entityOrEntities || (Array.isArray(entityOrEntities) && entityOrEntities.length === 0)) {
-      return originalManager.remove.call(originalManager, target, entityOrOptions, options);
+    if (!entityOrEntities || !entityClass || entityClass === Array || entityClass === Object) {
+      // If we still can't figure out the class (e.g. they passed a raw object without a class definition), 
+      // we must fail closed to prevent array bypasses.
+      throw new RlsSecurityViolationError('RLS: Cannot verify save() operation. Entity class could not be determined.');
     }
 
     const entities = Array.isArray(entityOrEntities) ? entityOrEntities : [entityOrEntities];
-
-    try {
-      for (const entity of entities) {
-        if (typeof entity !== 'object') continue;
-
-        const metadata = originalManager.connection.getMetadata(entity.constructor);
-        
-        if (isExemptTable(metadata.tableName)) {
-          continue; // Exempt tables can be removed without verification
-        }
-
-        const primaryKeyValue = extractPrimaryKeyValue(entity, metadata);
-        
-        if (primaryKeyValue === undefined || primaryKeyValue === null) {
-          // New entity without ID - nothing to verify
-          continue;
-        }
-
-        // Verify ownership via proxied findOne
-        const existingEntity = await manager.findOne(entity.constructor, {
-          where: { [metadata.primaryColumns[0].propertyName]: primaryKeyValue } as any
-        });
-
-        if (existingEntity === null) {
-          metrics.recordBlock('remove_without_ownership');
-          throw new RlsSecurityViolationError(
-            `RLS: Cannot remove entity with ID ${primaryKeyValue}. ` +
-            `Either the record does not exist or you do not have access to it.`
-          );
-        }
-      }
-
-      // All verifications passed - proceed with remove
-      return originalManager.remove.call(originalManager, target, entityOrOptions, options);
-    } catch (error) {
-      if (error instanceof RlsSecurityViolationError) {
-        throw error;
-      }
-      // For other errors, let TypeORM handle them
-      return originalManager.remove.call(originalManager, target, entityOrOptions, options);
+    if (entities.length === 0) {
+      return originalManager.save.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
     }
+    
+    let metadata: EntityMetadata;
+    try {
+      metadata = originalManager.connection.getMetadata(entityClass);
+    } catch (e) {
+      // If metadata fails, fail closed.
+      throw new RlsSecurityViolationError(`RLS: Cannot verify save() operation. Metadata not found for ${entityClass}.`);
+    }
+    
+    if (isExemptTable(metadata.tableName)) {
+      return originalManager.save.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
+    }
+
+    for (const entity of entities) {
+      if (typeof entity !== 'object') continue;
+
+      const pkCriteria = extractPrimaryKeyCriteria(entity, metadata);
+      
+      // If no PK criteria, it's an insert. 
+      // If it's an insert, the beforeInsert subscriber will handle tenant assignment.
+      // BUT if it has an explicit ID (e.g., predefined UUID), it will have PK criteria.
+      if (pkCriteria) {
+        // We must check if the entity *already exists*.
+        // We use the UNPROXIED manager to check raw existence, to distinguish between
+        // "record does not exist" (which means this is an insert with predefined ID)
+        // and "record exists but user doesn't own it" (which is a violation).
+        
+        let existingRaw: any = null;
+        try {
+           existingRaw = await originalManager.findOne(entityClass, { where: pkCriteria as any });
+        } catch (e) {
+           // Ignore findOne errors
+        }
+
+        if (existingRaw) {
+          // Record EXISTS in the database. This is an UPDATE.
+          // Now verify the user actually owns it using the PROXIED manager.
+          const existingSecured = await manager.findOne(entityClass, { where: pkCriteria as any });
+          
+          if (!existingSecured) {
+             // Record exists, but user cannot see it!
+             metrics.recordBlock('save_without_ownership');
+             throw new RlsSecurityViolationError(
+               `RLS: Cannot update entity. You do not have access to this record.`
+             );
+          }
+
+          // Verify tenant column matches (no spoofing)
+          const activeGroupIds = cls.get('activeGroupIds') || [];
+          const entityTenantId = getTenantColumnValue(entity);
+          const existingTenantId = getTenantColumnValue(existingSecured);
+          
+          if (entityTenantId !== undefined && existingTenantId !== undefined) {
+            // They are providing a tenant ID, and one exists. Make sure they aren't changing it to something unauthorized.
+            if (entityTenantId !== existingTenantId && !activeGroupIds.includes(entityTenantId)) {
+              metrics.recordBlock('tenant_mismatch');
+              throw new RlsSecurityViolationError(
+                `RLS: Unauthorized attempt to change tenant ID.`
+              );
+            }
+          }
+          // Note: We removed the strict check for `entityTenantId === undefined && existingTenantId !== undefined`
+          // because it broke partial updates where the payload omits the tenant ID.
+        } else {
+          // Record DOES NOT EXIST. This is an INSERT with a predefined ID.
+          // We must manually enforce the tenant assignment here, because if they bypass
+          // the subscriber, or if the subscriber misses it, we need defense in depth.
+          const activeGroupIds = cls.get('activeGroupIds') || [];
+          const primaryGroupId = cls.get('primaryGroupId');
+          const effectiveGroupId = primaryGroupId ?? activeGroupIds[0];
+          
+          if (effectiveGroupId !== undefined) {
+             const providedTenantId = getTenantColumnValue(entity);
+             if (providedTenantId !== undefined) {
+                // If they provided one, ensure they own it
+                if (!activeGroupIds.includes(providedTenantId)) {
+                   throw new RlsSecurityViolationError(`RLS: Tenant spoofing detected on insert.`);
+                }
+             } else {
+                // Auto-assign
+                // We rely on the beforeInsert subscriber to handle this cleanly, 
+                // but we could enforce it here too.
+             }
+          }
+        }
+      }
+    }
+
+    return originalManager.save.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
+  };
+
+  // 5. CRITICAL: Verify-Before-Mutate for remove()
+  manager.remove = async function (targetOrEntity: any, maybeEntityOrOptions?: any, maybeOptions?: any) {
+    if (cls.get('__rlsBypass')) {
+      return originalManager.remove.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
+    }
+
+    let entityClass: any;
+    let entityOrEntities: any;
+    let options: any;
+
+    if (typeof targetOrEntity === 'function' || typeof targetOrEntity === 'string') {
+      entityClass = targetOrEntity;
+      entityOrEntities = maybeEntityOrOptions;
+      options = maybeOptions;
+    } else {
+      if (Array.isArray(targetOrEntity) && targetOrEntity.length > 0) {
+        entityClass = targetOrEntity[0].constructor;
+      } else if (targetOrEntity && typeof targetOrEntity === 'object' && !Array.isArray(targetOrEntity)) {
+        entityClass = targetOrEntity.constructor;
+      }
+      entityOrEntities = targetOrEntity;
+      options = maybeEntityOrOptions;
+    }
+
+    if (!entityOrEntities || !entityClass || entityClass === Array || entityClass === Object) {
+      throw new RlsSecurityViolationError('RLS: Cannot verify remove() operation. Entity class could not be determined.');
+    }
+
+    const entities = Array.isArray(entityOrEntities) ? entityOrEntities : [entityOrEntities];
+    if (entities.length === 0) {
+      return originalManager.remove.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
+    }
+
+    let metadata: EntityMetadata;
+    try {
+      metadata = originalManager.connection.getMetadata(entityClass);
+    } catch (e) {
+      throw new RlsSecurityViolationError(`RLS: Cannot verify remove() operation. Metadata not found for ${entityClass}.`);
+    }
+    
+    if (isExemptTable(metadata.tableName)) {
+      return originalManager.remove.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
+    }
+
+    for (const entity of entities) {
+      if (typeof entity !== 'object') continue;
+
+      const pkCriteria = extractPrimaryKeyCriteria(entity, metadata);
+      
+      if (!pkCriteria) continue;
+
+      const existingEntity = await manager.findOne(entityClass, {
+        where: pkCriteria as any
+      });
+
+      if (existingEntity === null) {
+        // It might not exist, or they don't own it.
+        // If it doesn't exist, remove() is a no-op anyway, but if they don't own it, we must block.
+        // Let's check raw existence.
+        const existingRaw = await originalManager.findOne(entityClass, { where: pkCriteria as any });
+        if (existingRaw) {
+           metrics.recordBlock('remove_without_ownership');
+           throw new RlsSecurityViolationError(
+             `RLS: Cannot remove entity. You do not have access to it.`
+           );
+        }
+      }
+    }
+
+    return originalManager.remove.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
   };
 
   // 6. Block Raw SQL

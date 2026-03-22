@@ -11,3 +11,5 @@ export type {
   CompiledScopeTemplate,
 } from './rls.service';
 export { RlsInsertSubscriber, RlsSecurityViolationError } from './rls-subscriber';
+export { RlsBootstrapService, RlsBootstrapRule } from './rls-bootstrap.service';
+export { RlsSystemBypassService } from './internal/internal-bypass.service';

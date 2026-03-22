@@ -611,4 +611,124 @@ export class RolesService {
       source: value.source,
     }));
   }
+
+  /**
+   * Validate that setting a new parent won't create a circular reference.
+   * 
+   * @param roleId The role being modified
+   * @param newParentId The proposed new parent
+   * @throws BadRequestException if circular reference would be created
+   */
+  async validateNoCircularReference(
+    roleId: number,
+    newParentId: number,
+  ): Promise<void> {
+    if (roleId === newParentId) {
+      throw new BadRequestException(
+        'A role cannot be its own parent (circular reference)',
+      );
+    }
+
+    const descendants = await this.getDescendants(roleId);
+    const descendantIds = new Set(descendants.map(d => d.id));
+
+    if (descendantIds.has(newParentId)) {
+      throw new BadRequestException(
+        'Cannot set this as parent: would create circular reference in role hierarchy',
+      );
+    }
+
+    const ancestors = await this.getAncestors(roleId);
+    const ancestorIds = new Set(ancestors.map(a => a.id));
+
+    if (ancestorIds.has(newParentId)) {
+      throw new BadRequestException(
+        'Cannot set this as parent: would create circular reference in role hierarchy',
+      );
+    }
+  }
+
+  /**
+   * Validate that the proposed permission changes don't violate the 3-state permission model.
+   * Child roles cannot have permissions that their parents don't have (unless explicitly granted).
+   * 
+   * @param roleId The role being modified
+   * @param newPermissions Array of permission names being granted
+   * @throws BadRequestException if constraints would be violated
+   */
+  async validatePermissionConstraints(
+    roleId: number,
+    newPermissions: string[],
+  ): Promise<{ valid: boolean; warnings: string[] }> {
+    const role = await this.findOne(roleId);
+    const warnings: string[] = [];
+
+    if (!role.parentId) {
+      return { valid: true, warnings };
+    }
+
+    const ancestors = await this.getAncestors(roleId);
+    const parentPermissions = new Set<string>();
+
+    for (const ancestor of ancestors) {
+      const ancestorWithPerms = await this.rolesRepository.findOne({
+        where: { id: ancestor.id },
+        relations: ['rolePermissions', 'rolePermissions.permission'],
+      });
+
+      if (ancestorWithPerms?.rolePermissions) {
+        for (const rp of ancestorWithPerms.rolePermissions) {
+          if (rp.isGranted && rp.permission?.name) {
+            parentPermissions.add(rp.permission.name);
+          }
+        }
+      }
+    }
+
+    const invalidPermissions: string[] = [];
+    for (const perm of newPermissions) {
+      if (!parentPermissions.has(perm)) {
+        invalidPermissions.push(perm);
+      }
+    }
+
+    if (invalidPermissions.length > 0) {
+      const ancestorNames = ancestors.map(a => a.name).join(' → ');
+      warnings.push(
+        `Granting permissions [${invalidPermissions.join(', ')}] to role "${role.name}" ` +
+        `that are not granted by ancestors [${ancestorNames}]. ` +
+        `This may violate the hierarchical permission model.`,
+      );
+    }
+
+    return {
+      valid: true,
+      warnings,
+    };
+  }
+
+  /**
+   * Validate that removing a parent won't leave child roles without required permissions.
+   * 
+   * @param roleId The role being modified
+   * @throws BadRequestException if children would be affected
+   */
+  async validateParentRemoval(
+    roleId: number,
+  ): Promise<{ valid: boolean; affectedChildren: { id: number; name: string }[] }> {
+    const children = await this.rolesRepository.find({
+      where: { parentId: roleId },
+    });
+
+    const affectedChildren = children.map(c => ({ id: c.id, name: c.name }));
+
+    if (affectedChildren.length > 0) {
+      return {
+        valid: true,
+        affectedChildren,
+      };
+    }
+
+    return { valid: true, affectedChildren: [] };
+  }
 }

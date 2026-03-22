@@ -125,18 +125,16 @@ export class RlsModule {
         }
       };
 
-      const origQuery = qr.query.bind(qr);
-      qr.query = (...args: any[]) => {
-        crashIfNoBypass('query');
-        return (origQuery as any)(...args);
-      };
+      const methodsToBlock = ['query', 'rawQuery', 'insert', 'update', 'delete'];
 
-      if ((qr as any).rawQuery) {
-        const origRawQuery = (qr as any).rawQuery.bind(qr);
-        (qr as any).rawQuery = (...args: any[]) => {
-          crashIfNoBypass('rawQuery');
-          return (origRawQuery as any)(...args);
-        };
+      for (const methodName of methodsToBlock) {
+        if ((qr as any)[methodName]) {
+          const originalMethod = (qr as any)[methodName].bind(qr);
+          (qr as any)[methodName] = (...args: any[]) => {
+            crashIfNoBypass(methodName);
+            return originalMethod(...args);
+          };
+        }
       }
 
       // Secure the manager exposed on the query runner (e.g. during transactions)
