@@ -49,7 +49,38 @@ TypeORM manages queries through the `EntityManager`. Every `Repository` requests
 ```
 
 **Default-Deny Whitelist Approach:**
-The Proxy enforces a whitelist model. Tables must either:
+The Proxy enforces a two-layer model for every `EntityManager` method call:
+
+1. **Explicitly proxied write methods** — fully overridden with RLS enforcement:
+   - `save`, `remove`, `update`, `delete` — check entity ownership / tenant ID before delegating
+   - `softRemove`, `recover` — same ownership check as `remove`/`save`
+   - `softDelete`, `restore` — routed through the proxied `QueryBuilder` for automatic WHERE injection
+   - `increment`, `decrement` — routed through proxied `QueryBuilder`
+   - `insert`, `upsert` — check tenant stamping before delegating
+   - `clear` — hard-blocked unless inside `runSystemBypass()`
+   - `query` — hard-blocked unless inside `runSystemBypass()`
+   - `transaction` — callback receives a freshly proxied `EntityManager`
+   - `createQueryBuilder`, `getRepository`, `getTreeRepository`, `withRepository` — return proxied builders/repos
+
+2. **Explicitly allowed read methods** (delegated to original `EntityManager`, RLS applied at query-builder level):
+   - `find`, `findOne`, `findOneBy`, `findBy`, `findAndCount`, `findAndCountBy`
+   - `findOneOrFail`, `findOneByOrFail`
+   - `count`, `countBy`, `sum`, `average`, `minimum`, `maximum`
+   - `exists`, `existsBy`, `getId`, `create`, `merge`, `preload`, `hasId`
+
+3. **Unknown methods (default-deny)** — any method not in either list above returns a **wrapper function** that throws `RlsSecurityViolationError` if actually *called* outside a bypass. The wrapper does **not** throw on property *access*, because NestJS framework code (e.g. `@nestjs/schedule`'s `ScheduleExplorer`) enumerates every property of every injected service at startup to discover decorator metadata — throwing on access would crash module initialisation.
+
+```typescript
+// Default-deny gate — throw on CALL, not on property access:
+if (typeof value === 'function' && !PROXIED_METHODS.has(prop) && !SAFE_READ_METHODS.has(prop)) {
+  return function (...args) {
+    if (cls.get('__rlsBypass')) return value.apply(target, args);
+    throw new RlsSecurityViolationError(`Unrecognized EntityManager method: ${String(prop)}`);
+  };
+}
+```
+
+This means tables must either:
 1. Be listed in `exemptTables` (bypass RLS entirely), OR
 2. Have at least one RLS rule defined for the user's groups
 
@@ -62,13 +93,17 @@ Because `TypeOrmModule.forRootAsync()` creates the DataSource in a separate Nest
 
 RLS rules are stored relationally across normalized tables (`rls_rules`, `rls_join_paths`, `rls_join_conditions`). At query time, the `ScopeCompilerService` retrieves rules for the target table and user's groups, then compiles them into SQL conditions.
 
-**Storage Model (Relational):**
+**Storage Model (Relational — actual schema):**
 ```
-rls_rules:       { id, group_id, table_name, join_path_id, is_active }
-rls_join_paths:  { id, name, target_table, chain }
-rls_join_conditions: { id, join_path_id, from_table, from_col, to_table, to_col }
-rls_scope_templates: { id, join_path_id, column_name, operator, value }
+rls_rules:              { id, group_id, target_table, root_group_id, is_active, priority, description }
+rls_condition_groups:   { id, rule_id, parent_group_id, logical_operator, sort_order }
+rls_rule_conditions:    { id, condition_group_id, column_name, operator, value, sort_order }
+rls_join_paths:         { id, name, target_table, chain (JSON) }
+rls_join_conditions:    { id, join_path_id, from_table, from_col, to_table, to_col }
+rls_scope_templates:    { id, join_path_id, target_table, name, available_columns (JSON) }
 ```
+
+Conditions are stored as a tree of `rls_condition_groups` (each with an `AND`/`OR` operator) containing `rls_rule_conditions` leaves. The root group is linked from `rls_rules.root_group_id`. This replaces the legacy `sql` and `parameters` columns that previously stored raw SQL strings.
 
 **Compilation Flow:**
 1. `ScopeCompilerService.getCompiledScope(tableName, groupIds)` is called by the QueryBuilder Proxy
@@ -171,3 +206,33 @@ To prevent developers from abusing the bypass mechanism out of convenience, the 
 }
 ```
 If a Pull Request contains `import { ... } from '@our-org/nestjs-typeorm-rls/internal'`, security auditors can instantly flag it for strict review.
+
+### 3.4 NestJS Module Registration
+
+The new relational condition entities (`RlsConditionGroup`, `RlsRuleCondition`) and the `ScopeCompilerService` must be explicitly registered in the consuming application module. Forgetting either will cause a NestJS DI error at startup (`Nest can't resolve dependencies of RlsRulesController`).
+
+```typescript
+// permissions.module.ts
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      // ... other entities ...
+      RlsRule,
+      RlsConditionGroup,   // ← required
+      RlsRuleCondition,    // ← required
+      RlsJoinPath,
+      RlsJoinCondition,
+      RlsScopeTemplate,
+    ]),
+  ],
+  providers: [
+    // ... other providers ...
+    ScopeCompilerService,  // ← required
+  ],
+  exports: [
+    // ... other exports ...
+    ScopeCompilerService,  // ← export if other modules need it
+  ],
+})
+export class PermissionsModule {}
+```

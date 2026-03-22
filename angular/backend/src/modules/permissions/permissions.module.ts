@@ -34,6 +34,9 @@ import { RlsJoinCondition } from './entities/rls-join-condition.entity';
 import { RlsScopeTemplate } from './entities/rls-scope-template.entity';
 import { RlsContextGuard } from './guards/rls-context.guard';
 import { RlsService } from '@our-org/nestjs-typeorm-rls';
+import { RlsConditionGroup } from './entities/rls-condition-group.entity';
+import { RlsRuleCondition } from './entities/rls-rule-condition.entity';
+import { ScopeCompilerService } from './services/scope-compiler.service';
 
 @Module({
   imports: [
@@ -51,6 +54,8 @@ import { RlsService } from '@our-org/nestjs-typeorm-rls';
       Group,
       User,
       RlsRule,
+      RlsConditionGroup,
+      RlsRuleCondition,
       RlsJoinPath,
       RlsJoinCondition,
       RlsScopeTemplate,
@@ -76,6 +81,7 @@ import { RlsService } from '@our-org/nestjs-typeorm-rls';
       useClass: PermissionCheckerService,
     },
     RlsValidationService,
+    ScopeCompilerService,
     PermissionSeedsService,
     RlsContextGuard,
     RlsService,
@@ -84,6 +90,7 @@ import { RlsService } from '@our-org/nestjs-typeorm-rls';
     PermissionsService,
     PermissionCheckerService,
     RlsValidationService,
+    ScopeCompilerService,
     TypeOrmModule,
     PermissionSeedsService,
     RlsContextGuard,

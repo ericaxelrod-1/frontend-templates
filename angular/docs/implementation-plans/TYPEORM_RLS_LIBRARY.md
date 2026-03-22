@@ -19,9 +19,9 @@ This library will intercept public TypeORM queries via an `EntityManager` / `Que
 ## 2. Core Architecture
 
 ### 2.1 The Interception Point: `EntityManager` Proxy (Default-Deny)
-Instead of parsing raw SQL strings, the library uses a JavaScript `Proxy` to wrap the `EntityManager` and `SelectQueryBuilder`. It intercepts public TypeORM methods (`leftJoin`, `where`, `getMany`, etc.) and mutates the query parameters before passing them down. This automatically secures nested relations and implicit joins without hacking TypeORM internals.
+Instead of parsing raw SQL strings, the library uses a JavaScript `Proxy` to wrap the `EntityManager` and `SelectQueryBuilder`. It intercepts public TypeORM methods (`find`, `update`, `delete`, `save`, `remove`, `softRemove`, `softDelete`, `recover`, `restore`, `insert`, `upsert`, `increment`, `decrement`, etc.) and mutates the query parameters before passing them down.
 
-**Default-Deny Enforcement:** The Proxy validates table access against an allowlist. Queries to tables not in `exemptTables` and without active RLS rules for the user's groups are blocked with `WHERE 1=0` (production) or warned (development).
+**Default-Deny Enforcement:** Any `EntityManager` method not in the explicit whitelist is wrapped in a function that throws `RlsSecurityViolationError` if actually *called* outside a system bypass. Critically, the gate fires on *call*, not on *property access* — NestJS framework modules (e.g. `@nestjs/schedule`) enumerate all properties of injected services at startup for decorator discovery, and throwing on access would crash bootstrap.
 
 **Database Portability:** The library uses standard TypeORM repositories for all internal operations (rule loading, cache invalidation). The bootstrap/seeding phase does not execute raw SQL, ensuring compatibility with SQLite, MySQL, and PostgreSQL without modification.
 
@@ -29,10 +29,12 @@ Instead of parsing raw SQL strings, the library uses a JavaScript `Proxy` to wra
 Rules are stored in normalized relational tables, not JSON blobs or raw SQL strings:
 
 ```
-rls_rules:              { id, group_id, table_name, join_path_id, is_active }
-rls_join_paths:        { id, name, target_table, chain (JSON) }
-rls_join_conditions:   { id, join_path_id, from_table, from_col, to_table, to_col }
-rls_scope_templates:   { id, join_path_id, column_name, operator, value }
+rls_rules:              { id, group_id, target_table, root_group_id, is_active, priority }
+rls_condition_groups:   { id, rule_id, parent_group_id, logical_operator, sort_order }
+rls_rule_conditions:    { id, condition_group_id, column_name, operator, value, sort_order }
+rls_join_paths:         { id, name, target_table, chain (JSON) }
+rls_join_conditions:    { id, join_path_id, from_table, from_col, to_table, to_col }
+rls_scope_templates:    { id, join_path_id, target_table, name, available_columns (JSON) }
 ```
 
 The `ScopeCompilerService` retrieves rules via TypeORM repositories and compiles structured conditions (column + operator + value) into SQL at query time. This approach:
@@ -72,6 +74,7 @@ We have identified several critical bypass risks and mitigated them completely t
 | **Direct `QueryRunner` Usage** | **Hard Block:** The `QueryRunner` bypasses the `EntityManager`. The library patches `dataSource.createQueryRunner` to intercept and hard-crash (`throw Error`) if `.query()` or `.rawQuery()` are called outside a bypass block. |
 | **Direct `DataSource` Injection** | **TypeScript Augmentation:** We augment `@nestjs/typeorm` and `typeorm` types to poison `DataSource` injection. Attempting to use `@InjectDataSource()` throws a compile-time error. |
 | **Abuse of System Bypass** | **Package Exports:** `runSystemBypass` is physically separated in `package.json` exports. Developers MUST import from `@our-org/nestjs-typeorm-rls/internal`, making bypasses blatantly obvious in Code Review. |
+| **Framework property enumeration at startup** | **Throw-on-call, not throw-on-access:** The default-deny gate returns a wrapper function for unknown methods instead of throwing immediately, allowing `@nestjs/schedule` and similar frameworks to enumerate service properties without crashing bootstrap. |
 
 ### Final Threat Assessment
 What is prevented: Standard queries, nested relations, explicit joins, transactions, direct QueryRunner usage, direct DataSource injection, and accidental bypasses in production.
