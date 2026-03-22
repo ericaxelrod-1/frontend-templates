@@ -18,10 +18,30 @@ This library will intercept public TypeORM queries via an `EntityManager` / `Que
 
 ## 2. Core Architecture
 
-### 2.1 The Interception Point: `EntityManager` Proxy
+### 2.1 The Interception Point: `EntityManager` Proxy (Default-Deny)
 Instead of parsing raw SQL strings, the library uses a JavaScript `Proxy` to wrap the `EntityManager` and `SelectQueryBuilder`. It intercepts public TypeORM methods (`leftJoin`, `where`, `getMany`, etc.) and mutates the query parameters before passing them down. This automatically secures nested relations and implicit joins without hacking TypeORM internals.
 
-### 2.2 Context Propagation: `nestjs-cls`
+**Default-Deny Enforcement:** The Proxy validates table access against an allowlist. Queries to tables not in `exemptTables` and without active RLS rules for the user's groups are blocked with `WHERE 1=0` (production) or warned (development).
+
+**Database Portability:** The library uses standard TypeORM repositories for all internal operations (rule loading, cache invalidation). The bootstrap/seeding phase does not execute raw SQL, ensuring compatibility with SQLite, MySQL, and PostgreSQL without modification.
+
+### 2.2 Structured Rule Storage & Scope Compilation
+Rules are stored in normalized relational tables, not JSON blobs or raw SQL strings:
+
+```
+rls_rules:              { id, group_id, table_name, join_path_id, is_active }
+rls_join_paths:        { id, name, target_table, chain (JSON) }
+rls_join_conditions:   { id, join_path_id, from_table, from_col, to_table, to_col }
+rls_scope_templates:   { id, join_path_id, column_name, operator, value }
+```
+
+The `ScopeCompilerService` retrieves rules via TypeORM repositories and compiles structured conditions (column + operator + value) into SQL at query time. This approach:
+- Enables admin UI editing without code changes
+- Prevents SQL injection (no raw string concatenation)
+- Allows reusable join paths across multiple rules
+- Supports hot-reload by invalidating specific table caches
+
+### 2.3 Context Propagation: `nestjs-cls`
 TypeORM interceptors are singletons and do not have access to the HTTP request. We will use `nestjs-cls` (AsyncLocalStorage) to invisibly pass the active user's Group IDs down to the database layer.
 
 ---

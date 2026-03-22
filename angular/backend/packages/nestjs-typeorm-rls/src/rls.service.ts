@@ -12,6 +12,33 @@ export interface RlsScope {
   parameters?: Record<string, any>;
 }
 
+interface RlsRuleConditionRow {
+  id: number;
+  conditionGroupId: number;
+  columnName: string;
+  operator: string;
+  value: string | null;
+  sortOrder: number;
+}
+
+interface RlsConditionGroupRow {
+  id: number;
+  ruleId: number;
+  parentGroupId: number | null;
+  logicalOperator: string;
+  sortOrder: number;
+}
+
+interface RlsConditionGroupTree {
+  id: number;
+  ruleId: number;
+  parentGroupId: number | null;
+  logicalOperator: string;
+  sortOrder: number;
+  conditions: RlsRuleConditionRow[];
+  childGroups: RlsConditionGroupTree[];
+}
+
 export interface JoinCondition {
   id: number;
   fromTable: string;
@@ -102,6 +129,184 @@ export class RlsService {
     return descendants.map((r: any) => r.id);
   }
 
+  private async fetchRulesWithConditionTree(
+    tableName: string,
+    groupIds: number[],
+  ): Promise<Array<{ id: number; groupId: number; rootGroupId: number | null }>> {
+    if (!this.dataSource) return [];
+
+    const placeholders = groupIds.map(() => '?').join(',');
+    const rules = await this.dataSource.query(
+      `SELECT id, group_id as "groupId", root_group_id as "rootGroupId" 
+       FROM rls_rules 
+       WHERE group_id IN (${placeholders}) 
+       AND target_table = ?`,
+      [...groupIds, tableName],
+    );
+
+    return rules;
+  }
+
+  private async fetchConditionGroupsForRules(ruleIds: number[]): Promise<RlsConditionGroupRow[]> {
+    if (!this.dataSource || ruleIds.length === 0) return [];
+
+    const placeholders = ruleIds.map(() => '?').join(',');
+    const groups = await this.dataSource.query(
+      `SELECT id, rule_id as "ruleId", parent_group_id as "parentGroupId", 
+              logical_operator as "logicalOperator", sort_order as "sortOrder"
+       FROM rls_condition_groups
+       WHERE rule_id IN (${placeholders})
+       ORDER BY rule_id, sort_order`,
+      ruleIds,
+    );
+
+    return groups;
+  }
+
+  private async fetchConditionsForGroups(groupIds: number[]): Promise<RlsRuleConditionRow[]> {
+    if (!this.dataSource || groupIds.length === 0) return [];
+
+    const placeholders = groupIds.map(() => '?').join(',');
+    const conditions = await this.dataSource.query(
+      `SELECT id, condition_group_id as "conditionGroupId", 
+              column_name as "columnName", operator, value, sort_order as "sortOrder"
+       FROM rls_rule_conditions
+       WHERE condition_group_id IN (${placeholders})
+       ORDER BY conditionGroupId, sortOrder`,
+      groupIds,
+    );
+
+    return conditions;
+  }
+
+  private buildConditionGroupTree(
+    groups: RlsConditionGroupRow[],
+    conditions: RlsRuleConditionRow[],
+  ): Map<number, RlsConditionGroupTree> {
+    const groupMap = new Map<number, RlsConditionGroupTree>();
+
+    for (const group of groups) {
+      groupMap.set(group.id, {
+        ...group,
+        conditions: [],
+        childGroups: [],
+      });
+    }
+
+    for (const condition of conditions) {
+      const group = groupMap.get(condition.conditionGroupId);
+      if (group) {
+        group.conditions.push(condition);
+      }
+    }
+
+    const roots: RlsConditionGroupTree[] = [];
+    for (const group of groupMap.values()) {
+      if (group.parentGroupId === null) {
+        roots.push(group);
+      } else {
+        const parent = groupMap.get(group.parentGroupId);
+        if (parent) {
+          parent.childGroups.push(group);
+        }
+      }
+    }
+
+    return groupMap;
+  }
+
+  private compileGroupTree(
+    group: RlsConditionGroupTree,
+    paramPrefix: string = 'p',
+  ): { sql: string; parameters: Record<string, any> } {
+    const parts: string[] = [];
+    const params: Record<string, any> = {};
+    let idx = 0;
+
+    for (const condition of group.conditions) {
+      const paramName = `${paramPrefix}_${idx++}`;
+
+      if (['IS NULL', 'IS NOT NULL'].includes(condition.operator?.toUpperCase())) {
+        parts.push(`${condition.columnName} ${condition.operator}`);
+      } else if (condition.operator?.toUpperCase() === 'IN') {
+        const values = (condition.value || '').split(',').map(v => v.trim()).filter(v => v);
+        if (values.length > 0) {
+          const placeholders = values.map((_, i) => `:${paramName}_${i}`).join(', ');
+          parts.push(`${condition.columnName} IN (${placeholders})`);
+          values.forEach((v, i) => params[`${paramName}_${i}`] = v);
+        }
+      } else if (condition.operator && condition.columnName) {
+        parts.push(`${condition.columnName} ${condition.operator} :${paramName}`);
+        params[paramName] = condition.value;
+      }
+    }
+
+    for (const childGroup of group.childGroups) {
+      const child = this.compileGroupTree(childGroup, `${paramPrefix}_g${idx++}`);
+      if (child.sql) {
+        parts.push(`(${child.sql})`);
+        Object.assign(params, child.parameters);
+      }
+    }
+
+    return {
+      sql: parts.join(` ${group.logicalOperator || 'AND'} `),
+      parameters: params,
+    };
+  }
+
+  private async compileRuleConditions(
+    tableName: string,
+    groupIds: number[],
+  ): Promise<Array<{ groupId: number; sql: string; parameters: Record<string, any> }>> {
+    const rules = await this.fetchRulesWithConditionTree(tableName, groupIds);
+
+    if (rules.length === 0) {
+      return [];
+    }
+
+    const ruleIds = rules.map(r => r.id);
+    const groups = await this.fetchConditionGroupsForRules(ruleIds);
+    const conditions = await this.fetchConditionsForGroups(groups.map(g => g.id));
+
+    const groupTreeMap = this.buildConditionGroupTree(groups, conditions);
+
+    const results: Array<{ groupId: number; sql: string; parameters: Record<string, any> }> = [];
+
+    for (const rule of rules) {
+      if (rule.rootGroupId !== null) {
+        const rootGroup = groupTreeMap.get(rule.rootGroupId);
+        if (rootGroup) {
+          const compiled = this.compileGroupTree(rootGroup, `r${rule.id}`);
+          results.push({
+            groupId: rule.groupId,
+            sql: compiled.sql,
+            parameters: compiled.parameters,
+          });
+        }
+      } else {
+        const ruleGroups = groups.filter(g => g.ruleId === rule.id && g.parentGroupId === null);
+        if (ruleGroups.length > 0) {
+          for (const rootGroup of ruleGroups) {
+            const groupNode = groupTreeMap.get(rootGroup.id);
+            if (groupNode) {
+              const compiled = this.compileGroupTree(groupNode, `r${rule.id}`);
+              if (compiled.sql) {
+                results.push({
+                  groupId: rule.groupId,
+                  sql: compiled.sql,
+                  parameters: compiled.parameters,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
   async getRulesForTable(
     tableName: string,
     groupIds: number[],
@@ -123,15 +328,9 @@ export class RlsService {
       return null;
     }
 
-    const placeholders = allGroupIds.map(() => '?').join(',');
-    const rules = await this.dataSource.query(
-      `SELECT sql, parameters FROM rls_rules 
-       WHERE group_id IN (${placeholders}) 
-       AND target_table = ?`,
-      [...allGroupIds, tableName],
-    );
+    const compiledRules = await this.compileRuleConditions(tableName, allGroupIds);
 
-    if (!rules || rules.length === 0) {
+    if (compiledRules.length === 0) {
       return null;
     }
 
@@ -139,14 +338,19 @@ export class RlsService {
     const combinedParams: Record<string, any> = {};
     let paramIndex = 0;
 
-    for (const rule of rules) {
-      const params = rule.parameters ? JSON.parse(rule.parameters) : {};
-      for (const [key, value] of Object.entries(params)) {
-        const namespacedKey = `rls_${paramIndex++}_${key}`;
-        combinedParams[namespacedKey] = value;
-        combinedSqlParts.push(
-          rule.sql.replace(`:${key}\\b`, `:${namespacedKey}`),
-        );
+    for (const rule of compiledRules) {
+      let processedSql = rule.sql;
+      const params = rule.parameters || {};
+
+      if (Object.keys(params).length === 0) {
+        combinedSqlParts.push(processedSql);
+      } else {
+        for (const [key, value] of Object.entries(params)) {
+          const namespacedKey = `rls_${paramIndex++}_${key}`;
+          combinedParams[namespacedKey] = value;
+          processedSql = processedSql.replace(new RegExp(`:${key}\\b`, 'g'), `:${namespacedKey}`);
+        }
+        combinedSqlParts.push(processedSql);
       }
     }
 
@@ -161,7 +365,7 @@ export class RlsService {
       timestamp: Date.now(),
     });
 
-    this.logger.debug(`Fetched ${rules.length} rules for table ${tableName}`);
+    this.logger.debug(`Fetched ${compiledRules.length} compiled rules for table ${tableName}`);
     return result;
   }
 
@@ -179,18 +383,12 @@ export class RlsService {
       return [];
     }
 
-    const placeholders = allGroupIds.map(() => '?').join(',');
-    const rules = await this.dataSource.query(
-      `SELECT r.group_id, r.sql, r.parameters FROM rls_rules r 
-       WHERE r.group_id IN (${placeholders}) 
-       AND r.target_table = ?`,
-      [...allGroupIds, tableName],
-    );
+    const compiledRules = await this.compileRuleConditions(tableName, allGroupIds);
 
-    return rules.map((rule: any) => ({
-      groupId: rule.group_id,
+    return compiledRules.map(rule => ({
+      groupId: rule.groupId,
       sql: rule.sql,
-      parameters: rule.parameters ? JSON.parse(rule.parameters) : {},
+      parameters: rule.parameters,
     }));
   }
 

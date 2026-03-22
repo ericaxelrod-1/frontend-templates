@@ -5,9 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { Group } from './group.entity';
+import { RlsConditionGroup } from './rls-condition-group.entity';
 
 @Entity('rls_rules')
 export class RlsRule {
@@ -20,13 +22,7 @@ export class RlsRule {
   @Column({ name: 'target_table' })
   targetTable: string;
 
-  @Column({ type: 'text' })
-  sql: string;
-
-  @Column({ type: 'text', nullable: true })
-  parameters: string;
-
-  @Column({ name: 'is_active', default: true })
+  @Column({ type: 'int', nullable: true })
   isActive: boolean;
 
   @Column({ type: 'int', nullable: true })
@@ -35,9 +31,15 @@ export class RlsRule {
   @Column({ nullable: true })
   description: string;
 
+  @Column({ name: 'root_group_id', nullable: true })
+  rootGroupId: number | null;
+
   @ManyToOne(() => Group, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'group_id' })
   group: Group;
+
+  @OneToMany(() => RlsConditionGroup, g => g.rule)
+  conditionGroups: RlsConditionGroup[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

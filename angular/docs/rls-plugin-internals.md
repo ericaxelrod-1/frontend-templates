@@ -41,15 +41,49 @@ TypeORM manages queries through the `EntityManager`. Every `Repository` requests
     patchDataSourceQueryRunner(dataSource);
     
     const originalManager = dataSource.createEntityManager();
+    // Default-Deny Proxy: EntityManagerProxyHandler validates table access
+    // against whitelist (exemptTables) and activeGroupIds before allowing queries.
     return new Proxy(originalManager, new EntityManagerProxyHandler(cls));
   }
 }
 ```
 
+**Default-Deny Whitelist Approach:**
+The Proxy enforces a whitelist model. Tables must either:
+1. Be listed in `exemptTables` (bypass RLS entirely), OR
+2. Have at least one RLS rule defined for the user's groups
+
+If neither condition is met, queries are blocked (`WHERE 1=0` in production, warning in development). This prevents accidental exposure of unsecured tables.
+
 **Why does RlsModule create its own DataSource?**
 Because `TypeOrmModule.forRootAsync()` creates the DataSource in a separate NestJS DI context, injecting `DataSource` directly into `RlsModule` fails at runtime. The solution is to pass `dataSourceOptions` (the raw configuration object) from `ConfigService` and let RlsModule instantiate its own DataSource.
 
-### 2.2 The `QueryBuilder` Proxy (Solving Nested Relations)
+### 2.2 ScopeCompilerService — Relational Conditions to SQL Compilation
+
+RLS rules are stored relationally across normalized tables (`rls_rules`, `rls_join_paths`, `rls_join_conditions`). At query time, the `ScopeCompilerService` retrieves rules for the target table and user's groups, then compiles them into SQL conditions.
+
+**Storage Model (Relational):**
+```
+rls_rules:       { id, group_id, table_name, join_path_id, is_active }
+rls_join_paths:  { id, name, target_table, chain }
+rls_join_conditions: { id, join_path_id, from_table, from_col, to_table, to_col }
+rls_scope_templates: { id, join_path_id, column_name, operator, value }
+```
+
+**Compilation Flow:**
+1. `ScopeCompilerService.getCompiledScope(tableName, groupIds)` is called by the QueryBuilder Proxy
+2. Rules are fetched via TypeORM repositories (enabling hot-reload)
+3. Join chains are resolved from `rls_join_paths`
+4. Conditions are assembled based on operator (eq, ne, gt, in, etc.)
+5. SQL is injected via QueryBuilder's AST methods (`.andWhere()`, `.leftJoin()`)
+
+**Benefits of Relational Storage:**
+- Admin UI can edit rules without code changes
+- Join paths are reusable across multiple groups/tables
+- Conditions are parameterized (no raw SQL injection risk)
+- Rules can be cached and hot-reloaded independently
+
+### 2.3 The `QueryBuilder` Proxy (Solving Nested Relations)
 TypeORM processes nested relations (e.g., `find({ relations: ['orders'] })`) by silently calling `qb.leftJoin()` under the hood. Our `QueryBuilderProxy` intercepts these public method calls across the entire API surface:
 
 *   **Joins:** `leftJoin`, `innerJoin`, `leftJoinAndSelect`, `innerJoinAndSelect`, `rightJoin`, `fullJoin`.
@@ -76,8 +110,11 @@ get(target: SelectQueryBuilder<any>, prop: string) {
 
 Because application-level security relies on the developer actually using the proxied objects, we must explicitly block all avenues where a developer could bypass the `EntityManager`.
 
-### 3.1 Blocking Raw SQL (`QueryRunner`)
+### 3.1 Blocking Raw SQL (`QueryRunner`) and Bootstrap via Repositories
 If a developer accesses the `QueryRunner` directly to execute raw SQL, there is no AST for the proxy to intercept. To prevent this, the library overrides the execution methods on the driver.
+
+**Bootstrap uses TypeORM Repositories:**
+Initial RLS rule seeding must occur before normal application queries can succeed. The `RlsSystemBypassService.runSystemBypass()` executes within a modified context where the EntityManager Proxy is temporarily disabled, allowing direct database access. This bootstrap phase uses standard TypeORM repositories (not raw SQL) for portability across SQLite, MySQL, and PostgreSQL.
 
 ```typescript
 const originalCreateRunner = dataSource.createQueryRunner.bind(dataSource);

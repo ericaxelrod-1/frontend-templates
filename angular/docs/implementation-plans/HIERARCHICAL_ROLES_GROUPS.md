@@ -506,22 +506,32 @@ When a user belonging to multiple groups creates a new record, the system must k
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  SAVE-TIME CONFLICT CHECK                                        │
+│  SAVE-TIME CONFLICT CHECK (Structured Conditions)                │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  When admin saves a rule, check:                                │
+│  When admin saves a rule, check (via structured conditions):   │
 │                                                                  │
 │  • Does new rule contradict itself?                           │
-│    Example: country = 'US' AND country <> 'US'                 │
+│    Example: { column: 'country', op: '=', value: 'US' }        │
+│           AND { column: 'country', op: '<>', value: 'US' }    │
 │                                                                  │
 │  • Does new rule contradict parent group?                       │
-│    Example: Parent has country = 'US', child tries country <> 'US'│
+│    Example: Parent: { col: 'country', op: '=', val: 'US' }    │
+│             Child: { col: 'country', op: '<>', val: 'US' }    │
+│                                                                  │
+│  Conflict Detection Logic:                                     │
+│  • Compare (column + operator + value) tuples across rules    │
+│  • Detect logical inversions (eq vs ne, gt vs lt)              │
+│  • Flag contradictions at save-time, not runtime               │
 │                                                                  │
 │  ACTION: Show warning, allow save anyway                       │
 │  Result: 0 rows - honest answer                                │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Why Structured Conditions Enable Better Conflict Detection:**
+Since conditions are stored as discrete (column, operator, value) tuples rather than embedded in SQL or JSON, the system can compare them programmatically. This allows precise identification of conflicting column values and operators without parsing raw strings.
 
 ### 8.2 What We DON'T Check
 
@@ -669,17 +679,28 @@ If a parent group's scope is modified (e.g., changed from `region = 'US'` to `re
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  NOT a SQL builder (security risk)                             │
+│  NOT JSON storage (hard to query/edit)                          │
 │                                                                  │
-│  Drag-drop interface:                                          │
+│  Relational Storage:                                           │
+│  • Each condition = row in rls_scope_templates                 │
+│  • { column, operator, value } as structured columns           │
+│  • Joined to rls_join_paths for table traversal                │
+│                                                                  │
+│  UI Interface:                                                  │
 │  • Drag column to condition zone                               │
 │  • Select operator from dropdown                               │
-│  • Enter/select value                                         │
+│  • Enter/select value                                          │
 │  • Add multiple conditions                                     │
 │                                                                  │
-│  Test button: Returns sample rows + count                     │
+│  Test button: Returns sample rows + count                      │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Storage vs. Display:**
+- Admin UI shows drag-drop builder (no SQL exposure)
+- Underlying storage is relational (queryable, editable by services)
+- `ScopeCompilerService` compiles relational conditions to SQL at query time
 
 ### 10.5 Performance Considerations
 

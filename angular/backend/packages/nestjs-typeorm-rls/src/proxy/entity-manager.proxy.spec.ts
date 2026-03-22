@@ -1,4 +1,4 @@
-import { createEntityManagerProxy } from './entity-manager.proxy';
+import { createEntityManagerProxy, RlsSecurityViolationError } from './entity-manager.proxy';
 
 describe('EntityManager Proxy', () => {
   let mockManager: any;
@@ -89,9 +89,12 @@ describe('EntityManager Proxy', () => {
       receivedManager = m;
     });
 
-    // Since we are not using Proxy anymore but cloning, checking identity is tricky.
-    // However, the received manager should have our patched createQueryBuilder
     expect(receivedManager).not.toBe(fakeTxManager);
     expect(receivedManager.createQueryBuilder).not.toBe(fakeTxManager.createQueryBuilder);
+  });
+
+  it('should block unrecognized methods by default', () => {
+    const proxy = createEntityManagerProxy(mockManager, mockCls, mockRlsService, mockMetrics, mockConfig);
+    expect(() => (proxy as any).someNewMethod()).toThrow(RlsSecurityViolationError);
   });
 });

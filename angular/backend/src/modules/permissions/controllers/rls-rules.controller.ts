@@ -14,13 +14,15 @@ import {
 } from '@nestjs/common';
 import { RlsService } from '@our-org/nestjs-typeorm-rls';
 import { RlsRule } from '../entities/rls-rule.entity';
+import { RlsConditionGroup } from '../entities/rls-condition-group.entity';
+import { RlsRuleCondition } from '../entities/rls-rule-condition.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../guards/permission.guard';
 import { RequirePermission } from '../decorators/require-permission.decorator';
 import { RlsValidationService, ValidationResult } from '../services/rls-validation.service';
-import { CreateRlsRuleDto, UpdateRlsRuleDto, ValidateRlsRuleDto, InvalidateCacheDto } from '../dto/rls-rule.dto';
+import { CreateRlsRuleDto, UpdateRlsRuleDto, ValidateRlsRuleDto, InvalidateCacheDto, ScopeGroupDto, ScopeGroupItemDto, ScopeConditionDto } from '../dto/rls-rule.dto';
 
 @Controller('api/rls-rules')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -30,6 +32,10 @@ export class RlsRulesController {
     private readonly rlsValidationService: RlsValidationService,
     @InjectRepository(RlsRule)
     private readonly rlsRuleRepository: Repository<RlsRule>,
+    @InjectRepository(RlsConditionGroup)
+    private readonly conditionGroupRepository: Repository<RlsConditionGroup>,
+    @InjectRepository(RlsRuleCondition)
+    private readonly ruleConditionRepository: Repository<RlsRuleCondition>,
   ) {}
 
   @Get()
@@ -48,7 +54,7 @@ export class RlsRulesController {
 
     return this.rlsRuleRepository.find({
       where,
-      relations: ['group'],
+      relations: ['group', 'conditionGroups', 'conditionGroups.conditions'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -58,7 +64,7 @@ export class RlsRulesController {
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.rlsRuleRepository.findOne({
       where: { id },
-      relations: ['group'],
+      relations: ['group', 'conditionGroups', 'conditionGroups.conditions'],
     });
   }
 
@@ -67,7 +73,7 @@ export class RlsRulesController {
   async validateRule(@Body() validateDto: ValidateRlsRuleDto): Promise<ValidationResult> {
     return this.rlsValidationService.validateRule(
       validateDto.groupId,
-      validateDto.sql,
+      validateDto.scope,
       validateDto.targetTable,
     );
   }
@@ -77,7 +83,7 @@ export class RlsRulesController {
   async create(@Body() createDto: CreateRlsRuleDto): Promise<{ rule: RlsRule; validation?: ValidationResult }> {
     const validation = await this.rlsValidationService.validateRule(
       createDto.groupId,
-      createDto.sql,
+      createDto.scope,
       createDto.targetTable,
     );
 
@@ -93,15 +99,49 @@ export class RlsRulesController {
     const rule = this.rlsRuleRepository.create({
       groupId: createDto.groupId,
       targetTable: createDto.targetTable,
-      sql: createDto.sql,
-      parameters: createDto.parameters
-        ? JSON.stringify(createDto.parameters)
-        : null,
     });
 
     const saved = await this.rlsRuleRepository.save(rule);
+
+    const rootGroup = await this.conditionGroupRepository.save({
+      ruleId: saved.id,
+      logicalOperator: createDto.scope.logicalOperator,
+      sortOrder: 0,
+    });
+
+    await this.saveConditionsFromScope(createDto.scope.conditions, rootGroup.id, 0);
+
+    saved.rootGroupId = rootGroup.id;
+    await this.rlsRuleRepository.save(saved);
+
     this.rlsService.invalidateCache(createDto.targetTable);
     return { rule: saved, validation };
+  }
+
+  private async saveConditionsFromScope(conditions: ScopeGroupItemDto[], groupId: number, sortOffset: number): Promise<number> {
+    let sortOrder = sortOffset;
+
+    for (const condition of conditions) {
+      if ('logicalOperator' in condition) {
+        const childGroup = await this.conditionGroupRepository.save({
+          ruleId: (await this.conditionGroupRepository.findOne({ where: { id: groupId } }))!.ruleId,
+          parentGroupId: groupId,
+          logicalOperator: condition.logicalOperator,
+          sortOrder: sortOrder++,
+        });
+        sortOrder = await this.saveConditionsFromScope(condition.conditions, childGroup.id, sortOrder);
+      } else {
+        await this.ruleConditionRepository.save({
+          conditionGroupId: groupId,
+          columnName: condition.column,
+          operator: condition.operator,
+          value: condition.value || null,
+          sortOrder: sortOrder++,
+        });
+      }
+    }
+
+    return sortOrder;
   }
 
   @Put(':id')
@@ -112,7 +152,7 @@ export class RlsRulesController {
   ): Promise<{ rule: RlsRule; validation?: ValidationResult }> {
     const rule = await this.rlsRuleRepository.findOne({
       where: { id },
-      relations: ['group'],
+      relations: ['group', 'conditionGroups', 'conditionGroups.conditions'],
     });
 
     if (!rule) {
@@ -121,10 +161,10 @@ export class RlsRulesController {
 
     let validation: ValidationResult | undefined;
 
-    if (updateDto.sql !== undefined) {
+    if (updateDto.scope !== undefined) {
       validation = await this.rlsValidationService.validateParentRuleUpdate(
         rule.groupId,
-        updateDto.sql,
+        updateDto.scope,
         rule.targetTable,
       );
 
@@ -136,11 +176,17 @@ export class RlsRulesController {
         return { rule, validation };
       }
 
-      rule.sql = updateDto.sql;
-    }
+      await this.conditionGroupRepository.delete({ ruleId: rule.id });
 
-    if (updateDto.parameters !== undefined) {
-      rule.parameters = JSON.stringify(updateDto.parameters);
+      const rootGroup = await this.conditionGroupRepository.save({
+        ruleId: rule.id,
+        logicalOperator: updateDto.scope.logicalOperator,
+        sortOrder: 0,
+      });
+
+      await this.saveConditionsFromScope(updateDto.scope.conditions, rootGroup.id, 0);
+
+      rule.rootGroupId = rootGroup.id;
     }
 
     if (updateDto.isActive !== undefined) {

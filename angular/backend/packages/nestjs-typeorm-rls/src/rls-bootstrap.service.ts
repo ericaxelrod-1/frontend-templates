@@ -71,21 +71,19 @@ export class RlsBootstrapService implements OnModuleInit {
   }
 
   private async ensureRuleExists(rule: RlsBootstrapRule): Promise<void> {
-    // Check if rule already exists
-    const existing = await this.dataSource.query(
-      `SELECT id FROM rls_rules WHERE group_id = 1 AND target_table = ? AND sql = ?`,
-      [rule.targetTable, rule.sql],
-    );
+    const repo = this.dataSource.getRepository('rls_rules');
+    const existing = await repo.findOne({
+      where: { groupId: 1, targetTable: rule.targetTable, sql: rule.sql },
+    });
 
-    if (existing.length === 0) {
-      await this.dataSource.query(
-        `INSERT INTO rls_rules (group_id, target_table, sql, parameters, created_at, updated_at)
-         VALUES (1, ?, ?, ?, datetime('now'), datetime('now'))`,
-        [
-          rule.targetTable,
-          rule.sql,
-          rule.parameters ? JSON.stringify(rule.parameters) : null,
-        ],
+    if (!existing) {
+      await repo.save(
+        repo.create({
+          groupId: 1,
+          targetTable: rule.targetTable,
+          sql: rule.sql,
+          parameters: rule.parameters ? JSON.stringify(rule.parameters) : null,
+        }),
       );
       this.logger.debug(`Created fundamental rule for ${rule.targetTable}`);
     }
@@ -104,15 +102,21 @@ export class RlsBootstrapService implements OnModuleInit {
     parameters?: Record<string, any>,
   ): Promise<void> {
     await this.bypassService.runSystemBypass(async () => {
-      await this.dataSource.query(
-        `INSERT OR IGNORE INTO rls_rules (group_id, target_table, sql, parameters, created_at, updated_at)
-         VALUES (1, ?, ?, ?, datetime('now'), datetime('now'))`,
-        [
-          tableName,
-          whereClause,
-          parameters ? JSON.stringify(parameters) : null,
-        ],
-      );
+      const repo = this.dataSource.getRepository('rls_rules');
+      const existing = await repo.findOne({
+        where: { groupId: 1, targetTable: tableName, sql: whereClause },
+      });
+
+      if (!existing) {
+        await repo.save(
+          repo.create({
+            groupId: 1,
+            targetTable: tableName,
+            sql: whereClause,
+            parameters: parameters ? JSON.stringify(parameters) : null,
+          }),
+        );
+      }
     });
   }
 }

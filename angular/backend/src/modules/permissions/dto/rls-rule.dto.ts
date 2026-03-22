@@ -1,5 +1,30 @@
-import { IsString, IsOptional, IsBoolean, IsInt, IsArray, MaxLength, MinLength, IsNotEmpty } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsString, IsOptional, IsBoolean, IsInt, IsArray, MaxLength, ValidateNested, IsIn } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+
+export class ScopeConditionDto {
+  @IsString()
+  @MaxLength(255)
+  column: string;
+
+  @IsString()
+  @MaxLength(20)
+  operator: string;
+
+  @IsOptional()
+  @IsString()
+  value?: string;
+}
+
+export class ScopeGroupDto {
+  @IsIn(['AND', 'OR'])
+  logicalOperator: 'AND' | 'OR';
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  conditions: (ScopeConditionDto | ScopeGroupDto)[];
+}
+
+export type ScopeGroupItemDto = ScopeConditionDto | ScopeGroupDto;
 
 export class CreateRlsRuleDto {
   @IsInt()
@@ -10,13 +35,9 @@ export class CreateRlsRuleDto {
   @Transform(({ value }) => value?.toLowerCase().trim())
   targetTable: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(1)
-  sql: string;
-
-  @IsOptional()
-  parameters?: Record<string, any>;
+  @ValidateNested()
+  @Type(() => ScopeGroupDto)
+  scope: ScopeGroupDto;
 
   @IsOptional()
   @IsBoolean()
@@ -25,13 +46,9 @@ export class CreateRlsRuleDto {
 
 export class UpdateRlsRuleDto {
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(1)
-  sql?: string;
-
-  @IsOptional()
-  parameters?: Record<string, any>;
+  @ValidateNested()
+  @Type(() => ScopeGroupDto)
+  scope?: ScopeGroupDto;
 
   @IsOptional()
   @IsBoolean()
@@ -64,10 +81,9 @@ export class ValidateRlsRuleDto {
   @Transform(({ value }) => value?.toLowerCase().trim())
   targetTable: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(1)
-  sql: string;
+  @ValidateNested()
+  @Type(() => ScopeGroupDto)
+  scope: ScopeGroupDto;
 }
 
 export class InvalidateCacheDto {

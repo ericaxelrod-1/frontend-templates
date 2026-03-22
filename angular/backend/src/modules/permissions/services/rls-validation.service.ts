@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RlsRule } from '../entities/rls-rule.entity';
 import { Group } from '../entities/group.entity';
+import { ScopeGroupDto, ScopeGroupItemDto, ScopeConditionDto } from '../dto/rls-rule.dto';
 
 export interface ValidationWarning {
   type: 'self_conflict' | 'parent_conflict';
@@ -32,13 +33,13 @@ export class RlsValidationService {
 
   async validateRule(
     groupId: number,
-    sql: string,
+    scope: ScopeGroupDto,
     targetTable: string,
     existingRuleId?: number,
   ): Promise<ValidationResult> {
     const warnings: ValidationWarning[] = [];
 
-    const selfConflict = this.checkSelfConflict(sql);
+    const selfConflict = this.checkSelfConflict(scope);
     if (selfConflict) {
       warnings.push({
         type: 'self_conflict',
@@ -48,7 +49,7 @@ export class RlsValidationService {
       });
     }
 
-    const parentConflict = await this.checkParentConflict(groupId, sql, targetTable, existingRuleId);
+    const parentConflict = await this.checkParentConflict(groupId, scope, targetTable, existingRuleId);
     if (parentConflict) {
       warnings.push({
         type: 'parent_conflict',
@@ -70,14 +71,14 @@ export class RlsValidationService {
 
   async validateParentRuleUpdate(
     groupId: number,
-    newSql: string,
+    newScope: ScopeGroupDto,
     targetTable: string,
   ): Promise<ValidationResult> {
     const warnings: ValidationWarning[] = [];
 
     const childRules = await this.rlsRuleRepository.find({
       where: { targetTable },
-      relations: ['group'],
+      relations: ['group', 'conditionGroups', 'conditionGroups.conditions'],
     });
 
     for (const childRule of childRules) {
@@ -85,7 +86,10 @@ export class RlsValidationService {
         continue;
       }
 
-      const conflict = this.checkChildConflict(newSql, childRule.sql, childRule.group.name);
+      const childScope = await this.buildScopeFromRule(childRule);
+      if (!childScope) continue;
+
+      const conflict = this.checkChildConflict(newScope, childScope, childRule.group.name);
       if (conflict) {
         warnings.push({
           type: 'parent_conflict',
@@ -106,12 +110,43 @@ export class RlsValidationService {
     };
   }
 
-  private checkSelfConflict(sql: string): { column: string } | null {
-    // Parse conditions grouped by AND/OR to detect actual logical contradictions
-    // Only flag: col = X AND col != X (or col = X AND col = Y where X != Y)
-    // NOT flagged: col = X OR col = Y (valid multi-value IN clause)
-    
-    const conditions = this.parseConditions(sql);
+  private async buildScopeFromRule(rule: RlsRule): Promise<ScopeGroupDto | null> {
+    if (!rule.conditionGroups || rule.conditionGroups.length === 0) {
+      return null;
+    }
+
+    const rootGroup = rule.conditionGroups.find(g => g.parentGroupId === null);
+    if (!rootGroup) return null;
+
+    return this.buildScopeGroup(rootGroup, rule.conditionGroups);
+  }
+
+  private buildScopeGroup(group: any, allGroups: any[]): ScopeGroupDto {
+    const conditions: ScopeGroupItemDto[] = [];
+
+    if (group.conditions) {
+      for (const cond of group.conditions) {
+        conditions.push({
+          column: cond.columnName,
+          operator: cond.operator,
+          value: cond.value || undefined,
+        } as ScopeConditionDto);
+      }
+    }
+
+    const childGroups = allGroups.filter(g => g.parentGroupId === group.id);
+    for (const childGroup of childGroups) {
+      conditions.push(this.buildScopeGroup(childGroup, allGroups));
+    }
+
+    return {
+      logicalOperator: group.logicalOperator as 'AND' | 'OR',
+      conditions,
+    };
+  }
+
+  private checkSelfConflict(scope: ScopeGroupDto): { column: string } | null {
+    const conditions = this.flattenConditions(scope);
     const columnConditions = new Map<string, Array<{ operator: string; value: string; negated: boolean }>>();
 
     for (const cond of conditions) {
@@ -121,13 +156,11 @@ export class RlsValidationService {
       columnConditions.get(cond.column)!.push(cond);
     }
 
-    // Check each column for contradictions
     for (const [column, conds] of columnConditions) {
       if (conds.length < 2) {
-        continue; // Need at least 2 conditions on same column
+        continue;
       }
 
-      // Check for equality contradictions: col = X AND col != X
       const equals = conds.filter(c => c.operator === '=');
       const notEquals = conds.filter(c => c.operator === '!=' || c.operator === '<>');
 
@@ -135,15 +168,13 @@ export class RlsValidationService {
         return { column };
       }
 
-      // Check for different equals: col = X AND col = Y where X != Y
       if (equals.length >= 2) {
         const values = new Set(equals.map(c => c.value.toLowerCase()));
         if (values.size > 1) {
-          return { column }; // col = X AND col = Y with X != Y
+          return { column };
         }
       }
 
-      // Check for range contradictions: col > X AND col < X (or similar)
       const greaterThan = conds.filter(c => c.operator === '>');
       const lessThan = conds.filter(c => c.operator === '<');
       const greaterThanOrEqual = conds.filter(c => c.operator === '>=');
@@ -151,7 +182,6 @@ export class RlsValidationService {
 
       if ((greaterThan.length > 0 || greaterThanOrEqual.length > 0) &&
           (lessThan.length > 0 || lessThanOrEqual.length > 0)) {
-        // Check if ranges don't overlap
         const maxLower = Math.max(
           ...greaterThan.map(c => parseFloat(c.value)),
           ...greaterThanOrEqual.map(c => parseFloat(c.value))
@@ -162,7 +192,7 @@ export class RlsValidationService {
         );
 
         if (isNaN(maxLower) || isNaN(minUpper) || maxLower >= minUpper) {
-          return { column }; // Ranges don't overlap or are contradictory
+          return { column };
         }
       }
     }
@@ -170,43 +200,42 @@ export class RlsValidationService {
     return null;
   }
 
-  private parseConditions(sql: string): Array<{ column: string; operator: string; value: string; negated: boolean }> {
-    const conditions: Array<{ column: string; operator: string; value: string; negated: boolean }> = [];
+  private flattenConditions(scope: ScopeGroupDto): Array<{ column: string; operator: string; value: string; negated: boolean }> {
+    const result: Array<{ column: string; operator: string; value: string; negated: boolean }> = [];
 
-    // Match column operators value patterns
-    // Handles: col = 'value', col != 'value', col LIKE '%value%', col IN (a, b), etc.
-    const pattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*(=|!=|<>|<|>|>=|<=|LIKE|NOT\s+LIKE|IN|NOT\s+IN)\s*\(?['"]?([^'"\s,)(]+)['"]?\)?/gi;
-    let match;
+    const processItems = (items: ScopeGroupItemDto[]) => {
+      for (const item of items) {
+        if ('logicalOperator' in item) {
+          processItems(item.conditions);
+        } else {
+          let operator = item.operator.toUpperCase();
+          let negated = false;
 
-    while ((match = pattern.exec(sql)) !== null) {
-      const column = match[1].toLowerCase();
-      let operator = match[2].toUpperCase();
-      let value = match[3];
-      let negated = false;
+          if (operator === 'NOT LIKE') {
+            operator = '!=';
+            negated = true;
+          } else if (operator === 'NOT IN') {
+            operator = '!=';
+            negated = true;
+          }
 
-      // Normalize operator
-      if (operator === 'NOT LIKE') {
-        operator = '!=';
-        negated = true;
-      } else if (operator === 'NOT IN') {
-        operator = '!=';
-        negated = true;
+          result.push({
+            column: item.column.toLowerCase(),
+            operator,
+            value: item.value || '',
+            negated,
+          });
+        }
       }
+    };
 
-      // Skip array/list values (IN clauses with multiple values)
-      if (operator === 'IN' && value.includes(',')) {
-        continue;
-      }
-
-      conditions.push({ column, operator, value, negated });
-    }
-
-    return conditions;
+    processItems(scope.conditions);
+    return result;
   }
 
   private async checkParentConflict(
     groupId: number,
-    childSql: string,
+    childScope: ScopeGroupDto,
     targetTable: string,
     excludeRuleId?: number,
   ): Promise<{ column: string; parentValue: string; childValue: string } | null> {
@@ -217,6 +246,7 @@ export class RlsValidationService {
 
     const parentRules = await this.rlsRuleRepository.find({
       where: { groupId: parentGroup.id, targetTable },
+      relations: ['conditionGroups', 'conditionGroups.conditions'],
     });
 
     for (const parentRule of parentRules) {
@@ -224,12 +254,15 @@ export class RlsValidationService {
         continue;
       }
 
-      const conflict = this.checkChildConflict(parentRule.sql, childSql, parentGroup.name);
+      const parentScope = await this.buildScopeFromRule(parentRule);
+      if (!parentScope) continue;
+
+      const conflict = this.checkChildConflict(parentScope, childScope, parentGroup.name);
       if (conflict) {
         return {
           column: conflict.column,
-          parentValue: parentRule.sql,
-          childValue: childSql,
+          parentValue: JSON.stringify(parentScope),
+          childValue: JSON.stringify(childScope),
         };
       }
     }
@@ -238,12 +271,12 @@ export class RlsValidationService {
   }
 
   private checkChildConflict(
-    parentSql: string,
-    childSql: string,
+    parentScope: ScopeGroupDto,
+    childScope: ScopeGroupDto,
     childGroupName: string,
   ): { column: string; message: string } | null {
-    const parentColumnValues = this.extractColumnConditions(parentSql);
-    const childColumnValues = this.extractColumnConditions(childSql);
+    const parentColumnValues = this.extractColumnConditions(parentScope);
+    const childColumnValues = this.extractColumnConditions(childScope);
 
     for (const [column, childValue] of Object.entries(childColumnValues)) {
       if (parentColumnValues[column]) {
@@ -261,14 +294,14 @@ export class RlsValidationService {
     return null;
   }
 
-  private extractColumnConditions(sql: string): Record<string, string> {
+  private extractColumnConditions(scope: ScopeGroupDto): Record<string, string> {
     const conditions: Record<string, string> = {};
+    const flatConditions = this.flattenConditions(scope);
 
-    const pattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|!=|LIKE)\s*['"]?([^'"\s,)]+)['"]?/gi;
-    let match;
-
-    while ((match = pattern.exec(sql)) !== null) {
-      conditions[match[1].toLowerCase()] = match[2];
+    for (const cond of flatConditions) {
+      if (cond.operator === '=' || cond.operator === 'LIKE') {
+        conditions[cond.column] = cond.value;
+      }
     }
 
     return conditions;

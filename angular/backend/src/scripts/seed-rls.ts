@@ -1,32 +1,30 @@
 import { DataSource } from 'typeorm';
+import { RlsRule } from '../modules/permissions/entities/rls-rule.entity';
+import { RlsConditionGroup } from '../modules/permissions/entities/rls-condition-group.entity';
+import { RlsRuleCondition } from '../modules/permissions/entities/rls-rule-condition.entity';
 import { RlsSystemBypassService } from '../../packages/nestjs-typeorm-rls/src/internal/internal-bypass.service';
 import { ClsService } from 'nestjs-cls';
 
 interface BootstrapRule {
   targetTable: string;
-  sql: string;
   description: string;
 }
 
 const FUNDAMENTAL_RULES: BootstrapRule[] = [
   {
     targetTable: 'rls_rules',
-    sql: '1=1',
     description: 'Allow system to read RLS rules for management',
   },
   {
     targetTable: 'rls_join_paths',
-    sql: '1=1',
     description: 'Allow system to read join paths for query construction',
   },
   {
     targetTable: 'rls_join_conditions',
-    sql: '1=1',
     description: 'Allow system to read join conditions',
   },
   {
     targetTable: 'rls_scope_templates',
-    sql: '1=1',
     description: 'Allow system to read scope templates',
   },
 ];
@@ -43,6 +41,7 @@ async function bootstrap() {
     type: 'sqlite',
     database: dbPath,
     synchronize: false,
+    entities: [RlsRule, RlsConditionGroup, RlsRuleCondition],
   });
 
   await dataSource.initialize();
@@ -50,9 +49,6 @@ async function bootstrap() {
 
   const mockCls = {
     runWith: async (context: any, callback: () => Promise<any>) => {
-      // Note: This mock CLS does not set __rlsBypass context.
-      // The bypassService.runSystemBypass() directly calls the callback
-      // without using this mock, so this is purely for type compatibility.
       return callback();
     },
   } as unknown as ClsService;
@@ -60,18 +56,41 @@ async function bootstrap() {
   const bypassService = new RlsSystemBypassService(mockCls);
 
   await bypassService.runSystemBypass(async () => {
-    for (const rule of FUNDAMENTAL_RULES) {
-      const existing = await dataSource.query(
-        `SELECT id FROM rls_rules WHERE group_id = 1 AND target_table = ? AND sql = ?`,
-        [rule.targetTable, rule.sql],
-      );
+    const ruleRepo = dataSource.getRepository(RlsRule);
+    const groupRepo = dataSource.getRepository(RlsConditionGroup);
+    const conditionRepo = dataSource.getRepository(RlsRuleCondition);
 
-      if (existing.length === 0) {
-        await dataSource.query(
-          `INSERT INTO rls_rules (group_id, target_table, sql, parameters, created_at, updated_at)
-           VALUES (1, ?, ?, NULL, datetime('now'), datetime('now'))`,
-          [rule.targetTable, rule.sql],
-        );
+    for (const rule of FUNDAMENTAL_RULES) {
+      const existing = await ruleRepo.findOne({
+        where: { groupId: 1, targetTable: rule.targetTable },
+      });
+
+      if (!existing) {
+        const newRule = ruleRepo.create({
+          groupId: 1,
+          targetTable: rule.targetTable,
+        });
+        const savedRule = await ruleRepo.save(newRule);
+
+        const rootGroup = groupRepo.create({
+          ruleId: savedRule.id,
+          logicalOperator: 'AND',
+          sortOrder: 0,
+        });
+        const savedGroup = await groupRepo.save(rootGroup);
+
+        const alwaysTrueCondition = conditionRepo.create({
+          conditionGroupId: savedGroup.id,
+          columnName: '1',
+          operator: '=',
+          value: '1',
+          sortOrder: 0,
+        });
+        await conditionRepo.save(alwaysTrueCondition);
+
+        savedRule.rootGroupId = savedGroup.id;
+        await ruleRepo.save(savedRule);
+
         console.log(`✓ Created rule: ${rule.description}`);
       } else {
         console.log(`○ Rule exists: ${rule.description}`);

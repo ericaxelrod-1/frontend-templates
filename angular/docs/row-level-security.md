@@ -138,9 +138,40 @@ export class AuthCleanupTask {
 
 Because `users` and `groups` are subject to RLS, the application cannot function until the initial RLS rules are populated in the database. 
 
-During your deployment/seeding phase, you must use the `RlsSystemBypassService` to programmatically insert the foundational rules (e.g., ensuring users can see their own groups) before allowing the first login. 
+During your deployment/seeding phase, you must use the `RlsSystemBypassService` to programmatically insert the foundational rules (e.g., ensuring users can see their own groups) before allowing the first login. The bootstrap phase uses standard TypeORM repositories for database portability across SQLite, MySQL, and PostgreSQL—no raw SQL required.
 
 Once the initial seed rules are created, system administrators can manage subsequent rules using the Admin UI or REST API.
+
+## 4.1 Scope Builder UI — No Raw SQL Required
+
+RLS rules are defined through the Admin UI's **Scope Builder**, which provides a structured interface:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SCOPE BUILDER                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Target Table: [ orders ▼ ]                                     │
+│                                                                  │
+│  Join Path: [ Orders via Users → Groups ▼ ]                     │
+│                                                                  │
+│  Conditions:                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ [customer_id ▼] [= ▼] [{{ customerId }}]            [✕]   ││
+│  │ [status ▼]       [in ▼] [shipped, processing]       [✕]   ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  [+ Add Condition]                                              │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**How it works:**
+- **Column:** Dropdown of available columns from the target table (via join path)
+- **Operator:** Dropdown of valid operators (eq, ne, gt, lt, in, like, between)
+- **Value:** Text input or dynamic placeholder (e.g., `{{ customerId }}` from user context)
+
+Conditions are stored relationally in normalized tables (`rls_rules`, `rls_scope_templates`, `rls_join_conditions`). The `ScopeCompilerService` compiles these structured conditions into SQL at query time—no SQL strings are ever entered by administrators.
 
 ---
 

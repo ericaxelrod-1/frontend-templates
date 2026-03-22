@@ -8,6 +8,23 @@ import { createQueryBuilderProxy } from './query-builder.proxy';
 
 export { RlsSecurityViolationError };
 
+const SAFE_READ_METHODS = new Set([
+  'find', 'findOne', 'findOneBy', 'findBy', 'findAndCount',
+  'findAndCountBy', 'findOneOrFail', 'findOneByOrFail',
+  'count', 'countBy', 'sum', 'average', 'minimum', 'maximum',
+  'exists', 'existsBy',
+  'getId', 'create', 'merge', 'preload', 'hasId',
+]);
+
+const PROXIED_METHODS = new Set([
+  'createQueryBuilder', 'getRepository', 'getTreeRepository',
+  'update', 'delete', 'save', 'remove', 'query', 'transaction',
+]);
+
+const SAFE_PROPERTIES = new Set([
+  'connection', 'queryRunner', 'target',
+]);
+
 export function createEntityManagerProxy(
   originalManager: EntityManager,
   cls: ClsService,
@@ -18,7 +35,6 @@ export function createEntityManagerProxy(
   const manager = Object.create(originalManager);
   Object.assign(manager, originalManager);
 
-  // Helper to check if table is exempt
   const isExemptTable = (entityClassOrName: any): boolean => {
     if (!entityClassOrName) return false;
     if (typeof entityClassOrName === 'string') {
@@ -32,7 +48,6 @@ export function createEntityManagerProxy(
     }
   };
 
-  // Helper to extract primary key value(s) from entity for findOne criteria
   const extractPrimaryKeyCriteria = (entity: any, metadata: EntityMetadata): Record<string, any> | undefined => {
     if (!metadata.primaryColumns || metadata.primaryColumns.length === 0) return undefined;
     
@@ -50,13 +65,9 @@ export function createEntityManagerProxy(
       }
     }
 
-    // Only return criteria if we have ALL parts of the composite key, 
-    // OR if we have at least one key (which means it's an update attempt)
-    // If it's completely missing, it's an insert.
     return hasAnyKey ? criteria : undefined;
   };
 
-  // Helper to get tenant column value from entity
   const getTenantColumnValue = (entity: any): number | undefined => {
     if (!entity) return undefined;
     if ('groupId' in entity && typeof entity.groupId === 'number') {
@@ -74,25 +85,22 @@ export function createEntityManagerProxy(
     return undefined;
   };
 
-  // 1. Override createQueryBuilder
-  manager.createQueryBuilder = function (...args: any[]) {
+  const createOverriddenQueryBuilder = function (...args: any[]) {
     const qb = originalManager.createQueryBuilder.apply(originalManager, args as any);
     return createQueryBuilderProxy(qb, cls, rlsService, metrics, config);
   };
 
-  // 2. Override Repositories
-  manager.getRepository = function (...args: any[]) {
+  const createOverriddenGetRepository = function (...args: any[]) {
     const repo = originalManager.getRepository.apply(originalManager, args as any);
     return repo.extend({ manager: manager });
   };
 
-  manager.getTreeRepository = function (...args: any[]) {
+  const createOverriddenGetTreeRepository = function (...args: any[]) {
     const repo = originalManager.getTreeRepository.apply(originalManager, args as any);
     return new TreeRepository(repo.target, manager, repo.queryRunner);
   };
 
-  // 3. Intercept direct execution methods
-  manager.update = async function (entityClass: any, criteria: any, partialEntity?: any) {
+  const createOverriddenUpdate = async function (entityClass: any, criteria: any, partialEntity?: any) {
     if (cls.get('__rlsBypass')) {
       return originalManager.update.call(originalManager, entityClass, criteria, partialEntity);
     }
@@ -101,8 +109,6 @@ export function createEntityManagerProxy(
       return originalManager.update.call(originalManager, entityClass, criteria, partialEntity);
     }
 
-    // TENANT SPOOFING PROTECTION (Update)
-    // Check if the update payload tries to change the tenant ID to something unauthorized
     const activeGroupIds = cls.get('activeGroupIds') || [];
     const payloadTenantId = getTenantColumnValue(partialEntity);
     
@@ -117,7 +123,7 @@ export function createEntityManagerProxy(
     return qb.execute();
   };
 
-  manager.delete = async function (entityClass: any, criteria: any) {
+  const createOverriddenDelete = async function (entityClass: any, criteria: any) {
     if (cls.get('__rlsBypass')) {
       return originalManager.delete.call(originalManager, entityClass, criteria);
     }
@@ -130,24 +136,11 @@ export function createEntityManagerProxy(
     return qb.execute();
   };
 
-  // 4. CRITICAL: Verify-Before-Mutate for save()
-  // 
-  // KNOWN LIMITATION (TOCTOU): This method performs ownership verification by:
-  // 1. Fetching the existing record using the PROXIED manager (enforcing RLS)
-  // 2. Delegating actual save to originalManager.save()
-  //
-  // Step 2 generates its own UPDATE SQL which bypasses the QueryBuilder proxy.
-  // In horizontal scaling with multiple processes/connections, a race condition exists:
-  // Between the ownership check and the actual save, another process could modify the record.
-  // For SQLite (single-process), this is low risk. For multi-process deployments,
-  // consider adding database-level constraints (e.g., CHECK constraints on tenant columns).
-  //
-  manager.save = async function (targetOrEntity: any, maybeEntityOrOptions?: any, maybeOptions?: any) {
+  const createOverriddenSave = async function (targetOrEntity: any, maybeEntityOrOptions?: any, maybeOptions?: any) {
     if (cls.get('__rlsBypass')) {
       return originalManager.save.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
     }
 
-    // Resolve what the actual entity is. TypeORM is very flexible here.
     let entityClass: any;
     let entityOrEntities: any;
     let options: any;
@@ -157,7 +150,6 @@ export function createEntityManagerProxy(
       entityOrEntities = maybeEntityOrOptions;
       options = maybeOptions;
     } else {
-      // If targetOrEntity is an array, we must derive the class from the first element
       if (Array.isArray(targetOrEntity) && targetOrEntity.length > 0) {
         entityClass = targetOrEntity[0].constructor;
       } else if (targetOrEntity && typeof targetOrEntity === 'object' && !Array.isArray(targetOrEntity)) {
@@ -168,8 +160,6 @@ export function createEntityManagerProxy(
     }
 
     if (!entityOrEntities || !entityClass || entityClass === Array || entityClass === Object) {
-      // If we still can't figure out the class (e.g. they passed a raw object without a class definition), 
-      // we must fail closed to prevent array bypasses.
       throw new RlsSecurityViolationError('RLS: Cannot verify save() operation. Entity class could not be determined.');
     }
 
@@ -182,7 +172,6 @@ export function createEntityManagerProxy(
     try {
       metadata = originalManager.connection.getMetadata(entityClass);
     } catch (e) {
-      // If metadata fails, fail closed.
       throw new RlsSecurityViolationError(`RLS: Cannot verify save() operation. Metadata not found for ${entityClass}.`);
     }
     
@@ -195,42 +184,28 @@ export function createEntityManagerProxy(
 
       const pkCriteria = extractPrimaryKeyCriteria(entity, metadata);
       
-      // If no PK criteria, it's an insert. 
-      // If it's an insert, the beforeInsert subscriber will handle tenant assignment.
-      // BUT if it has an explicit ID (e.g., predefined UUID), it will have PK criteria.
       if (pkCriteria) {
-        // We must check if the entity *already exists*.
-        // We use the UNPROXIED manager to check raw existence, to distinguish between
-        // "record does not exist" (which means this is an insert with predefined ID)
-        // and "record exists but user doesn't own it" (which is a violation).
-        
         let existingRaw: any = null;
         try {
            existingRaw = await originalManager.findOne(entityClass, { where: pkCriteria as any });
         } catch (e) {
-           // Ignore findOne errors
         }
 
         if (existingRaw) {
-          // Record EXISTS in the database. This is an UPDATE.
-          // Now verify the user actually owns it using the PROXIED manager.
           const existingSecured = await manager.findOne(entityClass, { where: pkCriteria as any });
           
           if (!existingSecured) {
-             // Record exists, but user cannot see it!
              metrics.recordBlock('save_without_ownership');
              throw new RlsSecurityViolationError(
                `RLS: Cannot update entity. You do not have access to this record.`
              );
           }
 
-          // Verify tenant column matches (no spoofing)
           const activeGroupIds = cls.get('activeGroupIds') || [];
           const entityTenantId = getTenantColumnValue(entity);
           const existingTenantId = getTenantColumnValue(existingSecured);
           
           if (entityTenantId !== undefined && existingTenantId !== undefined) {
-            // They are providing a tenant ID, and one exists. Make sure they aren't changing it to something unauthorized.
             if (entityTenantId !== existingTenantId && !activeGroupIds.includes(entityTenantId)) {
               metrics.recordBlock('tenant_mismatch');
               throw new RlsSecurityViolationError(
@@ -238,12 +213,7 @@ export function createEntityManagerProxy(
               );
             }
           }
-          // Note: We removed the strict check for `entityTenantId === undefined && existingTenantId !== undefined`
-          // because it broke partial updates where the payload omits the tenant ID.
         } else {
-          // Record DOES NOT EXIST. This is an INSERT with a predefined ID.
-          // We must manually enforce the tenant assignment here, because if they bypass
-          // the subscriber, or if the subscriber misses it, we need defense in depth.
           const activeGroupIds = cls.get('activeGroupIds') || [];
           const primaryGroupId = cls.get('primaryGroupId');
           const effectiveGroupId = primaryGroupId ?? activeGroupIds[0];
@@ -251,14 +221,9 @@ export function createEntityManagerProxy(
           if (effectiveGroupId !== undefined) {
              const providedTenantId = getTenantColumnValue(entity);
              if (providedTenantId !== undefined) {
-                // If they provided one, ensure they own it
                 if (!activeGroupIds.includes(providedTenantId)) {
                    throw new RlsSecurityViolationError(`RLS: Tenant spoofing detected on insert.`);
                 }
-             } else {
-                // Auto-assign
-                // We rely on the beforeInsert subscriber to handle this cleanly, 
-                // but we could enforce it here too.
              }
           }
         }
@@ -268,8 +233,7 @@ export function createEntityManagerProxy(
     return originalManager.save.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
   };
 
-  // 5. CRITICAL: Verify-Before-Mutate for remove()
-  manager.remove = async function (targetOrEntity: any, maybeEntityOrOptions?: any, maybeOptions?: any) {
+  const createOverriddenRemove = async function (targetOrEntity: any, maybeEntityOrOptions?: any, maybeOptions?: any) {
     if (cls.get('__rlsBypass')) {
       return originalManager.remove.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
     }
@@ -324,9 +288,6 @@ export function createEntityManagerProxy(
       });
 
       if (existingEntity === null) {
-        // It might not exist, or they don't own it.
-        // If it doesn't exist, remove() is a no-op anyway, but if they don't own it, we must block.
-        // Let's check raw existence.
         const existingRaw = await originalManager.findOne(entityClass, { where: pkCriteria as any });
         if (existingRaw) {
            metrics.recordBlock('remove_without_ownership');
@@ -340,8 +301,7 @@ export function createEntityManagerProxy(
     return originalManager.remove.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
   };
 
-  // 6. Block Raw SQL
-  manager.query = async function (...args: any[]) {
+  const createOverriddenQuery = async function (...args: any[]) {
     if (!cls.get('__rlsBypass')) {
       metrics.recordBlock('raw_query');
       throw new Error(`[RLS] Raw EntityManager queries are strictly forbidden. Use QueryBuilder.`);
@@ -349,8 +309,7 @@ export function createEntityManagerProxy(
     return originalManager.query.apply(originalManager, args as any);
   };
 
-  // 7. Intercept Transactions
-  manager.transaction = async function (...args: any[]) {
+  const createOverriddenTransaction = async function (...args: any[]) {
     const lastArg = args[args.length - 1];
     if (typeof lastArg === 'function') {
       const wrappedCallback = async (transactionalEntityManager: EntityManager) => {
@@ -362,5 +321,37 @@ export function createEntityManagerProxy(
     return originalManager.transaction.apply(originalManager, args as any);
   };
 
-  return manager;
+  manager.createQueryBuilder = createOverriddenQueryBuilder;
+  manager.getRepository = createOverriddenGetRepository;
+  manager.getTreeRepository = createOverriddenGetTreeRepository;
+  manager.update = createOverriddenUpdate;
+  manager.delete = createOverriddenDelete;
+  manager.save = createOverriddenSave;
+  manager.remove = createOverriddenRemove;
+  manager.query = createOverriddenQuery;
+  manager.transaction = createOverriddenTransaction;
+
+  return new Proxy(manager, {
+    get(target, prop) {
+      if (PROXIED_METHODS.has(prop as string)) {
+        return (target as any)[prop];
+      }
+
+      if (SAFE_READ_METHODS.has(prop as string)) {
+        return (target as any)[prop]?.bind(target);
+      }
+
+      const value = (target as any)[prop];
+
+      if (SAFE_PROPERTIES.has(prop as string)) {
+        return value;
+      }
+
+      if (value === undefined) {
+        throw new RlsSecurityViolationError(`Unrecognized EntityManager method: ${String(prop)}`);
+      }
+
+      return value;
+    }
+  });
 }
