@@ -15,10 +15,10 @@ export class UserBehaviorProfile {
     id: string;
 
     @OneToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'userId' })
+    @JoinColumn({ name: 'user_id' })
     user: User;
 
-    @Column({ name: 'userId' })
+    @Column({ name: 'user_id' })
     userId: number;
 
     /**
