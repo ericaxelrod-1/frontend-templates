@@ -17,7 +17,7 @@ export class GroupsService {
   constructor(
     @InjectRepository(User) private userRepository: Repository<User>,
     @InjectRepository(Group) private groupRepository: Repository<Group>,
-  ) { }
+  ) {}
 
   async findAll(
     page = 0,
@@ -25,16 +25,21 @@ export class GroupsService {
     sortBy = 'name',
     sortDirection: 'ASC' | 'DESC' = 'ASC',
     search = '',
-  ): Promise<{ items: Group[]; total: number; page: number; pageSize: number }> {
+  ): Promise<{
+    items: Group[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     const skip = page * pageSize;
     const take = pageSize;
 
     const [items, total] = await this.groupRepository.findAndCount({
       where: search
         ? [
-          { name: ILike(`%${search}%`) },
-          { description: ILike(`%${search}%`) },
-        ]
+            { name: ILike(`%${search}%`) },
+            { description: ILike(`%${search}%`) },
+          ]
         : {},
       relations: ['users', 'owner'],
       order: { [sortBy]: sortDirection },
@@ -457,7 +462,10 @@ export class GroupsService {
   async getEffectiveMembers(groupId: number): Promise<User[]> {
     const allMemberIds = new Set<number>();
 
-    const groupIds = [groupId, ...(await this.getDescendants(groupId)).map((g) => g.id)];
+    const groupIds = [
+      groupId,
+      ...(await this.getDescendants(groupId)).map((g) => g.id),
+    ];
 
     for (const id of groupIds) {
       const group = await this.groupRepository.findOne({

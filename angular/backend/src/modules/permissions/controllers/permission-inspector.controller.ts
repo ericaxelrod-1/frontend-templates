@@ -31,7 +31,7 @@ export class PermissionInspectorController {
   @Get('user/:id')
   async inspectUser(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.findOne(id);
-    
+
     const rolePermissions = await this.rolePermissionRepository.find({
       where: { roleId: id },
       relations: ['permission', 'role'],
@@ -75,7 +75,8 @@ export class PermissionInspectorController {
     const role = await this.rolesService.findOne(id);
     const ancestors = await this.rolesService.getAncestors(id);
     const descendants = await this.rolesService.getDescendants(id);
-    const effectivePermissions = await this.rolesService.getEffectivePermissions(id);
+    const effectivePermissions =
+      await this.rolesService.getEffectivePermissions(id);
 
     return {
       role: {
@@ -125,7 +126,8 @@ export class PermissionInspectorController {
   }
 
   private async getEffectivePermissionsForRoles(roleIds: number[]) {
-    const allPermissions: Map<string, { isGranted: boolean; source: string }> = new Map();
+    const allPermissions: Map<string, { isGranted: boolean; source: string }> =
+      new Map();
 
     for (const roleId of roleIds) {
       const effective = await this.rolesService.getEffectivePermissions(roleId);

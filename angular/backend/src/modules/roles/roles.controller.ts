@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   ParseIntPipe,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -92,5 +93,43 @@ export class RolesController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<Permission[]> {
     return this.rolesService.getRolePermissions(id);
+  }
+
+  @Get(':id/effective-permissions')
+  @ApiOperation({ summary: 'Get effective permissions including inherited' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of effective permissions',
+    type: [Permission],
+  })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  getEffectivePermissions(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ permission: string; isGranted: boolean; source: string }[]> {
+    return this.rolesService.getEffectivePermissions(id);
+  }
+
+  @Get(':id/ancestors')
+  @ApiOperation({ summary: 'Get all ancestor roles' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of ancestor roles',
+    type: [Role],
+  })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  getAncestors(@Param('id', ParseIntPipe) id: number): Promise<Role[]> {
+    return this.rolesService.getAncestors(id);
+  }
+
+  @Get(':id/descendants')
+  @ApiOperation({ summary: 'Get all descendant roles' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of descendant roles',
+    type: [Role],
+  })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  getDescendants(@Param('id', ParseIntPipe) id: number): Promise<Role[]> {
+    return this.rolesService.getDescendants(id);
   }
 }

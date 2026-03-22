@@ -2,16 +2,27 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { ScopeGroup } from '../components/scope-builder/scope-builder.component';
 
 export interface RlsRule {
   id?: number;
   groupId: number;
   group?: any;
   targetTable: string;
-  sql: string;
+  scope: ScopeGroup;
   parameters?: Record<string, any>;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export interface SchemaColumn {
+  name: string;
+  dataType: string;
+}
+
+export interface TestScopeResult {
+  count: number;
+  sampleRows?: any[];
 }
 
 @Injectable({
@@ -56,5 +67,16 @@ export class RlsService {
 
   invalidateCache(tableName?: string): Observable<{ success: boolean }> {
     return this.http.post<{ success: boolean }>(`${this.apiUrl}/invalidate-cache`, { tableName });
+  }
+
+  getTableColumns(tableName: string): Observable<SchemaColumn[]> {
+    return this.http.get<SchemaColumn[]>(`${environment.apiUrl}/schema/tables/${tableName}/columns`);
+  }
+
+  testScope(tableName: string, scope: ScopeGroup): Observable<TestScopeResult> {
+    return this.http.post<TestScopeResult>(`${this.apiUrl}/test-scope`, {
+      table: tableName,
+      scope: scope
+    });
   }
 }

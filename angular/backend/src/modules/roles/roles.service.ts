@@ -20,7 +20,7 @@ export class RolesService {
     @InjectRepository(Permission)
     private permissionRepository: Repository<Permission>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) { }
+  ) {}
 
   async create(createRoleDto: CreateRoleDto): Promise<Role> {
     const { permissionIds, ...roleData } = createRoleDto;
@@ -154,7 +154,6 @@ export class RolesService {
     // Format permissions as 'resource:action' strings following the dynamic-access-control rule
     const permissions = rolePermissions.map((rp) => rp.permission.name);
 
-
     // Remove duplicates
     const uniquePermissions = [...new Set(permissions)];
 
@@ -245,7 +244,9 @@ export class RolesService {
 
     while (currentId !== null) {
       if (visited.has(currentId)) {
-        throw new Error('Setting this parent would create a circular reference');
+        throw new Error(
+          'Setting this parent would create a circular reference',
+        );
       }
 
       visited.add(currentId);
@@ -264,9 +265,15 @@ export class RolesService {
     roleId: number,
   ): Promise<{ permission: string; isGranted: boolean; source: string }[]> {
     const role = await this.findOne(roleId);
-    const hierarchyPath = [role, ...(await this.getAncestors(roleId)).reverse()];
+    const hierarchyPath = [
+      role,
+      ...(await this.getAncestors(roleId)).reverse(),
+    ];
 
-    const permissionMap = new Map<string, { isGranted: boolean; source: string }>();
+    const permissionMap = new Map<
+      string,
+      { isGranted: boolean; source: string }
+    >();
 
     for (const r of hierarchyPath) {
       if (!r.rolePermissions) continue;
@@ -283,7 +290,10 @@ export class RolesService {
         } else {
           const existing = permissionMap.get(permName)!;
           if (rp.isGranted !== null && rp.isGranted !== undefined) {
-            if (existing.isGranted === null || existing.isGranted === undefined) {
+            if (
+              existing.isGranted === null ||
+              existing.isGranted === undefined
+            ) {
               existing.isGranted = rp.isGranted;
               existing.source = r.name;
             } else if (!rp.isGranted) {
@@ -313,8 +323,12 @@ export class RolesService {
       return { valid: true, violations: [] };
     }
 
-    const parentPermissions = await this.getEffectivePermissions(childRole.parentId);
-    const parentPermMap = new Map(parentPermissions.map((p) => [p.permission, p.isGranted]));
+    const parentPermissions = await this.getEffectivePermissions(
+      childRole.parentId,
+    );
+    const parentPermMap = new Map(
+      parentPermissions.map((p) => [p.permission, p.isGranted]),
+    );
 
     for (const newPerm of newPermissions) {
       const permission = await this.permissionRepository.findOne({
@@ -349,4 +363,3 @@ export class RolesService {
     }
   }
 }
-

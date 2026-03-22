@@ -79,4 +79,16 @@ export class PermissionInspectorService {
   inspectGroup(groupId: number): Observable<PermissionInspection> {
     return this.http.get<PermissionInspection>(`${this.apiUrl}/permissions/inspector/group/${groupId}`);
   }
+
+  loadAllUsers(): Observable<PermissionInspection> {
+    return this.http.get<PermissionInspection>(`${this.apiUrl}/permissions/inspector/users`);
+  }
+
+  loadAllRoles(): Observable<PermissionInspection> {
+    return this.http.get<PermissionInspection>(`${this.apiUrl}/permissions/inspector/roles`);
+  }
+
+  loadAllGroups(): Observable<PermissionInspection> {
+    return this.http.get<PermissionInspection>(`${this.apiUrl}/permissions/inspector/groups`);
+  }
 }

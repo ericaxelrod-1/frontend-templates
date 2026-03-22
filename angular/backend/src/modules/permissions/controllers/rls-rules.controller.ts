@@ -55,13 +55,21 @@ export class RlsRulesController {
 
   @Post()
   async create(
-    @Body() createDto: { groupId: number; targetTable: string; sql: string; parameters?: Record<string, any> },
+    @Body()
+    createDto: {
+      groupId: number;
+      targetTable: string;
+      sql: string;
+      parameters?: Record<string, any>;
+    },
   ) {
     const rule = this.rlsRuleRepository.create({
       groupId: createDto.groupId,
       targetTable: createDto.targetTable,
       sql: createDto.sql,
-      parameters: createDto.parameters ? JSON.stringify(createDto.parameters) : null,
+      parameters: createDto.parameters
+        ? JSON.stringify(createDto.parameters)
+        : null,
     });
 
     const saved = await this.rlsRuleRepository.save(rule);

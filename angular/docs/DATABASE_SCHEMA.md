@@ -27,10 +27,12 @@ This document outlines the database schema design for the Angular Template Appli
 
 1. User authentication and authorization
 2. Role-based access control (RBAC)
-3. User groups for logical user segmentation
+3. User groups for logical user segmentation (with hierarchy support)
 4. Dynamic permission management for UI components, frontend routes, and API endpoints
-5. Login attempt tracking and security monitoring (including IP reputation and CAPTCHA)
-6. A clear structure primarily for SQLite, with considerations for future PostgreSQL migration.
+5. Login attempt tracking and security monitoring (including IP reputation, CAPTCHA, and pattern detection)
+6. Row-Level Security (RLS) for multi-tenant data isolation
+7. User behavioral profiling for anomaly detection
+8. A clear structure primarily for SQLite, with considerations for future PostgreSQL migration.
 
 **Naming Convention:**
 - **All database table names and column names MUST use `snake_case`**. This is the definitive convention for this project.
@@ -47,12 +49,19 @@ This document outlines the database schema design for the Angular Template Appli
 [user] *--* [group] (via user_groups)
 [user] *--* [permission] (via user_permissions) - Direct user permissions
 [user] o-- [login_attempt] (via login_attempts.user_id)
+[user] o-- [user_behavior_profile] (1:1)
 
 [role] *--* [permission] (via role_permissions)
 [role] o--o [role] (self-referencing for hierarchy - parent_id)
 
 [group] *--* [permission] (via group_permissions)
-[group] o-- [user_group] --o [user] (user_group is user_groups table)
+[group] o--o [group] (self-referencing for hierarchy - parent_id)
+[group] o-- [rls_rules] (1:many)
+[group] o-- [rls_join_paths] (1:many)
+
+[rls_rules] (rls_rules)
+[rls_join_paths] o-- [rls_join_conditions] (1:many)
+[rls_join_paths] o-- [rls_scope_templates] (1:many, via target_table)
 
 [permission] --o [action] (via permissions.action_id)
 [permission] --o [resource] (conceptually, via permissions.resource_name and resources table)
@@ -64,6 +73,8 @@ This document outlines the database schema design for the Angular Template Appli
 [ip_reputation]
 [captcha]
 [rate_limit_counter]
+[security_detected_patterns] o-- [pattern_login_attempts] --o [login_attempt]
+[security_detected_patterns] o-- [security_alerts] (1:many)
 ```
 *(Note: The ASCII ERD above is a high-level conceptual representation and may require updates to fully detail all explicit join entities and foreign key names accurately based on the table specifications below. Table and column names here are illustrative and will follow `snake_case` in the specifications.)*
 
@@ -133,8 +144,16 @@ Stores information about user groups. Corresponds to `Group` entity.
 | `settings`        | TEXT         | NULL                               | Group-specific settings (JSON)     |
 | `is_system_group` | BOOLEAN      | NOT NULL, DEFAULT 0                | If it's a system-managed group     |
 | `owner_id`        | INTEGER      | NULL, FOREIGN KEY (users.id ON DELETE SET NULL ON UPDATE NO ACTION) | User who owns/created the group  |
+| `parent_id`       | INTEGER      | NULL, FOREIGN KEY (groups.id ON DELETE CASCADE ON UPDATE NO ACTION) | Parent group for hierarchy |
+| `priority`        | INTEGER      | NULL                               | Group priority for ordering         |
 | `created_at`      | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                 |
 | `updated_at`      | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp              |
+
+Indexes:
+- PRIMARY KEY (`id`)
+- UNIQUE (`name`)
+- INDEX (`parent_id`)
+- INDEX (`priority`)
 
 ### `actions` Table
 Defines the granular, atomic operations or capabilities that can be performed within the application. Corresponds to the `Action` entity.
@@ -493,6 +512,90 @@ Links detected security patterns to their associated login attempts for detailed
 | UNIQUE (`pattern_id`, `login_attempt_id`) |                               | Ensures unique pattern-attempt pairs    |
 
 Indexes: `pattern_id`, `login_attempt_id`, `is_primary_evidence`.
+
+### `user_behavior_profile` Table
+Stores behavioral profile data for users, used for anomaly detection. Corresponds to `UserBehaviorProfile` entity.
+
+| Column               | Type         | Constraints                        | Description                             |
+|----------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`                 | TEXT         | PRIMARY KEY                        | UUID identifier                         |
+| `user_id`            | INTEGER      | NOT NULL, FOREIGN KEY (users.id ON DELETE CASCADE ON UPDATE NO ACTION) | Associated user ID |
+| `typical_login_hours`  | TEXT         | NULL                               | JSON array of 24 booleans for login hours |
+| `known_ips`          | TEXT         | NULL                               | JSON array of known IP addresses         |
+| `known_user_agents`  | TEXT         | NULL                               | JSON array of known User-Agent strings   |
+| `created_at`         | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Record creation timestamp                |
+| `updated_at`         | DATETIME     | NOT NULL, DEFAULT CURRENT_TIMESTAMP | Record last update timestamp            |
+
+Indexes: `user_id` (UNIQUE).
+
+### `rls_rules` Table
+Stores Row-Level Security rules that define data access policies per group. Corresponds to `RlsRule` entity.
+
+| Column          | Type         | Constraints                        | Description                             |
+|-----------------|--------------|------------------------------------|-----------------------------------------|
+| `id`            | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `group_id`      | INTEGER      | NOT NULL, FOREIGN KEY (groups.id ON DELETE CASCADE ON UPDATE NO ACTION) | Group this rule applies to |
+| `target_table`   | VARCHAR(255) | NOT NULL                           | Table this rule applies to              |
+| `sql`           | TEXT         | NOT NULL                           | SQL WHERE clause or filter condition   |
+| `parameters`    | TEXT         | NULL                               | JSON object with named parameters       |
+| `is_active`     | BOOLEAN      | NOT NULL, DEFAULT 1                | Whether the rule is active             |
+| `priority`      | INTEGER      | NOT NULL, DEFAULT 0                | Rule priority (higher = applied first)  |
+| `description`   | TEXT         | NULL                               | Rule description                        |
+| `created_at`    | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`    | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+
+Indexes: `group_id`, `target_table`, `is_active`.
+
+### `rls_join_paths` Table
+Stores the join paths used to traverse tables for RLS policy enforcement. Corresponds to `RlsJoinPath` entity.
+
+| Column          | Type         | Constraints                        | Description                             |
+|-----------------|--------------|------------------------------------|-----------------------------------------|
+| `id`            | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `name`          | VARCHAR(255) | NOT NULL, UNIQUE                   | Path name/identifier                    |
+| `target_table`  | VARCHAR(255) | NOT NULL                           | Final table in the join path            |
+| `chain`         | TEXT         | NOT NULL                           | JSON array of table names in order      |
+| `is_active`     | BOOLEAN      | NOT NULL, DEFAULT 1                | Whether the path is active              |
+| `created_at`    | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`    | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+
+Indexes: `name` (UNIQUE), `target_table`.
+
+### `rls_join_conditions` Table
+Stores the individual join conditions for each join path. Corresponds to `RlsJoinCondition` entity.
+
+| Column            | Type         | Constraints                        | Description                             |
+|-------------------|--------------|------------------------------------|-----------------------------------------|
+| `id`              | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `join_path_id`    | INTEGER      | NOT NULL, FOREIGN KEY (rls_join_paths.id ON DELETE CASCADE ON UPDATE NO ACTION) | Parent join path |
+| `from_table`      | VARCHAR(255) | NOT NULL                           | Source table in join                   |
+| `from_column`     | VARCHAR(255) | NOT NULL                           | Source column in join                  |
+| `to_table`        | VARCHAR(255) | NOT NULL                           | Target table in join                   |
+| `to_column`       | VARCHAR(255) | NOT NULL                           | Target column in join                  |
+| `operator`        | VARCHAR(10)  | NOT NULL, DEFAULT '='              | Join operator (typically '=')          |
+| `created_at`      | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`      | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+
+Indexes: `join_path_id`.
+
+### `rls_scope_templates` Table
+Stores reusable RLS scope templates that can be applied to multiple tables. Corresponds to `RlsScopeTemplate` entity.
+
+| Column          | Type         | Constraints                        | Description                             |
+|-----------------|--------------|------------------------------------|-----------------------------------------|
+| `id`            | INTEGER      | PRIMARY KEY AUTOINCREMENT          | Unique identifier                       |
+| `name`          | VARCHAR(255) | NOT NULL, UNIQUE                   | Template name                          |
+| `join_path_id`  | INTEGER      | NOT NULL, FOREIGN KEY (rls_join_paths.id ON DELETE CASCADE ON UPDATE NO ACTION) | Reference to join path |
+| `target_table`  | VARCHAR(255) | NOT NULL                           | Table this template applies to          |
+| `available_columns` | TEXT     | NOT NULL                           | JSON array of available columns         |
+| `description`   | TEXT         | NULL                               | Template description                    |
+| `scope_sql`     | TEXT         | NOT NULL                           | SQL template with placeholders          |
+| `parameters`    | TEXT         | NULL                               | JSON array of parameter definitions     |
+| `is_active`     | BOOLEAN      | NOT NULL, DEFAULT 1                | Whether the template is active          |
+| `created_at`    | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Creation timestamp                      |
+| `updated_at`    | DATETIME     | NOT NULL, DEFAULT (datetime('now')) | Last update timestamp                   |
+
+Indexes: `name` (UNIQUE), `is_active`.
 
 ## API Endpoints
 

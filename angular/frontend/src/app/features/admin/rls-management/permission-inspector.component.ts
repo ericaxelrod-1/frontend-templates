@@ -41,38 +41,50 @@ import { Group } from '../../../models/group.model';
         @if (activeTab === 'user') {
           <div class="inspector-form">
             <label>Select User:</label>
-            <select [(ngModel)]="selectedUserId" (change)="inspectUser()">
-              <option value="">Select a user...</option>
-              @for (user of users; track user.id) {
-                <option [value]="user.id">
-                  {{ user.firstName }} {{ user.lastName }} ({{ user.email }})
-                </option>
-              }
-            </select>
+            <div class="form-row">
+              <select [(ngModel)]="selectedUserId">
+                <option [ngValue]="undefined">Select a user...</option>
+                @for (user of users; track user.id) {
+                  <option [value]="user.id">
+                    {{ user.firstName }} {{ user.lastName }} ({{ user.email }})
+                  </option>
+                }
+              </select>
+              <button class="btn-primary" (click)="inspectUser()">Inspect User</button>
+              <button class="btn-secondary" (click)="loadAllUsers()">Load All</button>
+            </div>
           </div>
         }
 
         @if (activeTab === 'role') {
           <div class="inspector-form">
             <label>Select Role:</label>
-            <select [(ngModel)]="selectedRoleId" (change)="inspectRole()">
-              <option value="">Select a role...</option>
-              @for (role of roles; track role.id) {
-                <option [value]="role.id">{{ role.name }}</option>
-              }
-            </select>
+            <div class="form-row">
+              <select [(ngModel)]="selectedRoleId">
+                <option [ngValue]="undefined">Select a role...</option>
+                @for (role of roles; track role.id) {
+                  <option [value]="role.id">{{ role.name }}</option>
+                }
+              </select>
+              <button class="btn-primary" (click)="inspectRole()">Inspect Role</button>
+              <button class="btn-secondary" (click)="loadAllRoles()">Load All</button>
+            </div>
           </div>
         }
 
         @if (activeTab === 'group') {
           <div class="inspector-form">
             <label>Select Group:</label>
-            <select [(ngModel)]="selectedGroupId" (change)="inspectGroup()">
-              <option value="">Select a group...</option>
-              @for (group of groups; track group.id) {
-                <option [value]="group.id">{{ group.name }}</option>
-              }
-            </select>
+            <div class="form-row">
+              <select [(ngModel)]="selectedGroupId">
+                <option [ngValue]="undefined">Select a group...</option>
+                @for (group of groups; track group.id) {
+                  <option [value]="group.id">{{ group.name }}</option>
+                }
+              </select>
+              <button class="btn-primary" (click)="inspectGroup()">Inspect Group</button>
+              <button class="btn-secondary" (click)="loadAllGroups()">Load All</button>
+            </div>
           </div>
         }
 
@@ -250,11 +262,39 @@ import { Group } from '../../../models/group.model';
       font-weight: 500;
     }
     .inspector-form select {
-      width: 100%;
-      max-width: 400px;
+      flex: 1;
       padding: 0.5rem;
       border: 1px solid #cbd5e1;
       border-radius: 0.375rem;
+    }
+    .form-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      padding: 0.5rem 1rem;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+    .btn-secondary {
+      padding: 0.5rem 1rem;
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.375rem;
+      cursor: pointer;
+    }
+    .btn-secondary:hover {
+      background: #e2e8f0;
     }
     .inspection-results {
       display: grid;
@@ -413,6 +453,30 @@ export class PermissionInspectorComponent implements OnInit {
     this.inspectorService.inspectGroup(this.selectedGroupId).subscribe({
       next: (result: PermissionInspection) => this.inspection = result,
       error: (err: any) => console.error('Failed to inspect group:', err)
+    });
+  }
+
+  loadAllUsers(): void {
+    this.inspection = undefined;
+    this.inspectorService.loadAllUsers().subscribe({
+      next: (result: PermissionInspection) => this.inspection = result,
+      error: (err: any) => console.error('Failed to load all users:', err)
+    });
+  }
+
+  loadAllRoles(): void {
+    this.inspection = undefined;
+    this.inspectorService.loadAllRoles().subscribe({
+      next: (result: PermissionInspection) => this.inspection = result,
+      error: (err: any) => console.error('Failed to load all roles:', err)
+    });
+  }
+
+  loadAllGroups(): void {
+    this.inspection = undefined;
+    this.inspectorService.loadAllGroups().subscribe({
+      next: (result: PermissionInspection) => this.inspection = result,
+      error: (err: any) => console.error('Failed to load all groups:', err)
     });
   }
 }

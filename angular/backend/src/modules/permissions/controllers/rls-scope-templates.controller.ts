@@ -69,14 +69,18 @@ export class RlsScopeTemplatesController {
       availableColumns?: string[];
     },
   ) {
-    const template = await this.scopeTemplateRepository.findOne({ where: { id } });
+    const template = await this.scopeTemplateRepository.findOne({
+      where: { id },
+    });
     if (!template) {
       throw new Error('Scope template not found');
     }
 
     if (updateDto.name !== undefined) template.name = updateDto.name;
-    if (updateDto.joinPathId !== undefined) template.joinPathId = updateDto.joinPathId;
-    if (updateDto.targetTable !== undefined) template.targetTable = updateDto.targetTable;
+    if (updateDto.joinPathId !== undefined)
+      template.joinPathId = updateDto.joinPathId;
+    if (updateDto.targetTable !== undefined)
+      template.targetTable = updateDto.targetTable;
     if (updateDto.availableColumns !== undefined) {
       template.availableColumns = JSON.stringify(updateDto.availableColumns);
     }
