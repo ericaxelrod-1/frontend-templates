@@ -1,17 +1,25 @@
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppModule } from '../src/app.module';
-import * as path from 'path';
+import { Group } from '../src/modules/permissions/entities/group.entity';
+import { Role } from '../src/modules/roles/entities/role.entity';
+import { Permission } from '../src/modules/permissions/entities/permission.entity';
+import { User } from '../src/modules/users/entities/user.entity';
+import { LoginAttempt } from '../src/modules/auth/entities/login-attempt.entity';
+import { RlsRule } from '../src/modules/permissions/entities/rls-rule.entity';
+import { RlsJoinPath } from '../src/modules/permissions/entities/rls-join-path.entity';
+import { RlsJoinCondition } from '../src/modules/permissions/entities/rls-join-condition.entity';
+import { RolePermission } from '../src/modules/roles/entities/role-permission.entity';
+import { GroupPermission } from '../src/modules/permissions/entities/group-permission.entity';
 import * as bcrypt from 'bcrypt';
 
 async function createRlsTestModule(): Promise<TestingModule> {
   return Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
-        envFilePath: path.join(__dirname, '.env.rls-test'),
         isGlobal: true,
       }),
       AppModule,
@@ -41,6 +49,16 @@ async function createRlsTestModule(): Promise<TestingModule> {
 describe('RLS - Row Level Security (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let groupRepo: Repository<Group>;
+  let roleRepo: Repository<Role>;
+  let permissionRepo: Repository<Permission>;
+  let userRepo: Repository<User>;
+  let loginAttemptRepo: Repository<LoginAttempt>;
+  let rlsRuleRepo: Repository<RlsRule>;
+  let rlsJoinPathRepo: Repository<RlsJoinPath>;
+  let rlsJoinConditionRepo: Repository<RlsJoinCondition>;
+  let rolePermissionRepo: Repository<RolePermission>;
+  let groupPermissionRepo: Repository<GroupPermission>;
 
   const testUsers = {
     test_admin_a: {
@@ -95,289 +113,251 @@ describe('RLS - Row Level Security (e2e)', () => {
     await app.init();
     dataSource = moduleFixture.get(DataSource);
 
-    await cleanupTestData();
+    groupRepo = dataSource.getRepository(Group);
+    roleRepo = dataSource.getRepository(Role);
+    permissionRepo = dataSource.getRepository(Permission);
+    userRepo = dataSource.getRepository(User);
+    loginAttemptRepo = dataSource.getRepository(LoginAttempt);
+    rlsRuleRepo = dataSource.getRepository(RlsRule);
+    rlsJoinPathRepo = dataSource.getRepository(RlsJoinPath);
+    rlsJoinConditionRepo = dataSource.getRepository(RlsJoinCondition);
+    rolePermissionRepo = dataSource.getRepository(RolePermission);
+    groupPermissionRepo = dataSource.getRepository(GroupPermission);
+
     await setupTestData();
   }, 180000);
 
   afterAll(async () => {
-    await cleanupTestData();
     await app.close();
   });
 
-  async function cleanupTestData() {
-    const manager = dataSource.manager;
-
-    await manager.query(`
-      DELETE FROM login_attempts WHERE user_id IN (
-        SELECT id FROM users WHERE username LIKE 'test_%'
-      )
-    `);
-
-    await manager.query(`
-      DELETE FROM user_groups WHERE user_id IN (
-        SELECT id FROM users WHERE username LIKE 'test_%'
-      )
-    `);
-
-    await manager.query(`DELETE FROM users WHERE username LIKE 'test_%'`);
-
-    await manager.query(`DELETE FROM role_permissions WHERE role_id >= 10`);
-
-    await manager.query(`DELETE FROM group_permissions WHERE group_id >= 10`);
-
-    await manager.query(`DELETE FROM rls_rules WHERE group_id >= 10`);
-
-    await manager.query(`DELETE FROM rls_join_paths WHERE name LIKE 'test_%'`);
-
-    await manager.query(`DELETE FROM user_roles WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'test_%')`);
-
-    await manager.query(`DELETE FROM roles WHERE name LIKE 'test_%'`);
-
-    await manager.query(`DELETE FROM groups WHERE name LIKE 'test_%'`);
-  }
-
   async function setupTestData() {
-    const manager = dataSource.manager;
-
     // Create groups hierarchy
-    let result = await manager.query(`
-      INSERT INTO groups (name, description, parent_id, priority) 
-      VALUES ('test_company_a', 'Test Company A', NULL, 100)
-      RETURNING id
-    `);
-    groupIds.company_a = result[0].id;
+    const companyA = await groupRepo.save(groupRepo.create({
+      name: 'test_company_a',
+      description: 'Test Company A',
+      parentId: null,
+      priority: 100,
+    }));
+    groupIds.company_a = companyA.id;
 
-    result = await manager.query(`
-      INSERT INTO groups (name, description, parent_id, priority) 
-      VALUES ('test_engineering', 'Test Engineering', ${groupIds.company_a}, 90)
-      RETURNING id
-    `);
-    groupIds.engineering = result[0].id;
+    const engineering = await groupRepo.save(groupRepo.create({
+      name: 'test_engineering',
+      description: 'Test Engineering',
+      parentId: companyA.id,
+      priority: 90,
+    }));
+    groupIds.engineering = engineering.id;
 
-    result = await manager.query(`
-      INSERT INTO groups (name, description, parent_id, priority) 
-      VALUES ('test_frontend', 'Test Frontend', ${groupIds.engineering}, 80)
-      RETURNING id
-    `);
-    groupIds.frontend = result[0].id;
+    const frontend = await groupRepo.save(groupRepo.create({
+      name: 'test_frontend',
+      description: 'Test Frontend',
+      parentId: engineering.id,
+      priority: 80,
+    }));
+    groupIds.frontend = frontend.id;
 
-    result = await manager.query(`
-      INSERT INTO groups (name, description, parent_id, priority) 
-      VALUES ('test_company_b', 'Test Company B', NULL, 100)
-      RETURNING id
-    `);
-    groupIds.company_b = result[0].id;
+    const companyB = await groupRepo.save(groupRepo.create({
+      name: 'test_company_b',
+      description: 'Test Company B',
+      parentId: null,
+      priority: 100,
+    }));
+    groupIds.company_b = companyB.id;
 
-    result = await manager.query(`
-      INSERT INTO groups (name, description, parent_id, priority) 
-      VALUES ('test_marketing', 'Test Marketing', ${groupIds.company_b}, 90)
-      RETURNING id
-    `);
-    groupIds.marketing = result[0].id;
+    const marketing = await groupRepo.save(groupRepo.create({
+      name: 'test_marketing',
+      description: 'Test Marketing',
+      parentId: companyB.id,
+      priority: 90,
+    }));
+    groupIds.marketing = marketing.id;
 
     // Create test permissions
     const testPermissions = [
-      { name: 'users:read', description: 'Read users' },
-      { name: 'users:create', description: 'Create users' },
-      { name: 'users:update', description: 'Update users' },
-      { name: 'users:delete', description: 'Delete users' },
-      { name: 'roles:read', description: 'Read roles' },
-      { name: 'roles:manage', description: 'Manage roles' },
+      { name: 'users:read', description: 'Read users', resourceName: 'users' },
+      { name: 'users:create', description: 'Create users', resourceName: 'users' },
+      { name: 'users:update', description: 'Update users', resourceName: 'users' },
+      { name: 'users:delete', description: 'Delete users', resourceName: 'users' },
+      { name: 'roles:read', description: 'Read roles', resourceName: 'roles' },
+      { name: 'roles:manage', description: 'Manage roles', resourceName: 'roles' },
     ];
 
     for (const perm of testPermissions) {
-      const existingPerm = await manager.query(
-        `SELECT id FROM permissions WHERE name = $1`,
-        [perm.name],
-      );
-      if (existingPerm.length === 0) {
-        const permResult = await manager.query(`
-          INSERT INTO permissions (name, description, created_at, updated_at)
-          VALUES ('${perm.name}', '${perm.description}', NOW(), NOW())
-          RETURNING id
-        `);
-        permissionIds[perm.name] = permResult[0].id;
-      } else {
-        permissionIds[perm.name] = existingPerm[0].id;
+      let existingPerm = await permissionRepo.findOne({ where: { name: perm.name } });
+      if (!existingPerm) {
+        existingPerm = await permissionRepo.save(permissionRepo.create({
+          name: perm.name,
+          description: perm.description,
+          resourceName: perm.resourceName,
+          actionId: 1,
+        }));
       }
+      permissionIds[perm.name] = existingPerm.id;
     }
 
     // Create roles hierarchy for testing inheritance
-    // Parent role: test_admin_role (has all permissions)
-    result = await manager.query(`
-      INSERT INTO roles (name, description, is_system_role, parent_id, created_at, updated_at)
-      VALUES ('test_admin_role', 'Test Admin Role', false, NULL, NOW(), NOW())
-      RETURNING id
-    `);
-    roleIds.admin_role = result[0].id;
+    const adminRole = await roleRepo.save(roleRepo.create({
+      name: 'test_admin_role',
+      description: 'Test Admin Role',
+      isSystemRole: false,
+      parentId: null,
+    }));
+    roleIds.admin_role = adminRole.id;
 
-    // Child role: test_user_role (inherits from admin)
-    result = await manager.query(`
-      INSERT INTO roles (name, description, is_system_role, parent_id, created_at, updated_at)
-      VALUES ('test_user_role', 'Test User Role', false, ${roleIds.admin_role}, NOW(), NOW())
-      RETURNING id
-    `);
-    roleIds.user_role = result[0].id;
+    const userRole = await roleRepo.save(roleRepo.create({
+      name: 'test_user_role',
+      description: 'Test User Role',
+      isSystemRole: false,
+      parentId: adminRole.id,
+    }));
+    roleIds.user_role = userRole.id;
 
-    // Grandchild role: test_guest_role (inherits from user_role)
-    result = await manager.query(`
-      INSERT INTO roles (name, description, is_system_role, parent_id, created_at, updated_at)
-      VALUES ('test_guest_role', 'Test Guest Role', false, ${roleIds.user_role}, NOW(), NOW())
-      RETURNING id
-    `);
-    roleIds.guest_role = result[0].id;
+    const guestRole = await roleRepo.save(roleRepo.create({
+      name: 'test_guest_role',
+      description: 'Test Guest Role',
+      isSystemRole: false,
+      parentId: userRole.id,
+    }));
+    roleIds.guest_role = guestRole.id;
 
-    // Create role with denied permissions for testing
-    result = await manager.query(`
-      INSERT INTO roles (name, description, is_system_role, parent_id, created_at, updated_at)
-      VALUES ('test_limited_role', 'Test Limited Role', false, NULL, NOW(), NOW())
-      RETURNING id
-    `);
-    roleIds.limited_role = result[0].id;
+    const limitedRole = await roleRepo.save(roleRepo.create({
+      name: 'test_limited_role',
+      description: 'Test Limited Role',
+      isSystemRole: false,
+      parentId: null,
+    }));
+    roleIds.limited_role = limitedRole.id;
 
-    // Assign permissions to admin_role (has all: allowed)
+    // Assign permissions to admin_role
     for (const permName of ['users:read', 'users:create', 'users:update', 'users:delete', 'roles:read', 'roles:manage']) {
-      await manager.query(`
-        INSERT INTO role_permissions (role_id, permission_id, is_granted, created_at, updated_at)
-        VALUES (${roleIds.admin_role}, ${permissionIds[permName]}, true, NOW(), NOW())
-      `);
+      await rolePermissionRepo.save(rolePermissionRepo.create({
+        roleId: adminRole.id,
+        permissionId: permissionIds[permName],
+        isGranted: true,
+      }));
     }
 
-    // Assign permissions to user_role (subset: users:read, users:create)
-    // Note: inherits users:update, users:delete from parent
+    // Assign permissions to user_role
     for (const permName of ['users:read', 'users:create']) {
-      await manager.query(`
-        INSERT INTO role_permissions (role_id, permission_id, is_granted, created_at, updated_at)
-        VALUES (${roleIds.user_role}, ${permissionIds[permName]}, true, NOW(), NOW())
-      `);
+      await rolePermissionRepo.save(rolePermissionRepo.create({
+        roleId: userRole.id,
+        permissionId: permissionIds[permName],
+        isGranted: true,
+      }));
     }
 
-    // Explicitly deny users:delete in user_role (cannot inherit from parent)
-    await manager.query(`
-      INSERT INTO role_permissions (role_id, permission_id, is_granted, created_at, updated_at)
-      VALUES (${roleIds.user_role}, ${permissionIds['users:delete']}, false, NOW(), NOW())
-    `);
+    // Explicitly deny users:delete in user_role
+    await rolePermissionRepo.save(rolePermissionRepo.create({
+      roleId: userRole.id,
+      permissionId: permissionIds['users:delete'],
+      isGranted: false,
+    }));
 
-    // Assign permissions to guest_role (subset: users:read only)
-    await manager.query(`
-      INSERT INTO role_permissions (role_id, permission_id, is_granted, created_at, updated_at)
-      VALUES (${roleIds.guest_role}, ${permissionIds['users:read']}, true, NOW(), NOW())
-    `);
+    // Assign permissions to guest_role
+    await rolePermissionRepo.save(rolePermissionRepo.create({
+      roleId: guestRole.id,
+      permissionId: permissionIds['users:read'],
+      isGranted: true,
+    }));
 
-    // Assign permissions to limited_role (denied users:delete)
-    await manager.query(`
-      INSERT INTO role_permissions (role_id, permission_id, is_granted, created_at, updated_at)
-      VALUES (${roleIds.limited_role}, ${permissionIds['users:read']}, true, NOW(), NOW())
-    `);
-    await manager.query(`
-      INSERT INTO role_permissions (role_id, permission_id, is_granted, created_at, updated_at)
-      VALUES (${roleIds.limited_role}, ${permissionIds['users:delete']}, false, NOW(), NOW())
-    `);
+    // Assign permissions to limited_role
+    await rolePermissionRepo.save(rolePermissionRepo.create({
+      roleId: limitedRole.id,
+      permissionId: permissionIds['users:read'],
+      isGranted: true,
+    }));
+    await rolePermissionRepo.save(rolePermissionRepo.create({
+      roleId: limitedRole.id,
+      permissionId: permissionIds['users:delete'],
+      isGranted: false,
+    }));
 
-    // Assign group permissions for testing
+    // Assign group permissions
     for (const permName of ['users:read', 'users:create']) {
-      await manager.query(`
-        INSERT INTO group_permissions (group_id, permission_id, is_granted, created_at, updated_at)
-        VALUES (${groupIds.company_a}, ${permissionIds[permName]}, true, NOW(), NOW())
-      `);
+      await groupPermissionRepo.save(groupPermissionRepo.create({
+        groupId: companyA.id,
+        permissionId: permissionIds[permName],
+        isGranted: true,
+      }));
     }
 
-    // Assign group permissions for marketing
-    await manager.query(`
-      INSERT INTO group_permissions (group_id, permission_id, is_granted, created_at, updated_at)
-      VALUES (${groupIds.marketing}, ${permissionIds['users:read']}, true, NOW(), NOW())
-    `);
+    await groupPermissionRepo.save(groupPermissionRepo.create({
+      groupId: marketing.id,
+      permissionId: permissionIds['users:read'],
+      isGranted: true,
+    }));
 
-    // Create RLS rules for login_attempts
-    await manager.query(`
-      INSERT INTO rls_rules (group_id, target_table, sql, parameters)
-      VALUES (
-        ${groupIds.company_a},
-        'login_attempts',
-        'ip_address LIKE :ip_prefix',
-        '{"ip_prefix": "10.%"}'
-      )
-    `);
+    // Create RLS rules
+    await rlsRuleRepo.save(rlsRuleRepo.create({
+      groupId: companyA.id,
+      targetTable: 'login_attempts',
+      sql: 'ip_address LIKE :ip_prefix',
+      parameters: '{"ip_prefix": "10.%"}',
+    }));
 
-    await manager.query(`
-      INSERT INTO rls_rules (group_id, target_table, sql, parameters)
-      VALUES (
-        ${groupIds.company_b},
-        'login_attempts',
-        'ip_address LIKE :ip_prefix',
-        '{"ip_prefix": "192.168.%"}'
-      )
-    `);
+    await rlsRuleRepo.save(rlsRuleRepo.create({
+      groupId: companyB.id,
+      targetTable: 'login_attempts',
+      sql: 'ip_address LIKE :ip_prefix',
+      parameters: '{"ip_prefix": "192.168.%"}',
+    }));
 
-    // Create RLS join path for login_attempts
-    await manager.query(`
-      INSERT INTO rls_join_paths (name, target_table, chain)
-      VALUES (
-        'test_login_attempts_via_users',
-        'login_attempts',
-        '["groups", "user_groups", "users", "login_attempts"]'
-      )
-    `);
+    // Create RLS join path
+    const joinPath = await rlsJoinPathRepo.save(rlsJoinPathRepo.create({
+      name: 'test_login_attempts_via_users',
+      targetTable: 'login_attempts',
+      chain: '["groups", "user_groups", "users", "login_attempts"]',
+    }));
 
-    const joinPathResult = await manager.query(`
-      SELECT id FROM rls_join_paths WHERE name = 'test_login_attempts_via_users'
-    `);
-    const joinPathId = joinPathResult[0].id;
+    await rlsJoinConditionRepo.save(rlsJoinConditionRepo.create({
+      joinPathId: joinPath.id,
+      fromTable: 'groups',
+      fromColumn: 'id',
+      toTable: 'user_groups',
+      toColumn: 'group_id',
+    }));
 
-    await manager.query(`
-      INSERT INTO rls_join_conditions (join_path_id, from_table, from_column, to_table, to_column)
-      VALUES (${joinPathId}, 'groups', 'id', 'user_groups', 'group_id')
-    `);
+    await rlsJoinConditionRepo.save(rlsJoinConditionRepo.create({
+      joinPathId: joinPath.id,
+      fromTable: 'user_groups',
+      fromColumn: 'user_id',
+      toTable: 'users',
+      toColumn: 'id',
+    }));
 
-    await manager.query(`
-      INSERT INTO rls_join_conditions (join_path_id, from_table, from_column, to_table, to_column)
-      VALUES (${joinPathId}, 'user_groups', 'user_id', 'users', 'id')
-    `);
-
-    await manager.query(`
-      INSERT INTO rls_join_conditions (join_path_id, from_table, from_column, to_table, to_column)
-      VALUES (${joinPathId}, 'users', 'id', 'login_attempts', 'user_id')
-    `);
+    await rlsJoinConditionRepo.save(rlsJoinConditionRepo.create({
+      joinPathId: joinPath.id,
+      fromTable: 'users',
+      fromColumn: 'id',
+      toTable: 'login_attempts',
+      toColumn: 'user_id',
+    }));
 
     // Assign group IDs to test users
-    testUsers.test_admin_a.groupId = groupIds.company_a;
-    testUsers.test_user_a1.groupId = groupIds.company_a;
-    testUsers.test_user_eng.groupId = groupIds.engineering;
-    testUsers.test_user_fe.groupId = groupIds.frontend;
-    testUsers.test_admin_b.groupId = groupIds.company_b;
-    testUsers.test_user_b1.groupId = groupIds.marketing;
+    testUsers.test_admin_a.groupId = companyA.id;
+    testUsers.test_user_a1.groupId = companyA.id;
+    testUsers.test_user_eng.groupId = engineering.id;
+    testUsers.test_user_fe.groupId = frontend.id;
+    testUsers.test_admin_b.groupId = companyB.id;
+    testUsers.test_user_b1.groupId = marketing.id;
 
-    // Create test users with proper bcrypt hashed password
+    // Create test users
     const hashedPassword = await bcrypt.hash('Test123!', 10);
 
     for (const [key, user] of Object.entries(testUsers)) {
-      const result = await manager.query(`
-        INSERT INTO users (username, email, password, is_active, is_email_verified)
-        VALUES ('${user.username}', '${user.email}', '${hashedPassword}', 1, 1)
-        RETURNING id
-      `);
-      userIds[key] = result[0].id;
+      const newUser = await userRepo.save(userRepo.create({
+        username: user.username,
+        email: user.email,
+        password: hashedPassword,
+        isActive: true,
+        isEmailVerified: true,
+        groups: [{ id: user.groupId }] as Group[],
+        roles: [{ id: key.includes('admin') ? adminRole.id : userRole.id }] as Role[],
+      }));
+      userIds[key] = newUser.id;
 
-      // Assign to group
-      await manager.query(`
-        INSERT INTO user_groups (user_id, group_id)
-        VALUES (${userIds[key]}, ${user.groupId})
-      `);
-
-      // Assign to role based on user type
-      if (key.includes('admin')) {
-        await manager.query(`
-          INSERT INTO user_roles (user_id, role_id)
-          VALUES (${userIds[key]}, ${roleIds.admin_role})
-        `);
-      } else {
-        await manager.query(`
-          INSERT INTO user_roles (user_id, role_id)
-          VALUES (${userIds[key]}, ${roleIds.user_role})
-        `);
-      }
-
-      // Login to get valid JWT token
+      // Login to get JWT token
       try {
         const loginRes = await request(app.getHttpServer())
           .post('/auth/login')
@@ -394,40 +374,55 @@ describe('RLS - Row Level Security (e2e)', () => {
       }
     }
 
-    // Create 10 login attempts for each user
+    // Create login attempts
     for (let i = 1; i <= 10; i++) {
-      await manager.query(`
-        INSERT INTO login_attempts (user_id, ip_address, user_agent, status, email_attempted)
-        VALUES (${userIds.test_user_a1}, '10.0.0.${i}', 'Test Agent', 'success', '${testUsers.test_user_a1.email}')
-      `);
+      await loginAttemptRepo.save(loginAttemptRepo.create({
+        user: { id: userIds.test_user_a1 } as User,
+        ipAddress: `10.0.0.${i}`,
+        userAgent: 'Test Agent',
+        status: 'success',
+        emailAttempted: testUsers.test_user_a1.email,
+      }));
     }
 
     for (let i = 1; i <= 10; i++) {
-      await manager.query(`
-        INSERT INTO login_attempts (user_id, ip_address, user_agent, status, email_attempted)
-        VALUES (${userIds.test_user_eng}, '10.1.0.${i}', 'Test Agent', 'success', '${testUsers.test_user_eng.email}')
-      `);
+      await loginAttemptRepo.save(loginAttemptRepo.create({
+        user: { id: userIds.test_user_eng } as User,
+        ipAddress: `10.1.0.${i}`,
+        userAgent: 'Test Agent',
+        status: 'success',
+        emailAttempted: testUsers.test_user_eng.email,
+      }));
     }
 
     for (let i = 1; i <= 10; i++) {
-      await manager.query(`
-        INSERT INTO login_attempts (user_id, ip_address, user_agent, status, email_attempted)
-        VALUES (${userIds.test_user_fe}, '10.2.0.${i}', 'Test Agent', 'success', '${testUsers.test_user_fe.email}')
-      `);
+      await loginAttemptRepo.save(loginAttemptRepo.create({
+        user: { id: userIds.test_user_fe } as User,
+        ipAddress: `10.2.0.${i}`,
+        userAgent: 'Test Agent',
+        status: 'success',
+        emailAttempted: testUsers.test_user_fe.email,
+      }));
     }
 
     for (let i = 1; i <= 10; i++) {
-      await manager.query(`
-        INSERT INTO login_attempts (user_id, ip_address, user_agent, status, email_attempted)
-        VALUES (${userIds.test_user_b1}, '192.168.1.${i}', 'Test Agent', 'success', '${testUsers.test_user_b1.email}')
-      `);
+      await loginAttemptRepo.save(loginAttemptRepo.create({
+        user: { id: userIds.test_user_b1 } as User,
+        ipAddress: `192.168.1.${i}`,
+        userAgent: 'Test Agent',
+        status: 'success',
+        emailAttempted: testUsers.test_user_b1.email,
+      }));
     }
 
     for (let i = 1; i <= 10; i++) {
-      await manager.query(`
-        INSERT INTO login_attempts (user_id, ip_address, user_agent, status, email_attempted)
-        VALUES (${userIds.test_user_b1}, '192.168.2.${i}', 'Test Agent', 'failed', '${testUsers.test_user_b1.email}')
-      `);
+      await loginAttemptRepo.save(loginAttemptRepo.create({
+        user: { id: userIds.test_user_b1 } as User,
+        ipAddress: `192.168.2.${i}`,
+        userAgent: 'Test Agent',
+        status: 'failed',
+        emailAttempted: testUsers.test_user_b1.email,
+      }));
     }
   }
 
