@@ -25,7 +25,7 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
       ];
       
       if (typeof prop === 'string' && joinMethods.includes(prop)) {
-        return async function (entity: string | Function, alias: string, condition?: string, parameters?: any) {
+        return function (entity: string | Function, alias: string, condition?: string, parameters?: any) {
           if (cls.get('__rlsBypass')) {
             metrics.recordBypass();
             return value.call(target, entity, alias, condition, parameters);
@@ -60,42 +60,34 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
           }
 
           const groupIds = cls.get('activeGroupIds') || [];
-          const rlsRules = await rlsService.getRulesForTable(resolvedTableName, groupIds);
-
-          let securedCondition = condition;
-          let mergedParameters = parameters || {};
-
-          if (rlsRules) {
-             let sql = rlsRules.sql;
-             const params = rlsRules.parameters || {};
-             
-             // Namespace parameters
-             const uniqueParams: Record<string, any> = {};
-             for (const [key, val] of Object.entries(params)) {
-                const uniqueKey = `rls_${key}_${Math.random().toString(36).substr(2, 9)}`;
-                uniqueParams[uniqueKey] = val;
-                sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
-             }
-             
-             securedCondition = condition ? `(${condition}) AND (${sql})` : sql;
-             mergedParameters = { ...mergedParameters, ...uniqueParams };
-          } else if (config.fallbackBehavior === 'deny') {
-             securedCondition = condition ? `(${condition}) AND (1=0)` : '1=0';
-             metrics.recordBlock(resolvedTableName);
-          } else {
-             console.warn(`[RLS WARNING] Table '${resolvedTableName}' is unprotected!`);
+          const cachedRules = target.__rlsCachedRules || {};
+          
+          if (!cachedRules[resolvedTableName]) {
+            cachedRules[resolvedTableName] = rlsService.getRulesForTable(resolvedTableName, groupIds);
+            target.__rlsCachedRules = cachedRules;
           }
 
-          return value.call(target, entity, alias, securedCondition, mergedParameters);
+          target.__rlsPendingJoins = target.__rlsPendingJoins || [];
+          target.__rlsPendingJoins.push({
+            resolvedTableName,
+            originalCondition: condition,
+            originalParameters: parameters
+          });
+
+          return value.call(target, entity, alias, condition, parameters);
         };
       }
 
       const execMethods = [
-        'getOne', 'getMany', 'getManyAndCount', 'getRawOne', 'getRawMany', 'stream', 'execute'
+        'getOne', 'getMany', 'getManyAndCount', 'getRawOne', 'getRawMany', 'stream', 'execute', 'insert'
       ];
 
       if (typeof prop === 'string' && execMethods.includes(prop)) {
         return async function (...args: any[]) {
+          if (prop === 'insert' && !cls.get('__rlsBypass')) {
+            throw new Error(`[RLS] Direct QueryBuilder inserts are forbidden. Use Repository.save() or EntityManager.save().`);
+          }
+
           if (cls.get('__rlsBypass')) {
             if (!target.__rlsBypassLogged) {
               metrics.recordBypass();
@@ -104,11 +96,37 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
             return value.apply(target, args);
           }
 
-          // Reset bypass logging flag for new queries
-          target.__rlsBypassLogged = false;
-
           if (target.__rlsApplied) {
             return value.apply(target, args);
+          }
+
+          const cachedRules = target.__rlsCachedRules || {};
+          
+          for (const [tableName, rulesPromise] of Object.entries(cachedRules)) {
+            const rlsRules = await rulesPromise as any;
+            if (rlsRules) {
+               const pendingJoin = target.__rlsPendingJoins?.find((j: any) => j.resolvedTableName === tableName);
+               if (pendingJoin) {
+                  let sql = rlsRules.sql;
+                  const params = rlsRules.parameters || {};
+                  
+                  const uniqueParams: Record<string, any> = {};
+                  for (const [key, val] of Object.entries(params)) {
+                     const uniqueKey = `rls_${key}_${Math.random().toString(36).substr(2, 9)}`;
+                     uniqueParams[uniqueKey] = val;
+                     sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
+                  }
+                  
+                  const securedCondition = pendingJoin.originalCondition 
+                    ? `(${pendingJoin.originalCondition}) AND (${sql})`
+                    : sql;
+                  const mergedParameters = { ...pendingJoin.originalParameters, ...uniqueParams };
+                  
+                  target.andWhere(securedCondition, mergedParameters);
+               }
+            } else if (config.fallbackBehavior === 'deny') {
+               metrics.recordBlock(tableName);
+            }
           }
 
           const queryType = (target as any).expressionMap?.queryType;
@@ -116,14 +134,17 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
               const mainTableName = (target as any).expressionMap?.mainAlias?.metadata?.tableName;
               
               if (mainTableName && !config.exemptTables?.includes(mainTableName)) {
-                 const groupIds = cls.get('activeGroupIds') || [];
-                 const rlsRules = await rlsService.getRulesForTable(mainTableName, groupIds);
+                 if (!cachedRules[mainTableName]) {
+                    const groupIds = cls.get('activeGroupIds') || [];
+                    cachedRules[mainTableName] = rlsService.getRulesForTable(mainTableName, groupIds);
+                 }
+                 
+                 const rlsRules = await cachedRules[mainTableName] as any;
                  
                  if (rlsRules) {
                     let sql = rlsRules.sql;
                     const params = rlsRules.parameters || {};
                     
-                    // Namespace parameters
                     const uniqueParams: Record<string, any> = {};
                     for (const [key, val] of Object.entries(params)) {
                        const uniqueKey = `rls_${key}_${Math.random().toString(36).substr(2, 9)}`;
@@ -142,6 +163,8 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
            }
 
           target.__rlsApplied = true;
+          target.__rlsCachedRules = {};
+          target.__rlsPendingJoins = [];
           return value.apply(target, args);
         };
       }

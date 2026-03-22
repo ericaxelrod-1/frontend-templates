@@ -31,7 +31,9 @@ export class RlsContextGuard implements CanActivate {
       this.cls.set('activeGroupIds', groupIds);
 
       const activeGroupIdHeader = request.headers['x-active-group-id'];
-      
+      const method = request.method?.toUpperCase();
+      const isReadOnly = ['GET', 'HEAD', 'OPTIONS'].includes(method);
+
       if (activeGroupIdHeader !== undefined) {
         const activeGroupId = parseInt(activeGroupIdHeader, 10);
         
@@ -47,10 +49,10 @@ export class RlsContextGuard implements CanActivate {
         
         this.cls.set('primaryGroupId', activeGroupId);
         this.logger.debug(`Set RLS context for user ${user.id}: activeGroupId=${activeGroupId} from header`);
-      } else if (groupIds.length > 1) {
+      } else if (groupIds.length > 1 && !isReadOnly) {
         throw new BadRequestException(
           `User belongs to multiple groups [${groupIds.join(', ')}]. ` +
-          `X-Active-Group-Id header is required to specify the active context.`
+          `X-Active-Group-Id header is required to specify the active context for write operations.`
         );
       } else if (groupIds.length === 1) {
         this.cls.set('primaryGroupId', groupIds[0]);

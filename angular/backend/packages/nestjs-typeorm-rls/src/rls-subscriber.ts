@@ -1,15 +1,11 @@
 import { EventSubscriber, EntitySubscriberInterface, InsertEvent, DataSource } from 'typeorm';
 import { ClsService } from 'nestjs-cls';
 import { Logger } from '@nestjs/common';
+import { RlsSecurityViolationError } from './errors';
 
 const RLS_SCOPED_ENTITIES = ['groupId', 'customer_id', 'tenantId', 'organizationId'];
 
-export class RlsSecurityViolationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RlsSecurityViolationError';
-  }
-}
+export { RlsSecurityViolationError };
 
 export class RlsInsertSubscriber implements EntitySubscriberInterface {
   private readonly logger = new Logger('RlsInsertSubscriber');

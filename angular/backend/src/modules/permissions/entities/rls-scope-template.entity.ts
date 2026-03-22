@@ -26,6 +26,18 @@ export class RlsScopeTemplate {
   @Column({ name: 'available_columns', type: 'text' })
   availableColumns: string;
 
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
+
+  @Column({ nullable: true })
+  description: string;
+
+  @Column({ name: 'scope_sql', type: 'text', nullable: true })
+  scopeSql: string;
+
+  @Column({ type: 'text', nullable: true })
+  parameters: string;
+
   @ManyToOne(() => RlsJoinPath, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'join_path_id' })
   joinPath: RlsJoinPath;

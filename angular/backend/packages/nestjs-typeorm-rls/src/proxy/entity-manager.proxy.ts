@@ -3,14 +3,8 @@ import { ClsService } from 'nestjs-cls';
 import { RlsService } from '../rls.service';
 import { RlsMetricsService } from '../rls-metrics.service';
 import { RlsModuleOptions } from '../rls.module';
+import { RlsSecurityViolationError } from '../errors';
 import { createQueryBuilderProxy } from './query-builder.proxy';
-
-class RlsSecurityViolationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RlsSecurityViolationError';
-  }
-}
 
 export { RlsSecurityViolationError };
 

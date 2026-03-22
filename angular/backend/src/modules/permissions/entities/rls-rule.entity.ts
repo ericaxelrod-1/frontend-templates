@@ -26,6 +26,15 @@ export class RlsRule {
   @Column({ type: 'text', nullable: true })
   parameters: string;
 
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
+
+  @Column({ type: 'int', nullable: true })
+  priority: number;
+
+  @Column({ nullable: true })
+  description: string;
+
   @ManyToOne(() => Group, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'group_id' })
   group: Group;
