@@ -106,7 +106,8 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
     await queryRunner.dropIndex('user_groups', 'idx_user_groups_user_id');
     await queryRunner.dropIndex('user_groups', 'idx_user_groups_group_id');
     await queryRunner.dropIndex('roles', 'idx_roles_parent_id');
-    // Skip: idx_groups_parent_id - IDX_groups_parent_id already exists
+    // Note: idx_groups_parent_id created by migration 1774111230659 is intentionally
+    // NOT dropped here because it was created earlier and may still be needed.
     await queryRunner.dropIndex('groups', 'idx_groups_priority');
     await queryRunner.dropIndex('role_permissions', 'idx_role_permissions_role_id');
     await queryRunner.dropIndex('role_permissions', 'idx_role_permissions_permission_id');

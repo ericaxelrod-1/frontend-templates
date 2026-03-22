@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsArray, ValidateNested, MaxLength, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsInt, IsArray, ValidateNested, MaxLength, IsNotEmpty } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 export class CreateJoinConditionDto {
@@ -39,9 +39,10 @@ export class CreateRlsJoinPathDto {
   @Transform(({ value }) => value?.toLowerCase().trim())
   targetTable: string;
 
-  @IsString()
+  @IsArray()
+  @IsString({ each: true })
   @IsNotEmpty()
-  chain: string;
+  chain: string[];
 
   @IsOptional()
   @IsArray()
@@ -63,8 +64,13 @@ export class UpdateRlsJoinPathDto {
   targetTable?: string;
 
   @IsOptional()
-  @IsString()
-  chain?: string;
+  @IsArray()
+  @IsString({ each: true })
+  chain?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 
   @IsOptional()
   @IsArray()

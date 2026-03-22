@@ -53,7 +53,7 @@ export class RlsJoinPathsController {
     const joinPath = this.joinPathRepository.create({
       name: createDto.name,
       targetTable: createDto.targetTable,
-      chain: createDto.chain,
+      chain: JSON.stringify(createDto.chain),
     });
 
     const savedPath = await this.joinPathRepository.save(joinPath);
@@ -91,7 +91,8 @@ export class RlsJoinPathsController {
 
     if (updateDto.name) joinPath.name = updateDto.name;
     if (updateDto.targetTable) joinPath.targetTable = updateDto.targetTable;
-    if (updateDto.chain) joinPath.chain = updateDto.chain;
+    if (updateDto.chain) joinPath.chain = JSON.stringify(updateDto.chain);
+    if (updateDto.isActive !== undefined) joinPath.isActive = updateDto.isActive;
 
     await this.joinPathRepository.save(joinPath);
 

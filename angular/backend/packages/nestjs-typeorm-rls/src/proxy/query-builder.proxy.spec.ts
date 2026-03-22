@@ -21,7 +21,9 @@ describe('QueryBuilder Proxy', () => {
         queryType: 'select',
         mainAlias: { metadata: { tableName: 'users' } },
         aliases: []
-      }
+      },
+      __rlsCachedRules: {},
+      __rlsPendingJoins: []
     };
 
     mockCls = { 
@@ -38,32 +40,31 @@ describe('QueryBuilder Proxy', () => {
     mockConfig = { exemptTables: [], fallbackBehavior: 'deny' };
   });
 
-  it('should intercept leftJoin and apply rules with namespaced parameters', () => {
-    mockRlsService.getRulesForTable.mockReturnValue({ sql: 'tenant_id = :id', parameters: { id: 1 } });
+  it('should record pending join on leftJoin and apply RLS at execution', async () => {
+    mockRlsService.getRulesForTable.mockResolvedValue({ sql: 'tenant_id = :id', parameters: { id: 1 } });
     
     const proxy = createQueryBuilderProxy(mockQb, mockCls, mockRlsService, mockMetrics, mockConfig);
-    proxy.leftJoin('orders', 'order', 'order.userId = user.id');
-
-    // We expect the call to include the original condition AND the RLS condition
-    // We expect the parameters to contain the namespaced RLS parameter
-    // We DO NOT expect it to contain 'existing: 1' because that is already on the QB state
-    expect(mockQb.leftJoin).toHaveBeenCalledWith(
-      'orders', 
-      'order', 
-      expect.stringMatching(/\(order\.userId = user\.id\) AND \(tenant_id = :rls_id_[a-z0-9]+\)/), 
-      expect.objectContaining({})
-    );
     
-    // Verify the parameter object contains the dynamic key
-    const callArgs = mockQb.leftJoin.mock.calls[0];
-    const params = callArgs[3];
-    const dynamicKey = Object.keys(params).find(k => k.startsWith('rls_id_'));
-    expect(dynamicKey).toBeDefined();
-    expect(params[dynamicKey!]).toBe(1);
+    // leftJoin should just record the pending join and call original
+    const result = proxy.leftJoin('orders', 'order', 'order.userId = user.id');
+    
+    // Returns same proxy for chaining
+    expect(result).toBe(proxy);
+    
+    // Original leftJoin called with original condition (RLS applied later)
+    expect(mockQb.leftJoin).toHaveBeenCalledWith('orders', 'order', 'order.userId = user.id');
+    
+    // Now execute to trigger RLS application
+    await proxy.getMany();
+    
+    // RLS condition should be applied via andWhere
+    expect(mockQb.andWhere).toHaveBeenCalled();
+    const andWhereCall = mockQb.andWhere.mock.calls[0][0];
+    expect(andWhereCall).toContain('tenant_id = :');
   });
 
   it('should apply default deny on execution if no rules found', async () => {
-    mockRlsService.getRulesForTable.mockReturnValue(null); // No rules
+    mockRlsService.getRulesForTable.mockResolvedValue(null); // No rules
     
     const proxy = createQueryBuilderProxy(mockQb, mockCls, mockRlsService, mockMetrics, mockConfig);
     await proxy.getMany();

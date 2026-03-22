@@ -23,6 +23,9 @@ export class RlsJoinPath {
   @Column({ type: 'text' })
   chain: string;
 
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
+
   @OneToMany(() => RlsJoinCondition, (condition) => condition.joinPath)
   conditions: RlsJoinCondition[];
 
