@@ -8,15 +8,18 @@ import {
   Param,
   ParseIntPipe,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../guards/permission.guard';
+import { RequirePermission } from '../decorators/require-permission.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RlsJoinPath } from '../entities/rls-join-path.entity';
 import { RlsJoinCondition } from '../entities/rls-join-condition.entity';
 
 @Controller('api/rls/join-paths')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class RlsJoinPathsController {
   constructor(
     @InjectRepository(RlsJoinPath)
@@ -26,6 +29,7 @@ export class RlsJoinPathsController {
   ) {}
 
   @Get()
+  @RequirePermission('rls_join_paths:read')
   async findAll() {
     return this.joinPathRepository.find({
       relations: ['conditions'],
@@ -34,6 +38,7 @@ export class RlsJoinPathsController {
   }
 
   @Get(':id')
+  @RequirePermission('rls_join_paths:read')
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.joinPathRepository.findOne({
       where: { id },
@@ -42,6 +47,7 @@ export class RlsJoinPathsController {
   }
 
   @Post()
+  @RequirePermission('rls_join_paths:manage')
   async create(
     @Body()
     createDto: {
@@ -86,6 +92,7 @@ export class RlsJoinPathsController {
   }
 
   @Put(':id')
+  @RequirePermission('rls_join_paths:manage')
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body()
@@ -104,7 +111,7 @@ export class RlsJoinPathsController {
   ) {
     const joinPath = await this.joinPathRepository.findOne({ where: { id } });
     if (!joinPath) {
-      throw new Error('Join path not found');
+      throw new NotFoundException('Join path not found');
     }
 
     if (updateDto.name) joinPath.name = updateDto.name;
@@ -137,6 +144,7 @@ export class RlsJoinPathsController {
   }
 
   @Delete(':id')
+  @RequirePermission('rls_join_paths:manage')
   async delete(@Param('id', ParseIntPipe) id: number) {
     await this.joinPathRepository.delete(id);
     return { success: true };

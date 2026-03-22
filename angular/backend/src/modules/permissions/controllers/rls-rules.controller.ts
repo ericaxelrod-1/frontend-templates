@@ -9,16 +9,20 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { RlsService } from '@our-org/nestjs-typeorm-rls';
 import { RlsRule } from '../entities/rls-rule.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../guards/permission.guard';
+import { RequirePermission } from '../decorators/require-permission.decorator';
 import { RlsValidationService, ValidationResult } from '../services/rls-validation.service';
 
 @Controller('api/rls-rules')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class RlsRulesController {
   constructor(
     private readonly rlsService: RlsService,
@@ -28,6 +32,7 @@ export class RlsRulesController {
   ) {}
 
   @Get()
+  @RequirePermission('rls_rules:read')
   async findAll(
     @Query('groupId') groupId?: string,
     @Query('targetTable') targetTable?: string,
@@ -48,6 +53,7 @@ export class RlsRulesController {
   }
 
   @Get(':id')
+  @RequirePermission('rls_rules:read')
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.rlsRuleRepository.findOne({
       where: { id },
@@ -56,6 +62,7 @@ export class RlsRulesController {
   }
 
   @Post('validate')
+  @RequirePermission('rls_rules:manage')
   async validateRule(
     @Body()
     validateDto: {
@@ -72,6 +79,7 @@ export class RlsRulesController {
   }
 
   @Post()
+  @RequirePermission('rls_rules:manage')
   async create(
     @Body()
     createDto: {
@@ -89,7 +97,7 @@ export class RlsRulesController {
     );
 
     if (!validation.valid && !createDto.skipValidation) {
-      throw new Error(
+      throw new BadRequestException(
         `Rule validation failed: ${validation.warnings
           .filter(w => w.severity === 'error')
           .map(w => w.message)
@@ -112,6 +120,7 @@ export class RlsRulesController {
   }
 
   @Put(':id')
+  @RequirePermission('rls_rules:manage')
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body()
@@ -128,7 +137,7 @@ export class RlsRulesController {
     });
 
     if (!rule) {
-      throw new Error('Rule not found');
+      throw new NotFoundException('Rule not found');
     }
 
     let validation: ValidationResult | undefined;
@@ -161,6 +170,7 @@ export class RlsRulesController {
   }
 
   @Delete(':id')
+  @RequirePermission('rls_rules:manage')
   async delete(@Param('id', ParseIntPipe) id: number) {
     const rule = await this.rlsRuleRepository.findOne({ where: { id } });
     if (rule) {
@@ -172,6 +182,7 @@ export class RlsRulesController {
   }
 
   @Post('invalidate-cache')
+  @RequirePermission('rls_rules:manage')
   async invalidateCache(@Body() body: { tableName?: string }) {
     this.rlsService.invalidateCache(body.tableName);
     return { success: true };

@@ -8,14 +8,17 @@ import {
   Param,
   ParseIntPipe,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../guards/permission.guard';
+import { RequirePermission } from '../decorators/require-permission.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RlsScopeTemplate } from '../entities/rls-scope-template.entity';
 
 @Controller('api/rls/scope-templates')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class RlsScopeTemplatesController {
   constructor(
     @InjectRepository(RlsScopeTemplate)
@@ -23,6 +26,7 @@ export class RlsScopeTemplatesController {
   ) {}
 
   @Get()
+  @RequirePermission('rls_scope_templates:read')
   async findAll() {
     return this.scopeTemplateRepository.find({
       relations: ['joinPath'],
@@ -31,6 +35,7 @@ export class RlsScopeTemplatesController {
   }
 
   @Get(':id')
+  @RequirePermission('rls_scope_templates:read')
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.scopeTemplateRepository.findOne({
       where: { id },
@@ -39,6 +44,7 @@ export class RlsScopeTemplatesController {
   }
 
   @Post()
+  @RequirePermission('rls_scope_templates:manage')
   async create(
     @Body()
     createDto: {
@@ -59,6 +65,7 @@ export class RlsScopeTemplatesController {
   }
 
   @Put(':id')
+  @RequirePermission('rls_scope_templates:manage')
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body()
@@ -73,7 +80,7 @@ export class RlsScopeTemplatesController {
       where: { id },
     });
     if (!template) {
-      throw new Error('Scope template not found');
+      throw new NotFoundException('Scope template not found');
     }
 
     if (updateDto.name !== undefined) template.name = updateDto.name;
@@ -89,6 +96,7 @@ export class RlsScopeTemplatesController {
   }
 
   @Delete(':id')
+  @RequirePermission('rls_scope_templates:manage')
   async delete(@Param('id', ParseIntPipe) id: number) {
     await this.scopeTemplateRepository.delete(id);
     return { success: true };

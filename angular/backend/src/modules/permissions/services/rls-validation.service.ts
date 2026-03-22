@@ -81,7 +81,7 @@ export class RlsValidationService {
     });
 
     for (const childRule of childRules) {
-      if (!childRule.group || !this.isDescendant(childRule.group, groupId)) {
+      if (!childRule.group || !(await this.isDescendant(childRule.group, groupId))) {
         continue;
       }
 
@@ -288,15 +288,23 @@ export class RlsValidationService {
     return null;
   }
 
-  private isDescendant(group: Group, ancestorId: number): boolean {
+  private async isDescendant(group: Group, ancestorId: number): Promise<boolean> {
     if (group.id === ancestorId) {
       return true;
     }
 
-    if (group.parentId === ancestorId) {
-      return true;
+    if (!group.parentId) {
+      return false;
     }
 
-    return false;
+    const parentGroup = await this.groupRepository.findOne({
+      where: { id: group.parentId },
+    });
+
+    if (!parentGroup) {
+      return false;
+    }
+
+    return this.isDescendant(parentGroup, ancestorId);
   }
 }
