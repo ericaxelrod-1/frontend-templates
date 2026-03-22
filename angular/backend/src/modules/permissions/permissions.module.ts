@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PermissionsService } from './services/permissions.service';
 import { PermissionCheckerService } from './services/permission-checker.service';
+import { RlsValidationService } from './services/rls-validation.service';
 import { PermissionsController } from './controllers/permissions.controller';
 import { ResourcesController } from './controllers/resources.controller';
 import { ActionsController } from './controllers/actions.controller';
@@ -74,6 +75,7 @@ import { RlsService } from '@our-org/nestjs-typeorm-rls';
       provide: PermissionCheckerService,
       useClass: PermissionCheckerService,
     },
+    RlsValidationService,
     PermissionSeedsService,
     RlsContextGuard,
     RlsService,
@@ -81,6 +83,7 @@ import { RlsService } from '@our-org/nestjs-typeorm-rls';
   exports: [
     PermissionsService,
     PermissionCheckerService,
+    RlsValidationService,
     TypeOrmModule,
     PermissionSeedsService,
     RlsContextGuard,

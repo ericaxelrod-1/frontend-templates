@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { UsersService } from '../../users/users.service';
@@ -28,13 +29,40 @@ export class RlsContextGuard implements CanActivate {
       const groupIds = await this.usersService.getUserGroupIds(user.id);
       
       this.cls.set('activeGroupIds', groupIds);
-      
-      if (groupIds.length > 0) {
-        this.cls.set('primaryGroupId', groupIds[0]);
-      }
 
-      this.logger.debug(`Set RLS context for user ${user.id}: groups=${groupIds.join(',')}`);
+      const activeGroupIdHeader = request.headers['x-active-group-id'];
+      
+      if (activeGroupIdHeader !== undefined) {
+        const activeGroupId = parseInt(activeGroupIdHeader, 10);
+        
+        if (isNaN(activeGroupId)) {
+          throw new BadRequestException('X-Active-Group-Id header must be a valid number');
+        }
+        
+        if (!groupIds.includes(activeGroupId)) {
+          throw new BadRequestException(
+            `X-Active-Group-Id ${activeGroupId} is not one of the user's groups: [${groupIds.join(', ')}]`
+          );
+        }
+        
+        this.cls.set('primaryGroupId', activeGroupId);
+        this.logger.debug(`Set RLS context for user ${user.id}: activeGroupId=${activeGroupId} from header`);
+      } else if (groupIds.length > 1) {
+        throw new BadRequestException(
+          `User belongs to multiple groups [${groupIds.join(', ')}]. ` +
+          `X-Active-Group-Id header is required to specify the active context.`
+        );
+      } else if (groupIds.length === 1) {
+        this.cls.set('primaryGroupId', groupIds[0]);
+        this.logger.debug(`Set RLS context for user ${user.id}: single group=${groupIds[0]}`);
+      } else {
+        this.cls.set('primaryGroupId', null);
+        this.logger.debug(`Set RLS context for user ${user.id}: no groups`);
+      }
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       this.logger.error(`Failed to set RLS context: ${error.message}`);
     }
 
