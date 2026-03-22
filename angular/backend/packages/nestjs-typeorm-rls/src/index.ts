@@ -10,4 +10,4 @@ export type {
   ScopeTemplate,
   CompiledScopeTemplate,
 } from './rls.service';
-export { RlsInsertSubscriber } from './rls-subscriber';
+export { RlsInsertSubscriber, RlsSecurityViolationError } from './rls-subscriber';
