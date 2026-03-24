@@ -134,6 +134,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    console.log('ngOnInit - Initial Tables:', this.initialTables);
+    console.log('ngOnInit - Initial Conditions:', this.initialConditions);
     if (this.initialTables.length > 0) {
       this.canvasNodes = [...this.initialTables];
       this.nodeCounter = this.canvasNodes.length;
@@ -224,6 +226,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   onPaletteItemDropped(event: any): void {
+    console.log('Palette item dropped:', event);
     const { item, position } = event;
     const nodeId = `node_${++this.nodeCounter}`;
     const node = {
@@ -238,6 +241,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
 
     // Auto-connect to previous node if exists
     if (this.canvasNodes.length > 1) {
+      console.log('Auto-connecting nodes:', this.canvasNodes.length);
       const prevNode = this.canvasNodes[this.canvasNodes.length - 2];
       const edgeId = `edge_${++this.edgeCounter}`;
       const newEdge = {
@@ -275,10 +279,13 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   onSelectionChanged(event: any): void {
+    console.log('Selection changed:', event);
     const selected = event.selection || [];
     if (selected.length > 0) {
       const selectedId = selected[0].id;
+      console.log('Selected ID:', selectedId);
       const edge = this.canvasEdges.find(e => e.id === selectedId);
+      console.log('Found edge:', edge);
       if (edge) {
         this.onEdgeSelected(edge);
       }
@@ -392,6 +399,9 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
 
   getNodeTableName(nodeId: string): string {
     const node = this.canvasNodes.find(n => n.id === nodeId);
+    if (!node) {
+      console.log('Node not found for ID:', nodeId, 'Available nodes:', this.canvasNodes);
+    }
     return node?.data?.tableName || nodeId;
   }
 
