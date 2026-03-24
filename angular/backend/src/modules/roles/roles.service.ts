@@ -338,6 +338,24 @@ export class RolesService implements OnModuleInit {
     return descendants;
   }
 
+  async getHierarchyPath(roleId: number): Promise<Role[]> {
+    const role = await this.roleRepository.findOne({
+      where: { id: roleId },
+      relations: ['parent'],
+    });
+
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${roleId} not found`);
+    }
+
+    if (!role.parent) {
+      return [role];
+    }
+
+    const parentPath = await this.getHierarchyPath(role.parentId!);
+    return [...parentPath, role];
+  }
+
   async validateNoCircularReference(
     roleId: number,
     newParentId: number,
