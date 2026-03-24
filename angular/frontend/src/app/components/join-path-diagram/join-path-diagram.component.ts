@@ -12,8 +12,10 @@ import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
 export interface DiagramTableNode {
   id: string;
-  tableName: string;
-  columns: DiagramColumn[];
+  data: {
+    tableName: string;
+    columns: DiagramColumn[];
+  };
   position?: { x: number; y: number };
 }
 
@@ -77,8 +79,10 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     if (tables && tables.length > 0) {
       this.availableTables = tables.map(t => ({
         id: t.name,
-        tableName: t.name,
-        columns: t.columns,
+        data: {
+          tableName: t.name,
+          columns: t.columns,
+        },
       }));
       this.totalTables = tables.length;
       this.updatePaletteItems();
@@ -97,6 +101,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     nodes: [],
     edges: [],
   });
+
+  private modelInitialized = false;
 
   selectedEdgeId: string | null = null;
   sidebarOpen = false;
@@ -184,8 +190,10 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
         next: (response) => {
           const newTables = response.items.map(t => ({
             id: t.name,
-            tableName: t.name,
-            columns: t.columns,
+            data: {
+              tableName: t.name,
+              columns: t.columns,
+            },
           }));
           
           this.availableTables = this.currentPage === 1 
@@ -205,8 +213,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   updatePaletteItems(): void {
     this.paletteItems = this.availableTables.map(t => ({
       id: t.id,
-      label: t.tableName,
-      data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
+      label: t.data.tableName,
+      data: { label: t.data.tableName, tableName: t.data.tableName, columns: t.data.columns } as any,
     }));
   }
 
@@ -227,6 +235,24 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
       },
     };
     this.canvasNodes = [...this.canvasNodes, node];
+
+    // Auto-connect to previous node if exists
+    if (this.canvasNodes.length > 1) {
+      const prevNode = this.canvasNodes[this.canvasNodes.length - 2];
+      const edgeId = `edge_${++this.edgeCounter}`;
+      const newEdge = {
+        id: edgeId,
+        source: prevNode.id,
+        target: nodeId,
+        data: {
+          sourceColumn: '',
+          targetColumn: '',
+          operator: '=',
+        },
+      };
+      this.canvasEdges = [...this.canvasEdges, newEdge];
+    }
+
     this.syncModel();
     this.emitChange();
   }
@@ -246,6 +272,17 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   onEdgeSelected(edge: any): void {
     this.selectedEdgeId = edge.id;
     this.openEdgeSidebar(edge);
+  }
+
+  onSelectionChanged(event: any): void {
+    const selected = event.selection || [];
+    if (selected.length > 0) {
+      const selectedId = selected[0].id;
+      const edge = this.canvasEdges.find(e => e.id === selectedId);
+      if (edge) {
+        this.onEdgeSelected(edge);
+      }
+    }
   }
 
   openEdgeSidebar(edge: any): void {
@@ -299,10 +336,16 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   syncModel(): void {
-    this.model = initializeModel({
-      nodes: this.canvasNodes,
-      edges: this.canvasEdges,
-    });
+    if (!this.modelInitialized) {
+      this.model = initializeModel({
+        nodes: this.canvasNodes,
+        edges: this.canvasEdges,
+      });
+      this.modelInitialized = true;
+    } else {
+      this.model.updateNodes(this.canvasNodes);
+      this.model.updateEdges(this.canvasEdges);
+    }
   }
 
   calculateEdgePath(edge: any): string {
@@ -326,8 +369,10 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     const output: DiagramOutput = {
       tables: this.canvasNodes.map(n => ({
         id: n.id,
-        tableName: n.data.tableName,
-        columns: n.data.columns,
+        data: {
+          tableName: n.data.tableName,
+          columns: n.data.columns,
+        },
         position: n.position,
       })),
       edges: this.canvasEdges.map(e => ({

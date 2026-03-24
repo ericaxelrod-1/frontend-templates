@@ -124,8 +124,10 @@ export class JoinPathEditorDialogComponent {
         const tableMeta = data.tables.find(t => t.name === tableName);
         return {
           id: `node_${i}`,
-          tableName,
-          columns: tableMeta?.columns || [],
+          data: {
+            tableName,
+            columns: tableMeta?.columns || []
+          },
           position: { x: 100 + (i * 300), y: 150 }
         };
       });
@@ -145,7 +147,7 @@ export class JoinPathEditorDialogComponent {
   }
 
   onDiagramChange(output: DiagramOutput): void {
-    this.formData.chain = Array.from(new Set(output.tables.map(t => t.tableName)));
+    this.formData.chain = Array.from(new Set(output.tables.map(t => t.data.tableName)));
   }
 
   onTargetTableChange(table: string): void {

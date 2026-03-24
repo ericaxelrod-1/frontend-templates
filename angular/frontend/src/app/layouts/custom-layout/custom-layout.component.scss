@@ -58,7 +58,7 @@
 
 .layout-footer {
   grid-area: footer;
-  z-index: 800; // Below header, above content
+  z-index: 10; // Below header and sidenav
 }
 
 // Sidenav Container - takes full height of main area

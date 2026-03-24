@@ -53,6 +53,7 @@
       [model]="model"
       (paletteItemDropped)="onPaletteItemDropped($event)"
       (edgeDrawn)="onEdgeDrawn($event)"
+      (selectionChanged)="onSelectionChanged($event)"
     >
       <ng-template #nodeTemplate let-node>
         <div class="table-node" 
@@ -154,7 +155,7 @@
       </div>
     } @else {
       <div class="sidebar-header">
-        <h3>Join Chain Overview</h3>
+        <h3>Joins</h3>
       </div>
       <div class="sidebar-body">
         <div class="conditions-list">
