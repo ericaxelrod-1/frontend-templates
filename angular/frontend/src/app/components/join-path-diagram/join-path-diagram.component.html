@@ -5,8 +5,6 @@
     <ng-diagram-palette-item
       *ngFor="let item of paletteItems"
       [item]="item"
-      [width]="160"
-      [height]="60"
     >
       <div class="palette-item">
         <span class="palette-icon">&#128203;</span>
@@ -40,20 +38,19 @@
               </div>
             }
           </div>
-          <ng-diagram-port id="port-left" position="left" type="target"></ng-diagram-port>
-          <ng-diagram-port id="port-right" position="right" type="source"></ng-diagram-port>
-          <ng-diagram-port id="port-top" position="top" type="target"></ng-diagram-port>
-          <ng-diagram-port id="port-bottom" position="bottom" type="source"></ng-diagram-port>
+          <ng-diagram-port id="port-left" side="left" type="target"></ng-diagram-port>
+          <ng-diagram-port id="port-right" side="right" type="source"></ng-diagram-port>
+          <ng-diagram-port id="port-top" side="top" type="target"></ng-diagram-port>
+          <ng-diagram-port id="port-bottom" side="bottom" type="source"></ng-diagram-port>
         </div>
       </ng-template>
 
       <ng-template #edgeTemplate let-edge>
         <ng-diagram-base-edge
-          [path]="calculateEdgePath(edge)"
-          [markerEnd]="'url(#arrow)'"
+          [edge]="edge"
         ></ng-diagram-base-edge>
         @if (edge.data?.sourceColumn && edge.data?.targetColumn) {
-          <div class="edge-label" [style.transform]="'translate(-50%, -50%)'">
+          <div class="edge-label">
             {{ edge.data.sourceColumn }} {{ edge.data.operator }} {{ edge.data.targetColumn }}
           </div>
         }

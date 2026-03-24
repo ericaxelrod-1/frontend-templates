@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { ClsService } from 'nestjs-cls';
 
 export interface RlsRuleResult {
   sql: string;
@@ -105,6 +106,8 @@ export class RlsService {
   private joinPathCache: Map<string, CachedJoinPath> = new Map();
   private readonly CACHE_TTL_MS = 60000;
   private dataSource!: DataSource;
+
+  constructor(private readonly cls: ClsService) {}
 
   setDataSource(ds: DataSource) {
     this.dataSource = ds;
@@ -215,10 +218,21 @@ export class RlsService {
     return groupMap;
   }
 
+  private resolveTemplateValue(value: string | null): any {
+    if (!value) return value;
+    const match = value.match(/^{{\s*(\w+)\s*}}$/);
+    if (match) {
+      const key = match[1];
+      const resolved = this.cls.get(key);
+      if (resolved !== undefined) {
+        return resolved;
+      }
+    }
+    return value;
+  }
+
   /**
    * Compile a condition group tree into parameterized SQL.
-   * NOTE: This logic mirrors ScopeCompilerService.compileGroupRecursive() in the main app.
-   * Keep both in sync when modifying compilation logic.
    */
   private compileGroupTree(
     group: RlsConditionGroupTree,
@@ -234,15 +248,26 @@ export class RlsService {
       if (['IS NULL', 'IS NOT NULL'].includes(condition.operator?.toUpperCase())) {
         parts.push(`${condition.columnName} ${condition.operator}`);
       } else if (condition.operator?.toUpperCase() === 'IN') {
-        const values = (condition.value || '').split(',').map(v => v.trim()).filter(v => v);
+        let rawValues = this.resolveTemplateValue(condition.value);
+        let values: any[] = [];
+        
+        if (Array.isArray(rawValues)) {
+          values = rawValues;
+        } else {
+          values = (String(rawValues) || '').split(',').map(v => v.trim()).filter(v => v);
+        }
+
         if (values.length > 0) {
           const placeholders = values.map((_, i) => `:${paramName}_${i}`).join(', ');
           parts.push(`${condition.columnName} IN (${placeholders})`);
           values.forEach((v, i) => params[`${paramName}_${i}`] = v);
+        } else {
+          // Empty IN clause -> False
+          parts.push(`1=0`);
         }
       } else if (condition.operator && condition.columnName) {
         parts.push(`${condition.columnName} ${condition.operator} :${paramName}`);
-        params[paramName] = condition.value;
+        params[paramName] = this.resolveTemplateValue(condition.value);
       }
     }
 

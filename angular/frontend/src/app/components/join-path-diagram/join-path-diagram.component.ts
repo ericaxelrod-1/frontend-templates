@@ -1,8 +1,8 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { NgDiagramComponent, NgDiagramPaletteItemComponent, NgDiagramPaletteItemPreviewComponent, NgDiagramPortComponent, NgDiagramBaseEdgeComponent, provideNgDiagram, initializeModel, NgDiagramService } from 'ng-diagram';
+import { NgDiagramComponent, NgDiagramPaletteItemComponent, NgDiagramPaletteItemPreviewComponent, NgDiagramPortComponent, NgDiagramBaseEdgeComponent, provideNgDiagram, initializeModel } from 'ng-diagram';
 import { environment } from '../../../environments/environment';
 
 export interface DiagramTableNode {
@@ -73,10 +73,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   model: any;
 
   selectedEdgeId: string | null = null;
-  selectedEdge: DiagramEdge | null = null;
-
   sidebarOpen = false;
-  sidebarEdge: DiagramEdge | null = null;
+  sidebarEdge: any | null = null;
   sidebarSourceColumn = '';
   sidebarTargetColumn = '';
   sidebarOperator = '=';
@@ -84,9 +82,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   nodeCounter = 0;
   edgeCounter = 0;
 
-  paletteItems: { label: string; data: DiagramTableNode }[] = [];
-
-  private ngDiagramService: NgDiagramService | null = null;
+  paletteItems: any[] = [];
 
   constructor(private http: HttpClient) {}
 
@@ -127,7 +123,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {}
 
   loadAvailableTables(): void {
-    this.http.get<{ name: string; columns: DiagramColumn[] }[]>(`${environment.apiUrl}/schema/tables`)
+    this.http.get<any[]>(`${environment.apiUrl}/schema/tables`)
       .subscribe({
         next: (response) => {
           this.availableTables = response.map(t => ({
@@ -136,8 +132,9 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
             columns: t.columns,
           }));
           this.paletteItems = this.availableTables.map(t => ({
+            id: t.id,
             label: t.tableName,
-            data: t,
+            data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
           }));
         },
         error: () => {
@@ -154,35 +151,11 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
               { name: 'owner_id', dataType: 'integer', isForeignKey: true },
               { name: 'created_at', dataType: 'timestamp' },
             ]},
-            { id: 'orders', tableName: 'orders', columns: [
-              { name: 'id', dataType: 'integer', isPrimaryKey: true },
-              { name: 'user_id', dataType: 'integer', isForeignKey: true },
-              { name: 'total', dataType: 'decimal' },
-              { name: 'status', dataType: 'string' },
-              { name: 'created_at', dataType: 'timestamp' },
-            ]},
-            { id: 'products', tableName: 'products', columns: [
-              { name: 'id', dataType: 'integer', isPrimaryKey: true },
-              { name: 'name', dataType: 'string' },
-              { name: 'price', dataType: 'decimal' },
-              { name: 'category_id', dataType: 'integer', isForeignKey: true },
-            ]},
-            { id: 'categories', tableName: 'categories', columns: [
-              { name: 'id', dataType: 'integer', isPrimaryKey: true },
-              { name: 'name', dataType: 'string' },
-              { name: 'parent_id', dataType: 'integer', isForeignKey: true },
-            ]},
-            { id: 'order_items', tableName: 'order_items', columns: [
-              { name: 'id', dataType: 'integer', isPrimaryKey: true },
-              { name: 'order_id', dataType: 'integer', isForeignKey: true },
-              { name: 'product_id', dataType: 'integer', isForeignKey: true },
-              { name: 'quantity', dataType: 'integer' },
-              { name: 'price', dataType: 'decimal' },
-            ]},
           ];
           this.paletteItems = this.availableTables.map(t => ({
+            id: t.id,
             label: t.tableName,
-            data: t,
+            data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
           }));
         }
       });
@@ -211,19 +184,9 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     }
     const edgeId = `edge_${++this.edgeCounter}`;
     const updatedEdge = { ...edge, id: edgeId };
-    const existing = this.canvasEdges.find(e => e.id === edge.id);
-    if (existing) {
-      const idx = this.canvasEdges.indexOf(existing);
-      this.canvasEdges[idx] = updatedEdge;
-    } else {
-      this.canvasEdges = [...this.canvasEdges, updatedEdge];
-    }
+    this.canvasEdges = [...this.canvasEdges, updatedEdge];
     this.syncModel();
     this.openEdgeSidebar(updatedEdge);
-  }
-
-  onNodeSelected(event: any): void {
-    this.selectedEdgeId = null;
   }
 
   onEdgeSelected(edge: any): void {
@@ -277,6 +240,18 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
       nodes: this.canvasNodes,
       edges: this.canvasEdges,
     });
+  }
+
+  calculateEdgePath(edge: any): string {
+    if (!edge.source || !edge.target) return '';
+    const sourceNode = this.canvasNodes.find(n => n.id === edge.source);
+    const targetNode = this.canvasNodes.find(n => n.id === edge.target);
+    if (!sourceNode || !targetNode) return '';
+    return `M ${sourceNode.position.x} ${sourceNode.position.y} L ${targetNode.position.x} ${targetNode.position.y}`;
+  }
+
+  copyJson(): void {
+    navigator.clipboard.writeText(this.outputJson);
   }
 
   emitChange(): void {

@@ -98,6 +98,44 @@ async function bootstrap() {
         console.log(`○ Rule exists: ${rule.description}`);
       }
     }
+
+    // Add specific rule for 'groups' table using {{activeGroupIds}} placeholder
+    const existingGroupRule = await ruleRepo.findOne({
+      where: { groupId: 1, targetTable: 'groups' },
+    });
+
+    if (!existingGroupRule) {
+      const newRule = ruleRepo.create({
+        groupId: 1,
+        targetTable: 'groups',
+        description: 'Users can only see groups they are a member of or descendants thereof',
+      });
+      const savedRule = await ruleRepo.save(newRule);
+
+      const rootGroup = groupRepo.create({
+        ruleId: savedRule.id,
+        logicalOperator: 'AND',
+        sortOrder: 0,
+      });
+      const savedGroup = await groupRepo.save(rootGroup);
+
+      const groupCondition = conditionRepo.create({
+        conditionGroupId: savedGroup.id,
+        columnName: 'id',
+        operator: 'IN',
+        value: '{{activeGroupIds}}',
+        sortOrder: 0,
+      });
+      await conditionRepo.save(groupCondition);
+
+      savedRule.rootGroupId = savedGroup.id;
+      await ruleRepo.save(savedRule);
+
+      console.log(`✓ Created fundamental rule for 'groups' table`);
+    } else {
+      console.log(`○ Rule for 'groups' already exists`);
+    }
+
   });
 
   console.log('\nRLS Bootstrap Seeding completed successfully!');

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
+import { RlsService, SchemaColumn } from '../../../services/rls.service';
 
 interface RlsJoinPath {
   id?: number;
@@ -84,7 +85,7 @@ interface RlsScopeTemplate {
 
             <div class="form-group">
               <label>Target Table *</label>
-              <select [(ngModel)]="formData.targetTable" (change)="onTableChange(formData.targetTable)" required>
+              <select [(ngModel)]="formData.targetTable" (change)="onTableChange(formData.targetTable || '')" required>
                 <option value="">Select a table</option>
                 @for (table of tables; track table.name) {
                   <option [value]="table.name">{{ table.name }}</option>
@@ -174,32 +175,33 @@ export class ScopeTemplatesAdminComponent implements OnInit {
 
   loadTemplates(): void {
     this.http.get<RlsScopeTemplate[]>(`${environment.apiUrl}/rls/scope-templates`).subscribe({
-      next: (templates) => this.templates = templates,
-      error: (err) => console.error('Failed to load templates:', err)
+      next: (templates: RlsScopeTemplate[]) => this.templates = templates,
+      error: (err: any) => console.error('Failed to load templates:', err)
     });
   }
 
   loadJoinPaths(): void {
     this.http.get<RlsJoinPath[]>(`${environment.apiUrl}/rls/join-paths`).subscribe({
-      next: (paths) => this.joinPaths = paths,
-      error: (err) => console.error('Failed to load join paths:', err)
+      next: (paths: RlsJoinPath[]) => this.joinPaths = paths,
+      error: (err: any) => console.error('Failed to load join paths:', err)
     });
   }
 
   loadTables(): void {
     this.rlsService.getTables().subscribe({
-      next: (tables) => this.tables = tables,
-      error: (err) => console.error('Failed to load tables:', err)
+      next: (tables: { name: string }[]) => this.tables = tables,
+      error: (err: any) => console.error('Failed to load tables:', err)
     });
   }
 
   onTableChange(table: string): void {
     if (table) {
       this.rlsService.getTableColumns(table).subscribe({
-        next: (columns) => {
+        next: (columns: SchemaColumn[]) => {
           this.availableDbColumns = columns.map(c => c.name);
         },
-        error: () => {
+        error: (err: any) => {
+          console.error('Failed to load columns:', err);
           this.availableDbColumns = [];
         }
       });
@@ -271,7 +273,7 @@ export class ScopeTemplatesAdminComponent implements OnInit {
 
     observable.subscribe({
       next: () => { this.closeDialog(); this.loadTemplates(); },
-      error: (err) => console.error('Failed to save template:', err)
+      error: (err: any) => console.error('Failed to save template:', err)
     });
   }
 
@@ -279,7 +281,7 @@ export class ScopeTemplatesAdminComponent implements OnInit {
     if (!template.id || !confirm('Delete this template?')) return;
     this.http.delete(`${environment.apiUrl}/rls/scope-templates/${template.id}`).subscribe({
       next: () => this.loadTemplates(),
-      error: (err) => console.error('Failed to delete template:', err)
+      error: (err: any) => console.error('Failed to delete template:', err)
     });
   }
 }

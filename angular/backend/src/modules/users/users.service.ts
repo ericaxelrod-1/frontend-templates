@@ -761,11 +761,33 @@ export class UsersService {
       relations: ['groups'],
     });
 
-    if (!user || !user.groups) {
+    if (!user || !user.groups || user.groups.length === 0) {
       return [];
     }
 
-    return user.groups.map((g) => g.id);
+    const directGroupIds = user.groups.map((g) => g.id);
+    const allGroupIds = new Set<number>(directGroupIds);
+
+    // Fetch descendants for each direct group
+    // In a real app with deep trees, this might be better as a recursive CTE or specific service method
+    // For now we'll use a simple BFS to find all descendants since we don't inject GroupsService here to avoid circular dep
+    const queue = [...directGroupIds];
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      const children = await this.groupRepository.find({
+        where: { parentId: currentId },
+        select: ['id']
+      });
+
+      for (const child of children) {
+        if (!allGroupIds.has(child.id)) {
+          allGroupIds.add(child.id);
+          queue.push(child.id);
+        }
+      }
+    }
+
+    return Array.from(allGroupIds);
   }
 
   /**

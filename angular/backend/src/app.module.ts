@@ -45,6 +45,7 @@ import { GeoBlockMiddleware } from './common/middleware/geo-block.middleware';
     }),
     ClsModule.forRoot({
       global: true,
+      middleware: { mount: true },
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

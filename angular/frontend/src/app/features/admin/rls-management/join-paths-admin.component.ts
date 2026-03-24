@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
-import { RlsService } from '../../../services/rls.service';
+import { RlsService, SchemaColumn } from '../../../services/rls.service';
 import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput } from '../../../components/join-path-diagram/join-path-diagram.component';
 
 interface RlsJoinCondition {
@@ -152,10 +152,11 @@ interface RlsJoinPath {
 export class JoinPathsAdminComponent implements OnInit {
   paths: RlsJoinPath[] = [];
   tables: { name: string }[] = [];
+  tableColumns: Record<string, string[]> = {};
   showDialog = false;
   editingPath?: RlsJoinPath;
   formData: Partial<RlsJoinPath> & { conditions?: RlsJoinCondition[] } = {};
-  diagramConditions: DiagramJoinCondition[] = [];
+  diagramConditions: any[] = [];
 
   constructor(private http: HttpClient, private rlsService: RlsService) {}
 
@@ -166,18 +167,32 @@ export class JoinPathsAdminComponent implements OnInit {
 
   loadPaths(): void {
     this.http.get<RlsJoinPath[]>(`${environment.apiUrl}/rls/join-paths`).subscribe({
-      next: (paths) => this.paths = paths,
-      error: (err) => console.error('Failed to load join paths:', err)
+      next: (paths: RlsJoinPath[]) => this.paths = paths,
+      error: (err: any) => console.error('Failed to load join paths:', err)
     });
   }
 
   loadTables(): void {
     this.rlsService.getTables().subscribe({
-      next: (tables) => {
+      next: (tables: { name: string }[]) => {
         this.tables = tables;
+        tables.forEach(t => this.loadColumns(t.name));
       },
-      error: (err) => console.error('Failed to load tables:', err)
+      error: (err: any) => console.error('Failed to load tables:', err)
     });
+  }
+
+  loadColumns(tableName: string): void {
+    if (this.tableColumns[tableName]) return;
+    this.rlsService.getTableColumns(tableName).subscribe({
+      next: (columns: SchemaColumn[]) => {
+        this.tableColumns[tableName] = columns.map(c => c.name);
+      }
+    });
+  }
+
+  getColumns(tableName: string): string[] {
+    return this.tableColumns[tableName] || [];
   }
 
   formatChain(chain: string | string[]): string {
@@ -216,7 +231,7 @@ export class JoinPathsAdminComponent implements OnInit {
     this.editingPath = undefined;
   }
 
-  onDiagramConditionsChange(conditions: DiagramJoinCondition[]): void {
+  onDiagramConditionsChange(conditions: any[]): void {
     this.formData.conditions = conditions.map(c => ({
       fromTable: c.fromTable,
       fromColumn: c.fromColumn,
@@ -245,7 +260,7 @@ export class JoinPathsAdminComponent implements OnInit {
 
     observable.subscribe({
       next: () => { this.closeDialog(); this.loadPaths(); },
-      error: (err) => console.error('Failed to save join path:', err)
+      error: (err: any) => console.error('Failed to save join path:', err)
     });
   }
 
