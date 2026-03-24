@@ -58,7 +58,7 @@
 
 .layout-footer {
   grid-area: footer;
-  // No z-index - sits naturally behind main content in CSS Grid stacking context
+  z-index: -1; // Behind everything
 }
 
 // Sidenav Container - takes full height of main area
