@@ -9,6 +9,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ClsModule } from 'nestjs-cls';
 import { AuthModule } from './modules/auth/auth.module';
+import { EmailModule } from './modules/email/email.module';
 import { UsersModule } from './modules/users/users.module';
 import { User } from './modules/users/entities/user.entity';
 import { LoginAttempt } from './modules/auth/entities/login-attempt.entity';
@@ -21,6 +22,7 @@ import { CaptchaModule } from './modules/captcha/captcha.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import environmentConfig from './config/environment.config';
 import databaseConfig from './config/database.config';
+import emailConfig from './config/email.config';
 import { PermissionsService } from './modules/permissions/services/permissions.service';
 import { Logger } from '@nestjs/common';
 import { UsersSharedModule } from './modules/users/shared/users-shared.module';
@@ -31,12 +33,15 @@ import { RlsRule } from './modules/permissions/entities/rls-rule.entity';
 import { RlsJoinPath } from './modules/permissions/entities/rls-join-path.entity';
 import { RlsJoinCondition } from './modules/permissions/entities/rls-join-condition.entity';
 import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-template.entity';
+import { RolesModule } from './modules/roles/roles.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
+import { GeoBlockMiddleware } from './common/middleware/geo-block.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [environmentConfig, databaseConfig],
+      load: [environmentConfig, databaseConfig, emailConfig],
     }),
     ClsModule.forRoot({
       global: true,
@@ -82,9 +87,12 @@ import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-templ
       },
     }),
     AuthModule,
+    EmailModule,
     UsersModule,
     CaptchaModule,
     PermissionsModule,
+    RolesModule,
+    PrivacyModule,
   ],
 })
 export class AppModule implements NestModule, OnModuleInit {
@@ -97,6 +105,7 @@ export class AppModule implements NestModule, OnModuleInit {
 
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(IPAllowlistMiddleware).forRoutes('*path');
+    consumer.apply(GeoBlockMiddleware).forRoutes('*path');
   }
 
   async onModuleInit() {

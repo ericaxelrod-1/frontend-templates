@@ -28,6 +28,7 @@ import { AlertService, AlertSeverity } from './services/alert.service';
 import { LoginAttempt } from './entities/login-attempt.entity';
 import { Captcha } from './entities/captcha.entity';
 import { PermissionsService } from '../permissions/services/permissions.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
@@ -42,6 +43,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordValidationService: PasswordValidationService,
+    private readonly emailService: EmailService,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
     private readonly loginAttemptService: LoginAttemptService,
@@ -51,7 +53,7 @@ export class AuthService {
     private readonly alertService: AlertService,
     @Inject(forwardRef(() => PermissionsService))
     private readonly permissionsService: PermissionsService,
-  ) { }
+  ) {}
 
   /**
    * Validates a user's credentials
@@ -228,7 +230,11 @@ export class AuthService {
 
       // Run pattern detection after successful login to look for anomalies
       // Also update the Statistical User Baseline
-      await this.patternDetectionService.trackSuccessfulLoginBehavior(user.id, ipAddress, userAgent);
+      await this.patternDetectionService.trackSuccessfulLoginBehavior(
+        user.id,
+        ipAddress,
+        userAgent,
+      );
       this.detectLoginPatterns(user.id, email, ipAddress, userAgent).catch(
         (err) => {
           console.error('Error in pattern detection:', err);
@@ -397,9 +403,27 @@ export class AuthService {
       roleIds: [defaultRole.id],
     });
 
-    // Generate and send verification token
-    // This would typically generate a token and send an email
-    // For now, we'll just return the user
+    // Generate verification token
+    const verificationToken = this.jwtService.sign(
+      {
+        sub: newUser.id,
+        email: newUser.email,
+        type: 'email_verification',
+      },
+      { expiresIn: '24h' },
+    );
+
+    // Send verification email
+    const userName = newUser.firstName || newUser.username;
+    await this.emailService.sendVerificationEmail(
+      newUser.email,
+      verificationToken,
+      userName,
+    );
+
+    // Update verification timestamp
+    await this.usersService.updateVerificationSentAt(newUser.id);
+
     return {
       id: newUser.id,
       email: newUser.email,
@@ -505,16 +529,20 @@ export class AuthService {
 
     // Generate a reset token
     const resetToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, type: 'reset' },
+      { sub: user.id, email: user.email, type: 'password_reset' },
       { expiresIn: '1h' },
     );
 
-    // In a real application, you would send an email with the reset link
-    // For now, we just return the token for testing purposes
+    const userName = user.firstName || user.username;
+    await this.emailService.sendPasswordResetEmail(
+      user.email,
+      resetToken,
+      userName,
+    );
+
     return {
       success: true,
       message: 'If the email exists, a password reset link will be sent',
-      resetToken, // Only included for testing, would normally be sent via email
     };
   }
 
@@ -538,7 +566,7 @@ export class AuthService {
       payload = this.jwtService.verify(token);
 
       // Check if this is a reset token
-      if (payload.type !== 'reset') {
+      if (payload.type !== 'password_reset') {
         throw new Error('Invalid token type');
       }
     } catch (error) {
@@ -550,6 +578,58 @@ export class AuthService {
     await this.usersService.update(user.id, { password });
 
     return { success: true, message: 'Password reset successfully' };
+  }
+
+  /**
+   * Verify email using a JWT token
+   */
+  async verifyEmail(
+    token: string,
+    email: string,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      // Verify the JWT token
+      let payload;
+      try {
+        payload = this.jwtService.verify(token);
+      } catch (error) {
+        throw new UnauthorizedException(
+          'Invalid or expired verification token',
+        );
+      }
+
+      // Check if this is an email verification token
+      if (!payload.type || payload.type !== 'email_verification') {
+        throw new UnauthorizedException(
+          'Invalid token type for email verification',
+        );
+      }
+
+      // Check that the email in the token matches the provided email
+      if (!payload.email || payload.email !== email) {
+        throw new UnauthorizedException('Email mismatch in verification token');
+      }
+
+      // Verify the user exists and get the user ID
+      const user = await this.usersService.findOne(payload.sub);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      // Call usersService.verifyEmail to mark the user as verified
+      await this.usersService.verifyEmail(user.id);
+
+      return {
+        success: true,
+        message: 'Email verified successfully',
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      console.error('Error verifying email:', error);
+      throw new UnauthorizedException('Email verification failed');
+    }
   }
 
   /**

@@ -625,6 +625,200 @@ async updateVerificationSentAt(userId: number): Promise<void> {
 <p>If you didn't request a password reset, you can safely ignore this email.</p>
 ```
 
+#### 5.5 Privacy Ticket Email Templates
+
+These templates are used by the privacy ticket system (see PRIVACY_COMPLIANCE.md). Add to `backend/src/modules/email/providers/templates/`:
+
+##### 5.5.1 Ticket Submitted Confirmation (to user)
+
+**File**: `backend/src/modules/email/providers/templates/ticket-submitted.html`
+
+```html
+<p>Hi {{userName}},</p>
+<p>We have received your {{requestType}} request.</p>
+<p>Request Details:</p>
+<ul>
+  <li>Type: {{requestType}}</li>
+  <li>Submitted: {{submittedAt}}</li>
+  <li>Reference: #{{ticketId}}</li>
+</ul>
+<p>We will respond to your request within the required timeframe.</p>
+<p>If you need to add more information, please use your account to update your request.</p>
+<div style="text-align: center;">
+  <a class="button" href="{{dashboardUrl}}">View My Request</a>
+</div>
+```
+
+##### 5.5.2 Ticket Assigned (to admin)
+
+**File**: `backend/src/modules/email/providers/templates/ticket-assigned.html`
+
+```html
+<p>Hi {{adminName}},</p>
+<p>A new privacy ticket has been assigned to you.</p>
+<p>Request Details:</p>
+<ul>
+  <li>Type: {{requestType}}</li>
+  <li>From: {{requesterEmail}}</li>
+  <li>Submitted: {{submittedAt}}</li>
+  <li>Reference: #{{ticketId}}</li>
+  <li>SLA Deadline: {{slaDeadline}}</li>
+</ul>
+<p>Please review and process this request.</p>
+<div style="text-align: center;">
+  <a class="button" href="{{adminUrl}}">View Ticket</a>
+</div>
+```
+
+##### 5.5.3 SLA Warning (to admin)
+
+**File**: `backend/src/modules/email/providers/templates/sla-warning.html`
+
+```html
+<p>Hi {{adminName}},</p>
+<p><strong>SLA Warning:</strong> A privacy ticket is approaching its deadline.</p>
+<p>Ticket Details:</p>
+<ul>
+  <li>Reference: #{{ticketId}}</li>
+  <li>Type: {{requestType}}</li>
+  <li>Deadline: {{slaDeadline}}</li>
+  <li>Time Remaining: {{timeRemaining}}</li>
+</ul>
+<p>Please take action to ensure timely response.</p>
+<div style="text-align: center;">
+  <a class="button" href="{{adminUrl}}">View Ticket</a>
+</div>
+```
+
+##### 5.5.4 Ticket Resolved (to user)
+
+**File**: `backend/src/modules/email/providers/templates/ticket-resolved.html`
+
+```html
+<p>Hi {{userName}},</p>
+<p>Your {{requestType}} request has been completed.</p>
+<p>Resolution:</p>
+<div class="resolution">{{resolution}}</div>
+<p>If you have any questions, please contact our support team.</p>
+```
+
+##### 5.5.5 Ticket Rejected (to user)
+
+**File**: `backend/src/modules/email/providers/templates/ticket-rejected.html`
+
+```html
+<p>Hi {{userName}},</p>
+<p>Your {{requestType}} request could not be fulfilled.</p>
+<p>Reason:</p>
+<div class="reason">{{rejectionReason}}</div>
+<p>If you believe this is an error, you may submit a new request or contact support.</p>
+```
+
+#### 5.5.6 Privacy Ticket Service Methods
+
+Add to `backend/src/modules/email/email.service.ts`:
+
+```typescript
+async sendTicketSubmitted(
+  email: string,
+  userName: string,
+  ticketId: number,
+  requestType: string,
+): Promise<boolean> {
+  const frontendUrl = this.configService.get('email.frontendUrl');
+  return this.sendTemplateEmail(email, 'ticket-submitted', {
+    userName,
+    ticketId,
+    requestType,
+    submittedAt: new Date().toISOString(),
+    dashboardUrl: `${frontendUrl}/app/privacy`
+  });
+}
+
+async sendTicketAssigned(
+  adminEmail: string,
+  adminName: string,
+  ticketId: number,
+  requestType: string,
+  requesterEmail: string,
+  slaDeadline: Date,
+): Promise<boolean> {
+  const adminUrl = this.configService.get('email.frontendUrl') + '/app/admin/privacy-requests';
+  return this.sendTemplateEmail(adminEmail, 'ticket-assigned', {
+    adminName,
+    ticketId,
+    requestType,
+    requesterEmail,
+    submittedAt: new Date().toISOString(),
+    slaDeadline: slaDeadline.toISOString(),
+    adminUrl
+  });
+}
+
+async sendSlaWarning(
+  adminEmail: string,
+  adminName: string,
+  ticketId: number,
+  requestType: string,
+  slaDeadline: Date,
+): Promise<boolean> {
+  const adminUrl = this.configService.get('email.frontendUrl') + '/app/admin/privacy-requests';
+  const timeRemaining = Math.ceil((slaDeadline.getTime() - Date.now()) / (1000 * 60 * 60));
+  return this.sendTemplateEmail(adminEmail, 'sla-warning', {
+    adminName,
+    ticketId,
+    requestType,
+    slaDeadline: slaDeadline.toISOString(),
+    timeRemaining: `${timeRemaining} hours`,
+    adminUrl
+  });
+}
+
+async sendTicketResolved(
+  email: string,
+  userName: string,
+  ticketId: number,
+  requestType: string,
+  resolution: string,
+): Promise<boolean> {
+  return this.sendTemplateEmail(email, 'ticket-resolved', {
+    userName,
+    ticketId,
+    requestType,
+    resolution
+  });
+}
+
+async sendTicketRejected(
+  email: string,
+  userName: string,
+  ticketId: number,
+  requestType: string,
+  rejectionReason: string,
+): Promise<boolean> {
+  return this.sendTemplateEmail(email, 'ticket-rejected', {
+    userName,
+    ticketId,
+    requestType,
+    rejectionReason
+  });
+}
+
+private async sendTemplateEmail(
+  to: string,
+  template: string,
+  context: Record<string, any>
+): Promise<boolean> {
+  const result = await this.emailProvider.sendEmail({
+    to,
+    subject: `Privacy Request Update - #${context.ticketId || 'N/A'}`,
+    template,
+    context
+  });
+  return result.success;
+}
+```
+
 #### 5.4 Welcome Email Template
 
 **File**: `backend/src/modules/email/providers/templates/welcome-email.html`
@@ -677,6 +871,30 @@ describe('EmailService', () => {
     it('should include reset token in email');
   });
 });
+
+### Phase 8: E2E Testing (Real SMTP Verification)
+
+To ensure emails are actually delivered and formatted correctly, E2E tests are implemented to interact with a real SMTP server (MailDev).
+
+**File**: `backend/test/email.e2e-spec.ts`
+
+**Key Verification Steps**:
+1. Start MailDev on port 1025 (SMTP) and 1080 (HTTP API).
+2. Set `EMAIL_ENABLED=true` in `backend/.env.test`.
+3. Call `EmailService` methods in a real NestJS application context.
+4. Use `axios` to query MailDev's REST API (`http://localhost:1080/email`) to verify:
+   - Email was received by the correct recipient.
+   - Subject line matches expectations.
+   - HTML body contains correct dynamic data (names, tokens, URLs).
+
+**Running E2E Tests**:
+```bash
+# Start MailDev in a separate terminal
+cd angular/frontend/server/email-service && node start-maildev.js
+
+# Run E2E tests
+cd angular/backend && npm run test:e2e -- test/email.e2e-spec.ts
+```
 ```
 
 ---

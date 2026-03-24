@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLA Warning - Privacy Ticket</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background-color: #ff9800;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .content {
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+    .button {
+      display: inline-block;
+      background-color: #ff9800;
+      color: white;
+      text-decoration: none;
+      padding: 10px 20px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      margin-top: 20px;
+    }
+    .ticket-info {
+      background-color: white;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
+      border-left: 4px solid #ff9800;
+    }
+    .warning {
+      background-color: #fff3e0;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
+      border-left: 4px solid #ff9800;
+    }
+    .sla-info {
+      background-color: #e8f5e8;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
+      border-left: 4px solid #4caf50;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .status.warning {
+      background-color: #ff9800;
+      color: white;
+    }
+    .status.in-progress {
+      background-color: #2196f3;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>SLA Warning - Privacy Ticket</h1>
+    </div>
+    <div class="content">
+      <p>Hello {{ userName }},</p>
+      <p>This is a notification that your privacy ticket is approaching its Service Level Agreement (SLA) deadline.</p>
+      
+      <div class="ticket-info">
+        <h3>Ticket Details</h3>
+        <p><strong>Ticket ID:</strong> {{ ticketId }}</p>
+        <p><strong>Current Status:</strong> <span class="status in-progress">In Progress</span></p>
+        <p><strong>SLA Deadline:</strong> {{ slaDeadline }}</p>
+      </div>
+      
+      <div class="warning">
+        <h3>⚠️ SLA Warning</h3>
+        <p><strong>Time Remaining:</strong> {{ timeRemaining }}</p>
+        <p><strong>SLA Metric:</strong> {{ slaMetric }}</p>
+        <p><strong>Current Priority:</strong> {{ ticketPriority }}</p>
+      </div>
+      
+      <div class="sla-info">
+        <h3>SLA Information</h3>
+        <p><strong>SLA Type:</strong> {{ slaType }}</p>
+        <p><strong>Target Resolution:</strong> {{ targetResolution }}</p>
+        <p><strong>Business Days:</strong> {{ businessDays }}</p>
+      </div>
+      
+      <p>We are actively working to resolve your privacy request before the SLA deadline. Our team is prioritizing this case to ensure compliance with our service commitments.</p>
+      
+      <p>To help expedite processing, please ensure all requested information has been provided in your ticket. If you need to add any additional details, you can do so through your ticket dashboard.</p>
+      
+      <div style="text-align: center;">
+        <a class="button" href="{{ ticketUrl }}">View Ticket & Add Information</a>
+      </div>
+      
+      <p>If you have any urgent questions about this ticket, please contact our privacy support team directly at {{ supportEmail }}.</p>
+      
+      <p>We appreciate your understanding as we work to resolve your privacy request within the committed timeframe.</p>
+      
+      <p>Best regards,<br>Privacy Compliance Team</p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply to this message.</p>
+      <p>&copy; 2024 Angular App. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

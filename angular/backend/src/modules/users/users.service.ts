@@ -767,4 +767,29 @@ export class UsersService {
 
     return user.groups.map((g) => g.id);
   }
+
+  /**
+   * Update the registration verification sent timestamp for a user
+   */
+  async updateVerificationSentAt(userId: number): Promise<void> {
+    await this.userRepository.update(userId, {
+      registrationVerificationSentAt: new Date(),
+    });
+  }
+
+  /**
+   * Mark a user's email as verified
+   */
+  async verifyEmail(userId: number): Promise<void> {
+    const user = await this.findOne(userId);
+    if (!user) {
+      throw new Error(`User with ID ${userId} not found`);
+    }
+
+    // Update the user's email verification status and timestamp
+    await this.userRepository.update(userId, {
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+    });
+  }
 }
