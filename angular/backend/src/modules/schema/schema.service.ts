@@ -16,24 +16,46 @@ export interface ColumnInfo {
   comment?: string;
 }
 
+export interface TablePaginationOptions {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
 @Injectable()
 export class SchemaService {
   private readonly logger = new Logger(SchemaService.name);
 
   constructor(private readonly dataSource: DataSource) {}
 
-  async getAllTables(): Promise<TableInfo[]> {
+  async getAllTables(options: TablePaginationOptions = {}): Promise<{ items: TableInfo[]; total: number }> {
     const entities = this.dataSource.entityMetadatas;
-    const tables: TableInfo[] = [];
+    let tables: TableInfo[] = [];
 
     for (const entity of entities) {
+      if (options.search) {
+        if (!entity.tableName.toLowerCase().includes(options.search.toLowerCase())) {
+          continue;
+        }
+      }
+      
       tables.push({
         name: entity.tableName,
         columns: this.extractColumns(entity),
       });
     }
 
-    return tables.sort((a, b) => a.name.localeCompare(b.name));
+    tables.sort((a, b) => a.name.localeCompare(b.name));
+    
+    const total = tables.length;
+    
+    if (options.page !== undefined && options.limit !== undefined) {
+      const start = (options.page - 1) * options.limit;
+      const end = start + options.limit;
+      tables = tables.slice(start, end);
+    }
+
+    return { items: tables, total };
   }
 
   async getTableColumns(tableName: string): Promise<ColumnInfo[] | null> {

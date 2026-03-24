@@ -1,18 +1,37 @@
 <div class="join-path-diagram">
   <aside class="palette">
-    <h3>Available Tables</h3>
-    <p class="palette-hint">Drag tables to start building the join path</p>
+    <div class="palette-header">
+      <h3>Available Tables</h3>
+      <p class="palette-hint">Drag tables to the canvas</p>
+      
+      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange($event)" placeholder="Search tables...">
+      </mat-form-field>
+    </div>
     
     <div class="palette-items">
-      <ng-diagram-palette-item
-        *ngFor="let item of paletteItems"
-        [item]="item"
-      >
-        <div class="palette-item">
-          <mat-icon class="palette-icon">table_chart</mat-icon>
-          <span class="palette-label">{{ item.label }}</span>
-        </div>
-      </ng-diagram-palette-item>
+      @if (loadingPalette && currentPage === 1) {
+        <div class="palette-loading">Loading tables...</div>
+      } @else {
+        <ng-diagram-palette-item
+          *ngFor="let item of paletteItems"
+          [item]="item"
+        >
+          <div class="palette-item">
+            <mat-icon class="palette-icon">table_chart</mat-icon>
+            <span class="palette-label">{{ item.label }}</span>
+          </div>
+        </ng-diagram-palette-item>
+
+        @if (availableTables.length < totalTables) {
+          <button mat-button class="btn-load-more" (click)="loadMore()" [disabled]="loadingPalette">
+            {{ loadingPalette ? 'Loading...' : 'Load More (' + (totalTables - availableTables.length) + ')' }}
+          </button>
+        } @else if (availableTables.length === 0 && !loadingPalette) {
+          <div class="palette-empty">No tables found matching your search.</div>
+        }
+      }
     </div>
   </aside>
 

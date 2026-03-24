@@ -1,4 +1,4 @@
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -18,33 +18,17 @@ export class SchemaController {
   @ApiResponse({
     status: 200,
     description: 'List of all tables with their columns',
-    schema: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', example: 'users' },
-          columns: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string', example: 'id' },
-                type: { type: 'string', example: 'int' },
-                isPrimary: { type: 'boolean' },
-                isNullable: { type: 'boolean' },
-                isGenerated: { type: 'boolean' },
-                defaultValue: { type: 'any' },
-                comment: { type: 'string' },
-              },
-            },
-          },
-        },
-      },
-    },
   })
-  async getAllTables(): Promise<TableInfo[]> {
-    return this.schemaService.getAllTables();
+  async getAllTables(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ): Promise<{ items: TableInfo[]; total: number }> {
+    return this.schemaService.getAllTables({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
+    });
   }
 
   @Get('tables/:table/columns')

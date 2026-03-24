@@ -21,7 +21,7 @@ import {
   UpdateRlsScopeTemplateDto,
 } from '../dto/rls-scope-template.dto';
 
-@Controller('rls/scope-templates')
+@Controller('rls-scope-templates')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class RlsScopeTemplatesController {
   constructor(

@@ -7,7 +7,7 @@ import { SchemaService } from './schema.service';
 @Module({
   imports: [TypeOrmModule.forFeature([])],
   controllers: [SchemaController],
-  providers: [SchemaService, DataSource],
+  providers: [SchemaService],
   exports: [SchemaService],
 })
 export class SchemaModule {}

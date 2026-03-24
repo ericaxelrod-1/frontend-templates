@@ -1,11 +1,14 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { NgDiagramComponent, NgDiagramPaletteItemComponent, NgDiagramPaletteItemPreviewComponent, NgDiagramPortComponent, NgDiagramBaseEdgeComponent, provideNgDiagram, initializeModel } from 'ng-diagram';
 import { environment } from '../../../environments/environment';
+import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
 export interface DiagramTableNode {
   id: string;
@@ -16,8 +19,8 @@ export interface DiagramTableNode {
 
 export interface DiagramColumn {
   name: string;
-  dataType: string;
-  isPrimaryKey?: boolean;
+  type: string;
+  isPrimary?: boolean;
   isForeignKey?: boolean;
 }
 
@@ -53,6 +56,8 @@ export interface DiagramOutput {
     FormsModule,
     MatButtonModule,
     MatIconModule,
+    MatInputModule,
+    MatFormFieldModule,
     NgDiagramComponent,
     NgDiagramPaletteItemComponent,
     NgDiagramPaletteItemPreviewComponent,
@@ -67,6 +72,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   @Input() targetTable = '';
   @Input() initialTables: DiagramTableNode[] = [];
   @Input() initialConditions: DiagramJoinCondition[] = [];
+  
   @Input() set availableTablesFromParent(tables: any[]) {
     if (tables && tables.length > 0) {
       this.availableTables = tables.map(t => ({
@@ -74,11 +80,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
         tableName: t.name,
         columns: t.columns,
       }));
-      this.paletteItems = this.availableTables.map(t => ({
-        id: t.id,
-        label: t.tableName,
-        data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
-      }));
+      this.totalTables = tables.length;
+      this.updatePaletteItems();
     }
   }
 
@@ -89,7 +92,11 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   availableTables: DiagramTableNode[] = [];
   canvasNodes: any[] = [];
   canvasEdges: any[] = [];
-  model: any;
+  
+  model = initializeModel({
+    nodes: [],
+    edges: [],
+  });
 
   selectedEdgeId: string | null = null;
   sidebarOpen = false;
@@ -102,15 +109,25 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   edgeCounter = 0;
 
   paletteItems: any[] = [];
+  searchTerm = '';
+  searchSubject = new Subject<string>();
+  currentPage = 1;
+  pageSize = 20;
+  totalTables = 0;
+  loadingPalette = false;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) {
+    this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.currentPage = 1;
+      this.availableTables = [];
+      this.loadAvailableTables();
+    });
+  }
 
   ngOnInit(): void {
-    this.model = initializeModel({
-      nodes: [],
-      edges: [],
-    });
-
     if (this.initialTables.length > 0) {
       this.canvasNodes = [...this.initialTables];
       this.nodeCounter = this.canvasNodes.length;
@@ -137,29 +154,64 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     }
   }
 
-  ngOnDestroy(): void {}
+  ngOnDestroy(): void {
+    this.searchSubject.complete();
+  }
+
+  onSearchChange(term: string): void {
+    this.searchSubject.next(term);
+  }
+
+  loadMore(): void {
+    if (this.availableTables.length < this.totalTables) {
+      this.currentPage++;
+      this.loadAvailableTables();
+    }
+  }
 
   loadAvailableTables(): void {
-    this.http.get<any[]>(`${environment.apiUrl}/schema/tables`)
+    this.loadingPalette = true;
+    let params = new HttpParams()
+      .set('page', this.currentPage.toString())
+      .set('limit', this.pageSize.toString());
+    
+    if (this.searchTerm) {
+      params = params.set('search', this.searchTerm);
+    }
+
+    this.http.get<{ items: any[], total: number }>(`${environment.apiUrl}/schema/tables`, { params })
       .subscribe({
         next: (response) => {
-          this.availableTables = response.map(t => ({
+          const newTables = response.items.map(t => ({
             id: t.name,
             tableName: t.name,
             columns: t.columns,
           }));
-          this.paletteItems = this.availableTables.map(t => ({
-            id: t.id,
-            label: t.tableName,
-            data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
-          }));
+          
+          this.availableTables = this.currentPage === 1 
+            ? newTables 
+            : [...this.availableTables, ...newTables];
+            
+          this.totalTables = response.total;
+          this.updatePaletteItems();
+          this.loadingPalette = false;
         },
-        error: () => {}
+        error: () => {
+          this.loadingPalette = false;
+        }
       });
   }
 
+  updatePaletteItems(): void {
+    this.paletteItems = this.availableTables.map(t => ({
+      id: t.id,
+      label: t.tableName,
+      data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
+    }));
+  }
+
   getNodeIdByTableName(tableName: string): string {
-    const node = this.canvasNodes.find(n => n.data.tableName === tableName);
+    const node = this.canvasNodes.find(n => n.data?.tableName === tableName);
     return node?.id || tableName;
   }
 
