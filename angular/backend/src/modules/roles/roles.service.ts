@@ -59,12 +59,26 @@ export class RolesService implements OnModuleInit {
 
     const { permissionIds, ...roleData } = createRoleDto;
 
+    // Validate hierarchy
+    if (roleData.parentId) {
+      const hierarchyResult = await this.validateRoleHierarchy(0, roleData.parentId);
+      if (!hierarchyResult.valid) {
+        throw new BadRequestException(hierarchyResult.violations.join('; '));
+      }
+    }
+
     // Create role
     const role = this.roleRepository.create(roleData);
     const savedRole = await this.roleRepository.save(role);
 
-    // Assign permissions if provided
+    // Assign permissions if provided (with validation)
     if (permissionIds && permissionIds.length > 0) {
+      const permResult = await this.validateRolePermissions(savedRole.id, permissionIds);
+      if (!permResult.valid) {
+        // Rollback role creation if permissions are invalid
+        await this.roleRepository.remove(savedRole);
+        throw new BadRequestException(permResult.violations.join('; '));
+      }
       await this.assignPermissionsToRole(savedRole.id, permissionIds);
     }
 
@@ -146,12 +160,24 @@ export class RolesService implements OnModuleInit {
     // Check if role exists
     const role = await this.findOne(id);
 
+    // Validate hierarchy if parentId is changing
+    if (roleData.parentId !== undefined && roleData.parentId !== role.parentId) {
+      const hierarchyResult = await this.validateRoleHierarchy(id, roleData.parentId);
+      if (!hierarchyResult.valid) {
+        throw new BadRequestException(hierarchyResult.violations.join('; '));
+      }
+    }
+
     // Update role properties
     this.roleRepository.merge(role, roleData);
     await this.roleRepository.save(role);
 
-    // Update permissions if provided
+    // Update permissions if provided (with validation)
     if (permissionIds) {
+      const permResult = await this.validateRolePermissions(id, permissionIds);
+      if (!permResult.valid) {
+        throw new BadRequestException(permResult.violations.join('; '));
+      }
       await this.rolePermissionRepository.delete({ roleId: id });
       if (permissionIds.length > 0) {
         await this.assignPermissionsToRole(id, permissionIds);

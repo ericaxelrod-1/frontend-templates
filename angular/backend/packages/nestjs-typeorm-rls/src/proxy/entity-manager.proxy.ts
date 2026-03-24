@@ -330,7 +330,7 @@ export function createEntityManagerProxy(
       return (originalManager as any).softRemove.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
     }
     // Re-use the same ownership check as remove(), then delegate to original softRemove
-    await createOverriddenRemove(targetOrEntity, maybeEntityOrOptions, maybeOptions).catch(() => {});
+    await createOverriddenRemove(targetOrEntity, maybeEntityOrOptions, maybeOptions);
     return (originalManager as any).softRemove.call(originalManager, targetOrEntity, maybeEntityOrOptions, maybeOptions);
   };
 

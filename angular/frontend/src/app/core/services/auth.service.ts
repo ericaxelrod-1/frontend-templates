@@ -32,6 +32,7 @@ export class AuthService {
   private accessTokenSubject = new BehaviorSubject<string | null>(null);
   private refreshTokenSubject = new BehaviorSubject<string | null>(null);
   private csrfTokenSubject = new BehaviorSubject<string | null>(null);
+  private activeGroupIdSubject = new BehaviorSubject<number | null>(null);
   private platformId = inject(PLATFORM_ID);
   
   // Make these public for template access
@@ -47,6 +48,7 @@ export class AuthService {
   currentUser$ = this.currentUserSubject.asObservable();
   accessToken$ = this.accessTokenSubject.asObservable();
   csrfToken$ = this.csrfTokenSubject.asObservable();
+  activeGroupId$ = this.activeGroupIdSubject.asObservable();
 
   // Add a subject to signal when initialization is complete
   private isInitializedSubject = new BehaviorSubject<boolean>(false);
@@ -67,9 +69,18 @@ export class AuthService {
       if (user) {
         this.userPermissions = user.permissions || [];
         this.permissionCache.clear(); // Clear cache when user/permissions change
+        
+        // Default active group to user's first group if not already set
+        if (!this.activeGroupIdSubject.value && user.groups && user.groups.length > 0) {
+          const firstGroupId = user.groups[0].id;
+          if (firstGroupId !== undefined) {
+            this.activeGroupIdSubject.next(firstGroupId);
+          }
+        }
       } else {
         this.userPermissions = [];
         this.permissionCache.clear();
+        this.activeGroupIdSubject.next(null);
       }
     });
     // NOTE: Removed the direct call to loadAuthStateFromStorage from constructor
@@ -91,6 +102,17 @@ export class AuthService {
 
   get isAuthenticated(): boolean {
     return !!this.accessToken && !!this.currentUser;
+  }
+
+  getActiveGroupId(): number | null {
+    return this.activeGroupIdSubject.value;
+  }
+
+  setActiveGroupId(id: number): void {
+    this.activeGroupIdSubject.next(id);
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem('activeGroupId', id.toString());
+    }
   }
 
   /**
@@ -241,6 +263,10 @@ export class AuthService {
       const accessToken: string | null = localStorage.getItem('accessToken');
       const refreshToken: string | null = localStorage.getItem('refreshToken');
       const csrfToken: string | null = localStorage.getItem('csrfToken');
+      const activeGroupId = localStorage.getItem('activeGroupId');
+      if (activeGroupId) {
+        this.activeGroupIdSubject.next(parseInt(activeGroupId, 10));
+      }
       const userJson: string | null = localStorage.getItem('user');
       const user: User | null = userJson ? JSON.parse(userJson) as User : null;
 
@@ -408,6 +434,7 @@ export class AuthService {
     this.accessTokenSubject.next(null);
     this.refreshTokenSubject.next(null);
     this.csrfTokenSubject.next(null);
+    this.activeGroupIdSubject.next(null);
     
     // Clear permissions
     this.userPermissions = [];
@@ -419,6 +446,7 @@ export class AuthService {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('csrfToken');
+      localStorage.removeItem('activeGroupId');
     }
   }
 

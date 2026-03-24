@@ -42,7 +42,10 @@ export class GroupsService {
           ]
         : {},
       relations: ['users', 'owner'],
-      order: { [sortBy]: sortDirection },
+      order: { 
+        priority: 'ASC',
+        [sortBy]: sortDirection 
+      },
       skip,
       take,
     });
@@ -401,6 +404,7 @@ export class GroupsService {
       const currentId = queue.shift()!;
       const children = await this.groupRepository.find({
         where: { parentId: currentId },
+        order: { priority: 'ASC' }
       });
 
       for (const child of children) {

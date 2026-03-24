@@ -28,53 +28,52 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
       if (typeof prop === 'string' && joinMethods.includes(prop)) {
         return function (entity: string | Function, alias: string, condition?: string, parameters?: any) {
           if (cls.get('__rlsBypass')) {
-            metrics.recordBypass();
             return value.call(target, entity, alias, condition, parameters);
           }
 
           let resolvedTableName = '';
           try {
-             const metadata = target.connection.getMetadata(entity);
-             resolvedTableName = metadata.tableName;
-          } catch (e) {
-             if (typeof entity === 'string' && entity.includes('.')) {
-                const [parentAliasName, propertyName] = entity.split('.');
-                const parentAlias = target.expressionMap?.aliases.find((a: any) => a.name === parentAliasName);
-                if (parentAlias && parentAlias.metadata) {
-                   const relation = parentAlias.metadata.relations.find((r: any) => r.propertyName === propertyName);
-                   if (relation) {
-                      resolvedTableName = relation.inverseEntityMetadata.tableName;
+             if (typeof entity === 'function') {
+                const metadata = target.connection.getMetadata(entity);
+                resolvedTableName = metadata.tableName;
+             } else if (typeof entity === 'string') {
+                if (entity.includes('.')) {
+                   const [parentAliasName, propertyName] = entity.split('.');
+                   const parentAlias = target.expressionMap?.aliases.find((a: any) => a.name === parentAliasName);
+                   if (parentAlias && parentAlias.metadata) {
+                      const relation = parentAlias.metadata.relations.find((r: any) => r.propertyName === propertyName);
+                      if (relation) {
+                         resolvedTableName = relation.inverseEntityMetadata.tableName;
+                      }
                    }
+                } else {
+                   const metadata = target.connection.getMetadata(entity);
+                   resolvedTableName = metadata.tableName;
                 }
              }
-          }
-
-          if (!resolvedTableName) {
-             console.warn(`[RLS] Could not resolve table name for entity '${entity}'. Blocking access.`);
-             if (config.fallbackBehavior === 'deny') {
-                return value.call(target, entity, alias, '1=0', parameters);
-             }
+          } catch (e) {
+             // Fallback to string if metadata lookup fails
+             resolvedTableName = typeof entity === 'string' ? entity : '';
           }
 
           if (config.exemptTables?.includes(resolvedTableName)) {
             return value.call(target, entity, alias, condition, parameters);
           }
 
-          const groupIds = cls.get('activeGroupIds') || [];
-          const cachedRules = target.__rlsCachedRules || {};
-          
-          if (!cachedRules[resolvedTableName]) {
-            cachedRules[resolvedTableName] = rlsService.getRulesForTable(resolvedTableName, groupIds);
-            target.__rlsCachedRules = cachedRules;
-          }
-
+          // We defer join filtering to the execution phase because we might need to 
+          // inject additional joins (Smart Injection)
           target.__rlsPendingJoins = target.__rlsPendingJoins || [];
           target.__rlsPendingJoins.push({
             resolvedTableName,
+            alias,
+            method: prop,
+            entity,
             originalCondition: condition,
             originalParameters: parameters
           });
 
+          // Return target to allow chaining, but DON'T call the original yet if we plan to mutate it later
+          // Actually, we must call it to establish the alias in TypeORM's expression map
           return value.call(target, entity, alias, condition, parameters);
         };
       }
@@ -89,83 +88,75 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
             throw new Error(`[RLS] Direct QueryBuilder inserts are forbidden. Use Repository.save() or EntityManager.save().`);
           }
 
-          if (cls.get('__rlsBypass')) {
-            if (!target.__rlsBypassLogged) {
-              metrics.recordBypass();
-              target.__rlsBypassLogged = true;
-            }
+          if (cls.get('__rlsBypass') || target.__rlsApplied) {
             return value.apply(target, args);
           }
 
-          if (target.__rlsApplied) {
-            return value.apply(target, args);
+          const groupIds = cls.get('activeGroupIds') || [];
+          if (groupIds.length === 0 && config.fallbackBehavior === 'deny' && !isExempt(target, config)) {
+             target.andWhere('1=0');
+             target.__rlsApplied = true;
+             return value.apply(target, args);
           }
 
-          const cachedRules = target.__rlsCachedRules || {};
-          
-          for (const [tableName, rulesPromise] of Object.entries(cachedRules)) {
-            const rlsRules = await rulesPromise as any;
-            if (rlsRules) {
-               const pendingJoin = target.__rlsPendingJoins?.find((j: any) => j.resolvedTableName === tableName);
-               if (pendingJoin) {
-                  let sql = rlsRules.sql;
-                  const params = rlsRules.parameters || {};
-                  
-                  const uniqueParams: Record<string, any> = {};
-                  for (const [key, val] of Object.entries(params)) {
-                     const uniqueKey = generateUniqueKey(`rls_${key}`);
-                     uniqueParams[uniqueKey] = val;
-                     sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
-                  }
-                  
-                  const securedCondition = pendingJoin.originalCondition 
-                    ? `(${pendingJoin.originalCondition}) AND (${sql})`
-                    : sql;
-                  const mergedParameters = { ...pendingJoin.originalParameters, ...uniqueParams };
-                  
-                  target.andWhere(securedCondition, mergedParameters);
-               }
-            } else if (config.fallbackBehavior === 'deny') {
-               metrics.recordBlock(tableName);
-            }
+          // 1. Process Main Table
+          const mainTableName = target.expressionMap?.mainAlias?.metadata?.tableName;
+          if (mainTableName && !config.exemptTables?.includes(mainTableName)) {
+             const rlsRules = await rlsService.getRulesForTable(mainTableName, groupIds);
+             if (rlsRules) {
+                let sql = rlsRules.sql;
+                const params = rlsRules.parameters || {};
+                
+                // Smart Join Injection
+                const existingJoins = target.expressionMap?.joinAttributes.map((j: any) => ({
+                   table: j.metadata?.tableName || j.entityOrProperty,
+                   alias: j.alias.name
+                })) || [];
+                
+                const joinResult = await rlsService.computeRequiredJoins(mainTableName, sql, existingJoins);
+                for (const join of joinResult.joins) {
+                   target.leftJoin(join.table, join.alias, `${join.alias}.${join.fromColumn} ${join.operator} ${join.toTable}.${join.toColumn}`);
+                }
+
+                const uniqueParams: Record<string, any> = {};
+                for (const [key, val] of Object.entries(params)) {
+                   const uniqueKey = generateUniqueKey(`rls_${key}`);
+                   uniqueParams[uniqueKey] = val;
+                   sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
+                }
+                target.andWhere(`(${sql})`, uniqueParams);
+             } else if (config.fallbackBehavior === 'deny') {
+                target.andWhere('1=0');
+                metrics.recordBlock(mainTableName);
+             }
           }
 
-          const queryType = (target as any).expressionMap?.queryType;
-           if (queryType === 'select' || queryType === 'update' || queryType === 'delete') {
-              const mainTableName = (target as any).expressionMap?.mainAlias?.metadata?.tableName;
-              
-              if (mainTableName && !config.exemptTables?.includes(mainTableName)) {
-                 if (!cachedRules[mainTableName]) {
-                    const groupIds = cls.get('activeGroupIds') || [];
-                    cachedRules[mainTableName] = rlsService.getRulesForTable(mainTableName, groupIds);
-                 }
-                 
-                 const rlsRules = await cachedRules[mainTableName] as any;
-                 
-                 if (rlsRules) {
-                    let sql = rlsRules.sql;
-                    const params = rlsRules.parameters || {};
-                    
-                    const uniqueParams: Record<string, any> = {};
-                    for (const [key, val] of Object.entries(params)) {
-                       const uniqueKey = generateUniqueKey(`rls_${key}`);
-                       uniqueParams[uniqueKey] = val;
-                       sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
-                    }
-
-                    target.andWhere(`(${sql})`, uniqueParams);
-                 } else if (config.fallbackBehavior === 'deny') {
-                    target.andWhere('1=0');
-                    metrics.recordBlock(mainTableName);
-                 } else {
-                    console.warn(`[RLS WARNING] Table '${mainTableName}' is unprotected!`);
-                 }
-              }
-           }
+          // 2. Process Joined Tables
+          // Note: We can't easily "modify" existing join conditions in TypeORM SelectQueryBuilder
+          // after they are added. We have to use andWhere, but we must be careful about LEFT JOINs.
+          // For true security, we apply andWhere. If it was a LEFT JOIN, it becomes effectively an INNER JOIN
+          // which is the safer (though potentially restrictive) default for security.
+          const pendingJoins = target.__rlsPendingJoins || [];
+          for (const join of pendingJoins) {
+             const rlsRules = await rlsService.getRulesForTable(join.resolvedTableName, groupIds);
+             if (rlsRules) {
+                let sql = rlsRules.sql;
+                const params = rlsRules.parameters || {};
+                
+                const uniqueParams: Record<string, any> = {};
+                for (const [key, val] of Object.entries(params)) {
+                   const uniqueKey = generateUniqueKey(`rls_${key}`);
+                   uniqueParams[uniqueKey] = val;
+                   // Replace table names with aliases in the rule SQL
+                   sql = sql.replace(new RegExp(`\\b${join.resolvedTableName}\\.`, 'g'), `${join.alias}.`);
+                   sql = sql.replace(new RegExp(`:${key}\\b`, 'g'), `:${uniqueKey}`);
+                }
+                
+                target.andWhere(`(${sql})`, uniqueParams);
+             }
+          }
 
           target.__rlsApplied = true;
-          target.__rlsCachedRules = {};
-          target.__rlsPendingJoins = [];
           return value.apply(target, args);
         };
       }
@@ -180,4 +171,9 @@ export function createQueryBuilderProxy<T extends ObjectLiteral>(
       return value.bind(target);
     }
   });
+}
+
+function isExempt(target: any, config: RlsModuleOptions): boolean {
+   const mainTableName = target.expressionMap?.mainAlias?.metadata?.tableName;
+   return !!(mainTableName && config.exemptTables?.includes(mainTableName));
 }
