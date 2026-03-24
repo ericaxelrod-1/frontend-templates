@@ -10,7 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { RlsService, SchemaColumn } from '../../../services/rls.service';
-import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput } from '../../../components/join-path-diagram/join-path-diagram.component';
+import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput, DiagramTableNode } from '../../../components/join-path-diagram/join-path-diagram.component';
 
 interface RlsJoinCondition {
   id?: number;
@@ -33,66 +33,69 @@ interface RlsJoinPath {
 @Component({
   selector: 'app-join-path-editor-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatSelectModule, MatInputModule, JoinPathDiagramComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatIconModule, JoinPathDiagramComponent],
   template: `
     <div class="dialog-container">
-      <h2 mat-dialog-title>{{ data.editingPath ? 'Edit' : 'Create' }} Join Path</h2>
-      
-      <mat-dialog-content>
-        <div class="form-row">
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Name</mat-label>
+      <div class="dialog-header-compact">
+        <h2 class="dialog-title">{{ data.editingPath ? 'Edit' : 'Create' }} Join Path</h2>
+        
+        <div class="header-form">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Path Name</mat-label>
             <input matInput [(ngModel)]="formData.name" required placeholder="e.g., Orders via Users" />
           </mat-form-field>
-
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Target Table</mat-label>
-            <mat-select [(ngModel)]="formData.targetTable" required>
-              @for (table of data.tables; track table.name) {
-                <mat-option [value]="table.name">{{ table.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
+          
+          <div class="target-info" *ngIf="formData.targetTable">
+            <span class="label">Target:</span>
+            <code class="value">{{ formData.targetTable }}</code>
+          </div>
         </div>
 
+        <div class="header-actions">
+          <button mat-button (click)="onCancel()">Cancel</button>
+          <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!isFormValid()">
+            <mat-icon>save</mat-icon> {{ data.editingPath ? 'Save Changes' : 'Create Path' }}
+          </button>
+        </div>
+      </div>
+      
+      <mat-dialog-content>
         <div class="diagram-section">
-          <label class="section-label">Visual Join Builder</label>
-          <p class="hint">Connect tables to define the join path. The target table must be the end of the chain.</p>
           <app-join-path-diagram 
             [targetTable]="formData.targetTable || ''"
             [initialConditions]="diagramConditions"
+            [initialTables]="initialDiagramTables"
+            [availableTablesFromParent]="data.tables"
             (conditionsChange)="onDiagramConditionsChange($event)"
             (diagramChange)="onDiagramChange($event)"
+            (targetTableChange)="onTargetTableChange($event)"
           ></app-join-path-diagram>
         </div>
       </mat-dialog-content>
-
-      <mat-dialog-actions align="end">
-        <button mat-button (click)="onCancel()">Cancel</button>
-        <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!isFormValid()">
-          {{ data.editingPath ? 'Save Changes' : 'Create Path' }}
-        </button>
-      </mat-dialog-actions>
     </div>
   `,
   styles: [`
-    .dialog-container { display: flex; flex-direction: column; height: 100%; }
-    .form-row { display: flex; gap: var(--mat-sys-spacing-md); margin-top: 0.5rem; }
-    .flex-1 { flex: 1; }
-    .diagram-section { flex: 1; display: flex; flex-direction: column; min-height: 500px; margin-top: 1rem; }
-    .section-label { font-weight: 600; margin-bottom: 0.25rem; display: block; color: var(--mat-sys-on-surface); font-size: var(--fluid-text-sm); }
-    .hint { color: var(--mat-sys-on-surface-variant); font-size: var(--fluid-text-xs); margin-bottom: 1rem; }
-    mat-dialog-content { flex: 1; overflow-y: auto; }
+    .dialog-container { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--mat-sys-surface); }
+    .dialog-header-compact { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.5rem; background: var(--mat-sys-surface-container); border-bottom: 1px solid var(--mat-sys-outline-variant); gap: 2rem; }
+    .dialog-title { font-size: var(--fluid-text-base); font-weight: 600; margin: 0; color: var(--mat-sys-on-surface); white-space: nowrap; }
+    .header-form { flex: 1; display: flex; align-items: center; gap: 1.5rem; }
+    .header-form mat-form-field { width: 300px; }
+    .target-info { display: flex; align-items: center; gap: 0.5rem; font-size: var(--fluid-text-xs); color: var(--mat-sys-on-surface-variant); }
+    .target-info .value { background: var(--mat-sys-secondary-container); color: var(--mat-sys-on-secondary-container); padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+    .header-actions { display: flex; gap: 0.5rem; }
+    .diagram-section { flex: 1; height: calc(100vh - 64px); display: flex; flex-direction: column; }
+    mat-dialog-content { flex: 1; padding: 0 !important; margin: 0 !important; overflow: hidden; }
   `]
 })
 export class JoinPathEditorDialogComponent {
   formData: Partial<RlsJoinPath> & { conditions?: RlsJoinCondition[] };
   diagramConditions: any[] = [];
+  initialDiagramTables: DiagramTableNode[] = [];
 
   constructor(
     public dialogRef: MatDialogRef<JoinPathEditorDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: { 
-      tables: { name: string }[], 
+      tables: { name: string; columns: any[] }[], 
       editingPath: RlsJoinPath | null 
     }
   ) {
@@ -115,6 +118,17 @@ export class JoinPathEditorDialogComponent {
         toColumn: c.toColumn,
         operator: c.operator || '='
       }));
+      
+      // Initialize nodes based on chain
+      this.initialDiagramTables = (chain as string[]).map((tableName, i) => {
+        const tableMeta = data.tables.find(t => t.name === tableName);
+        return {
+          id: `node_${i}`,
+          tableName,
+          columns: tableMeta?.columns || [],
+          position: { x: 100 + (i * 300), y: 150 }
+        };
+      });
     } else {
       this.formData = { name: '', targetTable: '', chain: [], conditions: [] };
     }
@@ -132,6 +146,10 @@ export class JoinPathEditorDialogComponent {
 
   onDiagramChange(output: DiagramOutput): void {
     this.formData.chain = Array.from(new Set(output.tables.map(t => t.tableName)));
+  }
+
+  onTargetTableChange(table: string): void {
+    this.formData.targetTable = table;
   }
 
   isFormValid(): boolean {
@@ -184,11 +202,13 @@ export class JoinPathEditorDialogComponent {
                 <td><code>{{ path.targetTable }}</code></td>
                 <td>{{ formatChain(path.chain) }}</td>
                 <td>
-                  @for (cond of path.conditions; track cond.id) {
-                    <div class="condition-chip">
-                      {{ cond.fromTable }}.{{ cond.fromColumn }} {{ cond.operator || '=' }} {{ cond.toTable }}.{{ cond.toColumn }}
-                    </div>
-                  }
+                  <div class="chip-row">
+                    @for (cond of path.conditions; track cond.id) {
+                      <div class="condition-chip">
+                        {{ cond.fromTable }}.{{ cond.fromColumn }} {{ cond.operator || '=' }} {{ cond.toTable }}.{{ cond.toColumn }}
+                      </div>
+                    }
+                  </div>
                 </td>
                 <td class="actions">
                   <button mat-icon-button color="primary" (click)="editPath(path)" title="Edit">
@@ -223,7 +243,8 @@ export class JoinPathEditorDialogComponent {
     .paths-table th { background: var(--mat-sys-surface-container-high); font-weight: 600; color: var(--mat-sys-on-surface); }
     
     .name-cell { font-weight: 500; color: var(--mat-sys-primary); }
-    .condition-chip { background: var(--mat-sys-surface-container-highest); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 11px; margin: 2px 0; color: var(--mat-sys-on-surface-variant); display: inline-block; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .condition-chip { background: var(--mat-sys-surface-container-highest); padding: 2px 8px; border-radius: 4px; font-size: 11px; color: var(--mat-sys-on-surface-variant); }
     .actions { display: flex; gap: 4px; }
     
     .empty-state { text-align: center; color: var(--mat-sys-on-surface-variant); padding: 4rem 2rem; }
@@ -232,7 +253,7 @@ export class JoinPathEditorDialogComponent {
 })
 export class JoinPathsAdminComponent implements OnInit {
   paths: RlsJoinPath[] = [];
-  tables: { name: string }[] = [];
+  tables: { name: string; columns: any[] }[] = [];
 
   constructor(
     private http: HttpClient, 
@@ -247,17 +268,17 @@ export class JoinPathsAdminComponent implements OnInit {
 
   loadPaths(): void {
     this.http.get<RlsJoinPath[]>(`${environment.apiUrl}/rls/join-paths`).subscribe({
-      next: (paths: RlsJoinPath[]) => this.paths = paths,
+      next: (paths) => this.paths = paths,
       error: (err: any) => console.error('Failed to load join paths:', err)
     });
   }
 
   loadTables(): void {
-    this.rlsService.getTables().subscribe({
-      next: (tables: { name: string }[]) => {
+    this.http.get<any[]>(`${environment.apiUrl}/schema/tables`).subscribe({
+      next: (tables) => {
         this.tables = tables;
       },
-      error: (err: any) => console.error('Failed to load tables:', err)
+      error: (err) => console.error('Failed to load tables:', err)
     });
   }
 
@@ -279,8 +300,7 @@ export class JoinPathsAdminComponent implements OnInit {
         tables: this.tables,
         editingPath: path
       },
-      width: '1200px',
-      maxWidth: '95vw'
+      panelClass: 'fullscreen-dialog'
     });
 
     dialogRef.afterClosed().subscribe(result => {
@@ -297,7 +317,7 @@ export class JoinPathsAdminComponent implements OnInit {
 
     observable.subscribe({
       next: () => this.loadPaths(),
-      error: (err: any) => console.error('Failed to save join path:', err)
+      error: (err) => console.error('Failed to save join path:', err)
     });
   }
 

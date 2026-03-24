@@ -2,6 +2,8 @@ import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angu
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { NgDiagramComponent, NgDiagramPaletteItemComponent, NgDiagramPaletteItemPreviewComponent, NgDiagramPortComponent, NgDiagramBaseEdgeComponent, provideNgDiagram, initializeModel } from 'ng-diagram';
 import { environment } from '../../../environments/environment';
 
@@ -49,6 +51,8 @@ export interface DiagramOutput {
   imports: [
     CommonModule,
     FormsModule,
+    MatButtonModule,
+    MatIconModule,
     NgDiagramComponent,
     NgDiagramPaletteItemComponent,
     NgDiagramPaletteItemPreviewComponent,
@@ -63,9 +67,24 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   @Input() targetTable = '';
   @Input() initialTables: DiagramTableNode[] = [];
   @Input() initialConditions: DiagramJoinCondition[] = [];
+  @Input() set availableTablesFromParent(tables: any[]) {
+    if (tables && tables.length > 0) {
+      this.availableTables = tables.map(t => ({
+        id: t.name,
+        tableName: t.name,
+        columns: t.columns,
+      }));
+      this.paletteItems = this.availableTables.map(t => ({
+        id: t.id,
+        label: t.tableName,
+        data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
+      }));
+    }
+  }
 
   @Output() conditionsChange = new EventEmitter<DiagramJoinCondition[]>();
   @Output() diagramChange = new EventEmitter<DiagramOutput>();
+  @Output() targetTableChange = new EventEmitter<string>();
 
   availableTables: DiagramTableNode[] = [];
   canvasNodes: any[] = [];
@@ -93,11 +112,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     });
 
     if (this.initialTables.length > 0) {
-      this.canvasNodes = this.initialTables.map(t => ({
-        id: t.id,
-        position: t.position || { x: 100 + this.nodeCounter * 300, y: 100 },
-        data: { tableName: t.tableName, columns: t.columns },
-      }));
+      this.canvasNodes = [...this.initialTables];
       this.nodeCounter = this.canvasNodes.length;
       this.syncModel();
     }
@@ -105,8 +120,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     if (this.initialConditions.length > 0) {
       this.canvasEdges = this.initialConditions.map(c => ({
         id: c.id,
-        source: c.fromTable,
-        target: c.toTable,
+        source: this.getNodeIdByTableName(c.fromTable),
+        target: this.getNodeIdByTableName(c.toTable),
         data: {
           sourceColumn: c.fromColumn,
           targetColumn: c.toColumn,
@@ -117,7 +132,9 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
       this.syncModel();
     }
 
-    this.loadAvailableTables();
+    if (this.availableTables.length === 0) {
+      this.loadAvailableTables();
+    }
   }
 
   ngOnDestroy(): void {}
@@ -137,28 +154,13 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
             data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
           }));
         },
-        error: () => {
-          this.availableTables = [
-            { id: 'users', tableName: 'users', columns: [
-              { name: 'id', dataType: 'integer', isPrimaryKey: true },
-              { name: 'email', dataType: 'string' },
-              { name: 'group_id', dataType: 'integer', isForeignKey: true },
-              { name: 'created_at', dataType: 'timestamp' },
-            ]},
-            { id: 'groups', tableName: 'groups', columns: [
-              { name: 'id', dataType: 'integer', isPrimaryKey: true },
-              { name: 'name', dataType: 'string' },
-              { name: 'owner_id', dataType: 'integer', isForeignKey: true },
-              { name: 'created_at', dataType: 'timestamp' },
-            ]},
-          ];
-          this.paletteItems = this.availableTables.map(t => ({
-            id: t.id,
-            label: t.tableName,
-            data: { label: t.tableName, tableName: t.tableName, columns: t.columns } as any,
-          }));
-        }
+        error: () => {}
       });
+  }
+
+  getNodeIdByTableName(tableName: string): string {
+    const node = this.canvasNodes.find(n => n.data.tableName === tableName);
+    return node?.id || tableName;
   }
 
   onPaletteItemDropped(event: any): void {
@@ -229,10 +231,19 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   deleteNode(nodeId: string): void {
+    const node = this.canvasNodes.find(n => n.id === nodeId);
+    if (node?.data?.tableName === this.targetTable) {
+      this.setTargetTable('');
+    }
     this.canvasNodes = this.canvasNodes.filter(n => n.id !== nodeId);
     this.canvasEdges = this.canvasEdges.filter(e => e.source !== nodeId && e.target !== nodeId);
     this.syncModel();
     this.emitChange();
+  }
+
+  setTargetTable(tableName: string): void {
+    this.targetTable = tableName;
+    this.targetTableChange.emit(tableName);
   }
 
   syncModel(): void {
@@ -248,10 +259,6 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     const targetNode = this.canvasNodes.find(n => n.id === edge.target);
     if (!sourceNode || !targetNode) return '';
     return `M ${sourceNode.position.x} ${sourceNode.position.y} L ${targetNode.position.x} ${targetNode.position.y}`;
-  }
-
-  copyJson(): void {
-    navigator.clipboard.writeText(this.outputJson);
   }
 
   emitChange(): void {
@@ -286,19 +293,6 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     this.diagramChange.emit(output);
   }
 
-  get outputJson(): string {
-    const conditions: DiagramJoinCondition[] = this.canvasEdges.map(e => ({
-      id: e.id,
-      fromTable: this.getNodeTableName(e.source),
-      fromColumn: e.data?.sourceColumn || '',
-      toTable: this.getNodeTableName(e.target),
-      toColumn: e.data?.targetColumn || '',
-      operator: e.data?.operator || '=',
-    })).filter(c => c.fromColumn && c.toColumn);
-
-    return JSON.stringify(conditions, null, 2);
-  }
-
   getNodeTableName(nodeId: string): string {
     const node = this.canvasNodes.find(n => n.id === nodeId);
     return node?.data?.tableName || nodeId;
@@ -325,6 +319,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     this.sidebarOpen = false;
     this.sidebarEdge = null;
     this.selectedEdgeId = null;
+    this.setTargetTable('');
     this.syncModel();
     this.emitChange();
   }
