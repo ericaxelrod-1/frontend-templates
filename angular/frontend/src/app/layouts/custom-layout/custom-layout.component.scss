@@ -58,8 +58,7 @@
 
 .layout-footer {
   grid-area: footer;
-  position: relative;
-  z-index: 10; // Below header and sidenav
+  // No z-index - sits naturally behind main content in CSS Grid stacking context
 }
 
 // Sidenav Container - takes full height of main area
