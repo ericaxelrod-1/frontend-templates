@@ -286,7 +286,7 @@ export class ScopeTemplatesAdminComponent implements OnInit {
 
   loadTables(): void {
     this.rlsService.getTables().subscribe({
-      next: (tables) => this.tables = tables,
+      next: (response) => this.tables = response.items,
       error: (err) => console.error('Failed to load tables:', err)
     });
   }

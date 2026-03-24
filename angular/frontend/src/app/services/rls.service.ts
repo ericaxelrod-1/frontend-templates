@@ -76,8 +76,8 @@ export class RlsService {
     return this.http.get<SchemaColumn[]>(`${environment.apiUrl}/schema/tables/${tableName}/columns`);
   }
 
-  getTables(): Observable<{ name: string }[]> {
-    return this.http.get<{ name: string }[]>(`${environment.apiUrl}/schema/tables`);
+  getTables(): Observable<{ items: { name: string }[], total: number }> {
+    return this.http.get<{ items: { name: string }[], total: number }>(`${environment.apiUrl}/schema/tables`);
   }
 
   testScope(groupId: number, tableName: string, scope: ScopeGroup): Observable<TestScopeResult> {

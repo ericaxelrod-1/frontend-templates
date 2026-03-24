@@ -274,9 +274,9 @@ export class JoinPathsAdminComponent implements OnInit {
   }
 
   loadTables(): void {
-    this.http.get<any[]>(`${environment.apiUrl}/schema/tables`).subscribe({
-      next: (tables) => {
-        this.tables = tables;
+    this.http.get<{ items: any[], total: number }>(`${environment.apiUrl}/schema/tables`).subscribe({
+      next: (response) => {
+        this.tables = response.items;
       },
       error: (err) => console.error('Failed to load tables:', err)
     });
