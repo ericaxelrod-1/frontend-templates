@@ -5,70 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Ticket Submitted</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      background-color: #3f51b5;
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    .content {
-      padding: 20px;
-      background-color: #f9f9f9;
-    }
-    .button {
-      display: inline-block;
-      background-color: #3f51b5;
-      color: white;
-      text-decoration: none;
-      padding: 10px 20px;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    .footer {
-      text-align: center;
-      font-size: 12px;
-      color: #666;
-      margin-top: 20px;
-    }
-    .ticket-info {
-      background-color: white;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 4px;
-      border-left: 4px solid #3f51b5;
-    }
-    .priority {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: bold;
-      margin-left: 10px;
-    }
-    .priority.high {
-      background-color: #f44336;
-      color: white;
-    }
-    .priority.medium {
-      background-color: #ff9800;
-      color: white;
-    }
-    .priority.low {
-      background-color: #4caf50;
-      color: white;
-    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #3f51b5; color: #ffffff; padding: 20px; text-align: center; }
+    .content { padding: 20px; background-color: #f9f9f9; }
+    .cta-container { text-align: center; margin: 30px 0; }
+    .button { display: inline-block; background-color: #ff9800; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 4px; font-weight: bold; font-size: 16px; }
+    .footer { text-align: center; font-size: 12px; color: #666; margin-top: 20px; padding: 20px; }
+    .ticket-info { background-color: white; padding: 15px; margin: 15px 0; border-radius: 4px; border-left: 4px solid #3f51b5; }
+    .priority { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-left: 10px; }
+    .priority.high { background-color: #f44336; color: white; }
+    .priority.medium { background-color: #ff9800; color: white; }
+    .priority.low { background-color: #4caf50; color: white; }
   </style>
 </head>
 <body>
@@ -90,21 +38,17 @@
       
       <p>We have received your request and our privacy team will review it within 1-2 business days.</p>
       
-      <p>You can track the status of your request using the following link:</p>
-      
-      <div style="text-align: center;">
-        <a class="button" href="{{ ticketUrl }}">View Ticket Status</a>
+      <div class="cta-container">
+        <a class="button" style="background-color: #ff9800; color: #ffffff; text-decoration: none;" href="{{ ticketUrl }}">View Ticket Status</a>
       </div>
       
       <p>If you need to provide additional information or documents, you can upload them directly from your ticket dashboard.</p>
-      
-      <p>Thank you for your trust in our privacy compliance program.</p>
       
       <p>Best regards,<br>Privacy Team</p>
     </div>
     <div class="footer">
       <p>This is an automated email. Please do not reply to this message.</p>
-      <p>&copy; 2024 Angular App. All rights reserved.</p>
+      <p>&copy; {{ currentYear }} {{ appName }}. All rights reserved.</p>
     </div>
   </div>
 </body>

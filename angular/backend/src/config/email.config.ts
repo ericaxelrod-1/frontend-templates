@@ -2,6 +2,7 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('email', () => ({
   enabled: process.env.EMAIL_ENABLED === 'true',
+  appName: process.env.APP_NAME || 'Angular App',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4200',
   provider: process.env.EMAIL_PROVIDER || 'nodemailer',
   transport: {
@@ -16,6 +17,6 @@ export default registerAs('email', () => ({
       : undefined,
   },
   defaults: {
-    from: process.env.EMAIL_FROM || '"Angular App" <no-reply@example.com>',
+    from: process.env.EMAIL_FROM || `"${process.env.APP_NAME || 'Angular App'}" <no-reply@example.com>`,
   },
 }));

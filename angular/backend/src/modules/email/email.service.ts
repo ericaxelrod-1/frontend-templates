@@ -26,12 +26,12 @@ export class EmailService {
       to: email,
       subject: 'Verify Your Email Address',
       template: 'verify-email',
-      context: {
+      context: this.addGlobalContext({
         userName,
         verificationUrl: verifyUrl,
         token,
         expiresIn: '24 hours',
-      },
+      }),
     });
 
     if (!result.success) {
@@ -57,12 +57,12 @@ export class EmailService {
       to: email,
       subject: 'Password Reset Request',
       template: 'password-reset',
-      context: {
+      context: this.addGlobalContext({
         userName,
         resetUrl,
         token,
         expiresIn: '1 hour',
-      },
+      }),
     });
 
     if (!result.success) {
@@ -84,10 +84,10 @@ export class EmailService {
       to: email,
       subject: 'Welcome to the Application',
       template: 'welcome-email',
-      context: {
+      context: this.addGlobalContext({
         userName,
         loginUrl,
-      },
+      }),
     });
 
     if (!result.success) {
@@ -108,9 +108,17 @@ export class EmailService {
       to,
       subject,
       template,
-      context,
+      context: this.addGlobalContext(context),
     });
     return result.success;
+  }
+
+  private addGlobalContext(context: Record<string, any>): Record<string, any> {
+    return {
+      appName: this.configService.get('email.appName', 'Angular App'),
+      currentYear: new Date().getFullYear().toString(),
+      ...context,
+    };
   }
 
   // Privacy Ticket Email Methods
@@ -132,14 +140,14 @@ export class EmailService {
       to: email,
       subject: 'Privacy Ticket Submitted - Request Received',
       template: 'ticket-submitted',
-      context: {
+      context: this.addGlobalContext({
         userName,
         ticketId,
         ticketType,
         ticketPriority,
         submittedAt,
         ticketUrl,
-      },
+      }),
     });
 
     if (!result.success) {
@@ -170,7 +178,7 @@ export class EmailService {
       to: email,
       subject: 'Privacy Ticket Assigned - Specialist Assigned',
       template: 'ticket-assigned',
-      context: {
+      context: this.addGlobalContext({
         userName,
         ticketId,
         assignedAt,
@@ -179,7 +187,7 @@ export class EmailService {
         agentExpertise,
         ticketUrl,
         estimatedTimeframe,
-      },
+      }),
     });
 
     if (!result.success) {
@@ -213,7 +221,7 @@ export class EmailService {
       to: email,
       subject: 'SLA Warning - Privacy Ticket Approaching Deadline',
       template: 'sla-warning',
-      context: {
+      context: this.addGlobalContext({
         userName,
         ticketId,
         slaDeadline,
@@ -225,7 +233,7 @@ export class EmailService {
         businessDays,
         ticketUrl,
         supportEmail,
-      },
+      }),
     });
 
     if (!result.success) {
@@ -261,7 +269,7 @@ export class EmailService {
       to: email,
       subject: 'Privacy Ticket Resolved - Action Completed',
       template: 'ticket-resolved',
-      context: {
+      context: this.addGlobalContext({
         userName,
         ticketId,
         resolvedAt,
@@ -275,7 +283,7 @@ export class EmailService {
         resolutionNotes,
         documents,
         ticketUrl,
-      },
+      }),
     });
 
     if (!result.success) {
@@ -313,7 +321,7 @@ export class EmailService {
       to: email,
       subject: 'Privacy Ticket Rejected - Action Required',
       template: 'ticket-rejected',
-      context: {
+      context: this.addGlobalContext({
         userName,
         ticketId,
         rejectedAt,
@@ -329,7 +337,7 @@ export class EmailService {
         policy2,
         regulation1,
         ticketUrl,
-      },
+      }),
     });
 
     if (!result.success) {

@@ -5,141 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Ticket Resolved</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      background-color: #4caf50;
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    .content {
-      padding: 20px;
-      background-color: #f9f9f9;
-    }
-    .button {
-      display: inline-block;
-      background-color: #4caf50;
-      color: white;
-      text-decoration: none;
-      padding: 10px 20px;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    .footer {
-      text-align: center;
-      font-size: 12px;
-      color: #666;
-      margin-top: 20px;
-    }
-    .ticket-info {
-      background-color: white;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 4px;
-      border-left: 4px solid #4caf50;
-    }
-    .resolution-info {
-      background-color: #e8f5e8;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 4px;
-      border-left: 4px solid #4caf50;
-    }
-    .agent-info {
-      background-color: #f0f8ff;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 4px;
-    }
-    .status {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: bold;
-    }
-    .status.resolved {
-      background-color: #4caf50;
-      color: white;
-    }
-    .documents {
-      background-color: #f5f5f5;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 4px;
-    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #3f51b5; color: #ffffff; padding: 20px; text-align: center; }
+    .content { padding: 20px; background-color: #f9f9f9; }
+    .cta-container { text-align: center; margin: 30px 0; }
+    .button { display: inline-block; background-color: #ff9800; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 4px; font-weight: bold; font-size: 16px; }
+    .footer { text-align: center; font-size: 12px; color: #666; margin-top: 20px; padding: 20px; }
+    .resolution-box { background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 15px 0; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <h1>Privacy Ticket Resolved</h1>
+    <div class="header" style="background-color: #4caf50;">
+      <h1>Request Resolved</h1>
     </div>
     <div class="content">
       <p>Hello {{ userName }},</p>
-      <p>We are pleased to inform you that your privacy request has been successfully resolved.</p>
+      <p>Your privacy request has been completed.</p>
       
-      <div class="ticket-info">
-        <h3>Ticket Resolution Summary</h3>
-        <p><strong>Ticket ID:</strong> {{ ticketId }}</p>
-        <p><strong>Final Status:</strong> <span class="status resolved">Resolved</span></p>
-        <p><strong>Resolution Date:</strong> {{ resolvedAt }}</p>
-        <p><strong>Total Processing Time:</strong> {{ processingTime }}</p>
-      </div>
-      
-      <div class="resolution-info">
+      <div class="resolution-box">
         <h3>Resolution Details</h3>
-        <p><strong>Request Type:</strong> {{ requestType }}</p>
-        <p><strong>Resolution Action:</strong> {{ resolutionAction }}</p>
-        <p><strong>Compliance Status:</strong> {{ complianceStatus }}</p>
-        <p><strong>Data Impact:</strong> {{ dataImpact }}</p>
+        <p><strong>Ticket ID:</strong> {{ ticketId }}</p>
+        <p><strong>Resolved At:</strong> {{ resolvedAt }}</p>
+        <p><strong>Resolution:</strong> {{ resolutionAction }}</p>
       </div>
       
-      <div class="agent-info">
-        <h3>Assigned Privacy Specialist</h3>
-        <p><strong>Specialist:</strong> {{ agentName }}</p>
-        <p><strong>Contact:</strong> {{ agentEmail }}</p>
-        <p><strong>Resolution Notes:</strong> {{ resolutionNotes }}</p>
+      <div class="cta-container">
+        <a class="button" style="background-color: #ff9800; color: #ffffff; text-decoration: none;" href="{{ ticketUrl }}">View Final Details</a>
       </div>
       
-      {{#if documents}}
-      <div class="documents">
-        <h3>Related Documents</h3>
-        <p>The following documents are associated with your resolved ticket:</p>
-        <ul>
-          {{#each documents}}
-          <li><a href="{{this.url}}">{{this.name}}</a> ({{this.type}}, {{this.size}})</li>
-          {{/each}}
-        </ul>
-      </div>
-      {{/if}}
+      <p>If you have any further questions, please contact our privacy team.</p>
       
-      <p>Your privacy data has been processed according to applicable regulations and our internal privacy policies. All requested actions have been completed.</p>
-      
-      <p>If you have any questions about the resolution or need further clarification, please don't hesitate to contact our privacy team.</p>
-      
-      <div style="text-align: center;">
-        <a class="button" href="{{ ticketUrl }}">View Complete Resolution Report</a>
-      </div>
-      
-      <p>We appreciate your trust in our privacy compliance program and thank you for your cooperation throughout this process.</p>
-      
-      <p>Best regards,<br>Privacy Compliance Team</p>
+      <p>Best regards,<br>Privacy Team</p>
     </div>
     <div class="footer">
       <p>This is an automated email. Please do not reply to this message.</p>
-      <p>&copy; 2024 Angular App. All rights reserved.</p>
+      <p>&copy; {{ currentYear }} {{ appName }}. All rights reserved.</p>
     </div>
   </div>
 </body>

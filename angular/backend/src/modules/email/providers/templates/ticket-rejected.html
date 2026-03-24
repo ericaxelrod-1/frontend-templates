@@ -5,144 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Ticket Rejected</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      background-color: #f44336;
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    .content {
-      padding: 20px;
-      background-color: #f9f9f9;
-    }
-    .button {
-      display: inline-block;
-      background-color: #f44336;
-      color: white;
-      text-decoration: none;
-      padding: 10px 20px;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    .footer {
-      text-align: center;
-      font-size: 12px;
-      color: #666;
-      margin-top: 20px;
-    }
-    .ticket-info {
-      background-color: white;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 4px;
-      border-left: 4px solid #f44336;
-    }
-    .rejection-info {
-      background-color: #ffebee;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 4px;
-      border-left: 4px solid #f44336;
-    }
-    .appeal-info {
-      background-color: #e3f2fd;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 4px;
-      border-left: 4px solid #2196f3;
-    }
-    .status {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: bold;
-    }
-    .status.rejected {
-      background-color: #f44336;
-      color: white;
-    }
-    .reason {
-      background-color: #fff3e0;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 4px;
-      font-style: italic;
-    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #3f51b5; color: #ffffff; padding: 20px; text-align: center; }
+    .content { padding: 20px; background-color: #f9f9f9; }
+    .cta-container { text-align: center; margin: 30px 0; }
+    .button { display: inline-block; background-color: #ff9800; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 4px; font-weight: bold; font-size: 16px; }
+    .footer { text-align: center; font-size: 12px; color: #666; margin-top: 20px; padding: 20px; }
+    .rejection-box { background-color: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin: 15px 0; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <h1>Privacy Ticket Rejected</h1>
+    <div class="header" style="background-color: #f44336;">
+      <h1>Request Rejected</h1>
     </div>
     <div class="content">
       <p>Hello {{ userName }},</p>
-      <p>We regret to inform you that your privacy request has been rejected. Please review the details below for information on the rejection reason and available options.</p>
+      <p>We are writing to inform you that your privacy request could not be fulfilled at this time.</p>
       
-      <div class="ticket-info">
-        <h3>Ticket Rejection Summary</h3>
+      <div class="rejection-box">
+        <h3>Rejection Details</h3>
         <p><strong>Ticket ID:</strong> {{ ticketId }}</p>
-        <p><strong>Request Type:</strong> {{ requestType }}</p>
-        <p><strong>Final Status:</strong> <span class="status rejected">Rejected</span></p>
-        <p><strong>Rejection Date:</strong> {{ rejectedAt }}</p>
-      </div>
-      
-      <div class="rejection-info">
-        <h3>Rejection Reason</h3>
-        <p><strong>Category:</strong> {{ rejectionCategory }}</p>
-        <p><strong>Code:</strong> {{ rejectionCode }}</p>
-        <div class="reason">
-          <p><strong>Description:</strong> {{ rejectionReason }}</p>
-        </div>
+        <p><strong>Reason:</strong> {{ rejectionReason }}</p>
         <p><strong>Reference:</strong> {{ rejectionReference }}</p>
       </div>
       
-      <div class="appeal-info">
-        <h3>Appeal Options</h3>
-        <p>If you believe this rejection was made in error, you have the following options:</p>
-        <ul>
-          <li><strong>Internal Review:</strong> Request a review by our privacy oversight committee</li>
-          <li><strong>Appeal to Regulator:</strong> File a complaint with the relevant data protection authority</li>
-          <li><strong>Escalation:</strong> Request escalation to our executive privacy team</li>
-        </ul>
-        <p><strong>Appeal Deadline:</strong> {{ appealDeadline }}</p>
+      <div class="cta-container">
+        <a class="button" style="background-color: #ff9800; color: #ffffff; text-decoration: none;" href="{{ ticketUrl }}">View Appeal Options</a>
       </div>
       
-      <p>The rejection was based on the following policies and regulations:</p>
-      <ul>
-        <li>{{ policy1 }}</li>
-        <li>{{ policy2 }}</li>
-        <li>{{ regulation1 }}</li>
-      </ul>
+      <p>If you believe this decision was made in error, you may file an appeal through the link above.</p>
       
-      <p>If you wish to appeal this decision, please submit your appeal through the following portal:</p>
-      
-      <div style="text-align: center;">
-        <a class="button" href="{{ appealUrl }}">Submit Appeal</a>
-      </div>
-      
-      <p>You may also contact our privacy compliance officer directly at {{ complianceEmail }} for assistance with the appeal process.</p>
-      
-      <p>We understand this may be disappointing news and appreciate your understanding of our regulatory obligations.</p>
-      
-      <p>Best regards,<br>Privacy Compliance Team</p>
+      <p>Best regards,<br>Privacy Team</p>
     </div>
     <div class="footer">
       <p>This is an automated email. Please do not reply to this message.</p>
-      <p>&copy; 2024 Angular App. All rights reserved.</p>
+      <p>&copy; {{ currentYear }} {{ appName }}. All rights reserved.</p>
     </div>
   </div>
 </body>
