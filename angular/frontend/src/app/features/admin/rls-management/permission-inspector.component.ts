@@ -1,482 +1,162 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatListModule } from '@angular/material/list';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { PermissionInspectorService, PermissionInspection } from '../../../services/permission-inspector.service';
-import { UserService } from '../../../services/user.service';
-import { RoleService, Role } from '../../../services/role.service';
 import { GroupService } from '../../../services/group.service';
-import { User } from '../../../models/user.model';
 import { Group } from '../../../models/group.model';
+import { SidePanelRef } from '../../../shared/components/side-panel';
 
 @Component({
   selector: 'app-permission-inspector',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatButtonModule,
+    MatIconModule,
+    MatDividerModule,
+    MatListModule,
+    MatProgressBarModule
+  ],
   template: `
-    <div class="inspector">
-      <header class="inspector-header">
-        <h1>Permission Inspector</h1>
-        <p class="subtitle">Debug permission inheritance and effective permissions</p>
+    <div class="inspector-panel">
+      <header class="sidebar-header">
+        <div class="header-title">
+          <h2>Permission Inspector</h2>
+          <p class="subtitle">Analyze effective permissions and inheritance</p>
+        </div>
+        <button mat-icon-button (click)="close()">
+          <mat-icon>close</mat-icon>
+        </button>
       </header>
 
-      <div class="inspector-tabs">
-        <button 
-          [class.active]="activeTab === 'user'" 
-          (click)="activeTab = 'user'">
-          User Inspector
-        </button>
-        <button 
-          [class.active]="activeTab === 'role'" 
-          (click)="activeTab = 'role'">
-          Role Inspector
-        </button>
-        <button 
-          [class.active]="activeTab === 'group'" 
-          (click)="activeTab = 'group'">
-          Group Inspector
-        </button>
-      </div>
+      <mat-divider></mat-divider>
 
-      <div class="inspector-content">
-        @if (activeTab === 'user') {
-          <div class="inspector-form">
-            <label>Select User:</label>
-            <div class="form-row">
-              <select [(ngModel)]="selectedUserId">
-                <option [ngValue]="undefined">Select a user...</option>
-                @for (user of users; track user.id) {
-                  <option [value]="user.id">
-                    {{ user.firstName }} {{ user.lastName }} ({{ user.email }})
-                  </option>
-                }
-              </select>
-              <button class="btn-primary" (click)="inspectUser()">Inspect User</button>
-              <button class="btn-secondary" (click)="loadAllUsers()">Load All</button>
-            </div>
-          </div>
-        }
-
-        @if (activeTab === 'role') {
-          <div class="inspector-form">
-            <label>Select Role:</label>
-            <div class="form-row">
-              <select [(ngModel)]="selectedRoleId">
-                <option [ngValue]="undefined">Select a role...</option>
-                @for (role of roles; track role.id) {
-                  <option [value]="role.id">{{ role.name }}</option>
-                }
-              </select>
-              <button class="btn-primary" (click)="inspectRole()">Inspect Role</button>
-              <button class="btn-secondary" (click)="loadAllRoles()">Load All</button>
-            </div>
-          </div>
-        }
-
-        @if (activeTab === 'group') {
-          <div class="inspector-form">
-            <label>Select Group:</label>
-            <div class="form-row">
-              <select [(ngModel)]="selectedGroupId">
-                <option [ngValue]="undefined">Select a group...</option>
+      <div class="sidebar-body">
+        <div class="selection-controls">
+          <div class="form-group">
+            <label>Select User or Group</label>
+            <select [(ngModel)]="selectedId" (change)="onTargetChange()">
+              <option [ngValue]="null">Select a target...</option>
+              <optgroup label="Groups">
                 @for (group of groups; track group.id) {
-                  <option [value]="group.id">{{ group.name }}</option>
+                  <option [value]="'group:' + group.id">Group: {{ group.name }}</option>
                 }
-              </select>
-              <button class="btn-primary" (click)="inspectGroup()">Inspect Group</button>
-              <button class="btn-secondary" (click)="loadAllGroups()">Load All</button>
-            </div>
+              </optgroup>
+            </select>
           </div>
+        </div>
+
+        @if (loading) {
+          <mat-progress-bar mode="indeterminate"></mat-progress-bar>
         }
 
         @if (inspection) {
           <div class="inspection-results">
-            <div class="result-section">
-              <h3>Direct Assignments</h3>
-              
-              @if (inspection.directRoles?.length) {
-                <div class="assignment-group">
-                  <h4>Roles</h4>
-                  <ul>
-                    @for (role of inspection.directRoles; track role.id) {
-                      <li>{{ role.name }}</li>
-                    }
-                  </ul>
-                </div>
-              }
-
-              @if (inspection.directGroups?.length) {
-                <div class="assignment-group">
-                  <h4>Groups</h4>
-                  <ul>
-                    @for (group of inspection.directGroups; track group.id) {
-                      <li>{{ group.name }}</li>
-                    }
-                  </ul>
-                </div>
-              }
+            <div class="result-header">
+              <h3>Effective Permissions for {{ inspection.user?.email || inspection.role?.name || inspection.group?.name }}</h3>
             </div>
 
-            @if (inspection.hierarchy) {
-              <div class="result-section">
-                <h3>Hierarchy</h3>
-                
-                @if (inspection.hierarchy.ancestors?.length) {
-                  <div class="hierarchy-column">
-                    <h4>Ancestors</h4>
-                    <ul class="ancestor-list">
-                      @for (item of inspection.hierarchy.ancestors; track item.id) {
-                        <li class="ancestor">{{ item.name }}</li>
-                      }
-                    </ul>
+            <div class="permissions-list">
+              @for (perm of inspection.effectivePermissions; track perm.permission) {
+                <div class="permission-item" [class.granted]="perm.isGranted" [class.denied]="!perm.isGranted">
+                  <div class="perm-status">
+                    <mat-icon>{{ perm.isGranted ? 'check_circle' : 'cancel' }}</mat-icon>
                   </div>
-                }
-
-                <div class="hierarchy-column current">
-                  <h4>Current</h4>
-                  <div class="current-item">
-                    {{ inspection.role?.name || inspection.group?.name || 'Selected' }}
+                  <div class="perm-details">
+                    <div class="perm-name">{{ perm.permission }}</div>
+                    <div class="perm-source">
+                      Source: <strong>{{ perm.inheritedFrom || 'Direct' }}</strong>
+                    </div>
                   </div>
                 </div>
-
-                @if (inspection.hierarchy.descendants?.length) {
-                  <div class="hierarchy-column">
-                    <h4>Descendants</h4>
-                    <ul class="descendant-list">
-                      @for (item of inspection.hierarchy.descendants; track item.id) {
-                        <li class="descendant">{{ item.name }}</li>
-                      }
-                    </ul>
-                  </div>
-                }
-              </div>
-            }
-
-            @if (inspection.directPermissions?.length || inspection.effectivePermissions?.length) {
-              <div class="result-section">
-                <h3>Permissions</h3>
-                
-                @if (inspection.directPermissions?.length) {
-                  <div class="permissions-block">
-                    <h4>Direct Permissions</h4>
-                    <table class="permissions-table">
-                      <thead>
-                        <tr>
-                          <th>Permission</th>
-                          <th>Value</th>
-                          <th>Source</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (perm of inspection.directPermissions; track perm.permission) {
-                          <tr>
-                            <td><code>{{ perm.permission }}</code></td>
-                            <td>
-                              <span [class.granted]="perm.isGranted" [class.denied]="!perm.isGranted">
-                                {{ perm.isGranted ? 'Granted' : 'Denied' }}
-                              </span>
-                            </td>
-                            <td>{{ perm.source }}</td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-
-                @if (inspection.effectivePermissions?.length) {
-                  <div class="permissions-block">
-                    <h4>Effective Permissions (after inheritance)</h4>
-                    <table class="permissions-table">
-                      <thead>
-                        <tr>
-                          <th>Permission</th>
-                          <th>Effective Value</th>
-                          <th>Inherited From</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (perm of inspection.effectivePermissions; track perm.permission) {
-                          <tr>
-                            <td><code>{{ perm.permission }}</code></td>
-                            <td>
-                              <span [class.granted]="perm.isGranted" [class.denied]="!perm.isGranted">
-                                {{ perm.isGranted ? 'Granted' : 'Denied' }}
-                              </span>
-                            </td>
-                            <td>{{ perm.inheritedFrom || 'Direct' }}</td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-              </div>
-            }
+              } @empty {
+                <div class="empty-state">No permissions found for this target.</div>
+              }
+            </div>
           </div>
+        } @else if (!loading && selectedId) {
+          <div class="empty-state">Select a valid target to begin inspection.</div>
         }
       </div>
     </div>
   `,
   styles: [`
-    .inspector {
-      padding: 1.5rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    .inspector-header {
-      margin-bottom: 1.5rem;
-    }
-    .inspector-header h1 {
-      margin: 0 0 0.5rem 0;
-      font-size: 1.75rem;
-    }
-    .subtitle {
-      color: #64748b;
-      margin: 0;
-    }
-    .inspector-tabs {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 0.5rem;
-    }
-    .inspector-tabs button {
-      padding: 0.5rem 1rem;
-      border: none;
-      background: transparent;
-      color: #64748b;
-      cursor: pointer;
-      border-radius: 0.375rem 0.375rem 0 0;
-    }
-    .inspector-tabs button.active {
-      background: #3b82f6;
-      color: white;
-    }
-    .inspector-form {
-      margin-bottom: 1.5rem;
-    }
-    .inspector-form label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 500;
-    }
-    .inspector-form select {
-      flex: 1;
-      padding: 0.5rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 0.375rem;
-    }
-    .form-row {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .btn-primary {
-      padding: 0.5rem 1rem;
-      background: #3b82f6;
-      color: white;
-      border: none;
-      border-radius: 0.375rem;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    .btn-primary:hover {
-      background: #2563eb;
-    }
-    .btn-secondary {
-      padding: 0.5rem 1rem;
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
-      border-radius: 0.375rem;
-      cursor: pointer;
-    }
-    .btn-secondary:hover {
-      background: #e2e8f0;
-    }
-    .inspection-results {
-      display: grid;
-      gap: 1.5rem;
-    }
-    .result-section {
-      background: white;
-      border-radius: 0.5rem;
-      padding: 1.5rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .result-section h3 {
-      margin: 0 0 1rem 0;
-      font-size: 1.125rem;
-      color: #1e293b;
-    }
-    .assignment-group {
-      margin-bottom: 1rem;
-    }
-    .assignment-group h4 {
-      margin: 0 0 0.5rem 0;
-      font-size: 0.875rem;
-      color: #64748b;
-      text-transform: uppercase;
-    }
-    .assignment-group ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    .assignment-group li {
-      background: #f1f5f9;
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.875rem;
-    }
-    .hierarchy-column {
-      margin-bottom: 1rem;
-    }
-    .hierarchy-column h4 {
-      margin: 0 0 0.5rem 0;
-      font-size: 0.875rem;
-      color: #64748b;
-    }
-    .ancestor-list, .descendant-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .ancestor-list li, .descendant-list li {
-      padding: 0.25rem 0;
-      font-size: 0.875rem;
-    }
-    .ancestor { color: #64748b; }
-    .descendant { color: #94a3b8; }
-    .current-item {
-      font-weight: 600;
-      color: #3b82f6;
-      padding: 0.25rem 0;
-    }
-    .permissions-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-    }
-    .permissions-table th, .permissions-table td {
-      padding: 0.5rem;
-      text-align: left;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .permissions-table th {
-      font-weight: 600;
-      color: #64748b;
-    }
-    .granted {
-      color: #10b981;
-      font-weight: 500;
-    }
-    .denied {
-      color: #ef4444;
-      font-weight: 500;
-    }
+    .inspector-panel { display: flex; flex-direction: column; height: 100%; background: white; }
+    .sidebar-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.5rem; }
+    .header-title h2 { margin: 0; font-size: 1.25rem; font-weight: 500; }
+    .subtitle { margin: 0.25rem 0 0 0; font-size: 0.875rem; color: #64748b; }
+    .sidebar-body { flex: 1; overflow-y: auto; padding: 1.5rem; }
+    .selection-controls { margin-bottom: 1.5rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    .form-group label { font-size: 0.875rem; font-weight: 500; color: #475569; }
+    .form-group select { padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: white; }
+    .inspection-results { margin-top: 1.5rem; }
+    .result-header h3 { font-size: 1rem; margin-bottom: 1rem; color: #1e293b; }
+    .permissions-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .permission-item { display: flex; gap: 1rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; }
+    .permission-item.granted { border-left: 4px solid #22c55e; background: #f0fdf4; }
+    .permission-item.denied { border-left: 4px solid #ef4444; background: #fef2f2; }
+    .perm-status mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
+    .granted .perm-status { color: #16a34a; }
+    .denied .perm-status { color: #dc2626; }
+    .perm-name { font-weight: 600; font-size: 0.875rem; color: #1e293b; }
+    .perm-source { font-size: 0.75rem; color: #64748b; margin-top: 0.125rem; }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
   `]
 })
 export class PermissionInspectorComponent implements OnInit {
-  activeTab: 'user' | 'role' | 'group' = 'user';
-  
-  users: User[] = [];
-  roles: Role[] = [];
   groups: Group[] = [];
-  
-  selectedUserId?: number;
-  selectedRoleId?: number;
-  selectedGroupId?: number;
-  
+  selectedId: string | null = null;
   inspection?: PermissionInspection;
+  loading = false;
 
   constructor(
+    private groupService: GroupService,
     private inspectorService: PermissionInspectorService,
-    private userService: UserService,
-    private roleService: RoleService,
-    private groupService: GroupService
+    private sidePanelRef: SidePanelRef
   ) {}
 
   ngOnInit(): void {
-    this.loadUsers();
-    this.loadRoles();
     this.loadGroups();
   }
 
-  loadUsers(): void {
-    this.userService.getUsers().subscribe({
-      next: (res: any) => this.users = Array.isArray(res) ? res : (res.items || []),
-      error: (err: any) => console.error('Failed to load users:', err)
-    });
-  }
-
-  loadRoles(): void {
-    this.roleService.getRoles({}).subscribe({
-      next: (res: any) => this.roles = Array.isArray(res) ? res : (res.items || []),
-      error: (err: any) => console.error('Failed to load roles:', err)
-    });
-  }
-
   loadGroups(): void {
-    this.groupService.getGroups({}).subscribe({
-      next: (res: any) => this.groups = res.items || [],
+    this.groupService.getGroups({ pageSize: 100 }).subscribe({
+      next: (response: any) => this.groups = response.items,
       error: (err: any) => console.error('Failed to load groups:', err)
     });
   }
 
-  inspectUser(): void {
-    if (!this.selectedUserId) return;
-    this.inspection = undefined;
-    this.inspectorService.inspectUser(this.selectedUserId).subscribe({
-      next: (result: PermissionInspection) => this.inspection = result,
-      error: (err: any) => console.error('Failed to inspect user:', err)
-    });
+  onTargetChange(): void {
+    if (!this.selectedId) {
+      this.inspection = undefined;
+      return;
+    }
+
+    const [type, id] = this.selectedId.split(':');
+    this.loading = true;
+    
+    if (type === 'group') {
+      this.inspectorService.inspectGroup(parseInt(id, 10)).subscribe({
+        next: (result) => {
+          this.inspection = result;
+          this.loading = false;
+        },
+        error: (err) => {
+          console.error('Inspection failed:', err);
+          this.loading = false;
+        }
+      });
+    }
   }
 
-  inspectRole(): void {
-    if (!this.selectedRoleId) return;
-    this.inspection = undefined;
-    this.inspectorService.inspectRole(this.selectedRoleId).subscribe({
-      next: (result: PermissionInspection) => this.inspection = result,
-      error: (err: any) => console.error('Failed to inspect role:', err)
-    });
-  }
-
-  inspectGroup(): void {
-    if (!this.selectedGroupId) return;
-    this.inspection = undefined;
-    this.inspectorService.inspectGroup(this.selectedGroupId).subscribe({
-      next: (result: PermissionInspection) => this.inspection = result,
-      error: (err: any) => console.error('Failed to inspect group:', err)
-    });
-  }
-
-  loadAllUsers(): void {
-    this.inspection = undefined;
-    this.inspectorService.loadAllUsers().subscribe({
-      next: (result: PermissionInspection) => this.inspection = result,
-      error: (err: any) => console.error('Failed to load all users:', err)
-    });
-  }
-
-  loadAllRoles(): void {
-    this.inspection = undefined;
-    this.inspectorService.loadAllRoles().subscribe({
-      next: (result: PermissionInspection) => this.inspection = result,
-      error: (err: any) => console.error('Failed to load all roles:', err)
-    });
-  }
-
-  loadAllGroups(): void {
-    this.inspection = undefined;
-    this.inspectorService.loadAllGroups().subscribe({
-      next: (result: PermissionInspection) => this.inspection = result,
-      error: (err: any) => console.error('Failed to load all groups:', err)
-    });
+  close(): void {
+    this.sidePanelRef.close();
   }
 }

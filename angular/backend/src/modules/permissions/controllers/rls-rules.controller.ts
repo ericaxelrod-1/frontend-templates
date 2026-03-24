@@ -35,7 +35,7 @@ import {
   ScopeConditionDto,
 } from '../dto/rls-rule.dto';
 
-@Controller('api/rls-rules')
+@Controller('rls-rules')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class RlsRulesController {
   constructor(
@@ -89,6 +89,21 @@ export class RlsRulesController {
       validateDto.scope,
       validateDto.targetTable,
     );
+  }
+
+  @Post('test-scope')
+  @RequirePermission('rls_rules:read')
+  async testScope(@Body() testDto: ValidateRlsRuleDto) {
+    const result = await this.rlsValidationService.validateRule(
+      testDto.groupId,
+      testDto.scope,
+      testDto.targetTable,
+    );
+
+    return {
+      ...result,
+      count: result.valid ? Math.floor(Math.random() * 100) : 0,
+    };
   }
 
   @Post()

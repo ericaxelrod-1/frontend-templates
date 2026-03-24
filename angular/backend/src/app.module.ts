@@ -34,6 +34,7 @@ import { RlsJoinPath } from './modules/permissions/entities/rls-join-path.entity
 import { RlsJoinCondition } from './modules/permissions/entities/rls-join-condition.entity';
 import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-template.entity';
 import { RolesModule } from './modules/roles/roles.module';
+import { SchemaModule } from './modules/schema/schema.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { GeoBlockMiddleware } from './common/middleware/geo-block.middleware';
 
@@ -92,6 +93,7 @@ import { GeoBlockMiddleware } from './common/middleware/geo-block.middleware';
     UsersModule,
     CaptchaModule,
     PermissionsModule,
+    SchemaModule,
     RolesModule,
     PrivacyModule,
   ],

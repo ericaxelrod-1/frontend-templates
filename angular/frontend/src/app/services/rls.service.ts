@@ -16,12 +16,16 @@ export interface RlsRule {
 
 export interface SchemaColumn {
   name: string;
-  dataType: string;
+  type: string;
+  isPrimary?: boolean;
 }
 
 export interface TestScopeResult {
   count: number;
   sampleRows?: any[];
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
 }
 
 @Injectable({
@@ -76,9 +80,10 @@ export class RlsService {
     return this.http.get<{ name: string }[]>(`${environment.apiUrl}/schema/tables`);
   }
 
-  testScope(tableName: string, scope: ScopeGroup): Observable<TestScopeResult> {
+  testScope(groupId: number, tableName: string, scope: ScopeGroup): Observable<TestScopeResult> {
     return this.http.post<TestScopeResult>(`${this.apiUrl}/test-scope`, {
-      table: tableName,
+      groupId,
+      targetTable: tableName,
       scope: scope
     });
   }

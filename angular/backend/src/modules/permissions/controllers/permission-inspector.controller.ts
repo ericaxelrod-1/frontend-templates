@@ -15,7 +15,7 @@ import { Repository } from 'typeorm';
 import { RolePermission } from '../entities/role-permission.entity';
 import { GroupPermission } from '../entities/group-permission.entity';
 
-@Controller('api/permissions/inspector')
+@Controller('permissions/inspector')
 @UseGuards(JwtAuthGuard)
 export class PermissionInspectorController {
   constructor(

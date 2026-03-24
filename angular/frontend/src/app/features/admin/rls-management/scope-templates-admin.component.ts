@@ -1,6 +1,12 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { RlsService, SchemaColumn } from '../../../services/rls.service';
@@ -21,9 +27,150 @@ interface RlsScopeTemplate {
 }
 
 @Component({
+  selector: 'app-scope-template-editor-dialog',
+  standalone: true,
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatCheckboxModule],
+  template: `
+    <h2 mat-dialog-title>{{ data.editingTemplate ? 'Edit Template' : 'Create Scope Template' }}</h2>
+    <mat-dialog-content>
+      <div class="form-container">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Name</mat-label>
+          <input matInput [(ngModel)]="formData.name" required placeholder="e.g., Department Filter" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Target Table</mat-label>
+          <mat-select [(ngModel)]="formData.targetTable" (selectionChange)="onTableChange($event.value)" required>
+            @for (table of data.tables; track table.name) {
+              <mat-option [value]="table.name">{{ table.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Join Path</mat-label>
+          <mat-select [(ngModel)]="formData.joinPathId" required>
+            @for (path of data.joinPaths; track path.id) {
+              <mat-option [value]="path.id">{{ path.name }} ({{ path.targetTable }})</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="columns-section">
+          <h3>Available Columns</h3>
+          <p class="hint">Select columns that can be used for filtering</p>
+          <div class="columns-grid">
+            @for (col of availableDbColumns; track col) {
+              <mat-checkbox 
+                [checked]="selectedColumns.includes(col)" 
+                (change)="toggleColumn(col)"
+                class="column-checkbox"
+              >
+                {{ col }}
+              </mat-checkbox>
+            } @empty {
+              <p class="empty-hint">Select a target table to see available columns</p>
+            }
+          </div>
+        </div>
+      </div>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button (click)="onCancel()">Cancel</button>
+      <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!isFormValid()">
+        {{ data.editingTemplate ? 'Save Changes' : 'Create' }}
+      </button>
+    </mat-dialog-actions>
+  `,
+  styles: [`
+    .form-container { display: flex; flex-direction: column; gap: 1rem; padding-top: 0.5rem; min-width: 500px; }
+    .full-width { width: 100%; }
+    .columns-section h3 { margin: 1rem 0 0.25rem 0; font-size: 1rem; font-weight: 500; }
+    .hint { font-size: 0.75rem; color: #64748b; margin-bottom: 0.75rem; }
+    .columns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem; }
+    .column-checkbox { font-size: 0.875rem; }
+    .empty-hint { color: #94a3b8; font-size: 0.875rem; font-style: italic; }
+  `]
+})
+export class ScopeTemplateEditorDialogComponent implements OnInit {
+  formData: Partial<RlsScopeTemplate>;
+  availableDbColumns: string[] = [];
+  selectedColumns: string[] = [];
+
+  constructor(
+    public dialogRef: MatDialogRef<ScopeTemplateEditorDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: { 
+      tables: { name: string }[], 
+      joinPaths: RlsJoinPath[],
+      editingTemplate: RlsScopeTemplate | null 
+    },
+    private rlsService: RlsService
+  ) {
+    if (data.editingTemplate) {
+      this.formData = {
+        name: data.editingTemplate.name,
+        targetTable: data.editingTemplate.targetTable,
+        joinPathId: data.editingTemplate.joinPathId
+      };
+      this.selectedColumns = this.parseColumns(data.editingTemplate.availableColumns);
+    } else {
+      this.formData = { name: '', targetTable: '', joinPathId: 0 };
+    }
+  }
+
+  ngOnInit(): void {
+    if (this.formData.targetTable) {
+      this.onTableChange(this.formData.targetTable);
+    }
+  }
+
+  onTableChange(table: string): void {
+    if (table) {
+      this.rlsService.getTableColumns(table).subscribe({
+        next: (columns) => this.availableDbColumns = columns.map(c => c.name),
+        error: () => this.availableDbColumns = []
+      });
+    }
+  }
+
+  toggleColumn(column: string): void {
+    const index = this.selectedColumns.indexOf(column);
+    if (index === -1) {
+      this.selectedColumns.push(column);
+    } else {
+      this.selectedColumns.splice(index, 1);
+    }
+  }
+
+  parseColumns(columns: string | string[]): string[] {
+    if (Array.isArray(columns)) return columns;
+    try {
+      return JSON.parse(columns);
+    } catch {
+      return columns ? columns.split(',').map((c: string) => c.trim()) : [];
+    }
+  }
+
+  isFormValid(): boolean {
+    return !!(this.formData.name && this.formData.targetTable && this.formData.joinPathId && this.selectedColumns.length > 0);
+  }
+
+  onCancel(): void {
+    this.dialogRef.close();
+  }
+
+  onSave(): void {
+    if (this.isFormValid()) {
+      this.dialogRef.close({ ...this.formData, availableColumns: this.selectedColumns });
+    }
+  }
+}
+
+@Component({
   selector: 'app-scope-templates-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule],
   template: `
     <div class="scope-templates">
       <header class="header">
@@ -72,61 +219,6 @@ interface RlsScopeTemplate {
           }
         </tbody>
       </table>
-
-      @if (showDialog) {
-        <div class="dialog-overlay" (click)="closeDialog()">
-          <div class="dialog" (click)="$event.stopPropagation()">
-            <h2>{{ editingTemplate ? 'Edit' : 'Create' }} Scope Template</h2>
-            
-            <div class="form-group">
-              <label>Name *</label>
-              <input type="text" [(ngModel)]="formData.name" required placeholder="e.g., Department Filter" />
-            </div>
-
-            <div class="form-group">
-              <label>Target Table *</label>
-              <select [(ngModel)]="formData.targetTable" (change)="onTableChange(formData.targetTable || '')" required>
-                <option value="">Select a table</option>
-                @for (table of tables; track table.name) {
-                  <option [value]="table.name">{{ table.name }}</option>
-                }
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>Join Path *</label>
-              <select [(ngModel)]="formData.joinPathId" required>
-                <option value="">Select a join path...</option>
-                @for (path of joinPaths; track path.id) {
-                  <option [value]="path.id">{{ path.name }} ({{ path.targetTable }})</option>
-                }
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>Available Columns *</label>
-              <p class="hint">Select columns that can be used for filtering</p>
-              <div class="columns-grid">
-                @for (col of availableDbColumns; track col) {
-                  <label class="checkbox-label">
-                    <input type="checkbox" [checked]="selectedColumns.includes(col)" (change)="toggleColumn(col)" />
-                    {{ col }}
-                  </label>
-                } @empty {
-                  <p class="empty-hint">Select a target table to see available columns</p>
-                }
-              </div>
-            </div>
-
-            <div class="dialog-actions">
-              <button class="btn-secondary" (click)="closeDialog()">Cancel</button>
-              <button class="btn-primary" (click)="saveTemplate()" [disabled]="!isFormValid()">
-                {{ editingTemplate ? 'Update' : 'Create' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      }
     </div>
   `,
   styles: [`
@@ -139,33 +231,21 @@ interface RlsScopeTemplate {
     .column-chip { display: inline-block; background: #f1f5f9; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin: 0.125rem; }
     .actions { display: flex; gap: 0.5rem; }
     .btn-primary { background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; }
-    .btn-secondary { background: #e2e8f0; color: #475569; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; }
     .btn-small { padding: 0.25rem 0.5rem; border-radius: 0.25rem; border: none; cursor: pointer; background: #e2e8f0; }
     .btn-danger { background: #ef4444; color: white; }
-    .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .dialog { background: white; padding: 1.5rem; border-radius: 0.5rem; width: 500px; max-width: 90vw; }
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.25rem; font-weight: 500; }
-    .form-group input, .form-group select { width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; }
-    .hint { color: #64748b; font-size: 0.75rem; margin: 0.25rem 0; }
-    .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
     .empty-state { text-align: center; color: #94a3b8; padding: 2rem; }
-    .columns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem; }
-    .checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
-    .empty-hint { color: #94a3b8; font-size: 0.875rem; font-style: italic; }
   `]
 })
 export class ScopeTemplatesAdminComponent implements OnInit {
   templates: RlsScopeTemplate[] = [];
   joinPaths: RlsJoinPath[] = [];
   tables: { name: string }[] = [];
-  availableDbColumns: string[] = [];
-  showDialog = false;
-  editingTemplate?: RlsScopeTemplate;
-  formData: Partial<RlsScopeTemplate> = {};
-  selectedColumns: string[] = [];
 
-  constructor(private http: HttpClient, private rlsService: RlsService) {}
+  constructor(
+    private http: HttpClient, 
+    private rlsService: RlsService,
+    private dialog: MatDialog
+  ) {}
 
   ngOnInit(): void {
     this.loadTemplates();
@@ -175,48 +255,23 @@ export class ScopeTemplatesAdminComponent implements OnInit {
 
   loadTemplates(): void {
     this.http.get<RlsScopeTemplate[]>(`${environment.apiUrl}/rls/scope-templates`).subscribe({
-      next: (templates: RlsScopeTemplate[]) => this.templates = templates,
-      error: (err: any) => console.error('Failed to load templates:', err)
+      next: (templates) => this.templates = templates,
+      error: (err) => console.error('Failed to load templates:', err)
     });
   }
 
   loadJoinPaths(): void {
     this.http.get<RlsJoinPath[]>(`${environment.apiUrl}/rls/join-paths`).subscribe({
-      next: (paths: RlsJoinPath[]) => this.joinPaths = paths,
-      error: (err: any) => console.error('Failed to load join paths:', err)
+      next: (paths) => this.joinPaths = paths,
+      error: (err) => console.error('Failed to load join paths:', err)
     });
   }
 
   loadTables(): void {
     this.rlsService.getTables().subscribe({
-      next: (tables: { name: string }[]) => this.tables = tables,
-      error: (err: any) => console.error('Failed to load tables:', err)
+      next: (tables) => this.tables = tables,
+      error: (err) => console.error('Failed to load tables:', err)
     });
-  }
-
-  onTableChange(table: string): void {
-    if (table) {
-      this.rlsService.getTableColumns(table).subscribe({
-        next: (columns: SchemaColumn[]) => {
-          this.availableDbColumns = columns.map(c => c.name);
-        },
-        error: (err: any) => {
-          console.error('Failed to load columns:', err);
-          this.availableDbColumns = [];
-        }
-      });
-    } else {
-      this.availableDbColumns = [];
-    }
-  }
-
-  toggleColumn(column: string): void {
-    const index = this.selectedColumns.indexOf(column);
-    if (index === -1) {
-      this.selectedColumns.push(column);
-    } else {
-      this.selectedColumns.splice(index, 1);
-    }
   }
 
   parseColumns(columns: string | string[]): string[] {
@@ -229,51 +284,38 @@ export class ScopeTemplatesAdminComponent implements OnInit {
   }
 
   showCreateDialog(): void {
-    this.editingTemplate = undefined;
-    this.formData = { name: '', targetTable: '', joinPathId: undefined as any };
-    this.selectedColumns = [];
-    this.availableDbColumns = [];
-    this.showDialog = true;
+    this.openEditor(null);
   }
 
   editTemplate(template: RlsScopeTemplate): void {
-    this.editingTemplate = template;
-    this.formData = {
-      name: template.name,
-      targetTable: template.targetTable,
-      joinPathId: template.joinPathId
-    };
-    this.selectedColumns = this.parseColumns(template.availableColumns);
-    if (template.targetTable) {
-      this.onTableChange(template.targetTable);
-    }
-    this.showDialog = true;
+    this.openEditor(template);
   }
 
-  closeDialog(): void {
-    this.showDialog = false;
-    this.editingTemplate = undefined;
+  private openEditor(template: RlsScopeTemplate | null): void {
+    const dialogRef = this.dialog.open(ScopeTemplateEditorDialogComponent, {
+      data: {
+        tables: this.tables,
+        joinPaths: this.joinPaths,
+        editingTemplate: template
+      },
+      width: '600px'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.saveTemplate(result, template?.id);
+      }
+    });
   }
 
-  isFormValid(): boolean {
-    return !!(this.formData.name && this.formData.targetTable && this.formData.joinPathId && this.selectedColumns.length > 0);
-  }
-
-  saveTemplate(): void {
-    if (!this.isFormValid()) return;
-
-    const data = {
-      ...this.formData,
-      availableColumns: this.selectedColumns
-    };
-
-    const observable = this.editingTemplate?.id
-      ? this.http.put(`${environment.apiUrl}/rls/scope-templates/${this.editingTemplate.id}`, data)
-      : this.http.post(`${environment.apiUrl}/rls/scope-templates`, data);
+  saveTemplate(formData: any, id?: number): void {
+    const observable = id
+      ? this.http.put(`${environment.apiUrl}/rls/scope-templates/${id}`, formData)
+      : this.http.post(`${environment.apiUrl}/rls/scope-templates`, formData);
 
     observable.subscribe({
-      next: () => { this.closeDialog(); this.loadTemplates(); },
-      error: (err: any) => console.error('Failed to save template:', err)
+      next: () => this.loadTemplates(),
+      error: (err) => console.error('Failed to save template:', err)
     });
   }
 
@@ -281,7 +323,7 @@ export class ScopeTemplatesAdminComponent implements OnInit {
     if (!template.id || !confirm('Delete this template?')) return;
     this.http.delete(`${environment.apiUrl}/rls/scope-templates/${template.id}`).subscribe({
       next: () => this.loadTemplates(),
-      error: (err: any) => console.error('Failed to delete template:', err)
+      error: (err) => console.error('Failed to delete template:', err)
     });
   }
 }

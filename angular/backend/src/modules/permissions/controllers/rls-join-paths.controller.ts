@@ -22,7 +22,7 @@ import {
   UpdateRlsJoinPathDto,
 } from '../dto/rls-join-path.dto';
 
-@Controller('api/rls/join-paths')
+@Controller('rls/join-paths')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class RlsJoinPathsController {
   constructor(
