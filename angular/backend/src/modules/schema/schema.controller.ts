@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  NotFoundException,
-} from '@nestjs/common';
+import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -100,7 +95,9 @@ export class SchemaController {
     },
   })
   @ApiResponse({ status: 404, description: 'Table not found' })
-  async getTableMetadata(@Param('table') tableName: string): Promise<TableInfo> {
+  async getTableMetadata(
+    @Param('table') tableName: string,
+  ): Promise<TableInfo> {
     const metadata = await this.schemaService.getTableMetadata(tableName);
 
     if (metadata === null) {

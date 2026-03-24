@@ -1,0 +1,174 @@
+<div class="privacy-container">
+  <h1>Privacy Settings</h1>
+  <p class="subtitle">Manage your data and privacy preferences</p>
+
+  <div *ngIf="loading" class="loading">Loading...</div>
+
+  <div *ngIf="!loading && preferences" class="privacy-sections">
+    <!-- Marketing Preferences -->
+    <mat-card class="privacy-section">
+      <mat-card-header>
+        <mat-card-title>Marketing Communications</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="section-description">
+          Control how we communicate with you about products and services.
+        </p>
+        
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Marketing Consent</span>
+            <span class="toggle-description">Receive promotional emails and updates</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="preferences.marketingConsent"
+            (change)="onMarketingConsentChange($event)"
+            [disabled]="saving">
+          </mat-slide-toggle>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Do Not Sell My Personal Information</span>
+            <span class="toggle-description">Opt out of data selling/sharing (CCPA compliance)</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="preferences.doNotSell"
+            (change)="onDoNotSellChange($event)"
+            [disabled]="saving">
+          </mat-slide-toggle>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Privacy Restrictions -->
+    <mat-card class="privacy-section">
+      <mat-card-header>
+        <mat-card-title>Data Processing Restrictions</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="section-description">
+          Under GDPR Art. 18, you may request restriction of processing for specific purposes.
+        </p>
+        
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Restrict Analytics</span>
+            <span class="toggle-description">Limit data analysis and metrics</span>
+          </div>
+          <mat-slide-toggle
+            [(ngModel)]="restrictions.restrictAnalytics"
+            (change)="onRestrictionChange()"
+            [disabled]="saving">
+          </mat-slide-toggle>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Restrict Marketing</span>
+            <span class="toggle-description">Limit marketing-related processing</span>
+          </div>
+          <mat-slide-toggle
+            [(ngModel)]="restrictions.restrictMarketing"
+            (change)="onRestrictionChange()"
+            [disabled]="saving">
+          </mat-slide-toggle>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Restrict Third-Party Sharing</span>
+            <span class="toggle-description">Limit sharing with external parties</span>
+          </div>
+          <mat-slide-toggle
+            [(ngModel)]="restrictions.restrictThirdParty"
+            (change)="onRestrictionChange()"
+            [disabled]="saving">
+          </mat-slide-toggle>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Restrict Automated Profiling</span>
+            <span class="toggle-description">Limit automated decision-making</span>
+          </div>
+          <mat-slide-toggle
+            [(ngModel)]="restrictions.restrictProfiling"
+            (change)="onRestrictionChange()"
+            [disabled]="saving">
+          </mat-slide-toggle>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Processing Objections -->
+    <mat-card class="privacy-section">
+      <mat-card-header>
+        <mat-card-title>Objections to Processing</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="section-description">
+          Under GDPR Art. 21, you may object to specific types of processing.
+        </p>
+        
+        <div class="objection-list">
+          <div *ngFor="let type of processingTypes" class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">{{ type.label }}</span>
+              <span class="toggle-description">{{ type.description }}</span>
+            </div>
+            <mat-slide-toggle
+              [checked]="hasObjection(type.key)"
+              (change)="onObjectionToggle(type.key, $event)"
+              [disabled]="saving">
+            </mat-slide-toggle>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Data Management -->
+    <mat-card class="privacy-section">
+      <mat-card-header>
+        <mat-card-title>Your Data</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="section-description">
+          Export or delete your personal data.
+        </p>
+        
+        <div class="action-buttons">
+          <button mat-raised-button color="primary" (click)="openExportDialog()">
+            <mat-icon>download</mat-icon>
+            Export My Data
+          </button>
+          <button mat-raised-button color="warn" (click)="openDeleteDialog()">
+            <mat-icon>delete</mat-icon>
+            Delete Account
+          </button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Support -->
+    <mat-card class="privacy-section">
+      <mat-card-header>
+        <mat-card-title>Need Help?</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="section-description">
+          Can't find what you're looking for? Submit a support request.
+        </p>
+        <button mat-raised-button (click)="openSupportTicket()">
+          <mat-icon>support_agent</mat-icon>
+          Submit Privacy Request
+        </button>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Last Updated -->
+    <div class="last-updated" *ngIf="preferences.consentUpdatedAt">
+      <p>Last updated: {{ preferences.consentUpdatedAt | date:'medium' }}</p>
+    </div>
+  </div>
+</div>

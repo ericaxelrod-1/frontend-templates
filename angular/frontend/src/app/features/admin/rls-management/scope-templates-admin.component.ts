@@ -84,7 +84,12 @@ interface RlsScopeTemplate {
 
             <div class="form-group">
               <label>Target Table *</label>
-              <input type="text" [(ngModel)]="formData.targetTable" required placeholder="e.g., users" />
+              <select [(ngModel)]="formData.targetTable" (change)="onTableChange(formData.targetTable)" required>
+                <option value="">Select a table</option>
+                @for (table of tables; track table.name) {
+                  <option [value]="table.name">{{ table.name }}</option>
+                }
+              </select>
             </div>
 
             <div class="form-group">
@@ -99,9 +104,17 @@ interface RlsScopeTemplate {
 
             <div class="form-group">
               <label>Available Columns *</label>
-              <p class="hint">Comma-separated list of columns that can be used for filtering</p>
-              <input type="text" [(ngModel)]="columnsInput" required 
-                     placeholder="e.g., department, region, status" />
+              <p class="hint">Select columns that can be used for filtering</p>
+              <div class="columns-grid">
+                @for (col of availableDbColumns; track col) {
+                  <label class="checkbox-label">
+                    <input type="checkbox" [checked]="selectedColumns.includes(col)" (change)="toggleColumn(col)" />
+                    {{ col }}
+                  </label>
+                } @empty {
+                  <p class="empty-hint">Select a target table to see available columns</p>
+                }
+              </div>
             </div>
 
             <div class="dialog-actions">
@@ -136,21 +149,27 @@ interface RlsScopeTemplate {
     .hint { color: #64748b; font-size: 0.75rem; margin: 0.25rem 0; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
     .empty-state { text-align: center; color: #94a3b8; padding: 2rem; }
+    .columns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem; }
+    .checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
+    .empty-hint { color: #94a3b8; font-size: 0.875rem; font-style: italic; }
   `]
 })
 export class ScopeTemplatesAdminComponent implements OnInit {
   templates: RlsScopeTemplate[] = [];
   joinPaths: RlsJoinPath[] = [];
+  tables: { name: string }[] = [];
+  availableDbColumns: string[] = [];
   showDialog = false;
   editingTemplate?: RlsScopeTemplate;
   formData: Partial<RlsScopeTemplate> = {};
-  columnsInput = '';
+  selectedColumns: string[] = [];
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private rlsService: RlsService) {}
 
   ngOnInit(): void {
     this.loadTemplates();
     this.loadJoinPaths();
+    this.loadTables();
   }
 
   loadTemplates(): void {
@@ -167,19 +186,51 @@ export class ScopeTemplatesAdminComponent implements OnInit {
     });
   }
 
+  loadTables(): void {
+    this.rlsService.getTables().subscribe({
+      next: (tables) => this.tables = tables,
+      error: (err) => console.error('Failed to load tables:', err)
+    });
+  }
+
+  onTableChange(table: string): void {
+    if (table) {
+      this.rlsService.getTableColumns(table).subscribe({
+        next: (columns) => {
+          this.availableDbColumns = columns.map(c => c.name);
+        },
+        error: () => {
+          this.availableDbColumns = [];
+        }
+      });
+    } else {
+      this.availableDbColumns = [];
+    }
+  }
+
+  toggleColumn(column: string): void {
+    const index = this.selectedColumns.indexOf(column);
+    if (index === -1) {
+      this.selectedColumns.push(column);
+    } else {
+      this.selectedColumns.splice(index, 1);
+    }
+  }
+
   parseColumns(columns: string | string[]): string[] {
     if (Array.isArray(columns)) return columns;
     try {
       return JSON.parse(columns);
     } catch {
-      return columns.split(',').map((c: string) => c.trim());
+      return columns ? columns.split(',').map((c: string) => c.trim()) : [];
     }
   }
 
   showCreateDialog(): void {
     this.editingTemplate = undefined;
     this.formData = { name: '', targetTable: '', joinPathId: undefined as any };
-    this.columnsInput = '';
+    this.selectedColumns = [];
+    this.availableDbColumns = [];
     this.showDialog = true;
   }
 
@@ -190,7 +241,10 @@ export class ScopeTemplatesAdminComponent implements OnInit {
       targetTable: template.targetTable,
       joinPathId: template.joinPathId
     };
-    this.columnsInput = this.parseColumns(template.availableColumns).join(', ');
+    this.selectedColumns = this.parseColumns(template.availableColumns);
+    if (template.targetTable) {
+      this.onTableChange(template.targetTable);
+    }
     this.showDialog = true;
   }
 
@@ -200,7 +254,7 @@ export class ScopeTemplatesAdminComponent implements OnInit {
   }
 
   isFormValid(): boolean {
-    return !!(this.formData.name && this.formData.targetTable && this.formData.joinPathId && this.columnsInput);
+    return !!(this.formData.name && this.formData.targetTable && this.formData.joinPathId && this.selectedColumns.length > 0);
   }
 
   saveTemplate(): void {
@@ -208,7 +262,7 @@ export class ScopeTemplatesAdminComponent implements OnInit {
 
     const data = {
       ...this.formData,
-      availableColumns: this.columnsInput.split(',').map((c: string) => c.trim())
+      availableColumns: this.selectedColumns
     };
 
     const observable = this.editingTemplate?.id

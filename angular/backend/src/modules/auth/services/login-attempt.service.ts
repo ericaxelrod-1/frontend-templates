@@ -23,7 +23,7 @@ export class LoginAttemptService {
     private readonly ipReputationService: IPReputationService,
     @Inject(forwardRef(() => PatternDetectionService))
     private readonly patternDetectionService: PatternDetectionService,
-  ) { }
+  ) {}
 
   async create(data: {
     ipAddress: string;
@@ -44,7 +44,8 @@ export class LoginAttemptService {
     });
 
     // 1. Evaluate Contextual Risk Score in real time before saving
-    const riskScore = await this.patternDetectionService.evaluateRiskScore(loginAttempt);
+    const riskScore =
+      await this.patternDetectionService.evaluateRiskScore(loginAttempt);
 
     // Explicitly add riskScore to metadata to retain it
     const metadataWithRisk = { ...(data.metadata || {}), riskScore };

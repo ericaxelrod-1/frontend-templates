@@ -3,7 +3,7 @@ import { LoggerService } from './logger.service';
 
 @Injectable()
 export class HttpLoggerMiddleware implements NestMiddleware {
-  constructor(private readonly logger: LoggerService) { }
+  constructor(private readonly logger: LoggerService) {}
 
   use(request: any, response: any, next: () => void): void {
     const method = request.method;
@@ -22,7 +22,9 @@ export class HttpLoggerMiddleware implements NestMiddleware {
 
     response.on('finish', () => {
       const statusCode = response.statusCode;
-      const contentLength = response.getHeader ? response.getHeader('content-length') : 0;
+      const contentLength = response.getHeader
+        ? response.getHeader('content-length')
+        : 0;
       const duration = Date.now() - start;
 
       // Log based on status code

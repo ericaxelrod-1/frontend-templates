@@ -32,35 +32,21 @@ export class IPReputation {
   @Column({ type: 'integer', default: 0 })
   failedLoginAttempts: number;
 
-
-
-
   @Column({ type: 'boolean', default: false })
   isManuallyBlocked: boolean;
-
-
-
 
   @Column({ type: 'datetime', nullable: true })
   blockedUntilAuto: Date;
 
-
-
-
   @Column({ type: 'integer', default: 0 })
   captchaChallengeCount: number;
 
-
-
-
   @Column({ type: 'text', nullable: true })
   notes: string;
-
 
   @CreateDateColumn({ type: 'datetime' })
   firstSeenAt: Date;
 
   @UpdateDateColumn({ type: 'datetime' })
   lastUpdatedAt: Date;
-
 }

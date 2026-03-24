@@ -20,13 +20,11 @@ export class SecurityDetectedPattern {
   @Column({ length: 50 })
   patternType: string;
 
-
   @Column({ length: 20, default: 'medium' })
   severity: string;
 
   @Column({ type: 'text' })
   ipAddress: string;
-
 
   @Column({
     type: 'datetime',
@@ -34,20 +32,17 @@ export class SecurityDetectedPattern {
   })
   detectionTimestamp: Date;
 
-
   @Column({ type: 'datetime' })
   timeWindowStart: Date;
 
   @Column({ type: 'datetime' })
   timeWindowEnd: Date;
 
-
   @Column({ type: 'integer', default: 0 })
   attemptCount: number;
 
   @Column({ type: 'integer', default: 0 })
   uniqueEmailCount: number;
-
 
   @Column({ type: 'text' })
   evidence: string;
@@ -58,14 +53,12 @@ export class SecurityDetectedPattern {
   @Column({ type: 'datetime', nullable: true })
   resolvedAt: Date;
 
-
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'resolved_by' })
   resolvedBy: User;
 
   @Column({ type: 'text', nullable: true })
   resolutionNotes: string;
-
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
@@ -75,7 +68,6 @@ export class SecurityDetectedPattern {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 
   // Relations
   @OneToMany(() => SecurityAlert, (alert) => alert.pattern)

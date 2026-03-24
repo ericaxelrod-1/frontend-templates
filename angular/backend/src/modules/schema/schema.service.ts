@@ -88,7 +88,8 @@ export class SchemaService {
 
     return entity.relations.map((rel) => ({
       name: rel.propertyName,
-      targetTable: rel.type instanceof Function ? rel.type.name : String(rel.type),
+      targetTable:
+        rel.type instanceof Function ? rel.type.name : String(rel.type),
     }));
   }
 
@@ -137,7 +138,10 @@ export class SchemaService {
     for (const relation of entity.relations) {
       if (relation.joinColumns) {
         for (const joinCol of relation.joinColumns) {
-          if (joinCol.referencedColumn && joinCol.referencedColumn.entityMetadata) {
+          if (
+            joinCol.referencedColumn &&
+            joinCol.referencedColumn.entityMetadata
+          ) {
             references.push({
               tableName: joinCol.referencedColumn.entityMetadata.tableName,
               columnName: joinCol.referencedColumn.propertyName,

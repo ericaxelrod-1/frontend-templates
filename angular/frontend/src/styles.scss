@@ -1,11 +1,9 @@
-/* Import Angular Material and configure theming */
 @use '@angular/material' as mat;
 
-/* Include the common styles for Angular Material */
-@include mat.core();
-
-/* CRITICAL: Apply azure-blue Material 3 theme - THIS IS WHAT WAS MISSING */
+@import 'ng-diagram/styles.css';
 @import '@angular/material/prebuilt-themes/azure-blue.css';
+
+@include mat.core();
 
 /* ANGULAR MATERIAL 18+ THEMING - MODERN CSS CUSTOM PROPERTIES APPROACH */
 /* 

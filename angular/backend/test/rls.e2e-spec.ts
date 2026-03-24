@@ -133,206 +133,279 @@ describe('RLS - Row Level Security (e2e)', () => {
 
   async function setupTestData() {
     // Create groups hierarchy
-    const companyA = await groupRepo.save(groupRepo.create({
-      name: 'test_company_a',
-      description: 'Test Company A',
-      parentId: null,
-      priority: 100,
-    }));
+    const companyA = await groupRepo.save(
+      groupRepo.create({
+        name: 'test_company_a',
+        description: 'Test Company A',
+        parentId: null,
+        priority: 100,
+      }),
+    );
     groupIds.company_a = companyA.id;
 
-    const engineering = await groupRepo.save(groupRepo.create({
-      name: 'test_engineering',
-      description: 'Test Engineering',
-      parentId: companyA.id,
-      priority: 90,
-    }));
+    const engineering = await groupRepo.save(
+      groupRepo.create({
+        name: 'test_engineering',
+        description: 'Test Engineering',
+        parentId: companyA.id,
+        priority: 90,
+      }),
+    );
     groupIds.engineering = engineering.id;
 
-    const frontend = await groupRepo.save(groupRepo.create({
-      name: 'test_frontend',
-      description: 'Test Frontend',
-      parentId: engineering.id,
-      priority: 80,
-    }));
+    const frontend = await groupRepo.save(
+      groupRepo.create({
+        name: 'test_frontend',
+        description: 'Test Frontend',
+        parentId: engineering.id,
+        priority: 80,
+      }),
+    );
     groupIds.frontend = frontend.id;
 
-    const companyB = await groupRepo.save(groupRepo.create({
-      name: 'test_company_b',
-      description: 'Test Company B',
-      parentId: null,
-      priority: 100,
-    }));
+    const companyB = await groupRepo.save(
+      groupRepo.create({
+        name: 'test_company_b',
+        description: 'Test Company B',
+        parentId: null,
+        priority: 100,
+      }),
+    );
     groupIds.company_b = companyB.id;
 
-    const marketing = await groupRepo.save(groupRepo.create({
-      name: 'test_marketing',
-      description: 'Test Marketing',
-      parentId: companyB.id,
-      priority: 90,
-    }));
+    const marketing = await groupRepo.save(
+      groupRepo.create({
+        name: 'test_marketing',
+        description: 'Test Marketing',
+        parentId: companyB.id,
+        priority: 90,
+      }),
+    );
     groupIds.marketing = marketing.id;
 
     // Create test permissions
     const testPermissions = [
       { name: 'users:read', description: 'Read users', resourceName: 'users' },
-      { name: 'users:create', description: 'Create users', resourceName: 'users' },
-      { name: 'users:update', description: 'Update users', resourceName: 'users' },
-      { name: 'users:delete', description: 'Delete users', resourceName: 'users' },
+      {
+        name: 'users:create',
+        description: 'Create users',
+        resourceName: 'users',
+      },
+      {
+        name: 'users:update',
+        description: 'Update users',
+        resourceName: 'users',
+      },
+      {
+        name: 'users:delete',
+        description: 'Delete users',
+        resourceName: 'users',
+      },
       { name: 'roles:read', description: 'Read roles', resourceName: 'roles' },
-      { name: 'roles:manage', description: 'Manage roles', resourceName: 'roles' },
+      {
+        name: 'roles:manage',
+        description: 'Manage roles',
+        resourceName: 'roles',
+      },
     ];
 
     for (const perm of testPermissions) {
-      let existingPerm = await permissionRepo.findOne({ where: { name: perm.name } });
+      let existingPerm = await permissionRepo.findOne({
+        where: { name: perm.name },
+      });
       if (!existingPerm) {
-        existingPerm = await permissionRepo.save(permissionRepo.create({
-          name: perm.name,
-          description: perm.description,
-          resourceName: perm.resourceName,
-          actionId: 1,
-        }));
+        existingPerm = await permissionRepo.save(
+          permissionRepo.create({
+            name: perm.name,
+            description: perm.description,
+            resourceName: perm.resourceName,
+            actionId: 1,
+          }),
+        );
       }
       permissionIds[perm.name] = existingPerm.id;
     }
 
     // Create roles hierarchy for testing inheritance
-    const adminRole = await roleRepo.save(roleRepo.create({
-      name: 'test_admin_role',
-      description: 'Test Admin Role',
-      isSystemRole: false,
-      parentId: null,
-    }));
+    const adminRole = await roleRepo.save(
+      roleRepo.create({
+        name: 'test_admin_role',
+        description: 'Test Admin Role',
+        isSystemRole: false,
+        parentId: null,
+      }),
+    );
     roleIds.admin_role = adminRole.id;
 
-    const userRole = await roleRepo.save(roleRepo.create({
-      name: 'test_user_role',
-      description: 'Test User Role',
-      isSystemRole: false,
-      parentId: adminRole.id,
-    }));
+    const userRole = await roleRepo.save(
+      roleRepo.create({
+        name: 'test_user_role',
+        description: 'Test User Role',
+        isSystemRole: false,
+        parentId: adminRole.id,
+      }),
+    );
     roleIds.user_role = userRole.id;
 
-    const guestRole = await roleRepo.save(roleRepo.create({
-      name: 'test_guest_role',
-      description: 'Test Guest Role',
-      isSystemRole: false,
-      parentId: userRole.id,
-    }));
+    const guestRole = await roleRepo.save(
+      roleRepo.create({
+        name: 'test_guest_role',
+        description: 'Test Guest Role',
+        isSystemRole: false,
+        parentId: userRole.id,
+      }),
+    );
     roleIds.guest_role = guestRole.id;
 
-    const limitedRole = await roleRepo.save(roleRepo.create({
-      name: 'test_limited_role',
-      description: 'Test Limited Role',
-      isSystemRole: false,
-      parentId: null,
-    }));
+    const limitedRole = await roleRepo.save(
+      roleRepo.create({
+        name: 'test_limited_role',
+        description: 'Test Limited Role',
+        isSystemRole: false,
+        parentId: null,
+      }),
+    );
     roleIds.limited_role = limitedRole.id;
 
     // Assign permissions to admin_role
-    for (const permName of ['users:read', 'users:create', 'users:update', 'users:delete', 'roles:read', 'roles:manage']) {
-      await rolePermissionRepo.save(rolePermissionRepo.create({
-        roleId: adminRole.id,
-        permissionId: permissionIds[permName],
-        isGranted: true,
-      }));
+    for (const permName of [
+      'users:read',
+      'users:create',
+      'users:update',
+      'users:delete',
+      'roles:read',
+      'roles:manage',
+    ]) {
+      await rolePermissionRepo.save(
+        rolePermissionRepo.create({
+          roleId: adminRole.id,
+          permissionId: permissionIds[permName],
+          isGranted: true,
+        }),
+      );
     }
 
     // Assign permissions to user_role
     for (const permName of ['users:read', 'users:create']) {
-      await rolePermissionRepo.save(rolePermissionRepo.create({
-        roleId: userRole.id,
-        permissionId: permissionIds[permName],
-        isGranted: true,
-      }));
+      await rolePermissionRepo.save(
+        rolePermissionRepo.create({
+          roleId: userRole.id,
+          permissionId: permissionIds[permName],
+          isGranted: true,
+        }),
+      );
     }
 
     // Explicitly deny users:delete in user_role
-    await rolePermissionRepo.save(rolePermissionRepo.create({
-      roleId: userRole.id,
-      permissionId: permissionIds['users:delete'],
-      isGranted: false,
-    }));
+    await rolePermissionRepo.save(
+      rolePermissionRepo.create({
+        roleId: userRole.id,
+        permissionId: permissionIds['users:delete'],
+        isGranted: false,
+      }),
+    );
 
     // Assign permissions to guest_role
-    await rolePermissionRepo.save(rolePermissionRepo.create({
-      roleId: guestRole.id,
-      permissionId: permissionIds['users:read'],
-      isGranted: true,
-    }));
+    await rolePermissionRepo.save(
+      rolePermissionRepo.create({
+        roleId: guestRole.id,
+        permissionId: permissionIds['users:read'],
+        isGranted: true,
+      }),
+    );
 
     // Assign permissions to limited_role
-    await rolePermissionRepo.save(rolePermissionRepo.create({
-      roleId: limitedRole.id,
-      permissionId: permissionIds['users:read'],
-      isGranted: true,
-    }));
-    await rolePermissionRepo.save(rolePermissionRepo.create({
-      roleId: limitedRole.id,
-      permissionId: permissionIds['users:delete'],
-      isGranted: false,
-    }));
+    await rolePermissionRepo.save(
+      rolePermissionRepo.create({
+        roleId: limitedRole.id,
+        permissionId: permissionIds['users:read'],
+        isGranted: true,
+      }),
+    );
+    await rolePermissionRepo.save(
+      rolePermissionRepo.create({
+        roleId: limitedRole.id,
+        permissionId: permissionIds['users:delete'],
+        isGranted: false,
+      }),
+    );
 
     // Assign group permissions
     for (const permName of ['users:read', 'users:create']) {
-      await groupPermissionRepo.save(groupPermissionRepo.create({
-        groupId: companyA.id,
-        permissionId: permissionIds[permName],
-        isGranted: true,
-      }));
+      await groupPermissionRepo.save(
+        groupPermissionRepo.create({
+          groupId: companyA.id,
+          permissionId: permissionIds[permName],
+          isGranted: true,
+        }),
+      );
     }
 
-    await groupPermissionRepo.save(groupPermissionRepo.create({
-      groupId: marketing.id,
-      permissionId: permissionIds['users:read'],
-      isGranted: true,
-    }));
+    await groupPermissionRepo.save(
+      groupPermissionRepo.create({
+        groupId: marketing.id,
+        permissionId: permissionIds['users:read'],
+        isGranted: true,
+      }),
+    );
 
     // Create RLS rules
-    await rlsRuleRepo.save(rlsRuleRepo.create({
-      groupId: companyA.id,
-      targetTable: 'login_attempts',
-      sql: 'ip_address LIKE :ip_prefix',
-      parameters: '{"ip_prefix": "10.%"}',
-    }));
+    await rlsRuleRepo.save(
+      rlsRuleRepo.create({
+        groupId: companyA.id,
+        targetTable: 'login_attempts',
+        sql: 'ip_address LIKE :ip_prefix',
+        parameters: '{"ip_prefix": "10.%"}',
+      }),
+    );
 
-    await rlsRuleRepo.save(rlsRuleRepo.create({
-      groupId: companyB.id,
-      targetTable: 'login_attempts',
-      sql: 'ip_address LIKE :ip_prefix',
-      parameters: '{"ip_prefix": "192.168.%"}',
-    }));
+    await rlsRuleRepo.save(
+      rlsRuleRepo.create({
+        groupId: companyB.id,
+        targetTable: 'login_attempts',
+        sql: 'ip_address LIKE :ip_prefix',
+        parameters: '{"ip_prefix": "192.168.%"}',
+      }),
+    );
 
     // Create RLS join path
-    const joinPath = await rlsJoinPathRepo.save(rlsJoinPathRepo.create({
-      name: 'test_login_attempts_via_users',
-      targetTable: 'login_attempts',
-      chain: '["groups", "user_groups", "users", "login_attempts"]',
-    }));
+    const joinPath = await rlsJoinPathRepo.save(
+      rlsJoinPathRepo.create({
+        name: 'test_login_attempts_via_users',
+        targetTable: 'login_attempts',
+        chain: '["groups", "user_groups", "users", "login_attempts"]',
+      }),
+    );
 
-    await rlsJoinConditionRepo.save(rlsJoinConditionRepo.create({
-      joinPathId: joinPath.id,
-      fromTable: 'groups',
-      fromColumn: 'id',
-      toTable: 'user_groups',
-      toColumn: 'group_id',
-    }));
+    await rlsJoinConditionRepo.save(
+      rlsJoinConditionRepo.create({
+        joinPathId: joinPath.id,
+        fromTable: 'groups',
+        fromColumn: 'id',
+        toTable: 'user_groups',
+        toColumn: 'group_id',
+      }),
+    );
 
-    await rlsJoinConditionRepo.save(rlsJoinConditionRepo.create({
-      joinPathId: joinPath.id,
-      fromTable: 'user_groups',
-      fromColumn: 'user_id',
-      toTable: 'users',
-      toColumn: 'id',
-    }));
+    await rlsJoinConditionRepo.save(
+      rlsJoinConditionRepo.create({
+        joinPathId: joinPath.id,
+        fromTable: 'user_groups',
+        fromColumn: 'user_id',
+        toTable: 'users',
+        toColumn: 'id',
+      }),
+    );
 
-    await rlsJoinConditionRepo.save(rlsJoinConditionRepo.create({
-      joinPathId: joinPath.id,
-      fromTable: 'users',
-      fromColumn: 'id',
-      toTable: 'login_attempts',
-      toColumn: 'user_id',
-    }));
+    await rlsJoinConditionRepo.save(
+      rlsJoinConditionRepo.create({
+        joinPathId: joinPath.id,
+        fromTable: 'users',
+        fromColumn: 'id',
+        toTable: 'login_attempts',
+        toColumn: 'user_id',
+      }),
+    );
 
     // Assign group IDs to test users
     testUsers.test_admin_a.groupId = companyA.id;
@@ -346,15 +419,19 @@ describe('RLS - Row Level Security (e2e)', () => {
     const hashedPassword = await bcrypt.hash('Test123!', 10);
 
     for (const [key, user] of Object.entries(testUsers)) {
-      const newUser = await userRepo.save(userRepo.create({
-        username: user.username,
-        email: user.email,
-        password: hashedPassword,
-        isActive: true,
-        isEmailVerified: true,
-        groups: [{ id: user.groupId }] as Group[],
-        roles: [{ id: key.includes('admin') ? adminRole.id : userRole.id }] as Role[],
-      }));
+      const newUser = await userRepo.save(
+        userRepo.create({
+          username: user.username,
+          email: user.email,
+          password: hashedPassword,
+          isActive: true,
+          isEmailVerified: true,
+          groups: [{ id: user.groupId }] as Group[],
+          roles: [
+            { id: key.includes('admin') ? adminRole.id : userRole.id },
+          ] as Role[],
+        }),
+      );
       userIds[key] = newUser.id;
 
       // Login to get JWT token
@@ -376,53 +453,63 @@ describe('RLS - Row Level Security (e2e)', () => {
 
     // Create login attempts
     for (let i = 1; i <= 10; i++) {
-      await loginAttemptRepo.save(loginAttemptRepo.create({
-        user: { id: userIds.test_user_a1 } as User,
-        ipAddress: `10.0.0.${i}`,
-        userAgent: 'Test Agent',
-        status: 'success',
-        emailAttempted: testUsers.test_user_a1.email,
-      }));
+      await loginAttemptRepo.save(
+        loginAttemptRepo.create({
+          user: { id: userIds.test_user_a1 } as User,
+          ipAddress: `10.0.0.${i}`,
+          userAgent: 'Test Agent',
+          status: 'success',
+          emailAttempted: testUsers.test_user_a1.email,
+        }),
+      );
     }
 
     for (let i = 1; i <= 10; i++) {
-      await loginAttemptRepo.save(loginAttemptRepo.create({
-        user: { id: userIds.test_user_eng } as User,
-        ipAddress: `10.1.0.${i}`,
-        userAgent: 'Test Agent',
-        status: 'success',
-        emailAttempted: testUsers.test_user_eng.email,
-      }));
+      await loginAttemptRepo.save(
+        loginAttemptRepo.create({
+          user: { id: userIds.test_user_eng } as User,
+          ipAddress: `10.1.0.${i}`,
+          userAgent: 'Test Agent',
+          status: 'success',
+          emailAttempted: testUsers.test_user_eng.email,
+        }),
+      );
     }
 
     for (let i = 1; i <= 10; i++) {
-      await loginAttemptRepo.save(loginAttemptRepo.create({
-        user: { id: userIds.test_user_fe } as User,
-        ipAddress: `10.2.0.${i}`,
-        userAgent: 'Test Agent',
-        status: 'success',
-        emailAttempted: testUsers.test_user_fe.email,
-      }));
+      await loginAttemptRepo.save(
+        loginAttemptRepo.create({
+          user: { id: userIds.test_user_fe } as User,
+          ipAddress: `10.2.0.${i}`,
+          userAgent: 'Test Agent',
+          status: 'success',
+          emailAttempted: testUsers.test_user_fe.email,
+        }),
+      );
     }
 
     for (let i = 1; i <= 10; i++) {
-      await loginAttemptRepo.save(loginAttemptRepo.create({
-        user: { id: userIds.test_user_b1 } as User,
-        ipAddress: `192.168.1.${i}`,
-        userAgent: 'Test Agent',
-        status: 'success',
-        emailAttempted: testUsers.test_user_b1.email,
-      }));
+      await loginAttemptRepo.save(
+        loginAttemptRepo.create({
+          user: { id: userIds.test_user_b1 } as User,
+          ipAddress: `192.168.1.${i}`,
+          userAgent: 'Test Agent',
+          status: 'success',
+          emailAttempted: testUsers.test_user_b1.email,
+        }),
+      );
     }
 
     for (let i = 1; i <= 10; i++) {
-      await loginAttemptRepo.save(loginAttemptRepo.create({
-        user: { id: userIds.test_user_b1 } as User,
-        ipAddress: `192.168.2.${i}`,
-        userAgent: 'Test Agent',
-        status: 'failed',
-        emailAttempted: testUsers.test_user_b1.email,
-      }));
+      await loginAttemptRepo.save(
+        loginAttemptRepo.create({
+          user: { id: userIds.test_user_b1 } as User,
+          ipAddress: `192.168.2.${i}`,
+          userAgent: 'Test Agent',
+          status: 'failed',
+          emailAttempted: testUsers.test_user_b1.email,
+        }),
+      );
     }
   }
 
@@ -803,7 +890,9 @@ describe('RLS - Row Level Security (e2e)', () => {
       expect(Array.isArray(res.body)).toBe(true);
 
       // User_role should have inherited permissions from admin_role
-      const permMap = new Map(res.body.map((p: any) => [p.permission, p.isGranted]));
+      const permMap = new Map(
+        res.body.map((p: any) => [p.permission, p.isGranted]),
+      );
 
       // Directly assigned
       expect(permMap.get('users:read')).toBe(true);
@@ -831,7 +920,9 @@ describe('RLS - Row Level Security (e2e)', () => {
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
 
-      const permMap = new Map(res.body.map((p: any) => [p.permission, p.isGranted]));
+      const permMap = new Map(
+        res.body.map((p: any) => [p.permission, p.isGranted]),
+      );
 
       // Guest_role has users:read directly
       expect(permMap.get('users:read')).toBe(true);
@@ -863,11 +954,15 @@ describe('RLS - Row Level Security (e2e)', () => {
       }
 
       // Find a directly assigned permission
-      const usersRead = res.body.find((p: any) => p.permission === 'users:read');
+      const usersRead = res.body.find(
+        (p: any) => p.permission === 'users:read',
+      );
       expect(usersRead.source).toBe('test_guest_role');
 
       // Find an inherited permission
-      const usersUpdate = res.body.find((p: any) => p.permission === 'users:update');
+      const usersUpdate = res.body.find(
+        (p: any) => p.permission === 'users:update',
+      );
       expect(usersUpdate.source).toBe('test_admin_role');
     });
   });
@@ -895,7 +990,11 @@ describe('RLS - Row Level Security (e2e)', () => {
       // Check hierarchy
       expect(res.body.hierarchy).toHaveProperty('ancestors');
       expect(res.body.hierarchy).toHaveProperty('descendants');
-      expect(res.body.hierarchy.ancestors.some((r: any) => r.name === 'test_admin_role')).toBe(true);
+      expect(
+        res.body.hierarchy.ancestors.some(
+          (r: any) => r.name === 'test_admin_role',
+        ),
+      ).toBe(true);
 
       // Check effective permissions
       expect(res.body.effectivePermissions.length).toBeGreaterThan(0);
@@ -922,10 +1021,18 @@ describe('RLS - Row Level Security (e2e)', () => {
       expect(res.body.hierarchy).toHaveProperty('descendants');
 
       // Engineering should have Company A as ancestor
-      expect(res.body.hierarchy.ancestors.some((g: any) => g.name === 'test_company_a')).toBe(true);
+      expect(
+        res.body.hierarchy.ancestors.some(
+          (g: any) => g.name === 'test_company_a',
+        ),
+      ).toBe(true);
 
       // Engineering should have Frontend as descendant
-      expect(res.body.hierarchy.descendants.some((g: any) => g.name === 'test_frontend')).toBe(true);
+      expect(
+        res.body.hierarchy.descendants.some(
+          (g: any) => g.name === 'test_frontend',
+        ),
+      ).toBe(true);
     });
 
     it('should return user inspection with direct and effective permissions', async () => {
@@ -969,7 +1076,9 @@ describe('RLS - Row Level Security (e2e)', () => {
 
       expect(res.status).toBe(200);
 
-      const permMap = new Map(res.body.map((p: any) => [p.permission, p.isGranted]));
+      const permMap = new Map(
+        res.body.map((p: any) => [p.permission, p.isGranted]),
+      );
 
       // users:update is inherited from admin_role
       expect(permMap.get('users:update')).toBe(true);
@@ -988,7 +1097,9 @@ describe('RLS - Row Level Security (e2e)', () => {
 
       expect(res.status).toBe(200);
 
-      const permMap = new Map(res.body.map((p: any) => [p.permission, p.isGranted]));
+      const permMap = new Map(
+        res.body.map((p: any) => [p.permission, p.isGranted]),
+      );
 
       // users:delete should be denied (explicit denial overrides inherited)
       expect(permMap.get('users:delete')).toBe(false);
@@ -1008,7 +1119,9 @@ describe('RLS - Row Level Security (e2e)', () => {
 
       expect(res.status).toBe(200);
 
-      const permMap = new Map(res.body.map((p: any) => [p.permission, p.isGranted]));
+      const permMap = new Map(
+        res.body.map((p: any) => [p.permission, p.isGranted]),
+      );
 
       // roles:manage should be inherited from admin_role
       expect(permMap.get('roles:manage')).toBe(true);
@@ -1060,7 +1173,11 @@ describe('RLS - Row Level Security (e2e)', () => {
       expect(res.status).toBe(200);
 
       // Frontend should have Company A as ancestor
-      expect(res.body.hierarchy.ancestors.some((g: any) => g.name === 'test_company_a')).toBe(true);
+      expect(
+        res.body.hierarchy.ancestors.some(
+          (g: any) => g.name === 'test_company_a',
+        ),
+      ).toBe(true);
     });
 
     it('should return effective member count including inherited members', async () => {
@@ -1127,7 +1244,7 @@ describe('RLS - Row Level Security (e2e)', () => {
         .set('X-Active-Group-Id', '99999');
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toContain('not one of the user\'s groups');
+      expect(res.body.message).toContain("not one of the user's groups");
     });
 
     it('should reject non-numeric X-Active-Group-Id header', async () => {
@@ -1162,7 +1279,7 @@ describe('RLS - Row Level Security (e2e)', () => {
         .send({
           groupId: groupIds.engineering,
           targetTable: 'login_attempts',
-          sql: 'ip_address LIKE \'10.%\'',
+          sql: "ip_address LIKE '10.%'",
         });
 
       expect(res.status).toBe(200);
@@ -1184,7 +1301,7 @@ describe('RLS - Row Level Security (e2e)', () => {
         .send({
           groupId: groupIds.company_a,
           targetTable: 'login_attempts',
-          sql: 'ip_address = \'10.0.0.1\' AND ip_address = \'10.0.0.2\'',
+          sql: "ip_address = '10.0.0.1' AND ip_address = '10.0.0.2'",
         });
 
       expect(res.status).toBe(200);
@@ -1204,7 +1321,7 @@ describe('RLS - Row Level Security (e2e)', () => {
         .send({
           groupId: groupIds.engineering,
           targetTable: 'login_attempts',
-          sql: 'ip_address LIKE \'192.%\'',
+          sql: "ip_address LIKE '192.%'",
           skipValidation: true,
         });
 
@@ -1226,7 +1343,7 @@ describe('RLS - Row Level Security (e2e)', () => {
         .send({
           groupId: groupIds.engineering,
           targetTable: 'login_attempts',
-          sql: 'ip_address LIKE \'10.%\'',
+          sql: "ip_address LIKE '10.%'",
           skipValidation: true,
         });
 
@@ -1247,7 +1364,7 @@ describe('RLS - Row Level Security (e2e)', () => {
         .set('Authorization', `Bearer ${tokens.test_admin_a}`)
         .set('X-Active-Group-Id', groupIds.company_a.toString())
         .send({
-          sql: 'ip_address LIKE \'192.%\'',
+          sql: "ip_address LIKE '192.%'",
         });
 
       expect(updateRes.status).toBe(200);
@@ -1267,13 +1384,13 @@ describe('RLS - Row Level Security (e2e)', () => {
         .send({
           groupId: groupIds.company_a,
           targetTable: 'login_attempts',
-          sql: 'status = \'success\' OR status = \'pending\'',
+          sql: "status = 'success' OR status = 'pending'",
         });
 
       expect(res.status).toBe(200);
       // Should not have self_conflict errors
       const selfConflicts = res.body.warnings?.filter(
-        (w: any) => w.type === 'self_conflict' && w.severity === 'error'
+        (w: any) => w.type === 'self_conflict' && w.severity === 'error',
       );
       expect(selfConflicts).toHaveLength(0);
     });
@@ -1291,13 +1408,13 @@ describe('RLS - Row Level Security (e2e)', () => {
         .send({
           groupId: groupIds.company_a,
           targetTable: 'login_attempts',
-          sql: 'ip_address = \'10.0.0.1\' AND ip_address != \'10.0.0.1\'',
+          sql: "ip_address = '10.0.0.1' AND ip_address != '10.0.0.1'",
         });
 
       expect(res.status).toBe(200);
       // Should have self_conflict error
       const selfConflicts = res.body.warnings?.filter(
-        (w: any) => w.type === 'self_conflict' && w.severity === 'error'
+        (w: any) => w.type === 'self_conflict' && w.severity === 'error',
       );
       expect(selfConflicts.length).toBeGreaterThan(0);
     });

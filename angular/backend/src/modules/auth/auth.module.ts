@@ -96,4 +96,4 @@ import { User } from '../users/entities/user.entity';
     SecurityAlertService,
   ],
 })
-export class AuthModule { }
+export class AuthModule {}

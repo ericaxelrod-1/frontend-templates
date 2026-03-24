@@ -35,7 +35,6 @@ async function createTestLoginAttempt() {
           password: 'hashed_password_here',
           isActive: true,
           isEmailVerified: true,
-
         });
 
         await userRepository.save(user);

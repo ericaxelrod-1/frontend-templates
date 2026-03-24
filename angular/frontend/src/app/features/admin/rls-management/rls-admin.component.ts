@@ -97,13 +97,12 @@ export interface RlsRuleForm {
 
             <div class="form-group">
               <label>Target Table *</label>
-              <input 
-                type="text" 
-                [(ngModel)]="formData.targetTable" 
-                required
-                placeholder="e.g., tasks, projects, invoices"
-                (ngModelChange)="onTableChange($event)"
-              />
+              <select [(ngModel)]="formData.targetTable" (change)="onTableChange(formData.targetTable)" required>
+                <option value="">Select a table</option>
+                @for (table of tables; track table.name) {
+                  <option [value]="table.name">{{ table.name }}</option>
+                }
+              </select>
             </div>
 
             <div class="form-group">
@@ -307,6 +306,7 @@ export interface RlsRuleForm {
 export class RlsAdminComponent implements OnInit {
   rules: RlsRule[] = [];
   groups: Group[] = [];
+  tables: { name: string }[] = [];
   selectedGroupId?: number;
   selectedTable = '';
   showDialog = false;
@@ -327,6 +327,7 @@ export class RlsAdminComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadGroups();
+    this.loadTables();
     this.loadRules();
   }
 
@@ -336,6 +337,15 @@ export class RlsAdminComponent implements OnInit {
         this.groups = response.items;
       },
       error: (err: any) => console.error('Failed to load groups:', err)
+    });
+  }
+
+  loadTables(): void {
+    this.rlsService.getTables().subscribe({
+      next: (tables) => {
+        this.tables = tables;
+      },
+      error: (err) => console.error('Failed to load tables:', err)
     });
   }
 
@@ -372,6 +382,9 @@ export class RlsAdminComponent implements OnInit {
       scope: scope
     };
     this.availableColumns = [];
+    if (rule.targetTable) {
+      this.onTableChange(rule.targetTable);
+    }
     this.showDialog = true;
   }
 
@@ -388,15 +401,7 @@ export class RlsAdminComponent implements OnInit {
           this.availableColumns = columns;
         },
         error: () => {
-          this.availableColumns = [
-            { name: 'id', dataType: 'integer' },
-            { name: 'created_at', dataType: 'timestamp' },
-            { name: 'updated_at', dataType: 'timestamp' },
-            { name: 'group_id', dataType: 'integer' },
-            { name: 'owner_id', dataType: 'integer' },
-            { name: 'name', dataType: 'string' },
-            { name: 'status', dataType: 'string' }
-          ];
+          this.availableColumns = [];
         }
       });
     } else {

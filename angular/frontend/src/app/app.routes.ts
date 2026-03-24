@@ -41,6 +41,11 @@ export const routes: Routes = [
         canActivate: [AuthGuard]
       },
       {
+        path: 'privacy',
+        loadComponent: () => import('./features/privacy/privacy-settings.component').then(c => c.PrivacySettingsComponent),
+        canActivate: [AuthGuard]
+      },
+      {
         path: 'profile/change-password',
         loadComponent: () => import('./features/profile/password-change/password-change.component').then(c => c.PasswordChangeComponent),
         canActivate: [AuthGuard]
@@ -197,6 +202,10 @@ export const routes: Routes = [
       {
         path: 'privacy-policy',
         loadComponent: () => import('./features/legal/privacy-policy/privacy-policy.component').then(c => c.PrivacyPolicyComponent)
+      },
+      {
+        path: 'blocked',
+        loadComponent: () => import('./features/blocked/blocked.component').then(c => c.BlockedComponent)
       }
     ]
   },

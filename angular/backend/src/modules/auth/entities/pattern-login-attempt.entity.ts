@@ -30,8 +30,6 @@ export class PatternLoginAttempt {
   @Column({ type: 'boolean', default: false })
   isPrimaryEvidence: boolean;
 
-
   @CreateDateColumn()
   createdAt: Date;
-
 }

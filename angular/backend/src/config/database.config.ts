@@ -3,7 +3,6 @@ import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import * as path from 'path';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
-
 export default registerAs('database', () => {
   const nodeEnv = process.env.NODE_ENV || 'development';
   const dbTypeFromEnv = process.env.DB_TYPE?.toLowerCase();
@@ -19,9 +18,8 @@ export default registerAs('database', () => {
     database: process.env.DATABASE_FILE || 'db.sqlite',
     entities: commonEntities,
     synchronize: nodeEnv === 'test' || process.env.DB_SYNCHRONIZE === 'true',
-    logging: nodeEnv === 'development'
-        ? ['query', 'error', 'schema']
-        : ['error'],
+    logging:
+      nodeEnv === 'development' ? ['query', 'error', 'schema'] : ['error'],
     autoLoadEntities: true,
     extra: { foreign_keys: true },
     namingStrategy: new SnakeNamingStrategy(),
@@ -85,19 +83,11 @@ export default registerAs('database', () => {
     console.log('[DB Config] Using SQLite configuration via DB_TYPE.');
     chosenConfig = sqliteConfig;
   } else {
-    // Default to SQLite for development/test, Postgres for production if DB_TYPE is not set
-    if (nodeEnv === 'development' || nodeEnv === 'test') {
-      console.log(
-        `[DB Config] NODE_ENV is ${nodeEnv}. Defaulting to SQLite configuration.`,
-      );
-      chosenConfig = sqliteConfig;
-    } else {
-      // Handles 'production' or any other NODE_ENV value
-      console.log(
-        `[DB Config] NODE_ENV is ${nodeEnv}. Defaulting to PostgreSQL configuration.`,
-      );
-      chosenConfig = postgresConfig;
-    }
+    // Default to SQLite for all environments unless DB_TYPE is set to postgres
+    console.log(
+      `[DB Config] NODE_ENV is ${nodeEnv}. Defaulting to SQLite configuration.`,
+    );
+    chosenConfig = sqliteConfig;
   }
 
   // The logging is now defined within each specific config object (sqliteConfig, postgresConfig)

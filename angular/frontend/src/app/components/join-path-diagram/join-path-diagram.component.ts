@@ -127,10 +127,10 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {}
 
   loadAvailableTables(): void {
-    this.http.get<{ tables: { name: string; columns: DiagramColumn[] }[] }>(`${environment.apiUrl}/schema/tables`)
+    this.http.get<{ name: string; columns: DiagramColumn[] }[]>(`${environment.apiUrl}/schema/tables`)
       .subscribe({
         next: (response) => {
-          this.availableTables = response.tables.map(t => ({
+          this.availableTables = response.map(t => ({
             id: t.name,
             tableName: t.name,
             columns: t.columns,

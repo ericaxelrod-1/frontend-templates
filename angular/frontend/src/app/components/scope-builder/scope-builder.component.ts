@@ -291,10 +291,10 @@ export class ScopeBuilderComponent implements OnInit {
   }
 
   loadColumns(): void {
-    this.http.get<{ columns: SchemaColumn[] }>(`${environment.apiUrl}/schema/tables/${this.targetTable}/columns`)
+    this.http.get<SchemaColumn[]>(`${environment.apiUrl}/schema/tables/${this.targetTable}/columns`)
       .subscribe({
         next: (response) => {
-          this.columns = response.columns;
+          this.columns = response;
         },
         error: () => {
           this.columns = [
