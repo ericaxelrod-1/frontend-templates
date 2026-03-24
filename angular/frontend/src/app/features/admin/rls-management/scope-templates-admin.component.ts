@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { RlsService, SchemaColumn } from '../../../services/rls.service';
@@ -86,11 +87,11 @@ interface RlsScopeTemplate {
   styles: [`
     .form-container { display: flex; flex-direction: column; gap: 1rem; padding-top: 0.5rem; min-width: 500px; }
     .full-width { width: 100%; }
-    .columns-section h3 { margin: 1rem 0 0.25rem 0; font-size: 1rem; font-weight: 500; }
-    .hint { font-size: 0.75rem; color: #64748b; margin-bottom: 0.75rem; }
-    .columns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem; }
-    .column-checkbox { font-size: 0.875rem; }
-    .empty-hint { color: #94a3b8; font-size: 0.875rem; font-style: italic; }
+    .columns-section h3 { margin: 1rem 0 0.25rem 0; font-size: 1rem; font-weight: 600; color: var(--mat-sys-on-surface); }
+    .hint { font-size: var(--fluid-text-xs); color: var(--mat-sys-on-surface-variant); margin-bottom: 0.75rem; }
+    .columns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; border: 1px solid var(--mat-sys-outline-variant); border-radius: 8px; }
+    .column-checkbox { font-size: var(--fluid-text-sm); }
+    .empty-hint { color: var(--mat-sys-on-surface-variant); font-size: var(--fluid-text-sm); font-style: italic; opacity: 0.7; }
   `]
 })
 export class ScopeTemplateEditorDialogComponent implements OnInit {
@@ -170,13 +171,13 @@ export class ScopeTemplateEditorDialogComponent implements OnInit {
 @Component({
   selector: 'app-scope-templates-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatIconModule],
   template: `
     <div class="scope-templates">
       <header class="header">
         <h1>RLS Scope Templates</h1>
-        <button class="btn-primary" (click)="showCreateDialog()">
-          + Add Template
+        <button mat-raised-button color="primary" (click)="showCreateDialog()">
+          <mat-icon>add</mat-icon> Add Template
         </button>
       </header>
 
@@ -184,56 +185,72 @@ export class ScopeTemplateEditorDialogComponent implements OnInit {
         Scope templates define reusable data filters that can be applied to multiple groups.
       </p>
 
-      <table class="templates-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Target Table</th>
-            <th>Join Path</th>
-            <th>Available Columns</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (template of templates; track template.id) {
+      <div class="table-container">
+        <table class="templates-table">
+          <thead>
             <tr>
-              <td>{{ template.id }}</td>
-              <td>{{ template.name }}</td>
-              <td><code>{{ template.targetTable }}</code></td>
-              <td>{{ template.joinPath?.name || 'N/A' }}</td>
-              <td>
-                @for (col of parseColumns(template.availableColumns); track col) {
-                  <span class="column-chip">{{ col }}</span>
-                }
-              </td>
-              <td class="actions">
-                <button class="btn-small" (click)="editTemplate(template)">Edit</button>
-                <button class="btn-small btn-danger" (click)="deleteTemplate(template)">Delete</button>
-              </td>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Target Table</th>
+              <th>Join Path</th>
+              <th>Available Columns</th>
+              <th>Actions</th>
             </tr>
-          } @empty {
-            <tr>
-              <td colspan="6" class="empty-state">No scope templates configured</td>
-            </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (template of templates; track template.id) {
+              <tr>
+                <td>{{ template.id }}</td>
+                <td class="name-cell">{{ template.name }}</td>
+                <td><code>{{ template.targetTable }}</code></td>
+                <td>{{ template.joinPath?.name || 'N/A' }}</td>
+                <td>
+                  <div class="chip-container">
+                    @for (col of parseColumns(template.availableColumns); track col) {
+                      <span class="column-chip">{{ col }}</span>
+                    }
+                  </div>
+                </td>
+                <td class="actions">
+                  <button mat-icon-button color="primary" (click)="editTemplate(template)" title="Edit">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" (click)="deleteTemplate(template)" title="Delete">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty-state">
+                  <mat-icon>description_off</mat-icon>
+                  <p>No scope templates configured</p>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </div>
   `,
   styles: [`
-    .scope-templates { padding: 1.5rem; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .description { color: #64748b; margin-bottom: 1rem; font-size: 0.875rem; }
-    .templates-table { width: 100%; border-collapse: collapse; background: white; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .templates-table th, .templates-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
-    .templates-table th { background: #f8fafc; font-weight: 600; color: #475569; }
-    .column-chip { display: inline-block; background: #f1f5f9; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin: 0.125rem; }
-    .actions { display: flex; gap: 0.5rem; }
-    .btn-primary { background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; }
-    .btn-small { padding: 0.25rem 0.5rem; border-radius: 0.25rem; border: none; cursor: pointer; background: #e2e8f0; }
-    .btn-danger { background: #ef4444; color: white; }
-    .empty-state { text-align: center; color: #94a3b8; padding: 2rem; }
+    .scope-templates { padding: var(--fluid-spacing-md); }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .header h1 { margin: 0; font-size: var(--fluid-text-lg); font-weight: 600; color: var(--mat-sys-on-surface); }
+    .description { color: var(--mat-sys-on-surface-variant); margin-bottom: var(--fluid-spacing-md); font-size: var(--fluid-text-sm); }
+    
+    .table-container { background: var(--mat-sys-surface); border-radius: 8px; border: 1px solid var(--mat-sys-outline-variant); overflow: hidden; box-shadow: var(--mat-sys-shadow); }
+    .templates-table { width: 100%; border-collapse: collapse; }
+    .templates-table th, .templates-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--mat-sys-outline-variant); font-size: var(--fluid-text-sm); }
+    .templates-table th { background: var(--mat-sys-surface-container-high); font-weight: 600; color: var(--mat-sys-on-surface); }
+    
+    .name-cell { font-weight: 500; color: var(--mat-sys-primary); }
+    .chip-container { display: flex; flex-wrap: wrap; gap: 4px; }
+    .column-chip { background: var(--mat-sys-surface-container-highest); padding: 2px 8px; border-radius: 4px; font-size: 11px; color: var(--mat-sys-on-surface-variant); }
+    .actions { display: flex; gap: 4px; }
+    
+    .empty-state { text-align: center; color: var(--mat-sys-on-surface-variant); padding: 4rem 2rem; }
+    .empty-state mat-icon { font-size: 3rem; width: 3rem; height: 3rem; margin-bottom: 1rem; opacity: 0.5; }
   `]
 })
 export class ScopeTemplatesAdminComponent implements OnInit {
@@ -298,7 +315,8 @@ export class ScopeTemplatesAdminComponent implements OnInit {
         joinPaths: this.joinPaths,
         editingTemplate: template
       },
-      width: '600px'
+      width: '600px',
+      maxWidth: '95vw'
     });
 
     dialogRef.afterClosed().subscribe(result => {
@@ -314,7 +332,7 @@ export class ScopeTemplatesAdminComponent implements OnInit {
       : this.http.post(`${environment.apiUrl}/rls/scope-templates`, formData);
 
     observable.subscribe({
-      next: () => this.loadTemplates(),
+      next: () => { this.loadTemplates(); },
       error: (err) => console.error('Failed to save template:', err)
     });
   }

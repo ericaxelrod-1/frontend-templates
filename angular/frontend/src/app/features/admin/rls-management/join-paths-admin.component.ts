@@ -6,9 +6,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
-import { RlsService } from '../../../services/rls.service';
+import { RlsService, SchemaColumn } from '../../../services/rls.service';
 import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput } from '../../../components/join-path-diagram/join-path-diagram.component';
 
 interface RlsJoinCondition {
@@ -76,11 +77,11 @@ interface RlsJoinPath {
   `,
   styles: [`
     .dialog-container { display: flex; flex-direction: column; height: 100%; }
-    .form-row { display: flex; gap: 1rem; margin-top: 0.5rem; }
+    .form-row { display: flex; gap: var(--mat-sys-spacing-md); margin-top: 0.5rem; }
     .flex-1 { flex: 1; }
     .diagram-section { flex: 1; display: flex; flex-direction: column; min-height: 500px; margin-top: 1rem; }
-    .section-label { font-weight: 500; margin-bottom: 0.25rem; display: block; color: #1e293b; }
-    .hint { color: #64748b; font-size: 0.75rem; margin-bottom: 1rem; }
+    .section-label { font-weight: 600; margin-bottom: 0.25rem; display: block; color: var(--mat-sys-on-surface); font-size: var(--fluid-text-sm); }
+    .hint { color: var(--mat-sys-on-surface-variant); font-size: var(--fluid-text-xs); margin-bottom: 1rem; }
     mat-dialog-content { flex: 1; overflow-y: auto; }
   `]
 })
@@ -153,68 +154,80 @@ export class JoinPathEditorDialogComponent {
 @Component({
   selector: 'app-join-paths-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatIconModule],
   template: `
     <div class="join-paths">
       <header class="header">
         <h1>RLS Join Paths</h1>
-        <button class="btn-primary" (click)="showCreateDialog()">
-          + Add Join Path
+        <button mat-raised-button color="primary" (click)="showCreateDialog()">
+          <mat-icon>add</mat-icon> Add Join Path
         </button>
       </header>
 
-      <table class="paths-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Target Table</th>
-            <th>Chain</th>
-            <th>Conditions</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (path of paths; track path.id) {
+      <div class="table-container">
+        <table class="paths-table">
+          <thead>
             <tr>
-              <td>{{ path.id }}</td>
-              <td>{{ path.name }}</td>
-              <td><code>{{ path.targetTable }}</code></td>
-              <td>{{ formatChain(path.chain) }}</td>
-              <td>
-                @for (cond of path.conditions; track cond.id) {
-                  <div class="condition-chip">
-                    {{ cond.fromTable }}.{{ cond.fromColumn }} {{ cond.operator || '=' }} {{ cond.toTable }}.{{ cond.toColumn }}
-                  </div>
-                }
-              </td>
-              <td class="actions">
-                <button class="btn-small" (click)="editPath(path)">Edit</button>
-                <button class="btn-small btn-danger" (click)="deletePath(path)">Delete</button>
-              </td>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Target Table</th>
+              <th>Chain</th>
+              <th>Conditions</th>
+              <th>Actions</th>
             </tr>
-          } @empty {
-            <tr>
-              <td colspan="6" class="empty-state">No join paths configured</td>
-            </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (path of paths; track path.id) {
+              <tr>
+                <td>{{ path.id }}</td>
+                <td class="name-cell">{{ path.name }}</td>
+                <td><code>{{ path.targetTable }}</code></td>
+                <td>{{ formatChain(path.chain) }}</td>
+                <td>
+                  @for (cond of path.conditions; track cond.id) {
+                    <div class="condition-chip">
+                      {{ cond.fromTable }}.{{ cond.fromColumn }} {{ cond.operator || '=' }} {{ cond.toTable }}.{{ cond.toColumn }}
+                    </div>
+                  }
+                </td>
+                <td class="actions">
+                  <button mat-icon-button color="primary" (click)="editPath(path)" title="Edit">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" (click)="deletePath(path)" title="Delete">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty-state">
+                  <mat-icon>link_off</mat-icon>
+                  <p>No join paths configured</p>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </div>
   `,
   styles: [`
-    .join-paths { padding: 1.5rem; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-    .header h1 { margin: 0; font-size: 1.5rem; color: #1e293b; }
-    .paths-table { width: 100%; border-collapse: collapse; background: white; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .paths-table th, .paths-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
-    .paths-table th { background: #f8fafc; font-weight: 600; color: #475569; }
-    .condition-chip { background: #f1f5f9; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin: 0.125rem 0; }
-    .actions { display: flex; gap: 0.5rem; }
-    .btn-primary { background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; }
-    .btn-small { padding: 0.25rem 0.5rem; border-radius: 0.25rem; border: none; cursor: pointer; background: #e2e8f0; }
-    .btn-danger { background: #ef4444; color: white; }
-    .empty-state { text-align: center; color: #94a3b8; padding: 2rem; }
+    .join-paths { padding: var(--fluid-spacing-md); }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--fluid-spacing-md); }
+    .header h1 { margin: 0; font-size: var(--fluid-text-lg); font-weight: 600; color: var(--mat-sys-on-surface); }
+    
+    .table-container { background: var(--mat-sys-surface); border-radius: 8px; border: 1px solid var(--mat-sys-outline-variant); overflow: hidden; box-shadow: var(--mat-sys-shadow); }
+    .paths-table { width: 100%; border-collapse: collapse; }
+    .paths-table th, .paths-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--mat-sys-outline-variant); font-size: var(--fluid-text-sm); }
+    .paths-table th { background: var(--mat-sys-surface-container-high); font-weight: 600; color: var(--mat-sys-on-surface); }
+    
+    .name-cell { font-weight: 500; color: var(--mat-sys-primary); }
+    .condition-chip { background: var(--mat-sys-surface-container-highest); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 11px; margin: 2px 0; color: var(--mat-sys-on-surface-variant); display: inline-block; }
+    .actions { display: flex; gap: 4px; }
+    
+    .empty-state { text-align: center; color: var(--mat-sys-on-surface-variant); padding: 4rem 2rem; }
+    .empty-state mat-icon { font-size: 3rem; width: 3rem; height: 3rem; margin-bottom: 1rem; opacity: 0.5; }
   `]
 })
 export class JoinPathsAdminComponent implements OnInit {
@@ -234,20 +247,22 @@ export class JoinPathsAdminComponent implements OnInit {
 
   loadPaths(): void {
     this.http.get<RlsJoinPath[]>(`${environment.apiUrl}/rls/join-paths`).subscribe({
-      next: (paths) => this.paths = paths,
-      error: (err) => console.error('Failed to load join paths:', err)
+      next: (paths: RlsJoinPath[]) => this.paths = paths,
+      error: (err: any) => console.error('Failed to load join paths:', err)
     });
   }
 
   loadTables(): void {
     this.rlsService.getTables().subscribe({
-      next: (tables) => this.tables = tables,
-      error: (err) => console.error('Failed to load tables:', err)
+      next: (tables: { name: string }[]) => {
+        this.tables = tables;
+      },
+      error: (err: any) => console.error('Failed to load tables:', err)
     });
   }
 
   formatChain(chain: string | string[]): string {
-    return Array.isArray(chain) ? chain.join(', ') : chain;
+    return Array.isArray(chain) ? chain.join(' → ') : chain;
   }
 
   showCreateDialog(): void {
@@ -265,8 +280,7 @@ export class JoinPathsAdminComponent implements OnInit {
         editingPath: path
       },
       width: '1200px',
-      maxWidth: '95vw',
-      panelClass: 'full-height-dialog'
+      maxWidth: '95vw'
     });
 
     dialogRef.afterClosed().subscribe(result => {
@@ -283,7 +297,7 @@ export class JoinPathsAdminComponent implements OnInit {
 
     observable.subscribe({
       next: () => this.loadPaths(),
-      error: (err) => console.error('Failed to save join path:', err)
+      error: (err: any) => console.error('Failed to save join path:', err)
     });
   }
 
