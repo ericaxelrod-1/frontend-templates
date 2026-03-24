@@ -16,7 +16,10 @@ import { RequirePermission } from '../decorators/require-permission.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RlsScopeTemplate } from '../entities/rls-scope-template.entity';
-import { CreateRlsScopeTemplateDto, UpdateRlsScopeTemplateDto } from '../dto/rls-scope-template.dto';
+import {
+  CreateRlsScopeTemplateDto,
+  UpdateRlsScopeTemplateDto,
+} from '../dto/rls-scope-template.dto';
 
 @Controller('api/rls/scope-templates')
 @UseGuards(JwtAuthGuard, PermissionGuard)

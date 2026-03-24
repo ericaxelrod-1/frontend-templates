@@ -89,7 +89,7 @@ export class PermissionsController {
     private readonly routeScannerService: RouteScannerService,
     private readonly endpointScannerService: EndpointScannerService,
     private readonly cacheSyncService: CacheSyncService,
-  ) { }
+  ) {}
 
   // Permission check endpoint
   @Get('check/:resource/:action')

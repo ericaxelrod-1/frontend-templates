@@ -1,4 +1,13 @@
-import { IsString, IsOptional, IsBoolean, IsInt, IsArray, ValidateNested, MaxLength, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsInt,
+  IsArray,
+  ValidateNested,
+  MaxLength,
+  IsNotEmpty,
+} from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 export class CreateJoinConditionDto {

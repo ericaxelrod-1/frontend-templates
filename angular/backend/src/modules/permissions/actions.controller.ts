@@ -34,7 +34,7 @@ class UpdateActionDto {
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('permissions:access')
 export class ActionsController {
-  constructor(private readonly permissionsService: PermissionsService) { }
+  constructor(private readonly permissionsService: PermissionsService) {}
 
   @Get()
   @RequirePermission('actions:view')
@@ -43,7 +43,9 @@ export class ActionsController {
   async getAllActions() {
     // Get all permissions and extract unique actions
     const permissions = await this.permissionsService.findAll();
-    const uniqueActions = [...new Set(permissions.map((p) => p.actionEntity?.actionCode || ''))];
+    const uniqueActions = [
+      ...new Set(permissions.map((p) => p.actionEntity?.actionCode || '')),
+    ];
 
     // Convert to legacy format for backward compatibility
     return uniqueActions.map((name) => ({
@@ -61,7 +63,9 @@ export class ActionsController {
   async getActionById(@Param('id') id: string) {
     // Get all permissions and find those with matching actionName
     const permissions = await this.permissionsService.findAll();
-    const matchingPermissions = permissions.filter((p) => (p.actionEntity?.actionCode || '') === id);
+    const matchingPermissions = permissions.filter(
+      (p) => (p.actionEntity?.actionCode || '') === id,
+    );
 
     if (matchingPermissions.length === 0) {
       throw new NotFoundException(`Action with ID ${id} not found`);
@@ -109,7 +113,9 @@ export class ActionsController {
   ) {
     // Get all permissions with this action
     const permissions = await this.permissionsService.findAll();
-    const matchingPermissions = permissions.filter((p) => (p.actionEntity?.actionCode || '') === id);
+    const matchingPermissions = permissions.filter(
+      (p) => (p.actionEntity?.actionCode || '') === id,
+    );
 
     if (matchingPermissions.length === 0) {
       throw new NotFoundException(`Action with ID ${id} not found`);
@@ -133,7 +139,9 @@ export class ActionsController {
   async deleteAction(@Param('id') id: string) {
     // Get all permissions with this action
     const permissions = await this.permissionsService.findAll();
-    const matchingPermissions = permissions.filter((p) => (p.actionEntity?.actionCode || '') === id);
+    const matchingPermissions = permissions.filter(
+      (p) => (p.actionEntity?.actionCode || '') === id,
+    );
 
     if (matchingPermissions.length === 0) {
       throw new NotFoundException(`Action with ID ${id} not found`);

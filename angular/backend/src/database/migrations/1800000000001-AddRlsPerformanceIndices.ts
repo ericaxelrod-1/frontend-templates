@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
 
-export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface {
+export class AddRlsPerformanceIndices1800000000001
+  implements MigrationInterface
+{
   private async createIndexIfNotExists(
     queryRunner: QueryRunner,
     tableName: string,
@@ -121,8 +123,14 @@ export class AddRlsPerformanceIndices1800000000001 implements MigrationInterface
     await dropIfExists('roles', 'idx_roles_parent_id');
     await dropIfExists('groups', 'idx_groups_priority');
     await dropIfExists('role_permissions', 'idx_role_permissions_role_id');
-    await dropIfExists('role_permissions', 'idx_role_permissions_permission_id');
+    await dropIfExists(
+      'role_permissions',
+      'idx_role_permissions_permission_id',
+    );
     await dropIfExists('group_permissions', 'idx_group_permissions_group_id');
-    await dropIfExists('group_permissions', 'idx_group_permissions_permission_id');
+    await dropIfExists(
+      'group_permissions',
+      'idx_group_permissions_permission_id',
+    );
   }
 }

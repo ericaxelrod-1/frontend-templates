@@ -47,11 +47,9 @@ export class Role {
   @Column({ default: false })
   isDefault: boolean;
 
-
   // Parent-child relationship
   @Column({ nullable: true })
   parentId: number;
-
 
   @ManyToOne(() => Role, (role) => role.children, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'parent_id' })
@@ -74,5 +72,4 @@ export class Role {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

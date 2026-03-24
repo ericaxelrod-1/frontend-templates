@@ -38,7 +38,7 @@ export class RlsRule {
   @JoinColumn({ name: 'group_id' })
   group: Group;
 
-  @OneToMany(() => RlsConditionGroup, g => g.rule)
+  @OneToMany(() => RlsConditionGroup, (g) => g.rule)
   conditionGroups: RlsConditionGroup[];
 
   @CreateDateColumn({ name: 'created_at' })

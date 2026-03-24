@@ -65,7 +65,7 @@ import { RolesModule } from '../roles/roles.module';
     forwardRef(() => ScannersModule),
     forwardRef(() => PermissionsSharedModule),
     forwardRef(() => CacheModule),
-    RolesModule,
+    forwardRef(() => RolesModule),
   ],
   controllers: [
     PermissionsController,

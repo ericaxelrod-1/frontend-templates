@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { UsersService } from '../../users/users.service';
-import { RolesService } from '../../users/roles.service';
+import { RolesService } from '../../roles/roles.service';
 import { GroupsService } from '../../users/groups.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';

@@ -23,7 +23,6 @@ export class RolePermission {
   @PrimaryColumn()
   permissionId: number;
 
-
   /**
    * Whether the permission is granted (true), denied (false), or null (inherit from parent role)
    * This enables 3-state permissions as specified in HIERARCHICAL_ROLES_GROUPS.md
@@ -31,13 +30,11 @@ export class RolePermission {
   @Column({ type: 'boolean', nullable: true, default: null })
   isGranted: boolean | null;
 
-
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 
   @ManyToOne(() => Role, (role) => role.rolePermissions)
   @JoinColumn({ name: 'role_id' })

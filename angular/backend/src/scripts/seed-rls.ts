@@ -32,7 +32,9 @@ const FUNDAMENTAL_RULES: BootstrapRule[] = [
 async function bootstrap() {
   console.log('Starting RLS Bootstrap Seeding...');
   console.log('This script should be run ONCE after database migration.');
-  console.log('It creates fundamental RLS rules to allow the system to function.\n');
+  console.log(
+    'It creates fundamental RLS rules to allow the system to function.\n',
+  );
 
   const dbPath = process.env.DATABASE_FILE || 'db.sqlite';
   console.log(`Using database: ${dbPath}`);

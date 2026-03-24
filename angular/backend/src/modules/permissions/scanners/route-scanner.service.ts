@@ -43,7 +43,7 @@ export class RouteScannerService {
     private readonly permissionRepository: Repository<Permission>,
 
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * Scan all routing modules to find routes with permission guards

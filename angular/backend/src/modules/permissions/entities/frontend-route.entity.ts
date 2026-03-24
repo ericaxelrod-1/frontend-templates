@@ -19,7 +19,6 @@ export class FrontendRoute {
   @PrimaryColumn({ type: 'varchar', length: 255 })
   id: string;
 
-
   /**
    * The display name of the route for UI menus
    */
@@ -39,7 +38,6 @@ export class FrontendRoute {
   @Column({ nullable: true, length: 255 })
   componentName: string;
 
-
   /**
    * Whether this route overrides default permissions
    * If true, only explicitly assigned permissions apply
@@ -51,20 +49,17 @@ export class FrontendRoute {
   @Column({ nullable: true })
   lastSyncedAt: Date;
 
-
   /**
    * Whether this route is disabled
    */
   @Column({ default: false })
   isDisabled: boolean;
 
-
   /**
    * Whether this route should be shown in the navigation menu
    */
   @Column({ default: true })
   showInMenu: boolean;
-
 
   /**
    * Icon name for menu display
@@ -77,7 +72,6 @@ export class FrontendRoute {
    */
   @Column({ default: 100 })
   menuOrder: number;
-
 
   /**
    * Relationship to the permissions required to access this route
@@ -95,5 +89,4 @@ export class FrontendRoute {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

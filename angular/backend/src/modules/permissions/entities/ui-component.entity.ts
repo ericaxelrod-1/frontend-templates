@@ -18,13 +18,11 @@ export class UiComponent {
   @PrimaryColumn({ type: 'varchar', length: 255 })
   id: string;
 
-
   @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({ length: 255, nullable: true })
   filePath: string;
-
 
   @ManyToMany(() => Permission, (permission) => permission.components)
   @JoinTable({
@@ -37,15 +35,12 @@ export class UiComponent {
   @Column({ default: false })
   overridePermissions: boolean;
 
-
   @Column({ nullable: true })
   lastSyncedAt: Date;
-
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

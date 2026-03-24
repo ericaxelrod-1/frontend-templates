@@ -17,7 +17,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RlsJoinPath } from '../entities/rls-join-path.entity';
 import { RlsJoinCondition } from '../entities/rls-join-condition.entity';
-import { CreateRlsJoinPathDto, UpdateRlsJoinPathDto } from '../dto/rls-join-path.dto';
+import {
+  CreateRlsJoinPathDto,
+  UpdateRlsJoinPathDto,
+} from '../dto/rls-join-path.dto';
 
 @Controller('api/rls/join-paths')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -92,7 +95,8 @@ export class RlsJoinPathsController {
     if (updateDto.name) joinPath.name = updateDto.name;
     if (updateDto.targetTable) joinPath.targetTable = updateDto.targetTable;
     if (updateDto.chain) joinPath.chain = JSON.stringify(updateDto.chain);
-    if (updateDto.isActive !== undefined) joinPath.isActive = updateDto.isActive;
+    if (updateDto.isActive !== undefined)
+      joinPath.isActive = updateDto.isActive;
 
     await this.joinPathRepository.save(joinPath);
 

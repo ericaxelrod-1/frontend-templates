@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateRateLimitCounterTable1704067200000 implements MigrationInterface {
+export class CreateRateLimitCounterTable1704067200000
+  implements MigrationInterface
+{
   name = 'CreateRateLimitCounterTable1704067200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

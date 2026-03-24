@@ -15,12 +15,14 @@
     "skipLibCheck": true,
     "strictNullChecks": false,
     "noImplicitAny": false,
-    "strictBindCallApply": false,
+    "strictBindCallApply": true,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
       "@our-org/nestjs-typeorm-rls": ["packages/nestjs-typeorm-rls/src"],
       "@our-org/nestjs-typeorm-rls/*": ["packages/nestjs-typeorm-rls/src/*"]
     }
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/scripts/**/*", "**/*.spec.ts"]
 }

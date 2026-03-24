@@ -25,10 +25,8 @@ export class CacheRoute {
   @Column({ length: 255, nullable: true })
   componentName: string;
 
-
   @Column({ nullable: true })
   lastSyncedAt: Date;
-
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
@@ -38,5 +36,4 @@ export class CacheRoute {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

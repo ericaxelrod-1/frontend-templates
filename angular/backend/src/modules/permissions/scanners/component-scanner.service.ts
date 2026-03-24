@@ -42,7 +42,7 @@ export class ComponentScannerService {
     private readonly permissionRepository: Repository<Permission>,
 
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * Scan all Angular components to find those with appHasPermission directives

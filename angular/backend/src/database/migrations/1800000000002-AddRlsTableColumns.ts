@@ -108,10 +108,26 @@ export class AddRlsTableColumns1800000000002 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await this.dropColumnIfExists(queryRunner, 'rls_scope_templates', 'parameters');
-    await this.dropColumnIfExists(queryRunner, 'rls_scope_templates', 'scope_sql');
-    await this.dropColumnIfExists(queryRunner, 'rls_scope_templates', 'description');
-    await this.dropColumnIfExists(queryRunner, 'rls_scope_templates', 'is_active');
+    await this.dropColumnIfExists(
+      queryRunner,
+      'rls_scope_templates',
+      'parameters',
+    );
+    await this.dropColumnIfExists(
+      queryRunner,
+      'rls_scope_templates',
+      'scope_sql',
+    );
+    await this.dropColumnIfExists(
+      queryRunner,
+      'rls_scope_templates',
+      'description',
+    );
+    await this.dropColumnIfExists(
+      queryRunner,
+      'rls_scope_templates',
+      'is_active',
+    );
     await this.dropColumnIfExists(queryRunner, 'rls_rules', 'description');
     await this.dropColumnIfExists(queryRunner, 'rls_rules', 'priority');
     await this.dropColumnIfExists(queryRunner, 'rls_rules', 'is_active');

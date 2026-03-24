@@ -21,8 +21,19 @@ import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../guards/permission.guard';
 import { RequirePermission } from '../decorators/require-permission.decorator';
-import { RlsValidationService, ValidationResult } from '../services/rls-validation.service';
-import { CreateRlsRuleDto, UpdateRlsRuleDto, ValidateRlsRuleDto, InvalidateCacheDto, ScopeGroupDto, ScopeGroupItemDto, ScopeConditionDto } from '../dto/rls-rule.dto';
+import {
+  RlsValidationService,
+  ValidationResult,
+} from '../services/rls-validation.service';
+import {
+  CreateRlsRuleDto,
+  UpdateRlsRuleDto,
+  ValidateRlsRuleDto,
+  InvalidateCacheDto,
+  ScopeGroupDto,
+  ScopeGroupItemDto,
+  ScopeConditionDto,
+} from '../dto/rls-rule.dto';
 
 @Controller('api/rls-rules')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -70,7 +81,9 @@ export class RlsRulesController {
 
   @Post('validate')
   @RequirePermission('rls_rules:manage')
-  async validateRule(@Body() validateDto: ValidateRlsRuleDto): Promise<ValidationResult> {
+  async validateRule(
+    @Body() validateDto: ValidateRlsRuleDto,
+  ): Promise<ValidationResult> {
     return this.rlsValidationService.validateRule(
       validateDto.groupId,
       validateDto.scope,
@@ -80,7 +93,9 @@ export class RlsRulesController {
 
   @Post()
   @RequirePermission('rls_rules:manage')
-  async create(@Body() createDto: CreateRlsRuleDto): Promise<{ rule: RlsRule; validation?: ValidationResult }> {
+  async create(
+    @Body() createDto: CreateRlsRuleDto,
+  ): Promise<{ rule: RlsRule; validation?: ValidationResult }> {
     const validation = await this.rlsValidationService.validateRule(
       createDto.groupId,
       createDto.scope,
@@ -90,8 +105,8 @@ export class RlsRulesController {
     if (!validation.valid && !createDto.skipValidation) {
       throw new BadRequestException(
         `Rule validation failed: ${validation.warnings
-          .filter(w => w.severity === 'error')
-          .map(w => w.message)
+          .filter((w) => w.severity === 'error')
+          .map((w) => w.message)
           .join('; ')}`,
       );
     }
@@ -109,7 +124,11 @@ export class RlsRulesController {
       sortOrder: 0,
     });
 
-    await this.saveConditionsFromScope(createDto.scope.conditions, rootGroup.id, 0);
+    await this.saveConditionsFromScope(
+      createDto.scope.conditions,
+      rootGroup.id,
+      0,
+    );
 
     saved.rootGroupId = rootGroup.id;
     await this.rlsRuleRepository.save(saved);
@@ -118,18 +137,28 @@ export class RlsRulesController {
     return { rule: saved, validation };
   }
 
-  private async saveConditionsFromScope(conditions: ScopeGroupItemDto[], groupId: number, sortOffset: number): Promise<number> {
+  private async saveConditionsFromScope(
+    conditions: ScopeGroupItemDto[],
+    groupId: number,
+    sortOffset: number,
+  ): Promise<number> {
     let sortOrder = sortOffset;
 
     for (const condition of conditions) {
       if ('logicalOperator' in condition) {
         const childGroup = await this.conditionGroupRepository.save({
-          ruleId: (await this.conditionGroupRepository.findOne({ where: { id: groupId } }))!.ruleId,
+          ruleId: (await this.conditionGroupRepository.findOne({
+            where: { id: groupId },
+          }))!.ruleId,
           parentGroupId: groupId,
           logicalOperator: condition.logicalOperator,
           sortOrder: sortOrder++,
         });
-        sortOrder = await this.saveConditionsFromScope(condition.conditions, childGroup.id, sortOrder);
+        sortOrder = await this.saveConditionsFromScope(
+          condition.conditions,
+          childGroup.id,
+          sortOrder,
+        );
       } else {
         await this.ruleConditionRepository.save({
           conditionGroupId: groupId,
@@ -184,7 +213,11 @@ export class RlsRulesController {
         sortOrder: 0,
       });
 
-      await this.saveConditionsFromScope(updateDto.scope.conditions, rootGroup.id, 0);
+      await this.saveConditionsFromScope(
+        updateDto.scope.conditions,
+        rootGroup.id,
+        0,
+      );
 
       rule.rootGroupId = rootGroup.id;
     }

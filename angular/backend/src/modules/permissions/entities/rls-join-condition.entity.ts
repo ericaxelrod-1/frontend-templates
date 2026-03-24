@@ -32,7 +32,9 @@ export class RlsJoinCondition {
   @Column({ default: '=' })
   operator: string;
 
-  @ManyToOne(() => RlsJoinPath, (path) => path.conditions, { onDelete: 'CASCADE' })
+  @ManyToOne(() => RlsJoinPath, (path) => path.conditions, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'join_path_id' })
   joinPath: RlsJoinPath;
 

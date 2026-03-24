@@ -16,5 +16,6 @@ export class RlsRuleCondition {
   @Column({ type: 'text', nullable: true }) value: string | null;
   @Column({ name: 'sort_order', default: 0 }) sortOrder: number;
   @ManyToOne(() => RlsConditionGroup, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'condition_group_id' }) conditionGroup: RlsConditionGroup;
+  @JoinColumn({ name: 'condition_group_id' })
+  conditionGroup: RlsConditionGroup;
 }

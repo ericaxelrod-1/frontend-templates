@@ -22,14 +22,12 @@ export class GroupPermission {
   @PrimaryColumn()
   permissionId: number;
 
-
   /**
    * Whether the permission is granted (true) or denied (false)
    * Used for explicit permission denial in hierarchical permission systems
    */
   @Column({ default: true })
   isGranted: boolean;
-
 
   /**
    * Group relationship
@@ -56,5 +54,4 @@ export class GroupPermission {
    */
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsInt, IsArray, MaxLength, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  IsArray,
+  MaxLength,
+  IsNotEmpty,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreateRlsScopeTemplateDto {

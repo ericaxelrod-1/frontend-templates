@@ -13,6 +13,6 @@ export class RlsSystemBypassService {
    * @returns The result of the callback.
    */
   async runSystemBypass<T>(callback: () => Promise<T>): Promise<T> {
-    return this.cls.runWith({ __rlsBypass: true }, callback);
+    return this.cls.runWith({ __rlsBypass: true } as any, callback);
   }
 }

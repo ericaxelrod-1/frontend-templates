@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RlsRule } from '../entities/rls-rule.entity';
 import { Group } from '../entities/group.entity';
-import { ScopeGroupDto, ScopeGroupItemDto, ScopeConditionDto } from '../dto/rls-rule.dto';
+import {
+  ScopeGroupDto,
+  ScopeGroupItemDto,
+  ScopeConditionDto,
+} from '../dto/rls-rule.dto';
 
 export interface ValidationWarning {
   type: 'self_conflict' | 'parent_conflict';
@@ -49,7 +53,12 @@ export class RlsValidationService {
       });
     }
 
-    const parentConflict = await this.checkParentConflict(groupId, scope, targetTable, existingRuleId);
+    const parentConflict = await this.checkParentConflict(
+      groupId,
+      scope,
+      targetTable,
+      existingRuleId,
+    );
     if (parentConflict) {
       warnings.push({
         type: 'parent_conflict',
@@ -57,13 +66,16 @@ export class RlsValidationService {
         message: `Rule may restrict access beyond parent group scope: column '${parentConflict.column}' has narrower conditions`,
         details: {
           conflictingColumn: parentConflict.column,
-          conflictingValues: [parentConflict.parentValue, parentConflict.childValue],
+          conflictingValues: [
+            parentConflict.parentValue,
+            parentConflict.childValue,
+          ],
         },
       });
     }
 
     return {
-      valid: warnings.filter(w => w.severity === 'error').length === 0,
+      valid: warnings.filter((w) => w.severity === 'error').length === 0,
       warnings,
       canSave: true,
     };
@@ -82,14 +94,21 @@ export class RlsValidationService {
     });
 
     for (const childRule of childRules) {
-      if (!childRule.group || !(await this.isDescendant(childRule.group, groupId))) {
+      if (
+        !childRule.group ||
+        !(await this.isDescendant(childRule.group, groupId))
+      ) {
         continue;
       }
 
       const childScope = await this.buildScopeFromRule(childRule);
       if (!childScope) continue;
 
-      const conflict = this.checkChildConflict(newScope, childScope, childRule.group.name);
+      const conflict = this.checkChildConflict(
+        newScope,
+        childScope,
+        childRule.group.name,
+      );
       if (conflict) {
         warnings.push({
           type: 'parent_conflict',
@@ -110,12 +129,16 @@ export class RlsValidationService {
     };
   }
 
-  private async buildScopeFromRule(rule: RlsRule): Promise<ScopeGroupDto | null> {
+  private async buildScopeFromRule(
+    rule: RlsRule,
+  ): Promise<ScopeGroupDto | null> {
     if (!rule.conditionGroups || rule.conditionGroups.length === 0) {
       return null;
     }
 
-    const rootGroup = rule.conditionGroups.find(g => g.parentGroupId === null);
+    const rootGroup = rule.conditionGroups.find(
+      (g) => g.parentGroupId === null,
+    );
     if (!rootGroup) return null;
 
     return this.buildScopeGroup(rootGroup, rule.conditionGroups);
@@ -134,7 +157,7 @@ export class RlsValidationService {
       }
     }
 
-    const childGroups = allGroups.filter(g => g.parentGroupId === group.id);
+    const childGroups = allGroups.filter((g) => g.parentGroupId === group.id);
     for (const childGroup of childGroups) {
       conditions.push(this.buildScopeGroup(childGroup, allGroups));
     }
@@ -147,7 +170,10 @@ export class RlsValidationService {
 
   private checkSelfConflict(scope: ScopeGroupDto): { column: string } | null {
     const conditions = this.flattenConditions(scope);
-    const columnConditions = new Map<string, Array<{ operator: string; value: string; negated: boolean }>>();
+    const columnConditions = new Map<
+      string,
+      Array<{ operator: string; value: string; negated: boolean }>
+    >();
 
     for (const cond of conditions) {
       if (!columnConditions.has(cond.column)) {
@@ -161,34 +187,38 @@ export class RlsValidationService {
         continue;
       }
 
-      const equals = conds.filter(c => c.operator === '=');
-      const notEquals = conds.filter(c => c.operator === '!=' || c.operator === '<>');
+      const equals = conds.filter((c) => c.operator === '=');
+      const notEquals = conds.filter(
+        (c) => c.operator === '!=' || c.operator === '<>',
+      );
 
       if (equals.length > 0 && notEquals.length > 0) {
         return { column };
       }
 
       if (equals.length >= 2) {
-        const values = new Set(equals.map(c => c.value.toLowerCase()));
+        const values = new Set(equals.map((c) => c.value.toLowerCase()));
         if (values.size > 1) {
           return { column };
         }
       }
 
-      const greaterThan = conds.filter(c => c.operator === '>');
-      const lessThan = conds.filter(c => c.operator === '<');
-      const greaterThanOrEqual = conds.filter(c => c.operator === '>=');
-      const lessThanOrEqual = conds.filter(c => c.operator === '<=');
+      const greaterThan = conds.filter((c) => c.operator === '>');
+      const lessThan = conds.filter((c) => c.operator === '<');
+      const greaterThanOrEqual = conds.filter((c) => c.operator === '>=');
+      const lessThanOrEqual = conds.filter((c) => c.operator === '<=');
 
-      if ((greaterThan.length > 0 || greaterThanOrEqual.length > 0) &&
-          (lessThan.length > 0 || lessThanOrEqual.length > 0)) {
+      if (
+        (greaterThan.length > 0 || greaterThanOrEqual.length > 0) &&
+        (lessThan.length > 0 || lessThanOrEqual.length > 0)
+      ) {
         const maxLower = Math.max(
-          ...greaterThan.map(c => parseFloat(c.value)),
-          ...greaterThanOrEqual.map(c => parseFloat(c.value))
+          ...greaterThan.map((c) => parseFloat(c.value)),
+          ...greaterThanOrEqual.map((c) => parseFloat(c.value)),
         );
         const minUpper = Math.min(
-          ...lessThan.map(c => parseFloat(c.value)),
-          ...lessThanOrEqual.map(c => parseFloat(c.value))
+          ...lessThan.map((c) => parseFloat(c.value)),
+          ...lessThanOrEqual.map((c) => parseFloat(c.value)),
         );
 
         if (isNaN(maxLower) || isNaN(minUpper) || maxLower >= minUpper) {
@@ -200,8 +230,18 @@ export class RlsValidationService {
     return null;
   }
 
-  private flattenConditions(scope: ScopeGroupDto): Array<{ column: string; operator: string; value: string; negated: boolean }> {
-    const result: Array<{ column: string; operator: string; value: string; negated: boolean }> = [];
+  private flattenConditions(scope: ScopeGroupDto): Array<{
+    column: string;
+    operator: string;
+    value: string;
+    negated: boolean;
+  }> {
+    const result: Array<{
+      column: string;
+      operator: string;
+      value: string;
+      negated: boolean;
+    }> = [];
 
     const processItems = (items: ScopeGroupItemDto[]) => {
       for (const item of items) {
@@ -238,7 +278,11 @@ export class RlsValidationService {
     childScope: ScopeGroupDto,
     targetTable: string,
     excludeRuleId?: number,
-  ): Promise<{ column: string; parentValue: string; childValue: string } | null> {
+  ): Promise<{
+    column: string;
+    parentValue: string;
+    childValue: string;
+  } | null> {
     const parentGroup = await this.findParentGroup(groupId);
     if (!parentGroup) {
       return null;
@@ -257,7 +301,11 @@ export class RlsValidationService {
       const parentScope = await this.buildScopeFromRule(parentRule);
       if (!parentScope) continue;
 
-      const conflict = this.checkChildConflict(parentScope, childScope, parentGroup.name);
+      const conflict = this.checkChildConflict(
+        parentScope,
+        childScope,
+        parentGroup.name,
+      );
       if (conflict) {
         return {
           column: conflict.column,
@@ -281,7 +329,7 @@ export class RlsValidationService {
     for (const [column, childValue] of Object.entries(childColumnValues)) {
       if (parentColumnValues[column]) {
         const parentValue = parentColumnValues[column];
-        
+
         if (childValue.startsWith('<>') || childValue.startsWith('!=')) {
           return {
             column,
@@ -294,7 +342,9 @@ export class RlsValidationService {
     return null;
   }
 
-  private extractColumnConditions(scope: ScopeGroupDto): Record<string, string> {
+  private extractColumnConditions(
+    scope: ScopeGroupDto,
+  ): Record<string, string> {
     const conditions: Record<string, string> = {};
     const flatConditions = this.flattenConditions(scope);
 
@@ -321,7 +371,10 @@ export class RlsValidationService {
     return null;
   }
 
-  private async isDescendant(group: Group, ancestorId: number): Promise<boolean> {
+  private async isDescendant(
+    group: Group,
+    ancestorId: number,
+  ): Promise<boolean> {
     if (group.id === ancestorId) {
       return true;
     }

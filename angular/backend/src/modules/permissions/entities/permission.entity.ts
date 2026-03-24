@@ -49,19 +49,15 @@ export class Permission {
   @Column({ length: 50 })
   resourceName: string;
 
-
   /**
    * Reference to the Action entity (foreign key)
    */
   @Column()
   actionId: number;
 
-
   @ManyToOne(() => Action, { nullable: true, eager: true })
   @JoinColumn({ name: 'action_id' })
   actionEntity: Action;
-
-
 
   /**
    * Relationships with RolePermission join entity
@@ -126,5 +122,4 @@ export class Permission {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

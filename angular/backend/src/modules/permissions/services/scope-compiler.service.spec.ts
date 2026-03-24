@@ -63,7 +63,9 @@ describe('ScopeCompilerService', () => {
         ],
       };
       const result = service.compileFromTree(group);
-      expect(result.sql).toContain('tenant_id = :p_0 AND (department = :p_g1_0 OR department = :p_g1_1)');
+      expect(result.sql).toContain(
+        'tenant_id = :p_0 AND (department = :p_g1_0 OR department = :p_g1_1)',
+      );
       expect(result.parameters).toEqual({
         p_0: '100',
         p_g1_0: 'engineering',
@@ -74,7 +76,9 @@ describe('ScopeCompilerService', () => {
     it('should compile IS NULL operator without parameter', () => {
       const group = {
         logicalOperator: 'AND',
-        conditions: [{ columnName: 'deleted_at', operator: 'IS NULL', value: null }],
+        conditions: [
+          { columnName: 'deleted_at', operator: 'IS NULL', value: null },
+        ],
         childGroups: [],
       };
       const result = service.compileFromTree(group);
@@ -85,7 +89,9 @@ describe('ScopeCompilerService', () => {
     it('should compile IS NOT NULL operator without parameter', () => {
       const group = {
         logicalOperator: 'AND',
-        conditions: [{ columnName: 'archived_at', operator: 'IS NOT NULL', value: null }],
+        conditions: [
+          { columnName: 'archived_at', operator: 'IS NOT NULL', value: null },
+        ],
         childGroups: [],
       };
       const result = service.compileFromTree(group);
@@ -96,7 +102,13 @@ describe('ScopeCompilerService', () => {
     it('should compile IN operator with comma-separated values into multiple parameters', () => {
       const group = {
         logicalOperator: 'AND',
-        conditions: [{ columnName: 'status', operator: 'IN', value: 'active,pending,review' }],
+        conditions: [
+          {
+            columnName: 'status',
+            operator: 'IN',
+            value: 'active,pending,review',
+          },
+        ],
         childGroups: [],
       };
       const result = service.compileFromTree(group);
@@ -166,7 +178,9 @@ describe('ScopeCompilerService', () => {
         ],
       };
       const result = service.compileFromTree(group);
-      expect(result.sql).toContain('root = :p_0 AND (level1 = :p_g1_0 OR (level2a = :p_g1_g1_0 AND level2b = :p_g1_g1_1))');
+      expect(result.sql).toContain(
+        'root = :p_0 AND (level1 = :p_g1_0 OR (level2a = :p_g1_g1_0 AND level2b = :p_g1_g1_1))',
+      );
     });
 
     it('should compile empty group with no conditions', () => {
@@ -211,7 +225,9 @@ describe('ScopeCompilerService', () => {
         ],
       };
       const result = service.compileFromTree(group);
-      expect(result.sql).toContain('tenant_id = :p_0 AND deleted_at IS NULL AND role IN (:p_2_0, :p_2_1, :p_2_2) AND (department = :p_g3_0 OR department = :p_g3_1)');
+      expect(result.sql).toContain(
+        'tenant_id = :p_0 AND deleted_at IS NULL AND role IN (:p_2_0, :p_2_1, :p_2_2) AND (department = :p_g3_0 OR department = :p_g3_1)',
+      );
       expect(result.parameters).toEqual({
         p_0: 'tenant_123',
         p_2_0: 'admin',
@@ -237,7 +253,9 @@ describe('ScopeCompilerService', () => {
 
     it('should handle IS NULL in compileGroup', () => {
       const group = {
-        conditions: [{ columnName: 'nullable', operator: 'IS NULL', value: null }],
+        conditions: [
+          { columnName: 'nullable', operator: 'IS NULL', value: null },
+        ],
         childGroups: [],
         logicalOperator: 'AND',
       };

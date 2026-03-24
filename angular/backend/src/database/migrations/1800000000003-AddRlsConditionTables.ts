@@ -47,6 +47,8 @@ export class AddRlsConditionTables1800000000003 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE IF EXISTS "rls_rule_conditions"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "rls_condition_groups"`);
-    await queryRunner.query(`ALTER TABLE "rls_rules" DROP COLUMN "root_group_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "rls_rules" DROP COLUMN "root_group_id"`,
+    );
   }
 }

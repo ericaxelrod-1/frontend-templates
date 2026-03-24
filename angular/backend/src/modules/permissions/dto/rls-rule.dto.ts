@@ -1,4 +1,13 @@
-import { IsString, IsOptional, IsBoolean, IsInt, IsArray, MaxLength, ValidateNested, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsInt,
+  IsArray,
+  MaxLength,
+  ValidateNested,
+  IsIn,
+} from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 export class ScopeConditionDto {
