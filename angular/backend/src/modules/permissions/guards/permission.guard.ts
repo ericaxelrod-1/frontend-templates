@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  ForbiddenException,
   Logger,
   BadRequestException,
 } from '@nestjs/common';
@@ -89,7 +90,7 @@ export class PermissionGuard implements CanActivate {
           this.logger.debug(
             `User ${user.id} lacks required permission: ${permission}`,
           );
-          throw new UnauthorizedException(
+          throw new ForbiddenException(
             'You do not have all required permissions to access this resource',
           );
         }
@@ -121,7 +122,7 @@ export class PermissionGuard implements CanActivate {
     this.logger.debug(
       `User ${user.id} lacks all required permissions: ${JSON.stringify(requiredPermissions)}`,
     );
-    throw new UnauthorizedException(
+    throw new ForbiddenException(
       'You do not have permission to access this resource',
     );
   }
