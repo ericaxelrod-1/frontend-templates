@@ -47,6 +47,7 @@
 // Layout Areas
 .layout-header {
   grid-area: header;
+  position: relative;
   z-index: 1000; // Above sidebar and content
 }
 
@@ -54,11 +55,14 @@
   grid-area: main;
   overflow: hidden; // Prevent content from spilling out
   min-height: 0; // Important for proper grid behavior
+  position: relative;
+  z-index: 2; // Above footer
 }
 
 .layout-footer {
   grid-area: footer;
-  z-index: -1; // Behind everything
+  position: relative;
+  z-index: 1; // Below main content
 }
 
 // Sidenav Container - takes full height of main area
