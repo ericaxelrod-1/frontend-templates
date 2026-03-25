@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, Injector, runInInjectionContext } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -120,7 +120,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   totalTables = 0;
   loadingPalette = false;
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private injector: Injector) {
     this.searchSubject.pipe(
       debounceTime(300),
       distinctUntilChanged()
@@ -132,6 +132,12 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Initialize model once in injection context
+    this.model = runInInjectionContext(this.injector, () => initializeModel({
+      nodes: this.canvasNodes,
+      edges: this.canvasEdges,
+    }));
+
     if (this.initialTables.length > 0) {
       this.canvasNodes = [...this.initialTables];
       this.nodeCounter = this.canvasNodes.length;
@@ -224,9 +230,14 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   onPaletteItemDropped(event: any): void {
     const { item, position } = event;
     const nodeId = `node_${++this.nodeCounter}`;
+    
+    // Handle case where position might be undefined or have different structure
+    const x = position?.x ?? 100;
+    const y = position?.y ?? 100;
+    
     const node = {
       id: nodeId,
-      position: { x: position.x - 150, y: position.y - 40 },
+      position: { x: x - 150, y: y - 40 },
       data: {
         tableName: item.data.tableName,
         columns: item.data.columns,
@@ -334,12 +345,11 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   syncModel(): void {
-    // Re-initialize model to ensure clean state
-    // This is safer than partial updates which can cause state issues
-    this.model = initializeModel({
-      nodes: [...this.canvasNodes],
-      edges: [...this.canvasEdges],
-    });
+    // Use update methods to modify existing model - avoids injection context issues
+    if (this.model) {
+      this.model.updateNodes(this.canvasNodes);
+      this.model.updateEdges(this.canvasEdges);
+    }
   }
 
   calculateEdgePath(edge: any): string {
