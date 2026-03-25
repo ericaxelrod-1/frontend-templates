@@ -43,11 +43,7 @@
 
   .palette-items {
     flex: 1;
-    overflow-y: auto;
-    padding: var(--mat-sys-spacing-md);
-    display: flex;
-    flex-direction: column;
-    gap: var(--mat-sys-spacing-sm);
+    height: 100%;
   }
 
   .palette-loading, .palette-empty {
