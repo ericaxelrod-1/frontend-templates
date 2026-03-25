@@ -305,8 +305,7 @@ export class JoinPathsAdminComponent implements OnInit {
         editingPath: path
       },
       panelClass: 'fullscreen-dialog',
-      autoFocus: false,
-      restoreFocus: this.addPathButton
+      restoreFocus: true
     });
 
     dialogRef.afterClosed().pipe(take(1)).subscribe(result => {
