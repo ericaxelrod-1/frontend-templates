@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, ElementRef } from '@angular/core';
+import { Component, OnInit, Inject, ElementRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -262,7 +262,8 @@ export class JoinPathsAdminComponent implements OnInit {
     private http: HttpClient, 
     private rlsService: RlsService,
     private dialog: MatDialog,
-    private elementRef: ElementRef
+    private elementRef: ElementRef,
+    private zone: NgZone
   ) {}
 
   ngOnInit(): void {
@@ -304,8 +305,9 @@ export class JoinPathsAdminComponent implements OnInit {
         tables: this.tables,
         editingPath: path
       },
-      panelClass: 'fullscreen-dialog',
-      restoreFocus: false
+        panelClass: 'fullscreen-dialog',
+        restoreFocus: false,
+        position: { top: '0', left: '0' }
     });
 
     dialogRef.afterClosed().pipe(
@@ -326,9 +328,14 @@ export class JoinPathsAdminComponent implements OnInit {
     observable.pipe(take(1)).subscribe({
       next: () => {
         this.http.get<RlsJoinPath[]>(`${environment.apiUrl}/rls/join-paths`).pipe(take(1)).subscribe({
-          next: () => {
-            const h1 = this.elementRef.nativeElement.querySelector('h1') as HTMLElement;
-            if (h1) h1.focus();
+          next: (paths) => {
+            this.paths = paths;
+            this.zone.runOutsideAngular(() => {
+              setTimeout(() => {
+                const h1 = this.elementRef.nativeElement.querySelector('h1') as HTMLElement;
+                if (h1) h1.focus();
+              }, 0);
+            });
           }
         });
       },
