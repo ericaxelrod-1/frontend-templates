@@ -8,7 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
-import { take, tap, delay } from 'rxjs';
+import { take } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { RlsService, SchemaColumn } from '../../../services/rls.service';
 import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput, DiagramTableNode } from '../../../components/join-path-diagram/join-path-diagram.component';
@@ -304,16 +304,19 @@ export class JoinPathsAdminComponent implements OnInit {
         tables: this.tables,
         editingPath: path
       },
-        panelClass: 'fullscreen-dialog',
-        autoFocus: false,
-        restoreFocus: false
+      panelClass: 'fullscreen-dialog',
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      position: { top: '0', left: '0' },
+      autoFocus: false,
+      restoreFocus: this.addPathButton?.nativeElement
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    dialogRef.afterClosed().pipe(take(1)).subscribe(result => {
       if (result) {
         this.savePath(result, path?.id);
-      } else {
-        this.addPathButton?.nativeElement.focus();
       }
     });
   }
@@ -326,7 +329,6 @@ export class JoinPathsAdminComponent implements OnInit {
     observable.pipe(take(1)).subscribe({
       next: () => {
         this.loadPaths();
-        this.addPathButton?.nativeElement.focus();
       },
       error: (err) => console.error('Failed to save join path:', err)
     });
