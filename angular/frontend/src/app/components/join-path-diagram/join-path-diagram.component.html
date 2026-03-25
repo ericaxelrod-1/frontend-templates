@@ -125,8 +125,8 @@
           <label>Source (From) Column</label>
           <select [(ngModel)]="sidebarSourceColumn" (ngModelChange)="updateEdgeCondition()">
             <option value="">Select column...</option>
-            @for (col of availableCanvasColumns; track col.tableName + col.columnName) {
-              <option [value]="col.columnName">{{ col.tableName }}.{{ col.columnName }}</option>
+            @for (col of availableCanvasColumns; track col.tableName + '::' + col.columnName) {
+              <option [value]="col.tableName + '.' + col.columnName">{{ col.tableName }}.{{ col.columnName }}</option>
             }
           </select>
         </div>
@@ -143,8 +143,8 @@
           <label>Target (To) Column</label>
           <select [(ngModel)]="sidebarTargetColumn" (ngModelChange)="updateEdgeCondition()">
             <option value="">Select column...</option>
-            @for (col of availableCanvasColumns; track col.tableName + col.columnName) {
-              <option [value]="col.columnName">{{ col.tableName }}.{{ col.columnName }}</option>
+            @for (col of availableCanvasColumns; track col.tableName + '::' + col.columnName) {
+              <option [value]="col.tableName + '.' + col.columnName">{{ col.tableName }}.{{ col.columnName }}</option>
             }
           </select>
         </div>
