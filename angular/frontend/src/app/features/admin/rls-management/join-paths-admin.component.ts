@@ -34,7 +34,7 @@ interface RlsJoinPath {
 @Component({
   selector: 'app-join-path-editor-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatIconModule, JoinPathDiagramComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatIconModule, A11yModule, JoinPathDiagramComponent],
   template: `
     <div class="dialog-container">
       <div class="dialog-header-compact">
