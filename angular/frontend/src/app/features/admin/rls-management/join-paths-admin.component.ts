@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
-import { HttpClient } from '@angular/common/http';
+import { A11yModule } from '@angular/cdk/a11y';
 import { take } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { RlsService, SchemaColumn } from '../../../services/rls.service';
@@ -175,7 +175,7 @@ export class JoinPathEditorDialogComponent {
 @Component({
   selector: 'app-join-paths-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatIconModule, A11yModule],
   template: `
     <div class="join-paths">
       <header class="header">
