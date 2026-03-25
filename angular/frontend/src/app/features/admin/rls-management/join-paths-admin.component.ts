@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject } from '@angular/core';
+import { Component, OnInit, Inject, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -8,6 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
+import { take, tap } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { RlsService, SchemaColumn } from '../../../services/rls.service';
 import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput, DiagramTableNode } from '../../../components/join-path-diagram/join-path-diagram.component';
@@ -83,7 +84,7 @@ interface RlsJoinPath {
     .target-info { display: flex; align-items: center; gap: 0.5rem; font-size: var(--fluid-text-xs); color: var(--mat-sys-on-surface-variant); }
     .target-info .value { background: var(--mat-sys-secondary-container); color: var(--mat-sys-on-secondary-container); padding: 2px 8px; border-radius: 4px; font-weight: 600; }
     .header-actions { display: flex; gap: 0.5rem; }
-    .diagram-section { flex: 1; height: 100%; display: flex; flex-direction: column; }
+    .diagram-section { flex: 1; display: flex; flex-direction: column; }
     mat-dialog-content { flex: 1; padding: 0 !important; margin: 0 !important; overflow: hidden; min-height: 0; }
   `]
 })
@@ -260,7 +261,8 @@ export class JoinPathsAdminComponent implements OnInit {
   constructor(
     private http: HttpClient, 
     private rlsService: RlsService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private elementRef: ElementRef
   ) {}
 
   ngOnInit(): void {
@@ -320,8 +322,15 @@ export class JoinPathsAdminComponent implements OnInit {
       ? this.http.put(`${environment.apiUrl}/rls/join-paths/${id}`, formData)
       : this.http.post(`${environment.apiUrl}/rls/join-paths`, formData);
 
-    observable.subscribe({
-      next: () => this.loadPaths(),
+    observable.pipe(take(1)).subscribe({
+      next: () => {
+        this.http.get<RlsJoinPath[]>(`${environment.apiUrl}/rls/join-paths`).pipe(take(1)).subscribe({
+          next: () => {
+            const h1 = this.elementRef.nativeElement.querySelector('h1') as HTMLElement;
+            if (h1) h1.focus();
+          }
+        });
+      },
       error: (err) => console.error('Failed to save join path:', err)
     });
   }
