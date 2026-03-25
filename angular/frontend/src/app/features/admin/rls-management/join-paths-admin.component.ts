@@ -312,6 +312,7 @@ export class JoinPathsAdminComponent implements OnInit {
       if (result) {
         this.savePath(result, path?.id);
       }
+      this.addPathButton?.nativeElement.focus();
     });
   }
 
