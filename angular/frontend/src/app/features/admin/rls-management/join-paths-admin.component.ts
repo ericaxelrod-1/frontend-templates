@@ -302,7 +302,8 @@ export class JoinPathsAdminComponent implements OnInit {
         tables: this.tables,
         editingPath: path
       },
-      panelClass: 'fullscreen-dialog'
+      panelClass: 'fullscreen-dialog',
+      restoreFocus: false
     });
 
     dialogRef.afterClosed().subscribe(result => {

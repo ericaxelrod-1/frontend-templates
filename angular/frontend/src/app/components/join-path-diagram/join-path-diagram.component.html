@@ -10,7 +10,7 @@
       </mat-form-field>
     </div>
     
-    <div class="palette-items">
+    <div class="palette-items" (scroll)="onPaletteScroll($event)">
       @if (loadingPalette && currentPage === 1) {
         <div class="palette-loading">Loading tables...</div>
       } @else {
@@ -125,8 +125,8 @@
           <label>Source (From) Column</label>
           <select [(ngModel)]="sidebarSourceColumn" (ngModelChange)="updateEdgeCondition()">
             <option value="">Select column...</option>
-            @for (col of getEdgeSourceColumns(sidebarEdge); track col.name) {
-              <option [value]="col.name">{{ col.name }}</option>
+            @for (col of availableCanvasColumns; track col.tableName + col.columnName) {
+              <option [value]="col.columnName">{{ col.tableName }}.{{ col.columnName }}</option>
             }
           </select>
         </div>
@@ -143,8 +143,8 @@
           <label>Target (To) Column</label>
           <select [(ngModel)]="sidebarTargetColumn" (ngModelChange)="updateEdgeCondition()">
             <option value="">Select column...</option>
-            @for (col of getEdgeTargetColumns(sidebarEdge); track col.name) {
-              <option [value]="col.name">{{ col.name }}</option>
+            @for (col of availableCanvasColumns; track col.tableName + col.columnName) {
+              <option [value]="col.columnName">{{ col.tableName }}.{{ col.columnName }}</option>
             }
           </select>
         </div>

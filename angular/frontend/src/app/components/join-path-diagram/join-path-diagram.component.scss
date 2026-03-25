@@ -70,11 +70,11 @@
 .palette-item {
   display: flex;
   align-items: center;
-  gap: var(--mat-sys-spacing-sm);
-  padding: var(--mat-sys-spacing-sm);
+  gap: 4px;
+  padding: 4px 8px;
   background: var(--mat-sys-surface-container-high);
   border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: grab;
   transition: all 0.2s ease;
 
@@ -86,16 +86,16 @@
   }
 
   .palette-icon {
-    font-size: 1.25rem;
-    width: 1.25rem;
-    height: 1.25rem;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
     color: var(--mat-sys-primary);
   }
 
   .palette-label {
     font-weight: 500;
     color: var(--mat-sys-on-surface);
-    font-size: var(--fluid-text-xs);
+    font-size: 11px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -136,10 +136,10 @@
 }
 
 .table-node {
-  min-width: 220px;
+  min-width: 160px;
   background: var(--mat-sys-surface);
   border: 2px solid var(--mat-sys-outline);
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: var(--mat-sys-shadow);
   overflow: hidden;
   transition: box-shadow 0.2s ease;
@@ -159,24 +159,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 4px 8px;
   background: var(--mat-sys-primary-container);
   color: var(--mat-sys-on-primary-container);
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 
   .table-name {
     font-weight: 600;
-    font-size: 13px;
+    font-size: 11px;
   }
 
   .node-controls {
     display: flex;
-    gap: 4px;
+    gap: 2px;
   }
 
   button {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
@@ -186,7 +186,7 @@
     background: rgba(0,0,0,0.05);
     color: inherit;
     
-    mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    mat-icon { font-size: 14px; width: 14px; height: 14px; }
     
     &:hover { background: rgba(0,0,0,0.1); }
     &.btn-delete-node:hover { background: var(--mat-sys-error); color: var(--mat-sys-on-error); }
@@ -195,8 +195,8 @@
 }
 
 .table-columns {
-  padding: 4px 0;
-  max-height: 200px;
+  padding: 2px 0;
+  max-height: 150px;
   overflow-y: auto;
 }
 
@@ -204,8 +204,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px;
-  font-size: 11px;
+  padding: 2px 8px;
+  font-size: 10px;
   border-bottom: 1px solid var(--mat-sys-surface-variant);
 
   &:last-child {

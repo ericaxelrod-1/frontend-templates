@@ -116,6 +116,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   pageSize = 20;
   totalTables = 0;
   loadingPalette = false;
+  availableCanvasColumns: { tableName: string; columnName: string }[] = [];
 
   constructor(private http: HttpClient, private injector: Injector) {
     this.searchSubject.pipe(
@@ -171,6 +172,14 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     if (this.availableTables.length < this.totalTables) {
       this.currentPage++;
       this.loadAvailableTables();
+    }
+  }
+
+  onPaletteScroll(event: Event): void {
+    const target = event.target as HTMLElement;
+    const threshold = 50;
+    if (target.scrollHeight - target.scrollTop <= target.clientHeight + threshold) {
+      this.loadMore();
     }
   }
 
@@ -382,6 +391,14 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
       })),
       conditions,
     };
+
+    // Build flat list of all columns from all nodes on canvas for theta joins
+    this.availableCanvasColumns = nodes.flatMap((n: any) => 
+      (n.data?.columns || []).map((col: any) => ({
+        tableName: n.data.tableName,
+        columnName: col.name
+      }))
+    );
 
     this.conditionsChange.emit(conditions);
     this.diagramChange.emit(output);
