@@ -39,7 +39,7 @@
     <div class="canvas-toolbar">
       <div class="toolbar-status">
         <mat-icon class="status-icon">schema</mat-icon>
-        <span>{{ canvasNodes.length }} tables, {{ canvasEdges.length }} joins</span>
+        <span>{{ model.getNodes().length }} tables, {{ model.getEdges().length }} joins</span>
       </div>
       <div class="toolbar-actions">
         <button mat-stroked-button color="warn" (click)="clearDiagram()">
@@ -106,7 +106,7 @@
     </svg>
   </main>
 
-  <aside class="sidebar" [class.open]="sidebarOpen || canvasEdges.length > 0">
+  <aside class="sidebar" [class.open]="sidebarOpen || edges.length > 0">
     @if (sidebarEdge) {
       <div class="sidebar-header">
         <h3>Edit Join Condition</h3>
@@ -159,7 +159,7 @@
       </div>
       <div class="sidebar-body">
         <div class="conditions-list">
-          @for (edge of canvasEdges; track edge.id) {
+          @for (edge of edges; track edge.id) {
             <div class="condition-item" [class.active]="selectedEdgeId === edge.id" (click)="onEdgeSelected(edge)">
               <div class="cond-summary">
                 <span class="cond-table">{{ getNodeTableName(edge.source) }}</span>

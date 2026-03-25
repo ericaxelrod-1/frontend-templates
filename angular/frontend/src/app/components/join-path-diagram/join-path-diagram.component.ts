@@ -94,8 +94,6 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   @Output() targetTableChange = new EventEmitter<string>();
 
   availableTables: DiagramTableNode[] = [];
-  canvasNodes: any[] = [];
-  canvasEdges: any[] = [];
   
   model = initializeModel({
     nodes: [],
@@ -109,7 +107,6 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   sidebarTargetColumn = '';
   sidebarOperator = '=';
 
-  nodeCounter = 0;
   edgeCounter = 0;
 
   paletteItems: any[] = [];
@@ -132,36 +129,34 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Initialize model once in injection context
-    this.model = runInInjectionContext(this.injector, () => initializeModel({
-      nodes: this.canvasNodes,
-      edges: this.canvasEdges,
+    // Map initial conditions to edges - but we need node IDs first
+    // Since initialTables has indices as IDs (node_0, node_1), we can use those
+    const initialEdges = this.initialConditions.map((c, i) => ({
+      id: c.id || `edge_${i}`,
+      source: `node_${this.getNodeIndex(c.fromTable)}`,
+      target: `node_${this.getNodeIndex(c.toTable)}`,
+      data: {
+        sourceColumn: c.fromColumn,
+        targetColumn: c.toColumn,
+        operator: c.operator || '=',
+      },
     }));
 
-    if (this.initialTables.length > 0) {
-      this.canvasNodes = [...this.initialTables];
-      this.nodeCounter = this.canvasNodes.length;
-      this.syncModel();
-    }
+    this.edgeCounter = initialEdges.length;
 
-    if (this.initialConditions.length > 0) {
-      this.canvasEdges = this.initialConditions.map(c => ({
-        id: c.id,
-        source: this.getNodeIdByTableName(c.fromTable),
-        target: this.getNodeIdByTableName(c.toTable),
-        data: {
-          sourceColumn: c.fromColumn,
-          targetColumn: c.toColumn,
-          operator: c.operator || '=',
-        },
-      }));
-      this.edgeCounter = this.canvasEdges.length;
-      this.syncModel();
-    }
+    // Initialize model with initial data
+    this.model = runInInjectionContext(this.injector, () => initializeModel({
+      nodes: this.initialTables as any,
+      edges: initialEdges as any,
+    }));
 
     if (this.availableTables.length === 0) {
       this.loadAvailableTables();
     }
+  }
+
+  private getNodeIndex(tableName: string): number {
+    return this.initialTables.findIndex(t => t.data?.tableName === tableName);
   }
 
   ngOnDestroy(): void {
@@ -222,47 +217,42 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     }));
   }
 
+  get edges(): any[] {
+    return this.model.getEdges() as any[];
+  }
+
   getNodeIdByTableName(tableName: string): string {
-    const node = this.canvasNodes.find(n => n.data?.tableName === tableName);
+    // Query live model for node
+    const nodes = this.model.getNodes() as any[];
+    const node = nodes.find(n => n.data?.tableName === tableName);
     return node?.id || tableName;
   }
 
   onPaletteItemDropped(event: any): void {
-    const { item, position } = event;
-    const nodeId = `node_${++this.nodeCounter}`;
+    // Library natively adds the node to canvas - event contains the new node
+    const { node } = event;
     
-    // Handle case where position might be undefined or have different structure
-    const x = position?.x ?? 100;
-    const y = position?.y ?? 100;
-    
-    const node = {
-      id: nodeId,
-      position: { x: x - 150, y: y - 40 },
-      data: {
-        tableName: item.data.tableName,
-        columns: item.data.columns,
-      },
-    };
-    this.canvasNodes = [...this.canvasNodes, node];
+    // Query current state from model
+    const currentNodes = this.model.getNodes() as any[];
+    const currentEdges = this.model.getEdges() as any[];
 
     // Auto-connect to previous node if exists
-    if (this.canvasNodes.length > 1) {
-      const prevNode = this.canvasNodes[this.canvasNodes.length - 2];
+    if (currentNodes.length > 1) {
+      const prevNode = currentNodes[currentNodes.length - 2];
       const edgeId = `edge_${++this.edgeCounter}`;
       const newEdge = {
         id: edgeId,
         source: prevNode.id,
-        target: nodeId,
+        target: node.id,
         data: {
           sourceColumn: '',
           targetColumn: '',
           operator: '=',
         },
       };
-      this.canvasEdges = [...this.canvasEdges, newEdge];
+      this.model.updateEdges([...currentEdges, newEdge]);
     }
 
-    this.syncModel();
     this.emitChange();
   }
 
@@ -271,11 +261,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     if (!edge.data) {
       edge.data = { sourceColumn: '', targetColumn: '', operator: '=' };
     }
-    const edgeId = `edge_${++this.edgeCounter}`;
-    const updatedEdge = { ...edge, id: edgeId };
-    this.canvasEdges = [...this.canvasEdges, updatedEdge];
-    this.syncModel();
-    this.openEdgeSidebar(updatedEdge);
+    // Library handles adding the edge - just open sidebar
+    this.openEdgeSidebar(edge);
   }
 
   onEdgeSelected(edge: any): void {
@@ -287,7 +274,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     const selected = event.selection || [];
     if (selected.length > 0) {
       const selectedId = selected[0].id;
-      const edge = this.canvasEdges.find(e => e.id === selectedId);
+      // Query live model for the selected edge
+      const edge = (this.model.getEdges() as any[]).find(e => e.id === selectedId);
       if (edge) {
         this.onEdgeSelected(edge);
       }
@@ -304,38 +292,47 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
 
   updateEdgeCondition(): void {
     if (!this.sidebarEdge) return;
-    const idx = this.canvasEdges.findIndex(e => e.id === this.sidebarEdge!.id);
-    if (idx === -1) return;
-    this.canvasEdges[idx] = {
-      ...this.canvasEdges[idx],
-      data: {
-        sourceColumn: this.sidebarSourceColumn,
-        targetColumn: this.sidebarTargetColumn,
-        operator: this.sidebarOperator,
-      },
-    };
-    this.syncModel();
+    // Query live model and update edge
+    const currentEdges = this.model.getEdges();
+    const updatedEdges = currentEdges.map((e: any) => {
+      if (e.id === this.sidebarEdge.id) {
+        return {
+          ...e,
+          data: {
+            sourceColumn: this.sidebarSourceColumn,
+            targetColumn: this.sidebarTargetColumn,
+            operator: this.sidebarOperator,
+          },
+        };
+      }
+      return e;
+    });
+    this.model.updateEdges(updatedEdges);
     this.emitChange();
   }
 
   deleteSelectedEdge(): void {
     if (!this.selectedEdgeId) return;
-    this.canvasEdges = this.canvasEdges.filter(e => e.id !== this.selectedEdgeId);
+    // Filter live model directly
+    const updatedEdges = this.model.getEdges().filter((e: any) => e.id !== this.selectedEdgeId);
+    this.model.updateEdges(updatedEdges);
     this.sidebarOpen = false;
     this.sidebarEdge = null;
     this.selectedEdgeId = null;
-    this.syncModel();
     this.emitChange();
   }
 
   deleteNode(nodeId: string): void {
-    const node = this.canvasNodes.find(n => n.id === nodeId);
+    const nodes = this.model.getNodes() as any[];
+    const node = nodes.find(n => n.id === nodeId);
     if (node?.data?.tableName === this.targetTable) {
       this.setTargetTable('');
     }
-    this.canvasNodes = this.canvasNodes.filter(n => n.id !== nodeId);
-    this.canvasEdges = this.canvasEdges.filter(e => e.source !== nodeId && e.target !== nodeId);
-    this.syncModel();
+    // Filter both nodes and edges in live model
+    const updatedNodes = nodes.filter(n => n.id !== nodeId);
+    const updatedEdges = (this.model.getEdges() as any[]).filter(e => e.source !== nodeId && e.target !== nodeId);
+    this.model.updateNodes(updatedNodes);
+    this.model.updateEdges(updatedEdges);
     this.emitChange();
   }
 
@@ -344,24 +341,20 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     this.targetTableChange.emit(tableName);
   }
 
-  syncModel(): void {
-    // Use update methods to modify existing model - avoids injection context issues
-    if (this.model) {
-      this.model.updateNodes(this.canvasNodes);
-      this.model.updateEdges(this.canvasEdges);
-    }
-  }
-
   calculateEdgePath(edge: any): string {
     if (!edge.source || !edge.target) return '';
-    const sourceNode = this.canvasNodes.find(n => n.id === edge.source);
-    const targetNode = this.canvasNodes.find(n => n.id === edge.target);
+    const nodes = this.model.getNodes() as any[];
+    const sourceNode = nodes.find(n => n.id === edge.source);
+    const targetNode = nodes.find(n => n.id === edge.target);
     if (!sourceNode || !targetNode) return '';
     return `M ${sourceNode.position.x} ${sourceNode.position.y} L ${targetNode.position.x} ${targetNode.position.y}`;
   }
 
   emitChange(): void {
-    const conditions: DiagramJoinCondition[] = this.canvasEdges.map(e => ({
+    const edges = this.model.getEdges();
+    const nodes = this.model.getNodes();
+
+    const conditions: DiagramJoinCondition[] = edges.map((e: any) => ({
       id: e.id,
       fromTable: this.getNodeTableName(e.source),
       fromColumn: e.data?.sourceColumn || '',
@@ -371,7 +364,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     })).filter(c => c.fromColumn && c.toColumn);
 
     const output: DiagramOutput = {
-      tables: this.canvasNodes.map(n => ({
+      tables: nodes.map((n: any) => ({
         id: n.id,
         data: {
           tableName: n.data.tableName,
@@ -379,7 +372,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
         },
         position: n.position,
       })),
-      edges: this.canvasEdges.map(e => ({
+      edges: edges.map((e: any) => ({
         id: e.id,
         source: e.source,
         target: e.target,
@@ -395,12 +388,14 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   getNodeTableName(nodeId: string): string {
-    const node = this.canvasNodes.find(n => n.id === nodeId);
+    const nodes = this.model.getNodes() as any[];
+    const node = nodes.find(n => n.id === nodeId);
     return node?.data?.tableName || nodeId;
   }
 
   getNodeColumns(nodeId: string): DiagramColumn[] {
-    const node = this.canvasNodes.find(n => n.id === nodeId);
+    const nodes = this.model.getNodes() as any[];
+    const node = nodes.find(n => n.id === nodeId);
     return node?.data?.columns || [];
   }
 
@@ -413,15 +408,14 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   clearDiagram(): void {
-    this.canvasNodes = [];
-    this.canvasEdges = [];
-    this.nodeCounter = 0;
+    // Clear model directly
+    this.model.updateNodes([]);
+    this.model.updateEdges([]);
     this.edgeCounter = 0;
     this.sidebarOpen = false;
     this.sidebarEdge = null;
     this.selectedEdgeId = null;
     this.setTargetTable('');
-    this.syncModel();
     this.emitChange();
   }
 
