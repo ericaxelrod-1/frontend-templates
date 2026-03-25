@@ -8,7 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
-import { take, tap } from 'rxjs';
+import { take, tap, delay } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { RlsService, SchemaColumn } from '../../../services/rls.service';
 import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput, DiagramTableNode } from '../../../components/join-path-diagram/join-path-diagram.component';
@@ -308,11 +308,12 @@ export class JoinPathsAdminComponent implements OnInit {
       restoreFocus: false
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    dialogRef.afterClosed().pipe(
+      delay(150),
+      take(1)
+    ).subscribe(result => {
       if (result) {
-        setTimeout(() => {
-          this.savePath(result, path?.id);
-        }, 0);
+        this.savePath(result, path?.id);
       }
     });
   }
