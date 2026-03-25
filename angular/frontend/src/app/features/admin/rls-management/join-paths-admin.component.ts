@@ -53,7 +53,7 @@ interface RlsJoinPath {
         </div>
 
         <div class="header-actions">
-          <button mat-button (click)="onCancel()">Cancel</button>
+          <button mat-button cdkFocusInitial (click)="onCancel()">Cancel</button>
           <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!isFormValid()">
             <mat-icon>save</mat-icon> {{ data.editingPath ? 'Save Changes' : 'Create Path' }}
           </button>
@@ -305,13 +305,8 @@ export class JoinPathsAdminComponent implements OnInit {
         editingPath: path
       },
       panelClass: 'fullscreen-dialog',
-      width: '100vw',
-      height: '100vh',
-      maxWidth: '100vw',
-      maxHeight: '100vh',
-      position: { top: '0', left: '0' },
       autoFocus: false,
-      restoreFocus: this.addPathButton?.nativeElement
+      restoreFocus: this.addPathButton
     });
 
     dialogRef.afterClosed().pipe(take(1)).subscribe(result => {

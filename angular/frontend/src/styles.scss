@@ -304,10 +304,13 @@ body {
 }
 
 .fullscreen-dialog {
-  max-width: 100vw !important;
+  --mdc-dialog-container-width: 100vw;
+  --mdc-dialog-container-height: 100vh;
+  --mdc-dialog-container-max-width: 100vw;
+  --mdc-dialog-container-max-height: 100vh;
+  --mdc-dialog-shape-radius: 0;
   width: 100vw !important;
-  
-  .mat-mdc-dialog-container {
-    border-radius: 0 !important;
-  }
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
 }
