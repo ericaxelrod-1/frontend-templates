@@ -83,8 +83,8 @@ interface RlsJoinPath {
     .target-info { display: flex; align-items: center; gap: 0.5rem; font-size: var(--fluid-text-xs); color: var(--mat-sys-on-surface-variant); }
     .target-info .value { background: var(--mat-sys-secondary-container); color: var(--mat-sys-on-secondary-container); padding: 2px 8px; border-radius: 4px; font-weight: 600; }
     .header-actions { display: flex; gap: 0.5rem; }
-    .diagram-section { flex: 1; height: calc(100vh - 64px); display: flex; flex-direction: column; }
-    mat-dialog-content { flex: 1; padding: 0 !important; margin: 0 !important; overflow: hidden; }
+    .diagram-section { flex: 1; height: 100%; display: flex; flex-direction: column; }
+    mat-dialog-content { flex: 1; padding: 0 !important; margin: 0 !important; overflow: hidden; min-height: 0; }
   `]
 })
 export class JoinPathEditorDialogComponent {
@@ -308,7 +308,9 @@ export class JoinPathsAdminComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        this.savePath(result, path?.id);
+        setTimeout(() => {
+          this.savePath(result, path?.id);
+        }, 0);
       }
     });
   }

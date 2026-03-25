@@ -44,7 +44,7 @@
   .palette-items {
     flex: 1;
     height: 100%;
-    padding: var(--mat-sys-spacing-xs);
+    padding: var(--mat-sys-spacing-sm);
   }
 
   .palette-loading, .palette-empty {
@@ -68,7 +68,7 @@
   display: flex;
   align-items: center;
   gap: var(--mat-sys-spacing-xs);
-  padding: var(--mat-sys-spacing-xs) var(--mat-sys-spacing-sm);
+  padding: var(--mat-sys-spacing-xs) 0;
   background: var(--mat-sys-surface-container-high);
   border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 6px;
