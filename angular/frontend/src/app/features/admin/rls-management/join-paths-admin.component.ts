@@ -1,4 +1,5 @@
 import { Component, OnInit, Inject, ViewChild, ElementRef } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -10,8 +11,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { A11yModule } from '@angular/cdk/a11y';
 import { take } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { RlsService, SchemaColumn } from '../../../services/rls.service';
-import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput, DiagramTableNode } from '../../../components/join-path-diagram/join-path-diagram.component';
+import { RlsService } from '../../../services/rls.service';
+import { JoinPathDiagramComponent, DiagramJoinCondition, DiagramOutput, DiagramTableNode, DiagramColumn } from '../../../components/join-path-diagram/join-path-diagram.component';
 
 interface RlsJoinCondition {
   id?: number;
@@ -43,7 +44,7 @@ interface RlsJoinPath {
         <div class="header-form">
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Path Name</mat-label>
-            <input matInput [(ngModel)]="formData.name" required placeholder="e.g., Orders via Users" />
+            <input matInput [(ngModel)]="formData.name" required placeholder="e.g., Orders via Users" cdkFocusInitial />
           </mat-form-field>
           
           <div class="target-info" *ngIf="formData.targetTable">
@@ -53,7 +54,7 @@ interface RlsJoinPath {
         </div>
 
         <div class="header-actions">
-          <button mat-button cdkFocusInitial (click)="onCancel()">Cancel</button>
+          <button mat-button (click)="onCancel()">Cancel</button>
           <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!isFormValid()">
             <mat-icon>save</mat-icon> {{ data.editingPath ? 'Save Changes' : 'Create Path' }}
           </button>
@@ -90,13 +91,13 @@ interface RlsJoinPath {
 })
 export class JoinPathEditorDialogComponent {
   formData: Partial<RlsJoinPath> & { conditions?: RlsJoinCondition[] };
-  diagramConditions: any[] = [];
+  diagramConditions: DiagramJoinCondition[] = [];
   initialDiagramTables: DiagramTableNode[] = [];
 
   constructor(
     public dialogRef: MatDialogRef<JoinPathEditorDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: { 
-      tables: { name: string; columns: any[] }[], 
+      tables: { name: string; columns: DiagramColumn[] }[], 
       editingPath: RlsJoinPath | null 
     }
   ) {
@@ -111,7 +112,7 @@ export class JoinPathEditorDialogComponent {
         chain: chain,
         conditions: [...(data.editingPath.conditions || [])]
       };
-      this.diagramConditions = (data.editingPath.conditions || []).map((c, i) => ({
+      this.diagramConditions = (data.editingPath.conditions || []).map((c: RlsJoinCondition, i: number) => ({
         id: `c_${i}`,
         fromTable: c.fromTable,
         fromColumn: c.fromColumn,
@@ -121,8 +122,8 @@ export class JoinPathEditorDialogComponent {
       }));
       
       // Initialize nodes based on chain
-      this.initialDiagramTables = (chain as string[]).map((tableName, i) => {
-        const tableMeta = data.tables.find(t => t.name === tableName);
+      this.initialDiagramTables = (chain as string[]).map((tableName: string, i: number) => {
+        const tableMeta = data.tables.find((t: { name: string; columns: DiagramColumn[] }) => t.name === tableName);
         return {
           id: `node_${i}`,
           data: {
@@ -137,7 +138,7 @@ export class JoinPathEditorDialogComponent {
     }
   }
 
-  onDiagramConditionsChange(conditions: any[]): void {
+  onDiagramConditionsChange(conditions: DiagramJoinCondition[]): void {
     this.formData.conditions = conditions.map(c => ({
       fromTable: c.fromTable,
       fromColumn: c.fromColumn,
@@ -256,7 +257,7 @@ export class JoinPathEditorDialogComponent {
 })
 export class JoinPathsAdminComponent implements OnInit {
   paths: RlsJoinPath[] = [];
-  tables: { name: string; columns: any[] }[] = [];
+  tables: { name: string; columns: DiagramColumn[] }[] = [];
   @ViewChild('addPathButton', { read: ElementRef }) addPathButton!: ElementRef<HTMLButtonElement>;
 
   constructor(
@@ -272,17 +273,17 @@ export class JoinPathsAdminComponent implements OnInit {
 
   loadPaths(): void {
     this.http.get<RlsJoinPath[]>(`${environment.apiUrl}/rls/join-paths`).subscribe({
-      next: (paths) => this.paths = paths,
-      error: (err: any) => console.error('Failed to load join paths:', err)
+      next: (paths: RlsJoinPath[]) => this.paths = paths,
+      error: (err: unknown) => console.error('Failed to load join paths:', err)
     });
   }
 
   loadTables(): void {
-    this.http.get<{ items: any[], total: number }>(`${environment.apiUrl}/schema/tables`).subscribe({
-      next: (response) => {
+    this.http.get<{ items: { name: string; columns: DiagramColumn[] }[], total: number }>(`${environment.apiUrl}/schema/tables`).subscribe({
+      next: (response: { items: { name: string; columns: DiagramColumn[] }[], total: number }) => {
         this.tables = response.items;
       },
-      error: (err) => console.error('Failed to load tables:', err)
+      error: (err: unknown) => console.error('Failed to load tables:', err)
     });
   }
 
@@ -320,7 +321,7 @@ export class JoinPathsAdminComponent implements OnInit {
     });
   }
 
-  savePath(formData: any, id?: number): void {
+  savePath(formData: RlsJoinPath, id?: number): void {
     const observable = id
       ? this.http.put(`${environment.apiUrl}/rls/join-paths/${id}`, formData)
       : this.http.post(`${environment.apiUrl}/rls/join-paths`, formData);
@@ -329,7 +330,7 @@ export class JoinPathsAdminComponent implements OnInit {
       next: () => {
         this.loadPaths();
       },
-      error: (err) => console.error('Failed to save join path:', err)
+      error: (err: unknown) => console.error('Failed to save join path:', err)
     });
   }
 
@@ -337,7 +338,7 @@ export class JoinPathsAdminComponent implements OnInit {
     if (!path.id || !confirm('Delete this join path?')) return;
     this.http.delete(`${environment.apiUrl}/rls/join-paths/${path.id}`).subscribe({
       next: () => this.loadPaths(),
-      error: (err) => console.error('Failed to delete join path:', err)
+      error: (err: unknown) => console.error('Failed to delete join path:', err)
     });
   }
 }
