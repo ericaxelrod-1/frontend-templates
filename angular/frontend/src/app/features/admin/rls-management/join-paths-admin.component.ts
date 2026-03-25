@@ -305,7 +305,11 @@ export class JoinPathsAdminComponent implements OnInit {
         editingPath: path
       },
       panelClass: 'fullscreen-dialog',
-      restoreFocus: true
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      restoreFocus: false
     });
 
     dialogRef.afterClosed().pipe(take(1)).subscribe(result => {
