@@ -55,14 +55,6 @@
   grid-area: main;
   overflow: hidden; // Prevent content from spilling out
   min-height: 0; // Important for proper grid behavior
-  position: relative;
-  z-index: 2; // Above footer
-}
-
-.layout-footer {
-  grid-area: footer;
-  position: relative;
-  z-index: 1; // Below main content
 }
 
 // Sidenav Container - takes full height of main area
@@ -99,9 +91,17 @@
 
 // Sidenav Content - main content area
 .sidenav-content {
+  display: flex;
+  flex-direction: column;
   height: 100%; // Take full height of container
   overflow-y: auto; // Enable content scrolling
   overflow-x: hidden; // Prevent horizontal scroll
+  
+  // Footer inside sidenav content
+  .layout-footer {
+    flex-shrink: 0;
+    margin-top: auto;
+  }
 }
 
 // Main content area with proper flex layout

@@ -86,11 +86,12 @@ import { SidePanelService } from '../../shared/components/side-panel';
                 <router-outlet></router-outlet>
               </div>
             </main>
+            
+            <!-- Footer inside sidenav content - naturally sits behind sidebar -->
+            <app-footer class="layout-footer"></app-footer>
           </mat-sidenav-content>
         </mat-sidenav-container>
       </div>
-      
-      <app-footer class="layout-footer"></app-footer>
     </div>
   `,
   styleUrls: ['./custom-layout.component.scss']
