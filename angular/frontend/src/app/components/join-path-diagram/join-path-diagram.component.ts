@@ -153,6 +153,9 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
       edges: initialEdges as any,
     }));
 
+    // Populate availableCanvasColumns for theta joins
+    this.emitChange();
+
     if (this.availableTables.length === 0) {
       this.loadAvailableTables();
     }
@@ -303,6 +306,14 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
 
   updateEdgeCondition(): void {
     if (!this.sidebarEdge) return;
+    
+    // Parse composite values (table.column) to extract just column name
+    const parseColumn = (value: string) => {
+      if (!value) return '';
+      const parts = value.split('.');
+      return parts.length > 1 ? parts[1] : parts[0];
+    };
+
     // Query live model and update edge
     const currentEdges = this.model.getEdges();
     const updatedEdges = currentEdges.map((e: any) => {
@@ -310,8 +321,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
         return {
           ...e,
           data: {
-            sourceColumn: this.sidebarSourceColumn,
-            targetColumn: this.sidebarTargetColumn,
+            sourceColumn: parseColumn(this.sidebarSourceColumn),
+            targetColumn: parseColumn(this.sidebarTargetColumn),
             operator: this.sidebarOperator,
           },
         };
