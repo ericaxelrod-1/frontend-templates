@@ -38,10 +38,7 @@
   overflow: hidden;
 }
 
-::ng-deep .cdk-overlay-container,
-::ng-deep .cdk-global-overlay-wrapper {
-  position: static;
-}
+
 
 // CSS Grid Layout Container
 .app-layout {
@@ -214,3 +211,5 @@
   }
 
 }
+
+/* Force recompilation 1 */

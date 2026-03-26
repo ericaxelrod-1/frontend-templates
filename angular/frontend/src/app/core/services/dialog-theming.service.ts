@@ -33,7 +33,7 @@ import { DOCUMENT } from '@angular/common';
 export class DialogThemingService {
   private readonly LIGHT_THEME_CLASS = 'light-theme-dialogs';
   private readonly LIGHT_CONTENT_CLASS = 'light-dialog-content';
-  private appliedClasses: Set<string> = new Set();
+  private appliedClasses = new Set<string>();
 
   constructor(
     private overlayContainer: OverlayContainer,

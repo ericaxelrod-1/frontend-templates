@@ -33,10 +33,10 @@ export class LoginMonitoringService {
   // Login Attempts API
   getRecentAttempts(
     filters: LoginMonitoringFilters = {},
-    page: number = 0,
-    pageSize: number = 10,
-    sortBy: string = 'createdAt',
-    sortDirection: string = 'desc'
+    page = 0,
+    pageSize = 10,
+    sortBy = 'createdAt',
+    sortDirection = 'desc'
   ): Observable<PaginatedResponse<LoginAttempt>> {
     let url = `${this.apiUrl}/attempts/recent?limit=${pageSize}&offset=${page * pageSize}`;
     
@@ -75,10 +75,10 @@ export class LoginMonitoringService {
   // Pattern Detection API - UNIFIED APPROACH with Pagination Support
   getPatterns(
     filters: PatternDetectionFilters = {},
-    page: number = 0,
-    pageSize: number = 10,
-    sortBy: string = 'detectionTimestamp',
-    sortDirection: string = 'desc'
+    page = 0,
+    pageSize = 10,
+    sortBy = 'detectionTimestamp',
+    sortDirection = 'desc'
   ): Observable<PaginatedResponse<Pattern>> {
     let url = `${this.apiUrl}/patterns?limit=${pageSize}&offset=${page * pageSize}`;
     
@@ -189,10 +189,10 @@ export class LoginMonitoringService {
   // DEPRECATED METHOD - Replaced by unified getPatterns method
   getFilteredPatterns(
     filters: PatternDetectionFilters = {},
-    page: number = 0,
-    pageSize: number = 10,
-    sortBy: string = 'detectionTimestamp',
-    sortDirection: string = 'desc'
+    page = 0,
+    pageSize = 10,
+    sortBy = 'detectionTimestamp',
+    sortDirection = 'desc'
   ): Observable<Pattern[]> {
     // Redirect to unified method and extract items only
     return this.getPatterns(filters, page, pageSize, sortBy, sortDirection).pipe(
@@ -203,10 +203,10 @@ export class LoginMonitoringService {
   // Security Alerts API - Fixed to use correct endpoint and handle paginated response
   getSecurityAlerts(
     filters: SecurityAlertsFilters = {},
-    page: number = 0,
-    pageSize: number = 10,
-    sortBy: string = 'createdAt',
-    sortDirection: string = 'desc'
+    page = 0,
+    pageSize = 10,
+    sortBy = 'createdAt',
+    sortDirection = 'desc'
   ): Observable<SecurityAlert[]> {
     let url = `${environment.apiUrl}/security-alerts/alerts?limit=${pageSize}&offset=${page * pageSize}`;
     

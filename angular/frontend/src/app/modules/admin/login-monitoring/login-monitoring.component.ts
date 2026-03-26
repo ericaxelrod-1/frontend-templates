@@ -352,7 +352,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
         takeUntil(this.destroy$)
       ).subscribe(() => {
         // Map UI column names to backend field names
-        const columnToFieldMap: { [key: string]: string } = {
+        const columnToFieldMap: Record<string, string> = {
           'timestamp': 'detectionTimestamp',
           'type': 'patternType',
           'severity': 'severity'
@@ -819,7 +819,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
    * Following 150-angular-server-side-sorting rule
    */
   private getPatternSortField(sortHeaderId: string): string {
-    const fieldMapping: { [key: string]: string } = {
+    const fieldMapping: Record<string, string> = {
       'timestamp': 'detectionTimestamp',
       'type': 'patternType',
       'severity': 'severity',
@@ -832,7 +832,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   // Map security alerts UI column names to backend field names
   private getSecurityAlertsSortField(sortHeaderId: string): string {
-    const fieldMapping: { [key: string]: string } = {
+    const fieldMapping: Record<string, string> = {
       'timestamp': 'createdAt',
       'title': 'title',
       'type': 'alertType',
@@ -846,7 +846,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // BUG-113: Get severity class with responsive considerations
   getSeverityClass(severity: string): string {
     // BUG-124.19 FIX: Simple lookup, no circuit breaker needed for pure functions
-    const severityClasses: { [key: string]: string } = {
+    const severityClasses: Record<string, string> = {
       'low': 'severity-low',
       'medium': 'severity-medium',
       'high': 'severity-high',
@@ -1090,7 +1090,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
   // Pattern display methods
   getPatternIcon(patternType: string): string {
     // BUG-124.19 FIX: Pure function, no circuit breaker needed
-    const iconMap: { [key: string]: string } = {
+    const iconMap: Record<string, string> = {
       'brute_force': 'security',
       'distributed_attack': 'network_check',
       'credential_stuffing': 'vpn_key',
@@ -1104,7 +1104,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   getSeverityColor(severity: string): string {
     // BUG-124.19 FIX: Pure function, no circuit breaker needed
-    const colorMap: { [key: string]: string } = {
+    const colorMap: Record<string, string> = {
       'low': 'severity-low-color',
       'medium': 'severity-medium-color',
       'high': 'severity-high-color',
@@ -1115,7 +1115,7 @@ export class LoginMonitoringComponent implements OnInit, OnDestroy, AfterViewIni
 
   getPatternDisplayName(patternType: string): string {
     // BUG-124.19 FIX: Pure function, no circuit breaker needed
-    const nameMap: { [key: string]: string } = {
+    const nameMap: Record<string, string> = {
       'brute_force': 'Brute Force',
       'distributed_attack': 'Distributed Attack',
       'credential_stuffing': 'Credential Stuffing',

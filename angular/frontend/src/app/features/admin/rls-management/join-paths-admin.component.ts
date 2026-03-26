@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, Inject, ViewChild, ElementRef, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -77,22 +77,25 @@ interface RlsJoinPath {
     </div>
   `,
   styles: [`
-    .dialog-container { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--mat-sys-surface); }
-    .dialog-header-compact { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.5rem; background: var(--mat-sys-surface-container); border-bottom: 1px solid var(--mat-sys-outline-variant); gap: 2rem; }
+    :host { display: flex; flex-direction: column; height: 100%; width: 100%; }
+    .dialog-container { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--mat-sys-surface); flex: 1; }
+    .dialog-header-compact { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.5rem; background: var(--mat-sys-surface-container); border-bottom: 1px solid var(--mat-sys-outline-variant); gap: 2rem; flex-shrink: 0; }
     .dialog-title { font-size: var(--fluid-text-base); font-weight: 600; margin: 0; color: var(--mat-sys-on-surface); white-space: nowrap; }
     .header-form { flex: 1; display: flex; align-items: center; gap: 1.5rem; }
     .header-form mat-form-field { width: 300px; }
     .target-info { display: flex; align-items: center; gap: 0.5rem; font-size: var(--fluid-text-xs); color: var(--mat-sys-on-surface-variant); }
     .target-info .value { background: var(--mat-sys-secondary-container); color: var(--mat-sys-on-secondary-container); padding: 2px 8px; border-radius: 4px; font-weight: 600; }
     .header-actions { display: flex; gap: 0.5rem; }
-    .diagram-section { flex: 1; display: flex; flex-direction: column; }
-    mat-dialog-content { flex: 1; padding: 0 !important; margin: 0 !important; overflow: hidden; min-height: 0; }
+    .diagram-section { flex: 1 1 100%; display: flex; flex-direction: column; min-height: 0; overflow: hidden; height: 100%; }
+    mat-dialog-content { flex: 1 1 100% !important; padding: 0 !important; margin: 0 !important; overflow: hidden !important; min-height: 0 !important; display: flex !important; flex-direction: column !important; height: 100% !important; max-height: 100vh !important; }
   `]
 })
-export class JoinPathEditorDialogComponent {
+export class JoinPathEditorDialogComponent implements OnInit, OnDestroy {
+  @ViewChild(JoinPathDiagramComponent) diagramComponent!: JoinPathDiagramComponent;
   formData: Partial<RlsJoinPath> & { conditions?: RlsJoinCondition[] };
   diagramConditions: DiagramJoinCondition[] = [];
   initialDiagramTables: DiagramTableNode[] = [];
+  private zoomTimeout: any;
 
   constructor(
     public dialogRef: MatDialogRef<JoinPathEditorDialogComponent>,
@@ -135,6 +138,32 @@ export class JoinPathEditorDialogComponent {
       });
     } else {
       this.formData = { name: '', targetTable: '', chain: [], conditions: [] };
+    }
+  }
+
+  ngOnInit(): void {
+    // Trigger zoom to fit after the dialog animation completes
+    this.dialogRef.afterOpened()
+      .pipe(
+        take(1)
+      )
+      .subscribe(() => {
+        // Double-call strategy for robustness: 
+        // 1. Immediate call for fast rendering if ResizeObserver already fired
+        // 2. Delayed call as a safety net for animation completion
+        if (this.diagramComponent?.viewportService) {
+          this.diagramComponent.viewportService.zoomToFit();
+          
+          this.zoomTimeout = setTimeout(() => {
+            this.diagramComponent?.viewportService?.zoomToFit();
+          }, 100);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    if (this.zoomTimeout) {
+      clearTimeout(this.zoomTimeout);
     }
   }
 
@@ -310,14 +339,14 @@ export class JoinPathsAdminComponent implements OnInit {
       height: '100vh',
       maxWidth: '100vw',
       maxHeight: '100vh',
-      restoreFocus: false
+      autoFocus: false,
+      restoreFocus: true
     });
 
     dialogRef.afterClosed().pipe(take(1)).subscribe(result => {
       if (result) {
         this.savePath(result, path?.id);
       }
-      this.addPathButton?.nativeElement.focus();
     });
   }
 

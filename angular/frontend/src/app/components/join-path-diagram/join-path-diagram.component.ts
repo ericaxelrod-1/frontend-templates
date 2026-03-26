@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, Injector, runInInjectionContext } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, Injector, runInInjectionContext, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -7,7 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { NgDiagramComponent, NgDiagramPaletteItemComponent, NgDiagramPaletteItemPreviewComponent, NgDiagramPortComponent, NgDiagramBaseEdgeComponent, provideNgDiagram, initializeModel } from 'ng-diagram';
+import { NgDiagramComponent, NgDiagramPaletteItemComponent, NgDiagramPaletteItemPreviewComponent, NgDiagramPortComponent, NgDiagramBaseEdgeComponent, provideNgDiagram, initializeModel, NgDiagramViewportService } from 'ng-diagram';
 import { environment } from '../../../environments/environment';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
@@ -76,6 +76,8 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   @Input() targetTable = '';
   @Input() initialTables: DiagramTableNode[] = [];
   @Input() initialConditions: DiagramJoinCondition[] = [];
+  
+  public viewportService = inject(NgDiagramViewportService);
   
   @Input() set availableTablesFromParent(tables: any[]) {
     if (tables && tables.length > 0) {

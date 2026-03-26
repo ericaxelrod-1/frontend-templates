@@ -23,10 +23,10 @@ export class PatternDetectionService {
    */
   getPatterns(
     filters: PatternDetectionFilters = {},
-    page: number = 0,
-    pageSize: number = 10,
-    sortBy: string = 'detectionTimestamp',
-    sortDirection: string = 'desc'
+    page = 0,
+    pageSize = 10,
+    sortBy = 'detectionTimestamp',
+    sortDirection = 'desc'
   ): Observable<PaginatedResponse<Pattern>> {
     let url = `${this.apiUrl}/patterns?limit=${pageSize}&offset=${page * pageSize}`;
     

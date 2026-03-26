@@ -10,8 +10,8 @@ import { ActivatedRoute } from '@angular/router';
   styleUrls: ['./blocked.component.scss']
 })
 export class BlockedComponent {
-  regionCode: string = '';
-  regionName: string = '';
+  regionCode = '';
+  regionName = '';
 
   private regionNames: Record<string, string> = {
     'US-CA': 'California',
