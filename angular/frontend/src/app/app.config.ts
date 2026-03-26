@@ -2,7 +2,6 @@ import { ApplicationConfig, importProvidersFrom, isDevMode, APP_INITIALIZER } fr
 import { provideRouter, withPreloading, withDebugTracing, PreloadingStrategy, Route } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
-import { provideClientHydration } from '@angular/platform-browser';
 import { NgxsModule, Store } from '@ngxs/store';
 import { NgxsRouterPluginModule } from '@ngxs/router-plugin';
 import { NgxsFormPluginModule } from '@ngxs/form-plugin';
@@ -71,7 +70,6 @@ export const appConfig: ApplicationConfig = {
       withPreloading(SelectivePreloadingStrategy),
       ...(isDevMode() ? [withDebugTracing()] : [])
     ),
-    provideClientHydration(),
     provideAnimations(),
     provideHttpClient(withInterceptorsFromDi(), withFetch()),
     httpInterceptorProviders,
