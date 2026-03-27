@@ -163,11 +163,9 @@ export class AuthService {
    * @returns Observable<boolean> emitting true if auth state restored/refreshed, false otherwise.
    */
   initializeAuthState(): Observable<boolean> {
-    console.log('AuthService: Initializing authentication state (Solution B)...');
-    this.isInitializedSubject.next(false); // Signal start
+    this.isInitializedSubject.next(false);
 
     if (!isPlatformBrowser(this.platformId)) {
-      console.log('AuthService: Not in browser, skipping auth init.');
       this.isInitializedSubject.next(true);
       return of(false);
     }
@@ -177,30 +175,24 @@ export class AuthService {
         const storedData = this.readAuthStateFromStorage();
 
         if (storedData.accessToken && storedData.refreshToken) {
-          console.log('AuthService: Tokens found. Attempting proactive refresh...');
-          // Pass the actual refresh token string
           this.refreshAccessToken(storedData.refreshToken)
             .subscribe({
               next: () => {
-                console.log('AuthService: Proactive token refresh successful.');
                 observer.next(true);
                 observer.complete();
               },
               error: (refreshError) => {
-                console.warn('AuthService: Proactive token refresh failed. Clearing state.', refreshError);
                 this.clearAuthState();
                 observer.next(false);
                 observer.complete();
               }
             });
         } else {
-          console.log('AuthService: No valid token pair found in storage. Clearing state.');
           this.clearAuthState();
           observer.next(false);
           observer.complete();
         }
       } catch (error) {
-        console.error('AuthService: Error during initial auth state loading:', error);
         this.clearAuthState();
         observer.next(false);
         observer.complete();
@@ -208,11 +200,9 @@ export class AuthService {
     }).pipe(
       take(1),
       tap(result => {
-         console.log(`AuthService: Initialization observable completed. Final Auth State: ${result}`);
          this.isInitializedSubject.next(true);
       }),
       catchError(err => {
-        console.error('AuthService: Uncaught error in initialization pipe:', err);
         this.clearAuthState();
         this.isInitializedSubject.next(true);
         return of(false);
@@ -235,13 +225,11 @@ export class AuthService {
     
     // Using token property to match backend expectations
     const request = { token: refreshTokenToUse };
-    console.log('Sending refresh token request...');
     
     return this.http.post<AuthResponse>(`${this.API_URL}/refresh`, request)
       .pipe(
         tap(response => {
-          console.log('Token refresh HTTP call successful. Handling response...');
-          this.handleAuthResponse(response); // Updates subjects and storage
+          this.handleAuthResponse(response);
         }),
         catchError(error => {
           console.error('Token refresh HTTP call failed:', error);
@@ -334,8 +322,6 @@ export class AuthService {
 
   // Verify email
   verifyEmail(token: string, email: string): Observable<VerificationResponse> {
-    console.log('AuthService.verifyEmail called with token:', token, 'and email:', email);
-    
     if (!token) {
       return throwError(() => new Error('Verification token is required'));
     }
@@ -452,8 +438,6 @@ export class AuthService {
 
   // Delete account
   deleteAccount(): Observable<void> {
-    console.log('AuthService.deleteAccount called');
-    
     return this.http.delete<void>(`${this.API_URL}/delete-account`).pipe(
       tap(() => {
         // Clear auth state on successful account deletion

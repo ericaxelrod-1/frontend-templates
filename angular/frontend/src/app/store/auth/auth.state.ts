@@ -275,15 +275,12 @@ export class AuthState {
   login(ctx: StateContext<AuthStateModel>, action: AuthActions.Login) {
     ctx.patchState({ loading: true, error: null });
     
-    console.log('AuthState: Login action dispatched');
-    
     return this.authService.login({
       email: action.email,
       password: action.password,
       recaptchaToken: action.recaptchaToken
     }).pipe(
       tap(response => {
-        console.log('AuthState: Login successful');
         ctx.dispatch(new AuthActions.LoginSuccess(response.user));
       }),
       catchError(error => {
@@ -318,20 +315,12 @@ export class AuthState {
       isAuthenticated: true
     });
     
-    console.log('AuthState: Login successful, beginning sequential role and permission loading');
-    
-    // Use sequential flow with switchMap to ensure proper order:
-    // 1. Load roles first
-    // 2. Then load permissions
-    // 3. Then navigate to dashboard
     return this.rolesService.initialize().pipe(
       tap(() => {
-        console.log('AuthState: Roles loaded successfully');
         ctx.patchState({ rolesLoaded: true });
       }),
       switchMap(() => ctx.dispatch(new AuthActions.LoadUserPermissions())),
       switchMap(() => {
-        console.log('AuthState: Authentication sequence completed successfully');
         return ctx.dispatch(new Navigate(['/app/dashboard']));
       }),
       catchError(error => {
@@ -499,7 +488,6 @@ export class AuthState {
 
   @Action(AuthActions.Logout)
   logout(ctx: StateContext<AuthStateModel>) {
-    console.log('AuthState: Logout action dispatched');
     ctx.patchState({ loading: true });
     
     // Reset roles when logging out
@@ -571,17 +559,12 @@ export class AuthState {
       verificationSuccess: true
     });
     
-    console.log('AuthState: Email verification successful, beginning sequential role and permission loading');
-    
-    // Use the same sequential flow as login success
     return this.rolesService.initialize().pipe(
       tap(() => {
-        console.log('AuthState: Roles loaded successfully after email verification');
         ctx.patchState({ rolesLoaded: true });
       }),
       switchMap(() => ctx.dispatch(new AuthActions.LoadUserPermissions())),
       switchMap(() => {
-        console.log('AuthState: Verification authentication sequence completed successfully');
         return ctx.dispatch(new Navigate(['/app/dashboard']));
       }),
       catchError(error => {
@@ -611,7 +594,6 @@ export class AuthState {
           // Use sequential loading for app initialization too
           this.rolesService.initialize().pipe(
             tap(() => {
-              console.log('AuthState: Roles loaded successfully during app initialization');
               ctx.patchState({ rolesLoaded: true });
             }),
             switchMap(() => ctx.dispatch(new AuthActions.LoadUserPermissions())),

@@ -76,6 +76,14 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   @Input() targetTable = '';
   @Input() initialTables: DiagramTableNode[] = [];
   @Input() initialConditions: DiagramJoinCondition[] = [];
+  @Input() existingPaths: {id: number, name: string}[] = [];
+  
+  @Output() pathSelected = new EventEmitter<number>();
+  @Output() addJoin = new EventEmitter<{
+    conditions: DiagramJoinCondition[];
+    chain: string[];
+    targetTable: string;
+  }>();
   
   public viewportService = inject(NgDiagramViewportService);
   
@@ -285,11 +293,12 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   onEdgeSelected(edge: any): void {
     this.selectedEdgeId = edge.id;
     this.openEdgeSidebar(edge);
+    this.cdr.detectChanges();
   }
 
   onSelectionChanged(event: any): void {
-    const selectedNodes = event.nodes || [];
-    const selectedEdges = event.edges || [];
+    const selectedNodes = event.selectedNodes || [];
+    const selectedEdges = event.selectedEdges || [];
     
     if (selectedNodes.length > 0) {
       const node = selectedNodes[0];
@@ -306,6 +315,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
       this.selectedNodeId = null;
       this.selectedEdgeId = null;
     }
+    this.cdr.detectChanges();
   }
 
   openEdgeSidebar(edge: any): void {
@@ -346,11 +356,13 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   deleteSelectedEdge(): void {
+    console.log('[JoinPathDiagram] deleteSelectedEdge called, selectedEdgeId:', this.selectedEdgeId);
     if (!this.selectedEdgeId) return;
     this.deleteEdgeById(this.selectedEdgeId);
   }
 
   deleteEdgeById(edgeId: string): void {
+    console.log('[JoinPathDiagram] deleteEdgeById called, edgeId:', edgeId);
     const updatedEdges = this.model.getEdges().filter((e: any) => e.id !== edgeId);
     this.model.updateEdges(updatedEdges);
     this.sidebarOpen = false;
@@ -360,6 +372,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   deleteNode(nodeId: string): void {
+    console.log('[JoinPathDiagram] deleteNode called, nodeId:', nodeId);
     const nodes = this.model.getNodes() as any[];
     const node = nodes.find(n => n.id === nodeId);
     if (node?.data?.tableName === this.targetTable) {
@@ -395,6 +408,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   emitChange(): void {
+    console.log('[JoinPathDiagram] emitChange called, nodes:', this.model.getNodes().length, 'edges:', this.model.getEdges().length);
     const edges = this.model.getEdges();
     const nodes = this.model.getNodes();
 
@@ -476,5 +490,28 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     this.sidebarOpen = false;
     this.sidebarEdge = null;
     this.selectedEdgeId = null;
+  }
+
+  onPathSelected(pathId: number): void {
+    this.pathSelected.emit(pathId);
+  }
+
+  onAddJoin(): void {
+    console.log('[JoinPathDiagram] onAddJoin called - emitting addJoin event');
+    const edges = this.model.getEdges() as any[];
+    const nodes = this.model.getNodes() as any[];
+    
+    this.addJoin.emit({
+      conditions: edges.map((e, index) => ({
+        id: `c_${index}_${Date.now()}`,
+        fromTable: this.getNodeTableName(e.source),
+        fromColumn: e.data?.sourceColumn || '',
+        toTable: this.getNodeTableName(e.target),
+        toColumn: e.data?.targetColumn || '',
+        operator: e.data?.operator || '='
+      })),
+      chain: Array.from(new Set(nodes.map(n => n.data.tableName))),
+      targetTable: this.targetTable
+    });
   }
 }

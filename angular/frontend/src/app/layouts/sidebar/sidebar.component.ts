@@ -172,8 +172,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
    * Check if the user has a specific permission
    */
   hasPermission(permission: string): boolean {
-    const hasPermission = this.permissionService.hasPermissionSync(permission);
-    console.log(`Sidebar: Checking permission '${permission}':`, hasPermission);
-    return hasPermission;
+    return this.permissionService.hasPermissionSync(permission);
   }
 }

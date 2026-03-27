@@ -2,6 +2,21 @@
 
 This file provides guidelines for agents operating in this repository.
 
+## Agent Workflow Rules
+
+**IMPORTANT: Orchestrator must not invoke itself**
+- The orchestrator agent IS the primary agent in this session
+- When given a task, invoke `@developer` and `@code-review` subagents directly
+- Do NOT invoke `@orchestrator` as a subagent - that creates a recursive loop
+
+**Correct workflow:**
+1. Receive task as orchestrator
+2. Invoke `@developer` subagent to implement the fix
+3. Invoke `@code-review` subagent to verify and approve
+4. Code-review agent commits and pushes approved changes
+
+---
+
 ## Project Overview
 
 - **Frontend**: Angular 18.2.13 with Angular Material

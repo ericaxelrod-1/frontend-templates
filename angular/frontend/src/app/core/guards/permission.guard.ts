@@ -44,12 +44,8 @@ export class PermissionGuard implements CanActivate {
     const currentUser = this.store.selectSnapshot(AuthState.user) as User | null;
     const permissionsLoaded = this.store.selectSnapshot(AuthState.permissionsLoaded);
     
-    console.log('[PermissionGuard] Current user:', currentUser?.email);
-    console.log('[PermissionGuard] Permissions loaded:', permissionsLoaded);
-    
     // Redirect to login if not authenticated
     if (!isAuthenticated || !currentUser) {
-      console.log('[PermissionGuard] User not authenticated, redirecting to login');
       this.router.navigate(['/login'], { queryParams: { returnUrl: state.url } });
       return false;
     }
@@ -57,16 +53,12 @@ export class PermissionGuard implements CanActivate {
     // Check for permission rules in route data
     const permissionRule = route.data['permissions'] as PermissionRule;
     if (!permissionRule) {
-      console.log('[PermissionGuard] No permission rule defined, denying access');
       this.router.navigate(['/app/dashboard']);
       return false;
     }
     
-    console.log('[PermissionGuard] Checking permission rule:', permissionRule);
-    
     // If permissions aren't loaded yet, wait for them
     if (!permissionsLoaded) {
-      console.log('[PermissionGuard] Permissions not loaded yet, waiting...');
       
       // Return an observable that completes when permissions are loaded
       return this.store.select(AuthState.permissionsLoaded).pipe(
@@ -95,7 +87,6 @@ export class PermissionGuard implements CanActivate {
       // Single permission string (e.g., 'users:manage')
       const result = hasPermission(permissionRule);
       if (!result) {
-        console.log('[PermissionGuard] Permission denied:', permissionRule);
         this.router.navigate(['/app/dashboard']);
       }
       return result;
@@ -104,7 +95,6 @@ export class PermissionGuard implements CanActivate {
       // Array of permissions (any of them)
       const result = hasAnyPermission(permissionRule);
       if (!result) {
-        console.log('[PermissionGuard] No matching permissions in:', permissionRule);
         this.router.navigate(['/app/dashboard']);
       }
       return result;
@@ -113,14 +103,12 @@ export class PermissionGuard implements CanActivate {
       // Object with 'all' property for requiring all permissions
       const result = hasAllPermissions(permissionRule.all);
       if (!result) {
-        console.log('[PermissionGuard] Missing required permissions from:', permissionRule.all);
         this.router.navigate(['/app/dashboard']);
       }
       return result;
     }
     
     // If we get here, the permission rule format is invalid
-    console.log('[PermissionGuard] Invalid permission rule format, denying access');
     this.router.navigate(['/app/dashboard']);
     return false;
   }

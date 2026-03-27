@@ -40,14 +40,22 @@
       <div class="toolbar-status">
         <mat-icon class="status-icon">schema</mat-icon>
         <span>{{ model.getNodes().length }} tables, {{ model.getEdges().length }} joins</span>
+        @if (existingPaths.length > 0) {
+          <div class="existing-paths">
+            <span class="paths-label">Paths:</span>
+            <button mat-button class="path-chip" (click)="onPathSelected(path.id)" *ngFor="let path of existingPaths">
+              {{ path.name }}
+            </button>
+          </div>
+        }
       </div>
       <div class="toolbar-actions">
-        <button mat-stroked-button color="warn" 
+        <button mat-stroked-button color="warn" type="button"
                 [disabled]="!selectedNodeId" 
-                (click)="selectedNodeId && deleteNode(selectedNodeId)">
+                (click)="selectedNodeId && deleteNode(selectedNodeId); $event.preventDefault()">
           <mat-icon>delete</mat-icon> Remove Table
         </button>
-        <button mat-stroked-button color="warn" (click)="clearDiagram()">
+        <button mat-stroked-button color="warn" type="button" (click)="clearDiagram(); $event.preventDefault()">
           <mat-icon>delete_sweep</mat-icon> Reset Canvas
         </button>
       </div>
@@ -64,6 +72,7 @@
         <div class="table-node" 
              [class.selected]="selectedNodeId === node.id"
              [class.target-node]="node.data.tableName === targetTable"
+             (click)="setSelectedNode(node.id); $event.stopPropagation()"
              (pointerdown)="setSelectedNode(node.id); $event.stopPropagation()">
           <div class="table-header">
             <span class="table-name">{{ node.data.tableName }}</span>
@@ -154,9 +163,14 @@
           </select>
         </div>
 
-        <button mat-flat-button color="warn" (click)="deleteSelectedEdge()" class="full-width">
-          <mat-icon>link_off</mat-icon> Remove Join
-        </button>
+        <div class="button-group" (click)="$event.stopPropagation()">
+          <button type="button" class="mat-mdc-outlined-button mat-primary mat-mdc-button-base" (click)="onAddJoin(); $event.preventDefault(); $event.stopPropagation()">
+            <mat-icon>add</mat-icon> Add Join
+          </button>
+          <button mat-flat-button color="warn" type="button" (click)="deleteSelectedEdge(); $event.preventDefault(); $event.stopPropagation()" class="full-width">
+            <mat-icon>link_off</mat-icon> Remove Join
+          </button>
+        </div>
       </div>
     } @else {
       <div class="sidebar-header">

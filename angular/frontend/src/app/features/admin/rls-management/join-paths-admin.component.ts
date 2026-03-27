@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, Inject, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -32,6 +32,11 @@ interface RlsJoinPath {
   conditions?: RlsJoinCondition[];
 }
 
+interface ExistingPath {
+  id: number;
+  name: string;
+}
+
 @Component({
   selector: 'app-join-path-editor-dialog',
   standalone: true,
@@ -63,15 +68,18 @@ interface RlsJoinPath {
       
       <mat-dialog-content>
         <div class="diagram-section">
-          <app-join-path-diagram
+          <app-join-path-diagram #diagramComponent
             *ngIf="diagramReady"
             [targetTable]="formData.targetTable || ''"
             [initialConditions]="diagramConditions"
             [initialTables]="initialDiagramTables"
             [availableTablesFromParent]="data.tables"
+            [existingPaths]="data.existingPaths"
             (conditionsChange)="onDiagramConditionsChange($event)"
             (diagramChange)="onDiagramChange($event)"
             (targetTableChange)="onTargetTableChange($event)"
+            (pathSelected)="onPathSelected($event)"
+            (addJoin)="onAddJoin($event)"
           ></app-join-path-diagram>
         </div>
       </mat-dialog-content>
@@ -92,16 +100,22 @@ interface RlsJoinPath {
   `]
 })
 export class JoinPathEditorDialogComponent implements OnInit {
+  @ViewChild('diagramComponent') diagramComponent: any;
+  
   diagramReady = false;
   formData: Partial<RlsJoinPath> & { conditions?: RlsJoinCondition[] };
   diagramConditions: DiagramJoinCondition[] = [];
+  private _formValid = false;
   initialDiagramTables: DiagramTableNode[] = [];
+  pendingJoins: RlsJoinCondition[] = [];
 
   constructor(
     public dialogRef: MatDialogRef<JoinPathEditorDialogComponent>,
+    private cdr: ChangeDetectorRef,
     @Inject(MAT_DIALOG_DATA) public data: { 
       tables: { name: string; columns: DiagramColumn[] }[], 
-      editingPath: RlsJoinPath | null 
+      editingPath: RlsJoinPath | null,
+      existingPaths: ExistingPath[]
     }
   ) {
     if (data.editingPath) {
@@ -168,19 +182,72 @@ export class JoinPathEditorDialogComponent implements OnInit {
 
   onTargetTableChange(table: string): void {
     this.formData.targetTable = table;
+    this._formValid = !!(this.formData.name && this.formData.targetTable);
+    this.cdr.detectChanges();
+  }
+
+  onPathSelected(pathId: number): void {
+    const path = this.data.existingPaths?.find(p => p.id === pathId);
+    if (path) {
+      this.dialogRef.close({ switchToPath: path });
+    }
+  }
+
+  onAddJoin(joinData: { conditions: DiagramJoinCondition[], chain: string[], targetTable: string }): void {
+    console.log('[JoinPathEditor] onAddJoin called - saving locally, keeping dialog open');
+    
+    // Convert diagram conditions to RlsJoinCondition format and add to pending
+    const newConditions: RlsJoinCondition[] = joinData.conditions.map(c => ({
+      fromTable: c.fromTable,
+      fromColumn: c.fromColumn,
+      toTable: c.toTable,
+      toColumn: c.toColumn,
+      operator: c.operator
+    }));
+    
+    this.pendingJoins.push(...newConditions);
+    
+    // Update formData.chain with all chains (existing + new)
+    const newChain = joinData.chain || [];
+    const existingChain = this.formData.chain as string[] || [];
+    this.formData.chain = [...new Set([...existingChain, ...newChain])];
+    
+    // Don't clear the diagram - keep showing all joins on canvas
+    // Just save the data locally
+    
+    console.log('[JoinPathEditor] pendingJoins count:', this.pendingJoins.length);
+    this.cdr.detectChanges();
   }
 
   isFormValid(): boolean {
-    return !!(this.formData.name && this.formData.targetTable);
+    this._formValid = !!(this.formData.name && this.formData.targetTable);
+    console.log('[JoinPathEditor] isFormValid called, result:', this._formValid, 'name:', !!this.formData.name, 'targetTable:', !!this.formData.targetTable);
+    return this._formValid;
   }
 
   onCancel(): void {
+    console.log('[JoinPathEditor] onCancel called - closing dialog without data');
+    // Clear pending joins - don't save them
+    this.pendingJoins = [];
     this.dialogRef.close();
   }
 
   onSave(): void {
+    console.log('[JoinPathEditor] onSave called, formData:', JSON.stringify(this.formData));
     if (this.isFormValid()) {
-      this.dialogRef.close(this.formData);
+      // Combine pending joins with current diagram conditions
+      const allConditions = [
+        ...this.pendingJoins,
+        ...(this.formData.conditions || [])
+      ];
+      
+      const saveData = {
+        ...this.formData,
+        conditions: allConditions
+      };
+      
+      console.log('[JoinPathEditor] onSave - total conditions:', allConditions.length, 'pending:', this.pendingJoins.length, 'current:', this.formData.conditions?.length);
+      this.dialogRef.close(saveData);
     }
   }
 }
@@ -193,7 +260,7 @@ export class JoinPathEditorDialogComponent implements OnInit {
     <div class="join-paths">
       <header class="header">
         <h1>RLS Join Paths</h1>
-        <button #addPathButton mat-raised-button color="primary" (click)="showCreateDialog()">
+        <button #addPathButton mat-raised-button color="primary" type="button" (click)="showCreateDialog()">
           <mat-icon>add</mat-icon> Add Join Path
         </button>
       </header>
@@ -312,10 +379,12 @@ export class JoinPathsAdminComponent implements OnInit {
   }
 
   private openEditor(path: RlsJoinPath | null): void {
+    const existingPaths: ExistingPath[] = this.paths.map(p => ({ id: p.id!, name: p.name }));
     const dialogRef = this.dialog.open(JoinPathEditorDialogComponent, {
       data: {
         tables: this.tables,
-        editingPath: path
+        editingPath: path,
+        existingPaths
       },
       panelClass: 'fullscreen-dialog',
       width: '100vw',
@@ -327,30 +396,46 @@ export class JoinPathsAdminComponent implements OnInit {
     });
 
     dialogRef.afterClosed().pipe(take(1)).subscribe(result => {
-      if (result) {
+      console.log('[JoinPathEditor] Dialog closed, result:', result);
+      if (result?.switchToPath) {
+        console.log('[JoinPathEditor] Switching to path:', result.switchToPath.id);
+        this.editPath(this.paths.find(p => p.id === result.switchToPath.id)!);
+      } else if (result?.createNew) {
+        console.log('[JoinPathEditor] Creating new path');
+        this.showCreateDialog();
+      } else if (result) {
+        console.log('[JoinPathEditor] Saving path, id:', path?.id);
         this.savePath(result, path?.id);
+      } else {
+        console.log('[JoinPathEditor] Dialog closed with no result');
       }
     });
   }
 
   savePath(formData: RlsJoinPath, id?: number): void {
+    console.log('[JoinPathAdmin] savePath called, id:', id, 'formData:', JSON.stringify(formData));
     const observable = id
       ? this.http.put(`${environment.apiUrl}/rls/join-paths/${id}`, formData)
       : this.http.post(`${environment.apiUrl}/rls/join-paths`, formData);
 
     observable.pipe(take(1)).subscribe({
       next: () => {
+        console.log('[JoinPathAdmin] savePath successful');
         this.loadPaths();
       },
-      error: (err: unknown) => console.error('Failed to save join path:', err)
+      error: (err: unknown) => console.error('[JoinPathAdmin] Failed to save join path:', err)
     });
   }
 
   deletePath(path: RlsJoinPath): void {
+    console.log('[JoinPathAdmin] deletePath called, id:', path.id);
     if (!path.id || !confirm('Delete this join path?')) return;
     this.http.delete(`${environment.apiUrl}/rls/join-paths/${path.id}`).subscribe({
-      next: () => this.loadPaths(),
-      error: (err: unknown) => console.error('Failed to delete join path:', err)
+      next: () => {
+        console.log('[JoinPathAdmin] deletePath successful');
+        this.loadPaths();
+      },
+      error: (err: unknown) => console.error('[JoinPathAdmin] Failed to delete join path:', err)
     });
   }
 }
