@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { A11yModule } from '@angular/cdk/a11y';
 import { take } from 'rxjs';
 import { environment } from '../../../../environments/environment';
@@ -40,7 +41,7 @@ interface ExistingPath {
 @Component({
   selector: 'app-join-path-editor-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatIconModule, A11yModule, JoinPathDiagramComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatSelectModule, MatInputModule, MatIconModule, MatSnackBarModule, A11yModule, JoinPathDiagramComponent],
   template: `
     <div class="dialog-container">
       <div class="dialog-header-compact">
@@ -112,6 +113,7 @@ export class JoinPathEditorDialogComponent implements OnInit {
   constructor(
     public dialogRef: MatDialogRef<JoinPathEditorDialogComponent>,
     private cdr: ChangeDetectorRef,
+    private snackBar: MatSnackBar,
     @Inject(MAT_DIALOG_DATA) public data: { 
       tables: { name: string; columns: DiagramColumn[] }[], 
       editingPath: RlsJoinPath | null,
@@ -215,13 +217,16 @@ export class JoinPathEditorDialogComponent implements OnInit {
     // Don't clear the diagram - keep showing all joins on canvas
     // Just save the data locally
     
+    this.snackBar.open('Join added. Total: ' + this.pendingJoins.length, 'Close', { duration: 2000 });
+    
     console.log('[JoinPathEditor] pendingJoins count:', this.pendingJoins.length);
     this.cdr.detectChanges();
   }
 
   isFormValid(): boolean {
-    this._formValid = !!(this.formData.name && this.formData.targetTable);
-    console.log('[JoinPathEditor] isFormValid called, result:', this._formValid, 'name:', !!this.formData.name, 'targetTable:', !!this.formData.targetTable);
+    // Enable Create Path if: name entered AND (targetTable set OR pendingJoins exist)
+    this._formValid = !!(this.formData.name && (this.formData.targetTable || this.pendingJoins.length > 0));
+    console.log('[JoinPathEditor] isFormValid called, result:', this._formValid, 'name:', !!this.formData.name, 'targetTable:', !!this.formData.targetTable, 'pendingJoins:', this.pendingJoins.length);
     return this._formValid;
   }
 
