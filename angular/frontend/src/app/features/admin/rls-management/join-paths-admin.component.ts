@@ -120,18 +120,51 @@ export class JoinPathEditorDialogComponent implements OnInit {
       existingPaths: ExistingPath[]
     }
   ) {
+    console.log('[JoinPathEditor] CONSTRUCTOR - data.editingPath:', JSON.stringify(data.editingPath, null, 2));
+    console.log('[JoinPathEditor] CONSTRUCTOR - data.tables:', data.tables?.map(t => t.name));
+    
     if (data.editingPath) {
-      const chain = Array.isArray(data.editingPath.chain) 
-        ? [...data.editingPath.chain] 
-        : (data.editingPath.chain as string).split(',').map(s => s.trim());
+      // Parse chain - it comes as JSON string from backend
+      let chain: string[] = [];
+      if (Array.isArray(data.editingPath.chain)) {
+        chain = [...data.editingPath.chain];
+      } else if (typeof data.editingPath.chain === 'string') {
+        try {
+          chain = JSON.parse(data.editingPath.chain);
+        } catch (e) {
+          console.error('[JoinPathEditor] Failed to parse chain:', e);
+          chain = [];
+        }
+      }
+      
+      console.log('[JoinPathEditor] CONSTRUCTOR - parsed chain:', chain);
+      console.log('[JoinPathEditor] CONSTRUCTOR - raw targetTable:', data.editingPath.targetTable, 'type:', typeof data.editingPath.targetTable);
+      console.log('[JoinPathEditor] CONSTRUCTOR - raw conditions:', JSON.stringify(data.editingPath.conditions));
+      
+      // Determine targetTable - use explicit value or derive from last table in chain
+      const targetTable = data.editingPath.targetTable || (chain.length > 0 ? chain[chain.length - 1] : '');
+      
+      // Deduplicate conditions by fromTable+fromColumn+toTable+toColumn
+      const rawConditions = data.editingPath.conditions || [];
+      const uniqueConditions = rawConditions.filter((c: RlsJoinCondition, idx: number, arr: RlsJoinCondition[]) => {
+        const key = `${c.fromTable}.${c.fromColumn}.${c.toTable}.${c.toColumn}`;
+        return arr.findIndex((x: RlsJoinCondition) => 
+          `${x.fromTable}.${x.fromColumn}.${x.toTable}.${x.toColumn}` === key
+        ) === idx;
+      });
+      
+      console.log('[JoinPathEditor] CONSTRUCTOR - unique conditions:', uniqueConditions.length, 'vs original:', rawConditions.length);
         
       this.formData = {
         name: data.editingPath.name,
-        targetTable: data.editingPath.targetTable,
+        targetTable: targetTable,
         chain: chain,
-        conditions: [...(data.editingPath.conditions || [])]
+        conditions: uniqueConditions
       };
-      this.diagramConditions = (data.editingPath.conditions || []).map((c: RlsJoinCondition, i: number) => ({
+      
+      console.log('[JoinPathEditor] CONSTRUCTOR - formData after set:', JSON.stringify(this.formData));
+      
+      this.diagramConditions = uniqueConditions.map((c: RlsJoinCondition, i: number) => ({
         id: `c_${i}`,
         fromTable: c.fromTable,
         fromColumn: c.fromColumn,
@@ -140,11 +173,14 @@ export class JoinPathEditorDialogComponent implements OnInit {
         operator: c.operator || '='
       }));
       
-      // Initialize nodes based on chain
-      this.initialDiagramTables = (chain as string[]).map((tableName: string, i: number) => {
+      console.log('[JoinPathEditor] CONSTRUCTOR - diagramConditions:', JSON.stringify(this.diagramConditions));
+      
+      // Initialize nodes based on chain - use table name as ID for proper edge mapping
+      this.initialDiagramTables = chain.map((tableName: string, i: number) => {
         const tableMeta = data.tables.find((t: { name: string; columns: DiagramColumn[] }) => t.name === tableName);
+        console.log('[JoinPathEditor] CONSTRUCTOR - looking for table:', tableName, 'found:', !!tableMeta);
         return {
-          id: `node_${i}`,
+          id: tableName, // Use table name as ID directly
           data: {
             tableName,
             columns: tableMeta?.columns || []
@@ -152,18 +188,25 @@ export class JoinPathEditorDialogComponent implements OnInit {
           position: { x: 100 + (i * 300), y: 150 }
         };
       });
+      
+      console.log('[JoinPathEditor] CONSTRUCTOR - initialDiagramTables:', JSON.stringify(this.initialDiagramTables.map(t => ({ id: t.id, tableName: t.data.tableName }))));
     } else {
       this.formData = { name: '', targetTable: '', chain: [], conditions: [] };
     }
   }
 
   ngOnInit(): void {
+    console.log('[JoinPathEditor] ngOnInit - formData.targetTable:', this.formData.targetTable);
+    console.log('[JoinPathEditor] ngOnInit - diagramConditions count:', this.diagramConditions.length);
+    console.log('[JoinPathEditor] ngOnInit - initialDiagramTables count:', this.initialDiagramTables.length);
+    console.log('[JoinPathEditor] ngOnInit - initialDiagramTables:', JSON.stringify(this.initialDiagramTables.map(t => ({ id: t.id, tableName: t.data.tableName }))));
     this.dialogRef.afterOpened()
       .pipe(take(1))
       .subscribe(() => {
         // Wait for dialog animation to complete before rendering the diagram
         setTimeout(() => {
           this.diagramReady = true;
+          console.log('[JoinPathEditor] diagramReady=true, formData.targetTable:', this.formData.targetTable);
         }, 200);
       });
   }
@@ -232,7 +275,6 @@ export class JoinPathEditorDialogComponent implements OnInit {
 
   onCancel(): void {
     console.log('[JoinPathEditor] onCancel called - closing dialog without data');
-    // Clear pending joins - don't save them
     this.pendingJoins = [];
     this.dialogRef.close();
   }
@@ -240,18 +282,17 @@ export class JoinPathEditorDialogComponent implements OnInit {
   onSave(): void {
     console.log('[JoinPathEditor] onSave called, formData:', JSON.stringify(this.formData));
     if (this.isFormValid()) {
-      // Combine pending joins with current diagram conditions
-      const allConditions = [
-        ...this.pendingJoins,
-        ...(this.formData.conditions || [])
-      ];
-      
+      // Use diagram's current conditions as source of truth (formData.conditions)
+      // pendingJoins are already reflected in the diagram, so don't duplicate
       const saveData = {
         ...this.formData,
-        conditions: allConditions
+        conditions: this.formData.conditions || []
       };
       
-      console.log('[JoinPathEditor] onSave - total conditions:', allConditions.length, 'pending:', this.pendingJoins.length, 'current:', this.formData.conditions?.length);
+      // Clear pending joins after save
+      this.pendingJoins = [];
+      
+      console.log('[JoinPathEditor] onSave - conditions from diagram:', saveData.conditions.length);
       this.dialogRef.close(saveData);
     }
   }

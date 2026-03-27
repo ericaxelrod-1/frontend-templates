@@ -143,18 +143,29 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Map initial conditions to edges - but we need node IDs first
-    // Since initialTables has indices as IDs (node_0, node_1), we can use those
-    const initialEdges = this.initialConditions.map((c, i) => ({
-      id: c.id || `edge_${i}`,
-      source: `node_${this.getNodeIndex(c.fromTable)}`,
-      target: `node_${this.getNodeIndex(c.toTable)}`,
-      data: {
-        sourceColumn: c.fromColumn,
-        targetColumn: c.toColumn,
-        operator: c.operator || '=',
-      },
-    }));
+    console.log('[JoinPathDiagram] ngOnInit - RECEIVED:');
+    console.log('[JoinPathDiagram]   targetTable:', this.targetTable);
+    console.log('[JoinPathDiagram]   initialTables:', JSON.stringify(this.initialTables.map(t => ({ id: t.id, tableName: t.data?.tableName }))));
+    console.log('[JoinPathDiagram]   initialConditions:', JSON.stringify(this.initialConditions));
+    
+    // Map initial conditions to edges - node IDs are now table names directly
+    const initialEdges = this.initialConditions.map((c, i) => {
+      const sourceId = this.getNodeIdByTableName(c.fromTable);
+      const targetId = this.getNodeIdByTableName(c.toTable);
+      console.log('[JoinPathDiagram]   mapping condition:', c.fromTable, '->', c.toTable, 'sourceId:', sourceId, 'targetId:', targetId);
+      return {
+        id: c.id || `edge_${i}`,
+        source: sourceId,
+        target: targetId,
+        data: {
+          sourceColumn: c.fromColumn,
+          targetColumn: c.toColumn,
+          operator: c.operator || '=',
+        },
+      };
+    });
+
+    console.log('[JoinPathDiagram] Created edges:', initialEdges.length, JSON.stringify(initialEdges, null, 2));
 
     this.edgeCounter = initialEdges.length;
 
@@ -172,9 +183,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     }
   }
 
-  private getNodeIndex(tableName: string): number {
-    return this.initialTables.findIndex(t => t.data?.tableName === tableName);
-  }
+
 
   ngOnDestroy(): void {
     this.searchSubject.complete();
@@ -247,7 +256,12 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   getNodeIdByTableName(tableName: string): string {
-    // Query live model for node
+    // First check initialTables (for initial load)
+    const initialNode = this.initialTables.find(t => t.data?.tableName === tableName);
+    if (initialNode) {
+      return initialNode.id;
+    }
+    // Fallback: query live model for node
     const nodes = this.model.getNodes() as any[];
     const node = nodes.find(n => n.data?.tableName === tableName);
     return node?.id || tableName;
@@ -291,6 +305,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   onEdgeSelected(edge: any): void {
+    console.log('[JoinPathDiagram] onEdgeSelected:', edge.id, 'edge.data:', edge.data);
     this.selectedEdgeId = edge.id;
     this.openEdgeSidebar(edge);
     this.cdr.detectChanges();
@@ -319,10 +334,18 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   openEdgeSidebar(edge: any): void {
+    console.log('[JoinPathDiagram] openEdgeSidebar called:');
+    console.log('[JoinPathDiagram]   edge:', edge);
+    console.log('[JoinPathDiagram]   edge.data:', edge?.data);
     this.sidebarEdge = edge;
-    this.sidebarSourceColumn = edge.data?.sourceColumn || '';
-    this.sidebarTargetColumn = edge.data?.targetColumn || '';
+    const sourceTable = this.getNodeTableName(edge.source);
+    const targetTable = this.getNodeTableName(edge.target);
+    this.sidebarSourceColumn = edge.data?.sourceColumn ? `${sourceTable}.${edge.data.sourceColumn}` : '';
+    this.sidebarTargetColumn = edge.data?.targetColumn ? `${targetTable}.${edge.data.targetColumn}` : '';
     this.sidebarOperator = edge.data?.operator || '=';
+    console.log('[JoinPathDiagram]   sidebarSourceColumn:', this.sidebarSourceColumn);
+    console.log('[JoinPathDiagram]   sidebarTargetColumn:', this.sidebarTargetColumn);
+    console.log('[JoinPathDiagram]   sidebarOperator:', this.sidebarOperator);
     this.sidebarOpen = true;
   }
 
