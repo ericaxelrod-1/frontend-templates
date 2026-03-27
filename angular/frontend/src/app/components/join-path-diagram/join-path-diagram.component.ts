@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, Injector, runInInjectionContext, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, Injector, runInInjectionContext, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -105,6 +105,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   });
 
   selectedEdgeId: string | null = null;
+  selectedNodeId: string | null = null;
   sidebarOpen = false;
   sidebarEdge: any | null = null;
   sidebarSourceColumn = '';
@@ -122,7 +123,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   loadingPalette = false;
   availableCanvasColumns: { tableName: string; columnName: string }[] = [];
 
-  constructor(private http: HttpClient, private injector: Injector) {
+  constructor(private http: HttpClient, private injector: Injector, private cdr: ChangeDetectorRef) {
     this.searchSubject.pipe(
       debounceTime(300),
       distinctUntilChanged()
@@ -287,14 +288,23 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   }
 
   onSelectionChanged(event: any): void {
-    const selected = event.selection || [];
-    if (selected.length > 0) {
-      const selectedId = selected[0].id;
-      // Query live model for the selected edge
-      const edge = (this.model.getEdges() as any[]).find(e => e.id === selectedId);
-      if (edge) {
-        this.onEdgeSelected(edge);
-      }
+    const selectedNodes = event.nodes || [];
+    const selectedEdges = event.edges || [];
+    
+    if (selectedNodes.length > 0) {
+      const node = selectedNodes[0];
+      this.selectedNodeId = node.id;
+      this.selectedEdgeId = null;
+      this.sidebarOpen = false;
+      this.sidebarEdge = null;
+    } else if (selectedEdges.length > 0) {
+      const edge = selectedEdges[0];
+      this.selectedNodeId = null;
+      this.selectedEdgeId = edge.id;
+      this.onEdgeSelected(edge);
+    } else {
+      this.selectedNodeId = null;
+      this.selectedEdgeId = null;
     }
   }
 
@@ -337,8 +347,11 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
 
   deleteSelectedEdge(): void {
     if (!this.selectedEdgeId) return;
-    // Filter live model directly
-    const updatedEdges = this.model.getEdges().filter((e: any) => e.id !== this.selectedEdgeId);
+    this.deleteEdgeById(this.selectedEdgeId);
+  }
+
+  deleteEdgeById(edgeId: string): void {
+    const updatedEdges = this.model.getEdges().filter((e: any) => e.id !== edgeId);
     this.model.updateEdges(updatedEdges);
     this.sidebarOpen = false;
     this.sidebarEdge = null;
@@ -363,6 +376,13 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
   setTargetTable(tableName: string): void {
     this.targetTable = tableName;
     this.targetTableChange.emit(tableName);
+    this.cdr.detectChanges();
+  }
+
+  setSelectedNode(nodeId: string): void {
+    this.selectedNodeId = nodeId;
+    this.selectedEdgeId = null;
+    this.cdr.detectChanges();
   }
 
   calculateEdgePath(edge: any): string {
@@ -447,6 +467,7 @@ export class JoinPathDiagramComponent implements OnInit, OnDestroy {
     this.sidebarOpen = false;
     this.sidebarEdge = null;
     this.selectedEdgeId = null;
+    this.selectedNodeId = null;
     this.setTargetTable('');
     this.emitChange();
   }

@@ -145,6 +145,7 @@
 
 .table-node {
   min-width: 160px;
+  pointer-events: auto !important;
   background: var(--mat-sys-surface);
   border: 2px solid var(--mat-sys-outline);
   border-radius: 8px;
@@ -197,7 +198,6 @@
     mat-icon { font-size: 14px; width: 14px; height: 14px; }
     
     &:hover { background: rgba(0,0,0,0.1); }
-    &.btn-delete-node:hover { background: var(--mat-sys-error); color: var(--mat-sys-on-error); }
     &.btn-target { color: var(--mat-sys-tertiary); }
   }
 }
@@ -357,6 +357,14 @@
     
     .cond-table { color: var(--mat-sys-primary); }
     .cond-op { color: var(--mat-sys-tertiary); }
+    
+    .btn-delete-edge {
+      margin-left: auto;
+      width: 24px;
+      height: 24px;
+      
+      mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    }
   }
   
   .cond-cols {

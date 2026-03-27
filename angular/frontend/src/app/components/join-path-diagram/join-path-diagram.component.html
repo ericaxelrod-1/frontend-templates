@@ -42,6 +42,11 @@
         <span>{{ model.getNodes().length }} tables, {{ model.getEdges().length }} joins</span>
       </div>
       <div class="toolbar-actions">
+        <button mat-stroked-button color="warn" 
+                [disabled]="!selectedNodeId" 
+                (click)="selectedNodeId && deleteNode(selectedNodeId)">
+          <mat-icon>delete</mat-icon> Remove Table
+        </button>
         <button mat-stroked-button color="warn" (click)="clearDiagram()">
           <mat-icon>delete_sweep</mat-icon> Reset Canvas
         </button>
@@ -57,8 +62,9 @@
     >
       <ng-template #nodeTemplate let-node>
         <div class="table-node" 
-             [class.selected]="selectedEdgeId === node.id"
-             [class.target-node]="node.data.tableName === targetTable">
+             [class.selected]="selectedNodeId === node.id"
+             [class.target-node]="node.data.tableName === targetTable"
+             (pointerdown)="setSelectedNode(node.id); $event.stopPropagation()">
           <div class="table-header">
             <span class="table-name">{{ node.data.tableName }}</span>
             <div class="node-controls">
@@ -67,7 +73,6 @@
                       (click)="setTargetTable(node.data.tableName); $event.stopPropagation()">
                 <mat-icon>{{ node.data.tableName === targetTable ? 'star' : 'star_border' }}</mat-icon>
               </button>
-              <button class="btn-delete-node" (click)="deleteNode(node.id); $event.stopPropagation()">×</button>
             </div>
           </div>
           <div class="table-columns">
@@ -165,6 +170,11 @@
                 <span class="cond-table">{{ getNodeTableName(edge.source) }}</span>
                 <span class="cond-op">{{ edge.data?.operator || '=' }}</span>
                 <span class="cond-table">{{ getNodeTableName(edge.target) }}</span>
+                <button mat-icon-button color="warn" class="btn-delete-edge" 
+                        (click)="deleteEdgeById(edge.id); $event.stopPropagation()"
+                        title="Remove join">
+                  <mat-icon>delete</mat-icon>
+                </button>
               </div>
               <div class="cond-cols" *ngIf="edge.data?.sourceColumn">
                 {{ edge.data.sourceColumn }} → {{ edge.data.targetColumn }}

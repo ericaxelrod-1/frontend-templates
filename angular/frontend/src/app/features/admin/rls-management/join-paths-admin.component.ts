@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, ViewChild, ElementRef, OnDestroy } from '@angular/core';
+import { Component, OnInit, Inject, ViewChild, ElementRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -63,7 +63,8 @@ interface RlsJoinPath {
       
       <mat-dialog-content>
         <div class="diagram-section">
-          <app-join-path-diagram 
+          <app-join-path-diagram
+            *ngIf="diagramReady"
             [targetTable]="formData.targetTable || ''"
             [initialConditions]="diagramConditions"
             [initialTables]="initialDiagramTables"
@@ -90,12 +91,11 @@ interface RlsJoinPath {
     mat-dialog-content { flex: 1 1 100% !important; padding: 0 !important; margin: 0 !important; overflow: hidden !important; min-height: 0 !important; display: flex !important; flex-direction: column !important; height: 100% !important; max-height: 100vh !important; }
   `]
 })
-export class JoinPathEditorDialogComponent implements OnInit, OnDestroy {
-  @ViewChild(JoinPathDiagramComponent) diagramComponent!: JoinPathDiagramComponent;
+export class JoinPathEditorDialogComponent implements OnInit {
+  diagramReady = false;
   formData: Partial<RlsJoinPath> & { conditions?: RlsJoinCondition[] };
   diagramConditions: DiagramJoinCondition[] = [];
   initialDiagramTables: DiagramTableNode[] = [];
-  private zoomTimeout: any;
 
   constructor(
     public dialogRef: MatDialogRef<JoinPathEditorDialogComponent>,
@@ -142,29 +142,14 @@ export class JoinPathEditorDialogComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Trigger zoom to fit after the dialog animation completes
     this.dialogRef.afterOpened()
-      .pipe(
-        take(1)
-      )
+      .pipe(take(1))
       .subscribe(() => {
-        // Double-call strategy for robustness: 
-        // 1. Immediate call for fast rendering if ResizeObserver already fired
-        // 2. Delayed call as a safety net for animation completion
-        if (this.diagramComponent?.viewportService) {
-          this.diagramComponent.viewportService.zoomToFit();
-          
-          this.zoomTimeout = setTimeout(() => {
-            this.diagramComponent?.viewportService?.zoomToFit();
-          }, 100);
-        }
+        // Wait for dialog animation to complete before rendering the diagram
+        setTimeout(() => {
+          this.diagramReady = true;
+        }, 200);
       });
-  }
-
-  ngOnDestroy(): void {
-    if (this.zoomTimeout) {
-      clearTimeout(this.zoomTimeout);
-    }
   }
 
   onDiagramConditionsChange(conditions: DiagramJoinCondition[]): void {
@@ -186,9 +171,7 @@ export class JoinPathEditorDialogComponent implements OnInit, OnDestroy {
   }
 
   isFormValid(): boolean {
-    return !!(this.formData.name && this.formData.targetTable && 
-             Array.isArray(this.formData.chain) && this.formData.chain.length > 0 &&
-             this.formData.conditions && this.formData.conditions.length > 0);
+    return !!(this.formData.name && this.formData.targetTable);
   }
 
   onCancel(): void {
