@@ -37,6 +37,8 @@ import { RolesModule } from './modules/roles/roles.module';
 import { SchemaModule } from './modules/schema/schema.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { GeoBlockMiddleware } from './common/middleware/geo-block.middleware';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -97,6 +99,8 @@ import { GeoBlockMiddleware } from './common/middleware/geo-block.middleware';
     RolesModule,
     PrivacyModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule implements NestModule, OnModuleInit {
   private readonly logger = new Logger(AppModule.name);
