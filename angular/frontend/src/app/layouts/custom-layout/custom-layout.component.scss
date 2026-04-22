@@ -22,19 +22,34 @@
 :host {
   display: block;
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
 }
+
+.layout-header {
+  flex-shrink: 0;
+}
+
+.layout-main {
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+
 
 // CSS Grid Layout Container
 .app-layout {
   display: grid;
   grid-template-areas:
     "header"
-    "main"
-    "footer";
-  grid-template-rows: auto 1fr auto; // Header auto, main flexible, footer auto
+    "main";
+  grid-template-rows: auto 1fr; // Header auto, main flexible
   height: 100vh; // Full viewport height
   width: 100%;
+  overflow: hidden;
 
   // Admin context modifications
   &.admin-context {
@@ -47,6 +62,7 @@
 // Layout Areas
 .layout-header {
   grid-area: header;
+  position: relative;
   z-index: 1000; // Above sidebar and content
 }
 
@@ -54,11 +70,6 @@
   grid-area: main;
   overflow: hidden; // Prevent content from spilling out
   min-height: 0; // Important for proper grid behavior
-}
-
-.layout-footer {
-  grid-area: footer;
-  z-index: 800; // Below header, above content
 }
 
 // Sidenav Container - takes full height of main area
@@ -95,23 +106,48 @@
 
 // Sidenav Content - main content area
 .sidenav-content {
-  height: 100%; // Take full height of container
-  overflow-y: auto; // Enable content scrolling
-  overflow-x: hidden; // Prevent horizontal scroll
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100%;
+  min-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+// Target Angular Material's internal drawer content
+::ng-deep .mat-drawer-content {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+}
+
+// Main content grows to fill space
+.main-content {
+  flex: 1 0 auto !important;
+  display: flex;
+  flex-direction: column;
+}
+
+// Footer inside sidenav content
+.layout-footer {
+  flex-shrink: 0;
+  width: 100%;
+  margin-top: auto;
+  position: relative;
+  z-index: 1;
+  background-color: var(--mat-sys-surface);
+  border-top: 1px solid var(--mat-sys-outline-variant);
 }
 
 // Main content area with proper flex layout
 .main-content {
-  height: 100%; // Take full height of sidenav-content
-  display: flex;
-  flex-direction: column;
-  min-height: 0; // Important for proper flex behavior
-
   // Content wrapper - fluid design (no max-width constraints)
   .content-wrapper {
     flex: 1;
     width: 100%;
-    // REMOVED: max-width: 1200px; // Enable full-width layouts on large screens
     box-sizing: border-box;
 
     // Mobile-first responsive padding
@@ -175,3 +211,5 @@
   }
 
 }
+
+/* Force recompilation 1 */

@@ -37,7 +37,7 @@ export class LoginMonitoringController {
     private readonly patternDetectionService: PatternDetectionService,
     private readonly alertService: AlertService,
     private readonly securityAlertService: SecurityAlertService,
-  ) { }
+  ) {}
 
   @Get('attempts/recent')
   @UseGuards(JwtAuthGuard, PermissionGuard)

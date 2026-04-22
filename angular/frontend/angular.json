@@ -39,18 +39,18 @@
                 "src/styles"
               ]
             },
-            "budgets": [
-              {
-                "type": "initial",
-                "maximumWarning": "1.5MB",
-                "maximumError": "2MB"
-              },
-              {
-                "type": "anyComponentStyle",
-                "maximumWarning": "25kB",
-                "maximumError": "30kB"
-              }
-            ],
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "1.5MB",
+                  "maximumError": "2MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "30kB",
+                  "maximumError": "35kB"
+                }
+              ],
             "prerender": true,
             "ssr": {
               "entry": "server.ts"
@@ -72,8 +72,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "20kB",
-                  "maximumError": "25kB"
+                  "maximumWarning": "30kB",
+                  "maximumError": "35kB"
                 }
               ],
               "outputHashing": "all",

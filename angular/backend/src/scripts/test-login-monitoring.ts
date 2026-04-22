@@ -75,7 +75,6 @@ async function testLoginMonitoring() {
       `Created IP reputation: ${reputation.ipAddress}, Failed attempts: ${reputation.failedLoginAttempts}, Blocked: ${reputation.isManuallyBlocked}`,
     );
 
-
     // Increment failed attempts
     await ipReputationService.incrementFailedAttempts('192.168.1.102');
     await ipReputationService.incrementFailedAttempts('192.168.1.102');
@@ -88,7 +87,6 @@ async function testLoginMonitoring() {
     logger.log(
       `Updated IP reputation: ${updatedReputation.ipAddress}, Failed attempts: ${updatedReputation.failedLoginAttempts}, Blocked: ${updatedReputation.isManuallyBlocked}`,
     );
-
 
     // Check if captcha is required
     const captchaRequired =

@@ -56,23 +56,19 @@ export class RolesConstantsService {
   initialize(): Observable<void> {
     // If already initialized, return immediately
     if (this.isInitialized) {
-      console.log('RolesConstantsService: Already initialized, skipping fetch');
       return of(void 0);
     }
 
     // If initialization is already in progress, return the observable that will complete when done
     if (this.initializeInProgress) {
-      console.log('RolesConstantsService: Initialization already in progress, waiting for completion');
       return this.roles$.pipe(map(() => void 0));
     }
 
-    console.log('RolesConstantsService: Starting role initialization');
     this.initializeInProgress = true;
 
     return this.http.get<ServerResponse<SystemRole>>(this.apiUrl).pipe(
       tap(response => {
         const roles = response.items;
-        console.log('RolesConstantsService: Received roles from backend:', roles);
 
         // Reset the SystemRoles object
         Object.keys(SystemRoles).forEach(key => {
@@ -113,7 +109,6 @@ export class RolesConstantsService {
         this.rolesSubject.next(rolesMap);
         this.isInitialized = true;
         this.initializeInProgress = false;
-        console.log('RolesConstantsService: Loaded system roles:', SystemRoles);
       }),
       catchError(error => {
         console.error('RolesConstantsService: Failed to load system roles:', error);

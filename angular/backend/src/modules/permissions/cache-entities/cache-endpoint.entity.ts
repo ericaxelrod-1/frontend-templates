@@ -33,10 +33,8 @@ export class CacheEndpoint {
   @Column({ length: 100, nullable: true })
   handlerName: string;
 
-
   @Column({ nullable: true })
   lastSyncedAt: Date;
-
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
@@ -46,5 +44,4 @@ export class CacheEndpoint {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

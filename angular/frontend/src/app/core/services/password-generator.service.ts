@@ -34,7 +34,7 @@ export class PasswordGeneratorService {
    * @param options Generation options
    * @returns Generated password
    */
-  generatePassword(length: number = 12, options?: {
+  generatePassword(length = 12, options?: {
     includeUppercase?: boolean;
     includeLowercase?: boolean;
     includeNumbers?: boolean;

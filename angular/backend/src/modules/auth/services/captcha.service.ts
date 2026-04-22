@@ -13,7 +13,7 @@ export class CaptchaService {
   constructor(
     @InjectRepository(Captcha)
     private readonly captchaRepository: Repository<Captcha>,
-  ) { }
+  ) {}
 
   private generateToken(): string {
     return crypto.randomBytes(32).toString('hex');

@@ -18,7 +18,6 @@ export class SecurityAlert {
   @Column({ length: 50 })
   alertType: string;
 
-
   @Column({ length: 20, default: 'medium' })
   severity: string;
 
@@ -40,7 +39,6 @@ export class SecurityAlert {
   @Column({ type: 'text', nullable: true })
   ipAddress: string;
 
-
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'user_id' })
   user: User;
@@ -51,14 +49,12 @@ export class SecurityAlert {
   @Column({ type: 'datetime', nullable: true })
   acknowledgedAt: Date;
 
-
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'acknowledged_by' })
   acknowledgedBy: User;
 
   @Column({ type: 'datetime', nullable: true })
   resolvedAt: Date;
-
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'resolved_by' })
@@ -67,19 +63,15 @@ export class SecurityAlert {
   @Column({ type: 'text', nullable: true })
   resolutionNotes: string;
 
-
   @Column({ type: 'text', nullable: true })
   alertData: string;
 
-
   @Column({ type: 'datetime', nullable: true })
   expiresAt: Date;
-
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

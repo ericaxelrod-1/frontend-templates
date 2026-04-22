@@ -121,6 +121,21 @@ export class PermissionSeedsService {
         resource: 'login-monitoring',
         actions: ['view', 'manage'],
       },
+      // RLS Rules
+      {
+        resource: 'rls_rules',
+        actions: ['read', 'manage'],
+      },
+      // RLS Join Paths
+      {
+        resource: 'rls_join_paths',
+        actions: ['read', 'manage'],
+      },
+      // RLS Scope Templates
+      {
+        resource: 'rls_scope_templates',
+        actions: ['read', 'manage'],
+      },
     ];
 
     // Get all existing actions
@@ -251,6 +266,14 @@ export class PermissionSeedsService {
         // Login monitoring
         'login-monitoring:view',
         'login-monitoring:manage',
+
+        // RLS management
+        'rls_rules:read',
+        'rls_rules:manage',
+        'rls_join_paths:read',
+        'rls_join_paths:manage',
+        'rls_scope_templates:read',
+        'rls_scope_templates:manage',
       ],
     };
 

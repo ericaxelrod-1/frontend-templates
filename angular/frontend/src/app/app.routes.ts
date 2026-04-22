@@ -41,6 +41,11 @@ export const routes: Routes = [
         canActivate: [AuthGuard]
       },
       {
+        path: 'privacy',
+        loadComponent: () => import('./features/privacy/privacy-settings.component').then(c => c.PrivacySettingsComponent),
+        canActivate: [AuthGuard]
+      },
+      {
         path: 'profile/change-password',
         loadComponent: () => import('./features/profile/password-change/password-change.component').then(c => c.PasswordChangeComponent),
         canActivate: [AuthGuard]
@@ -120,6 +125,38 @@ export const routes: Routes = [
             data: {
               permissions: 'login-monitoring:read'
             }
+          },
+          {
+            path: 'rls-rules',
+            loadComponent: () => import('./features/admin/rls-management/rls-admin.component').then(c => c.RlsAdminComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'rls:admin'
+            }
+          },
+          {
+            path: 'join-paths',
+            loadComponent: () => import('./features/admin/rls-management/join-paths-admin.component').then(c => c.JoinPathsAdminComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'rls:admin'
+            }
+          },
+          {
+            path: 'scope-templates',
+            loadComponent: () => import('./features/admin/rls-management/scope-templates-admin.component').then(c => c.ScopeTemplatesAdminComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'rls:admin'
+            }
+          },
+          {
+            path: 'permission-inspector',
+            loadComponent: () => import('./features/admin/rls-management/permission-inspector.component').then(c => c.PermissionInspectorComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'rls:admin'
+            }
           }
         ]
       }
@@ -165,6 +202,10 @@ export const routes: Routes = [
       {
         path: 'privacy-policy',
         loadComponent: () => import('./features/legal/privacy-policy/privacy-policy.component').then(c => c.PrivacyPolicyComponent)
+      },
+      {
+        path: 'blocked',
+        loadComponent: () => import('./features/blocked/blocked.component').then(c => c.BlockedComponent)
       }
     ]
   },

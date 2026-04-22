@@ -25,10 +25,8 @@ export class CacheComponent {
   @Column({ length: 255, nullable: true })
   filePath: string;
 
-
   @Column({ nullable: true })
   lastSyncedAt: Date;
-
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
@@ -38,5 +36,4 @@ export class CacheComponent {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

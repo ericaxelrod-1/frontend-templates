@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -18,9 +13,7 @@ import { RequirePermission } from '../../permissions/decorators/require-permissi
 @ApiTags('login-attempts')
 @Controller('login-attempts')
 export class LoginAttemptsController {
-  constructor(
-    private readonly loginAttemptService: LoginAttemptService,
-  ) {}
+  constructor(private readonly loginAttemptService: LoginAttemptService) {}
 
   @Get('attempts')
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -85,4 +78,4 @@ export class LoginAttemptsController {
       ...stats,
     };
   }
-} 
+}

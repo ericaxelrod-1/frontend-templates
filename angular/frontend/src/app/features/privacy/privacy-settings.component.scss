@@ -1,0 +1,90 @@
+.privacy-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+
+  h1 {
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+  }
+
+  .subtitle {
+    color: #666;
+    margin-bottom: 2rem;
+  }
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.privacy-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.privacy-section {
+  mat-card-header {
+    margin-bottom: 1rem;
+  }
+
+  .section-description {
+    color: #666;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+  }
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid #eee;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .toggle-info {
+    display: flex;
+    flex-direction: column;
+
+    .toggle-label {
+      font-weight: 500;
+      color: #2c3e50;
+    }
+
+    .toggle-description {
+      font-size: 0.85rem;
+      color: #666;
+    }
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+
+  button {
+    mat-icon {
+      margin-right: 0.5rem;
+    }
+  }
+}
+
+.last-updated {
+  text-align: center;
+  color: #888;
+  font-size: 0.85rem;
+  margin-top: 1rem;
+}
+
+.objection-list {
+  display: flex;
+  flex-direction: column;
+}

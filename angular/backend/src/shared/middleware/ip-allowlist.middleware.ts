@@ -5,7 +5,7 @@ import { IPAllowlistService } from '../services/ip-allowlist.service';
 export class IPAllowlistMiddleware implements NestMiddleware {
   private readonly logger = new Logger(IPAllowlistMiddleware.name);
 
-  constructor(private readonly ipAllowlistService: IPAllowlistService) { }
+  constructor(private readonly ipAllowlistService: IPAllowlistService) {}
 
   use(req: any, res: any, next: () => void) {
     const ip = this.getClientIp(req);
@@ -39,6 +39,11 @@ export class IPAllowlistMiddleware implements NestMiddleware {
     }
 
     // If no X-Forwarded-For, use the direct connection IP
-    return req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || '0.0.0.0';
+    return (
+      req.ip ||
+      req.socket?.remoteAddress ||
+      req.connection?.remoteAddress ||
+      '0.0.0.0'
+    );
   }
 }

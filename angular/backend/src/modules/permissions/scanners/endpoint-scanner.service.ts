@@ -51,7 +51,7 @@ export class EndpointScannerService {
     private readonly metadataScanner: MetadataScanner,
     private readonly reflector: Reflector,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * Scan all NestJS controllers to find endpoints with permission requirements

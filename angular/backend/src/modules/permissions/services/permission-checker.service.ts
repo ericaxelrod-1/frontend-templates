@@ -33,7 +33,7 @@ export class PermissionCheckerService implements IPermissionChecker {
 
     @InjectRepository(GroupPermission)
     private readonly groupPermissionRepository: Repository<GroupPermission>,
-  ) { }
+  ) {}
 
   /**
    * Check if a user has a specific permission

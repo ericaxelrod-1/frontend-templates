@@ -23,10 +23,10 @@ export class LoginAttemptsService {
    */
   getRecentAttempts(
     filters: LoginMonitoringFilters = {},
-    page: number = 0,
-    pageSize: number = 10,
-    sortBy: string = 'createdAt',
-    sortDirection: string = 'desc'
+    page = 0,
+    pageSize = 10,
+    sortBy = 'createdAt',
+    sortDirection = 'desc'
   ): Observable<PaginatedResponse<LoginAttempt>> {
     let url = `${this.apiUrl}/attempts?limit=${pageSize}&offset=${page * pageSize}`;
     
@@ -73,7 +73,7 @@ export class LoginAttemptsService {
   /**
    * Get login statistics
    */
-  getStatistics(days: number = 7): Observable<Statistics> {
+  getStatistics(days = 7): Observable<Statistics> {
     let url = `${this.apiUrl}/statistics`;
     
     if (days) {

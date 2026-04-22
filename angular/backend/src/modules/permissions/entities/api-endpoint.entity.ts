@@ -51,7 +51,6 @@ export class ApiEndpoint {
   @Column({ nullable: true, length: 100 })
   handlerName: string;
 
-
   /**
    * Whether this endpoint overrides default permissions
    * If true, only explicitly assigned permissions apply
@@ -60,14 +59,12 @@ export class ApiEndpoint {
   @Column({ default: false })
   overridePermissions: boolean;
 
-
   /**
    * Last time this endpoint was synced with the codebase
    * Used to detect stale endpoints
    */
   @Column({ nullable: true })
   lastSyncedAt: Date;
-
 
   /**
    * Relationship to the permissions required to access this endpoint
@@ -85,5 +82,4 @@ export class ApiEndpoint {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

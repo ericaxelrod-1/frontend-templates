@@ -4,7 +4,6 @@ import { CommonModule } from '@angular/common';
 import { DebugButtonComponent } from './components/debug/debug-button.component';
 import { DebugLogsComponent } from './components/debug/debug-logs.component';
 import { environment } from '../environments/environment';
-import { CookieConsentComponent } from '../shared/cookie-consent/cookie-consent.component';
 
 @Component({
   selector: 'app-root',
@@ -14,7 +13,6 @@ import { CookieConsentComponent } from '../shared/cookie-consent/cookie-consent.
     CommonModule,
     DebugButtonComponent,
     DebugLogsComponent,
-    CookieConsentComponent
   ],
   template: `
     <router-outlet></router-outlet>
@@ -24,7 +22,6 @@ import { CookieConsentComponent } from '../shared/cookie-consent/cookie-consent.
                   (closed)="showLogs = false"
                   (logsCountChanged)="updateLogsCount($event)">
     </app-debug-logs>
-    <app-cookie-consent></app-cookie-consent>
   `,
   styles: [`
     :host {

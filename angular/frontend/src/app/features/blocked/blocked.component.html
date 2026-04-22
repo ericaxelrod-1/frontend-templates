@@ -1,0 +1,33 @@
+<div class="blocked-container">
+  <div class="blocked-card">
+    <div class="warning-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+      </svg>
+    </div>
+
+    <h1>Access Denied</h1>
+
+    <p class="message">
+      We're sorry, but this service is not available in {{ regionName }}.
+    </p>
+
+    <div class="info-section">
+      <h3>Why am I seeing this?</h3>
+      <p>
+        This service is not available in your region due to local regulations
+        or legal compliance requirements.
+      </p>
+      <p *ngIf="regionCode === 'US-CA'">
+        California residents: We currently block access while evaluating compliance options.
+      </p>
+    </div>
+
+    <div class="help-section">
+      <p>
+        If you believe you've received this message in error, please contact support.
+      </p>
+    </div>
+  </div>
+</div>

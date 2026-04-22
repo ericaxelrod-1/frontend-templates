@@ -46,13 +46,11 @@ export class Group {
   @Column({ default: false })
   isSystemGroup: boolean;
 
-
   /**
    * Owner of the group (nullable FK to users.id)
    */
   @Column({ nullable: true })
   ownerId: number;
-
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'owner_id' })
@@ -64,7 +62,19 @@ export class Group {
   @UpdateDateColumn()
   updatedAt: Date;
 
-
   @ManyToMany(() => User, (user) => user.groups)
   users: User[];
+
+  @Column({ nullable: true })
+  parentId: number;
+
+  @ManyToOne(() => Group, (group) => group.children, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'parent_id' })
+  parent: Group;
+
+  @OneToMany(() => Group, (group) => group.parent)
+  children: Group[];
+
+  @Column({ nullable: true })
+  priority: number;
 }

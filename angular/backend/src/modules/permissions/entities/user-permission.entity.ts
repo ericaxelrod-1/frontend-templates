@@ -22,7 +22,6 @@ export class UserPermission {
   @PrimaryColumn()
   permissionId: number;
 
-
   /**
    * Whether the permission is granted (true) or denied (false)
    * Used for explicit permission denial in hierarchical permission systems
@@ -30,7 +29,6 @@ export class UserPermission {
    */
   @Column({ default: true })
   isGranted: boolean;
-
 
   /**
    * User relationship
@@ -57,5 +55,4 @@ export class UserPermission {
    */
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

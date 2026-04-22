@@ -38,7 +38,6 @@ export class Action {
   @Column({ unique: true, length: 255 })
   actionCode: string;
 
-
   /**
    * Icon to represent this action in the UI
    */
@@ -62,5 +61,4 @@ export class Action {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

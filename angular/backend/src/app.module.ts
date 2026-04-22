@@ -7,7 +7,9 @@ import {
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ClsModule } from 'nestjs-cls';
 import { AuthModule } from './modules/auth/auth.module';
+import { EmailModule } from './modules/email/email.module';
 import { UsersModule } from './modules/users/users.module';
 import { User } from './modules/users/entities/user.entity';
 import { LoginAttempt } from './modules/auth/entities/login-attempt.entity';
@@ -20,17 +22,31 @@ import { CaptchaModule } from './modules/captcha/captcha.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import environmentConfig from './config/environment.config';
 import databaseConfig from './config/database.config';
+import emailConfig from './config/email.config';
 import { PermissionsService } from './modules/permissions/services/permissions.service';
 import { Logger } from '@nestjs/common';
 import { UsersSharedModule } from './modules/users/shared/users-shared.module';
 import { PermissionsSharedModule } from './modules/permissions/shared/permissions-shared.module';
 import { AuthSharedModule } from './modules/auth/shared/auth-shared.module';
+import { RlsModule } from '@our-org/nestjs-typeorm-rls';
+import { RlsRule } from './modules/permissions/entities/rls-rule.entity';
+import { RlsJoinPath } from './modules/permissions/entities/rls-join-path.entity';
+import { RlsJoinCondition } from './modules/permissions/entities/rls-join-condition.entity';
+import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-template.entity';
+import { RolesModule } from './modules/roles/roles.module';
+import { SchemaModule } from './modules/schema/schema.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
+import { GeoBlockMiddleware } from './common/middleware/geo-block.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [environmentConfig, databaseConfig],
+      load: [environmentConfig, databaseConfig, emailConfig],
+    }),
+    ClsModule.forRoot({
+      global: true,
+      middleware: { mount: true },
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -41,15 +57,45 @@ import { AuthSharedModule } from './modules/auth/shared/auth-shared.module';
     ScheduleModule.forRoot(),
     LoggerModule,
     SharedModule,
-    // Import shared modules first to make interfaces available
     UsersSharedModule,
     PermissionsSharedModule,
     AuthSharedModule,
-    // Then import feature modules
+    RlsModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const dbConfig = configService.get('database');
+        return {
+          enabled: process.env.NODE_ENV !== 'test',
+          exemptTables: [
+            'roles',
+            'permissions',
+            'role_permissions',
+            'actions',
+            'resources',
+            'cache_components',
+            'cache_routes',
+            'cache_endpoints',
+            'cache_sync_status',
+            'migrations',
+            'rls_rules',
+            'rls_join_paths',
+            'rls_join_conditions',
+            'rls_scope_templates',
+          ],
+          fallbackBehavior: 'deny' as const,
+          dataSourceOptions: dbConfig as any,
+        };
+      },
+    }),
     AuthModule,
+    EmailModule,
     UsersModule,
     CaptchaModule,
     PermissionsModule,
+    SchemaModule,
+    RolesModule,
+    PrivacyModule,
   ],
 })
 export class AppModule implements NestModule, OnModuleInit {
@@ -61,14 +107,13 @@ export class AppModule implements NestModule, OnModuleInit {
   ) {}
 
   configure(consumer: MiddlewareConsumer) {
-    // Apply IP allowlist middleware to all routes
     consumer.apply(IPAllowlistMiddleware).forRoutes('*path');
+    consumer.apply(GeoBlockMiddleware).forRoutes('*path');
   }
 
   async onModuleInit() {
     const environment = this.configService.get('NODE_ENV', 'development');
 
-    // Only seed permissions in development environment by default
     if (environment === 'development') {
       this.logger.log(
         'Development environment detected, seeding default permissions...',

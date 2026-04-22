@@ -1,6 +1,7 @@
-import { Component, OnInit, Input, Output, EventEmitter } from "@angular/core";
+import { Component, OnInit, Input, Output, EventEmitter, OnDestroy } from "@angular/core";
 import { MatSnackBar } from "@angular/material/snack-bar";
-import { Observable } from "rxjs";
+import { Observable, Subject } from "rxjs";
+import { takeUntil } from "rxjs/operators";
 import { LoginMonitoringService } from "../shared/login-monitoring.service";
 import { LoginMonitoringSharedModule } from "../shared/login-monitoring-shared.module";
 import { Statistics } from "../shared/login-monitoring.models";
@@ -13,12 +14,13 @@ import { ResponsiveLayoutService } from "../../../../shared/services/responsive-
   templateUrl: "./statistics-dashboard.component.html",
   styleUrls: ["./statistics-dashboard.component.scss"]
 })
-export class StatisticsDashboardComponent implements OnInit {
+export class StatisticsDashboardComponent implements OnInit, OnDestroy {
   @Input() hasPermission = false;
   @Output() statsLoaded = new EventEmitter<Statistics>();
 
   statistics: Statistics | null = null;
   loading = false;
+  private destroy$ = new Subject<void>();
 
   // Responsive observables (initialized in constructor)
   responsiveClass$!: Observable<string>;
@@ -40,23 +42,30 @@ export class StatisticsDashboardComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   loadStats(): void {
     if (!this.hasPermission) return;
     
     this.loading = true;
     
-    this.loginMonitoringService.getStatistics().subscribe({
-      next: (data) => {
-        this.statistics = data;
-        this.loading = false;
-        this.statsLoaded.emit(data);
-      },
-      error: (error) => {
-        console.error("Error loading statistics:", error);
-        this.snackBar.open("Failed to load statistics", "Close", { duration: 5000 });
-        this.loading = false;
-      }
-    });
+    this.loginMonitoringService.getStatistics()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.statistics = data;
+          this.loading = false;
+          this.statsLoaded.emit(data);
+        },
+        error: (error) => {
+          console.error("Error loading statistics:", error);
+          this.snackBar.open("Failed to load statistics", "Close", { duration: 5000 });
+          this.loading = false;
+        }
+      });
   }
 
   refreshStats(): void {

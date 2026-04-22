@@ -1,0 +1,207 @@
+<div class="join-path-diagram">
+  <aside class="palette">
+    <div class="palette-header">
+      <h3>Available Tables</h3>
+      <p class="palette-hint">Drag tables to the canvas</p>
+      
+      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange($event)" placeholder="Search tables...">
+      </mat-form-field>
+    </div>
+    
+    <cdk-virtual-scroll-viewport itemSize="40" class="palette-items" (scrolledToNearEnd)="loadMore()">
+      @if (loadingPalette && currentPage === 1) {
+        <div class="palette-loading">Loading tables...</div>
+      } @else {
+        <ng-diagram-palette-item
+          *cdkVirtualFor="let item of paletteItems"
+          [item]="item"
+        >
+          <div class="palette-item">
+            <mat-icon class="palette-icon">table_chart</mat-icon>
+            <span class="palette-label">{{ item.label }}</span>
+          </div>
+        </ng-diagram-palette-item>
+
+        @if (availableTables.length < totalTables) {
+          <button mat-button class="btn-load-more" (click)="loadMore()" [disabled]="loadingPalette">
+            {{ loadingPalette ? 'Loading...' : 'Load More (' + (totalTables - availableTables.length) + ')' }}
+          </button>
+        } @else if (availableTables.length === 0 && !loadingPalette) {
+          <div class="palette-empty">No tables found matching your search.</div>
+        }
+      }
+    </cdk-virtual-scroll-viewport>
+  </aside>
+
+  <main class="canvas-area">
+    <div class="canvas-toolbar">
+      <div class="toolbar-status">
+        <mat-icon class="status-icon">schema</mat-icon>
+        <span>{{ model.getNodes().length }} tables, {{ model.getEdges().length }} joins</span>
+        @if (existingPaths.length > 0) {
+          <div class="existing-paths">
+            <span class="paths-label">Paths:</span>
+            <button mat-button class="path-chip" (click)="onPathSelected(path.id)" *ngFor="let path of existingPaths">
+              {{ path.name }}
+            </button>
+          </div>
+        }
+      </div>
+      <div class="toolbar-actions">
+        <button mat-stroked-button color="warn" type="button"
+                [disabled]="!selectedNodeId" 
+                (click)="selectedNodeId && deleteNode(selectedNodeId); $event.preventDefault()">
+          <mat-icon>delete</mat-icon> Remove Table
+        </button>
+        <button mat-stroked-button color="warn" type="button" (click)="clearDiagram(); $event.preventDefault()">
+          <mat-icon>delete_sweep</mat-icon> Reset Canvas
+        </button>
+      </div>
+    </div>
+
+    <ng-diagram
+      class="diagram-canvas"
+      [model]="model"
+      (paletteItemDropped)="onPaletteItemDropped($event)"
+      (edgeDrawn)="onEdgeDrawn($event)"
+      (selectionChanged)="onSelectionChanged($event)"
+    >
+      <ng-template #nodeTemplate let-node>
+        <div class="table-node" 
+             [class.selected]="selectedNodeId === node.id"
+             [class.target-node]="node.data.tableName === targetTable"
+             (click)="setSelectedNode(node.id); $event.stopPropagation()"
+             (pointerdown)="setSelectedNode(node.id); $event.stopPropagation()">
+          <div class="table-header">
+            <span class="table-name">{{ node.data.tableName }}</span>
+            <div class="node-controls">
+              <button class="btn-target" 
+                      [title]="node.data.tableName === targetTable ? 'Current Target' : 'Set as Target Table'"
+                      (click)="setTargetTable(node.data.tableName); $event.stopPropagation()">
+                <mat-icon>{{ node.data.tableName === targetTable ? 'star' : 'star_border' }}</mat-icon>
+              </button>
+            </div>
+          </div>
+          <div class="table-columns">
+            @for (col of node.data.columns; track col.name) {
+              <div class="column-row" [class.pk]="col.isPrimary" [class.fk]="col.isForeignKey">
+                <span class="col-name">{{ col.name }}</span>
+                <span class="col-type">{{ col.type }}</span>
+              </div>
+            }
+          </div>
+          <ng-diagram-port id="port-left" side="left" type="target"></ng-diagram-port>
+          <ng-diagram-port id="port-right" side="right" type="source"></ng-diagram-port>
+          <ng-diagram-port id="port-top" side="top" type="target"></ng-diagram-port>
+          <ng-diagram-port id="port-bottom" side="bottom" type="source"></ng-diagram-port>
+        </div>
+      </ng-template>
+
+      <ng-template #edgeTemplate let-edge>
+        <ng-diagram-base-edge
+          [edge]="edge"
+        ></ng-diagram-base-edge>
+        @if (edge.data?.sourceColumn && edge.data?.targetColumn) {
+          <div class="edge-label">
+            {{ edge.data.sourceColumn }} {{ edge.data.operator }} {{ edge.data.targetColumn }}
+          </div>
+        }
+      </ng-template>
+    </ng-diagram>
+
+    <svg class="diagram-defs" aria-hidden="true">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--mat-sys-tertiary)"/>
+        </marker>
+      </defs>
+    </svg>
+  </main>
+
+  <aside class="sidebar" [class.open]="sidebarOpen || edges.length > 0">
+    @if (sidebarEdge) {
+      <div class="sidebar-header">
+        <h3>Edit Join Condition</h3>
+        <button mat-icon-button (click)="closeSidebar()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="sidebar-body">
+        <div class="join-info">
+          <span class="join-table">{{ getNodeTableName(sidebarEdge.source) }}</span>
+          <mat-icon>arrow_forward</mat-icon>
+          <span class="join-table">{{ getNodeTableName(sidebarEdge.target) }}</span>
+        </div>
+
+        <div class="form-group">
+          <label>Source (From) Column</label>
+          <select [(ngModel)]="sidebarSourceColumn" (ngModelChange)="updateEdgeCondition()">
+            <option value="">Select column...</option>
+            @for (col of availableCanvasColumns; track col.tableName + '::' + col.columnName) {
+              <option [value]="col.tableName + '.' + col.columnName">{{ col.tableName }}.{{ col.columnName }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Comparison Operator</label>
+          <select [(ngModel)]="sidebarOperator" (ngModelChange)="updateEdgeCondition()">
+            <option value="=">=</option>
+            <option value="!=">!=</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Target (To) Column</label>
+          <select [(ngModel)]="sidebarTargetColumn" (ngModelChange)="updateEdgeCondition()">
+            <option value="">Select column...</option>
+            @for (col of availableCanvasColumns; track col.tableName + '::' + col.columnName) {
+              <option [value]="col.tableName + '.' + col.columnName">{{ col.tableName }}.{{ col.columnName }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="button-group" (click)="$event.stopPropagation()">
+          <button type="button" class="mat-mdc-outlined-button mat-primary mat-mdc-button-base" (click)="onAddJoin(); $event.preventDefault(); $event.stopPropagation()">
+            <mat-icon>add</mat-icon> Add Join
+          </button>
+          <button mat-flat-button color="warn" type="button" (click)="deleteSelectedEdge(); $event.preventDefault(); $event.stopPropagation()" class="full-width">
+            <mat-icon>link_off</mat-icon> Remove Join
+          </button>
+        </div>
+      </div>
+    } @else {
+      <div class="sidebar-header">
+        <h3>Joins</h3>
+      </div>
+      <div class="sidebar-body">
+        <div class="conditions-list">
+          @for (edge of edges; track edge.id) {
+            <div class="condition-item" [class.active]="selectedEdgeId === edge.id" (click)="onEdgeSelected(edge)">
+              <div class="cond-summary">
+                <span class="cond-table">{{ getNodeTableName(edge.source) }}</span>
+                <span class="cond-op">{{ edge.data?.operator || '=' }}</span>
+                <span class="cond-table">{{ getNodeTableName(edge.target) }}</span>
+                <button mat-icon-button color="warn" class="btn-delete-edge" 
+                        (click)="deleteEdgeById(edge.id); $event.stopPropagation()"
+                        title="Remove join">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              <div class="cond-cols" *ngIf="edge.data?.sourceColumn">
+                {{ edge.data.sourceColumn }} → {{ edge.data.targetColumn }}
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-hint">
+              <mat-icon>info</mat-icon>
+              <p>Connect tables on the canvas to define join logic. Click an edge to configure columns.</p>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </aside>
+</div>

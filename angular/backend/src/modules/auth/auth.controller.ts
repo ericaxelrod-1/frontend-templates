@@ -44,7 +44,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly permissionsService: PermissionsService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   @ApiOperation({ summary: 'Login user and get token' })
   @ApiBody({ type: LoginDto })
@@ -116,6 +116,11 @@ export class AuthController {
   @HttpCode(200)
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Post('verify-email')
+  async verifyEmail(@Body() dto: { token: string; email: string }) {
+    return this.authService.verifyEmail(dto.token, dto.email);
   }
 
   @ApiOperation({ summary: 'Reset password with token' })

@@ -26,13 +26,11 @@ export class Captcha {
   @Column({ type: 'boolean', default: false })
   isUsed: boolean;
 
-
   @Column({ type: 'datetime' })
   expiresAt: Date;
 
   @Column({ type: 'text', nullable: true })
   ipAddress: string;
-
 
   @Column({ type: 'text', nullable: true })
   metadata: string;
@@ -42,5 +40,4 @@ export class Captcha {
 
   @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
-
 }

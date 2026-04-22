@@ -32,6 +32,7 @@ import { Action } from '../entities/action.entity';
 import { CacheSyncService } from '../../cache/cache-sync.service';
 import { RequestContext } from '../../shared/request-context';
 import { ManifestService } from '../scanners/manifest.service';
+import { RolesService } from '../../roles/roles.service';
 
 @Injectable()
 export class PermissionsService {
@@ -80,7 +81,7 @@ export class PermissionsService {
     @InjectRepository(Action)
     private actionRepository: Repository<Action>,
     private readonly cacheSyncService: CacheSyncService,
-  ) { }
+  ) {}
 
   /**
    * Get all available permissions
@@ -167,14 +168,13 @@ export class PermissionsService {
       `Cache miss for user permissions: ${userId}, fetching from database`,
     );
 
-    // Fetch user with roles, role permissions, groups, and group permissions
+    const rolesService = this.moduleRef.get(RolesService, { strict: false });
+
+    // Fetch user with roles, groups, and direct permissions
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: [
         'roles',
-        'roles.rolePermissions',
-        'roles.rolePermissions.permission',
-        'roles.rolePermissions.permission.actionEntity',
         'groups',
         'groups.groupPermissions',
         'groups.groupPermissions.permission',
@@ -191,18 +191,14 @@ export class PermissionsService {
 
     const permissions: string[] = [];
 
-    // Add role permissions
+    // Add role permissions via getEffectivePermissions to resolve hierarchy inheritance
     for (const role of user.roles || []) {
-      if (role.rolePermissions) {
-        for (const rolePermission of role.rolePermissions) {
-          if (rolePermission.permission && rolePermission.isGranted !== false) {
-            const permission = rolePermission.permission;
-            const permString = permission.name;
-
-            if (!permissions.includes(permString)) {
-              permissions.push(permString);
-            }
-          }
+      const effectivePermissions = await rolesService.getEffectivePermissions(
+        role.id,
+      );
+      for (const ep of effectivePermissions) {
+        if (ep.isGranted !== false && !permissions.includes(ep.permission)) {
+          permissions.push(ep.permission);
         }
       }
     }
@@ -290,7 +286,6 @@ export class PermissionsService {
     component.overridePermissions = overridePermissions;
     component.lastSyncedAt = new Date();
 
-
     return this.componentRepository.save(component);
   }
 
@@ -336,7 +331,6 @@ export class PermissionsService {
     route.overridePermissions = overridePermissions;
     route.lastSyncedAt = new Date();
 
-
     return this.routeRepository.save(route);
   }
 
@@ -379,7 +373,6 @@ export class PermissionsService {
     // Check if user has any of the required permissions
     const requiredPermissionStrings = route.requiredPermissions.map(
       (p) => p.name,
-
     );
 
     const hasAccess = requiredPermissionStrings.some((permission) =>
@@ -434,7 +427,6 @@ export class PermissionsService {
     endpoint.overridePermissions = overridePermissions;
     endpoint.lastSyncedAt = new Date();
 
-
     return this.endpointRepository.save(endpoint);
   }
 
@@ -481,7 +473,6 @@ export class PermissionsService {
     // Check if user has any of the required permissions
     const requiredPermissionStrings = endpoint.requiredPermissions.map(
       (p) => p.name,
-
     );
 
     const hasAccess = requiredPermissionStrings.some((perm) =>
@@ -611,7 +602,9 @@ export class PermissionsService {
 
     // Invalidate caches
     this.cacheService.delete(`permissions:resource:${permission.resourceName}`);
-    this.cacheService.delete(`permissions:action:${permission.actionEntity?.name || ''}`);
+    this.cacheService.delete(
+      `permissions:action:${permission.actionEntity?.name || ''}`,
+    );
 
     this.cacheService.delete('permissions:all');
 
@@ -658,8 +651,9 @@ export class PermissionsService {
 
     // Check if action has been changed
     if (updatePermissionDto.name) {
-      this.cacheService.delete(`permissions:action:${permission.actionEntity?.name || ''}`);
-
+      this.cacheService.delete(
+        `permissions:action:${permission.actionEntity?.name || ''}`,
+      );
     }
 
     this.cacheService.delete('permissions:all');
@@ -676,7 +670,9 @@ export class PermissionsService {
     // Invalidate caches before deletion
     this.cacheService.delete(`permissions:id:${id}`);
     this.cacheService.delete(`permissions:resource:${permission.resourceName}`);
-    this.cacheService.delete(`permissions:action:${permission.actionEntity?.name || ''}`);
+    this.cacheService.delete(
+      `permissions:action:${permission.actionEntity?.name || ''}`,
+    );
 
     this.cacheService.delete('permissions:all');
 
@@ -966,7 +962,6 @@ export class PermissionsService {
       const hasPermission = role.rolePermissions.some(
         (rp) => rp.permission.name === permission.name,
       );
-
 
       if (!hasPermission) {
         // Create role permission relationship
@@ -1306,6 +1301,11 @@ export class PermissionsService {
       { resource: 'permissions', action: 'read' },
       { resource: 'permissions', action: 'update' },
       { resource: 'dashboard', action: 'read' },
+      { resource: 'groups', action: 'read' },
+      { resource: 'groups', action: 'create' },
+      { resource: 'groups', action: 'update' },
+      { resource: 'groups', action: 'delete' },
+      { resource: 'rls', action: 'admin' },
     ];
 
     for (const { resource, action } of defaultPermissions) {

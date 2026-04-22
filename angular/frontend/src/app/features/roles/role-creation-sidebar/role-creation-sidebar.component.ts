@@ -313,7 +313,7 @@ export class RoleCreationSidebarComponent implements OnInit {
 
   availablePermissions: Permission[] = [];
   permissionGroups: PermissionGroup[] = [];
-  selectedPermissions: Set<number> = new Set();
+  selectedPermissions = new Set<number>();
 
   constructor(
     private roleService: RoleService,

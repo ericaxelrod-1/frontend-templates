@@ -1,0 +1,63 @@
+.blocked-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+}
+
+.blocked-card {
+  max-width: 500px;
+  padding: 3rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.warning-icon {
+  color: #e74c3c;
+  margin-bottom: 1.5rem;
+}
+
+h1 {
+  color: #2c3e50;
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.message {
+  color: #555;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.info-section {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  text-align: left;
+
+  h3 {
+    color: #2c3e50;
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  p {
+    color: #666;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+  }
+}
+
+.help-section {
+  p {
+    color: #888;
+    font-size: 0.9rem;
+  }
+}

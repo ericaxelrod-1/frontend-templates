@@ -22,10 +22,10 @@ export class SecurityAlertsService {
    */
   getSecurityAlerts(
     filters: SecurityAlertsFilters = {},
-    page: number = 0,
-    pageSize: number = 10,
-    sortBy: string = 'createdAt',
-    sortDirection: string = 'desc'
+    page = 0,
+    pageSize = 10,
+    sortBy = 'createdAt',
+    sortDirection = 'desc'
   ): Observable<PaginatedResponse<SecurityAlert>> {
     let url = `${this.apiUrl}/alerts?limit=${pageSize}&offset=${page * pageSize}`;
     

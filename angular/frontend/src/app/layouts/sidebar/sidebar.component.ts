@@ -85,6 +85,30 @@ export class SidebarComponent implements OnInit, OnDestroy {
       icon: 'security', 
       route: '/app/admin/login-monitoring', 
       permission: 'login-monitoring:read'
+    },
+    { 
+      label: 'RLS Rules', 
+      icon: 'rule', 
+      route: '/app/admin/rls-rules', 
+      permission: 'rls:admin'
+    },
+    { 
+      label: 'Join Paths', 
+      icon: 'account_tree', 
+      route: '/app/admin/join-paths', 
+      permission: 'rls:admin'
+    },
+    { 
+      label: 'Scope Templates', 
+      icon: 'layers', 
+      route: '/app/admin/scope-templates', 
+      permission: 'rls:admin'
+    },
+    { 
+      label: 'Permission Inspector', 
+      icon: 'search', 
+      route: '/app/admin/permission-inspector', 
+      permission: 'rls:admin'
     }
   ];
   
@@ -148,8 +172,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
    * Check if the user has a specific permission
    */
   hasPermission(permission: string): boolean {
-    const hasPermission = this.permissionService.hasPermissionSync(permission);
-    console.log(`Sidebar: Checking permission '${permission}':`, hasPermission);
-    return hasPermission;
+    return this.permissionService.hasPermissionSync(permission);
   }
 }

@@ -45,17 +45,10 @@ export class User {
   @Column({ default: false })
   isEmailVerified: boolean;
 
-
-
-
   @Column({ nullable: true })
-
   lastLoginAt: Date;
 
-
-
   @Column({ default: false })
-
   requiresPasswordChange: boolean;
 
   @Column({ type: 'simple-json', nullable: true })
@@ -67,21 +60,14 @@ export class User {
   @Column({ nullable: true })
   registrationVerificationSentAt: Date;
 
-
-
-
   @Column({ nullable: true })
-
   userVerifiedAt: Date;
-
-
 
   @Column({ default: false })
   isDeleted: boolean;
 
   @Column({ nullable: true })
   deletedAt: Date;
-
 
   @Column({ default: false })
   isBlocked: boolean;
@@ -93,8 +79,25 @@ export class User {
   blockedUntil: Date;
 
   @Column({ type: 'text', nullable: true })
-
   blockedReason: string;
+
+  @Column({ default: false })
+  marketingConsent: boolean;
+
+  @Column({ default: false })
+  doNotSell: boolean;
+
+  @Column({ nullable: true })
+  consentUpdatedAt: Date;
+
+  @Column({ type: 'simple-json', nullable: true })
+  privacyRestrictions: Record<string, boolean>;
+
+  @Column({ nullable: true })
+  processingObjectionAt: Date;
+
+  @Column({ type: 'simple-json', nullable: true })
+  processingObjections: Record<string, string>;
 
   @ManyToMany(() => Role, (role) => role.users)
   @JoinTable({
@@ -140,5 +143,4 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
 }

@@ -22,7 +22,6 @@ export class LoginAttempt {
   @Column({ type: 'text', nullable: true })
   emailAttempted: string;
 
-
   @Column({ type: 'text', default: 'failed' })
   status:
     | 'success'
@@ -38,11 +37,9 @@ export class LoginAttempt {
   @Column({ type: 'text', nullable: true })
   failureReason: string;
 
-
   @Column({ type: 'text', nullable: true })
   metadata: string;
 
   @CreateDateColumn({ type: 'datetime' })
   attemptedAt: Date;
-
 }

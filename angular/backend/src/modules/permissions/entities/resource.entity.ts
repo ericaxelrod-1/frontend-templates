@@ -33,7 +33,6 @@ export class Resource {
   @UpdateDateColumn()
   updatedAt: Date;
 
-
   // This relation is no longer valid since Permission doesn't have a resource property
   // @OneToMany(() => Permission, permission => permission.resource)
   // permissions: Permission[];

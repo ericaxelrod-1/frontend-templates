@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -22,7 +17,7 @@ export class IpReputationController {
   constructor(
     private readonly ipReputationService: IPReputationService,
     private readonly loginAttemptService: LoginAttemptService,
-  ) { }
+  ) {}
 
   @Get('reputation/:ipAddress')
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -73,4 +68,4 @@ export class IpReputationController {
       aggregatedStats,
     };
   }
-} 
+}

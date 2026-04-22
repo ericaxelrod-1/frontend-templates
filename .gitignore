@@ -349,3 +349,4 @@ fix_role_permissions_*.sql
 # Audit reports (keep directory structure but ignore old reports)
 audit_reports/*.json
 audit_reports/*.log
+.env.gmail

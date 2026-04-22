@@ -24,10 +24,11 @@ import { PatternSummaryQueryDto } from '../dto/pattern-summary-query.dto';
 
 // DTO for test pattern creation request
 class CreateTestPatternDto {
-  @ApiProperty({ 
+  @ApiProperty({
     enum: ['simple', 'enhanced'],
     default: 'simple',
-    description: 'Test mode - simple creates isolated patterns, enhanced creates realistic multi-pattern scenarios'
+    description:
+      'Test mode - simple creates isolated patterns, enhanced creates realistic multi-pattern scenarios',
   })
   mode?: 'simple' | 'enhanced';
 }
@@ -123,9 +124,10 @@ export class PatternDetectionController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('login-monitoring:manage')
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create test patterns for a specific scenario',
-    description: 'Creates test login attempts that will trigger pattern detection. Simple mode creates isolated patterns, enhanced mode creates realistic multi-pattern scenarios.'
+    description:
+      'Creates test login attempts that will trigger pattern detection. Simple mode creates isolated patterns, enhanced mode creates realistic multi-pattern scenarios.',
   })
   @ApiResponse({
     status: 201,
@@ -144,7 +146,7 @@ export class PatternDetectionController {
     @Body() createTestPatternDto: CreateTestPatternDto,
   ) {
     const mode = createTestPatternDto.mode || 'simple';
-    
+
     // Create test login attempts with mode
     await this.patternDetectionService.createTestLoginAttempts(scenario, mode);
 
@@ -152,12 +154,14 @@ export class PatternDetectionController {
     let detectedPatterns: any[];
     if (mode === 'simple') {
       // Run detection for only the requested pattern type
-      detectedPatterns = await this.patternDetectionService.detectSpecificPattern(scenario);
+      detectedPatterns =
+        await this.patternDetectionService.detectSpecificPattern(scenario);
     } else {
       // Enhanced mode - run full detection (current behavior)
-      detectedPatterns = await this.patternDetectionService.detectAndStorePatterns();
+      detectedPatterns =
+        await this.patternDetectionService.detectAndStorePatterns();
     }
-    
+
     console.log(
       `Test scenario '${scenario}' (${mode} mode) created. Detected and stored patterns:`,
       detectedPatterns.length,
@@ -169,10 +173,10 @@ export class PatternDetectionController {
       scenario: scenario,
       mode: mode,
       patternsDetected: detectedPatterns.length,
-      patterns: detectedPatterns.map(p => ({
+      patterns: detectedPatterns.map((p) => ({
         type: p.type,
-        severity: p.severity
-      }))
+        severity: p.severity,
+      })),
     };
   }
 
@@ -191,4 +195,4 @@ export class PatternDetectionController {
       patternsDeletedCount: result.patternsDeleted,
     };
   }
-} 
+}

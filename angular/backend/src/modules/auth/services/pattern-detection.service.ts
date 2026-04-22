@@ -112,9 +112,7 @@ export class PatternDetectionService {
     return this.getStoredPatterns();
   }
 
-  async detectSpecificPattern(
-    patternType: string
-  ): Promise<DetectedPattern[]> {
+  async detectSpecificPattern(patternType: string): Promise<DetectedPattern[]> {
     let patterns: DetectedPattern[] = [];
 
     // Map scenario names to pattern detection methods
@@ -574,7 +572,7 @@ export class PatternDetectionService {
       case 'brute_force':
         if (mode === 'simple') {
           // Simple mode: Minimal data that ONLY triggers brute force
-          const simpleIP = '192.168.200.1';  // Use unique IP range for simple tests
+          const simpleIP = '192.168.200.1'; // Use unique IP range for simple tests
           const simpleEmail = 'bruteforce.simple@test.example.com';
 
           // Create exactly 6 failed attempts (just above threshold of 5)
@@ -609,7 +607,12 @@ export class PatternDetectionService {
         if (mode === 'simple') {
           // Simple mode: Exactly 4 IPs (minimum for distributed) with same email
           const targetEmail = 'distributed.simple@test.example.com';
-          const simpleIPs = ['10.200.0.1', '10.200.0.2', '10.200.0.3', '10.200.0.4'];
+          const simpleIPs = [
+            '10.200.0.1',
+            '10.200.0.2',
+            '10.200.0.3',
+            '10.200.0.4',
+          ];
 
           for (let i = 0; i < simpleIPs.length; i++) {
             const attemptTime = new Date(now.getTime() - i * 600000); // 10 minutes apart
@@ -646,10 +649,16 @@ export class PatternDetectionService {
           // Simple mode: Many different emails from one IP
           const stuffingIP = '192.168.201.1';
           const emails = [
-            'user1.simple@test.com', 'user2.simple@test.com', 'user3.simple@test.com',
-            'user4.simple@test.com', 'user5.simple@test.com', 'user6.simple@test.com',
-            'user7.simple@test.com', 'user8.simple@test.com', 'user9.simple@test.com',
-            'user10.simple@test.com'
+            'user1.simple@test.com',
+            'user2.simple@test.com',
+            'user3.simple@test.com',
+            'user4.simple@test.com',
+            'user5.simple@test.com',
+            'user6.simple@test.com',
+            'user7.simple@test.com',
+            'user8.simple@test.com',
+            'user9.simple@test.com',
+            'user10.simple@test.com',
           ];
 
           for (let i = 0; i < emails.length; i++) {
@@ -699,8 +708,10 @@ export class PatternDetectionService {
           // Simple mode: 4 different accounts from same IP
           const switchingIP = '192.168.202.1';
           const simpleEmails = [
-            'alice.simple@test.com', 'bob.simple@test.com',
-            'charlie.simple@test.com', 'diana.simple@test.com'
+            'alice.simple@test.com',
+            'bob.simple@test.com',
+            'charlie.simple@test.com',
+            'diana.simple@test.com',
           ];
 
           for (let i = 0; i < simpleEmails.length; i++) {
@@ -708,7 +719,7 @@ export class PatternDetectionService {
             await this.createTestAttempt({
               ipAddress: switchingIP,
               emailAttempted: simpleEmails[i],
-              status: 'success',  // All successful to avoid brute force
+              status: 'success', // All successful to avoid brute force
               attemptedAt: attemptTime,
               userAgent: 'Simple-Test-Agent/1.0',
             });
@@ -787,7 +798,7 @@ export class PatternDetectionService {
         if (mode === 'simple') {
           // Simple mode: Single attempt from known suspicious IP
           await this.createTestAttempt({
-            ipAddress: '45.67.89.12',  // Known VPN/proxy range
+            ipAddress: '45.67.89.12', // Known VPN/proxy range
             emailAttempted: 'location.simple@test.example.com',
             status: 'success',
             attemptedAt: now,
@@ -836,7 +847,7 @@ export class PatternDetectionService {
         if (mode === 'simple') {
           // Simple mode: Login at unusual time (3 AM local)
           const anomalyTime = new Date();
-          anomalyTime.setHours(3, 0, 0, 0);  // 3:00 AM
+          anomalyTime.setHours(3, 0, 0, 0); // 3:00 AM
 
           await this.createTestAttempt({
             ipAddress: '192.168.203.1',
@@ -930,7 +941,9 @@ export class PatternDetectionService {
     const result = await this.rateLimitCounterRepository
       .createQueryBuilder('counter')
       .where('counter.key LIKE :keyPattern', { keyPattern: `ip:%` })
-      .andWhere('counter.count >= :threshold', { threshold: this.thresholds.bruteForceAttempts })
+      .andWhere('counter.count >= :threshold', {
+        threshold: this.thresholds.bruteForceAttempts,
+      })
       .andWhere('counter.windowExpiresAt > :now', { now: startTime })
       .getMany();
 
@@ -978,7 +991,7 @@ export class PatternDetectionService {
 
   /**
    * Evaluates the risk score (0-100) of a given login attempt.
-   * This operates in real-time as a login is happening, taking into account GeoIP, 
+   * This operates in real-time as a login is happening, taking into account GeoIP,
    * recent rate-limit failures, and statistical user behavioral baselines.
    */
   async evaluateRiskScore(attempt: LoginAttempt): Promise<number> {
@@ -991,9 +1004,13 @@ export class PatternDetectionService {
 
       // Check recent failure counters for this IP
       const ipCounter = await this.rateLimitCounterRepository.findOne({
-        where: { key: `ip:${attempt.ipAddress}` }
+        where: { key: `ip:${attempt.ipAddress}` },
       });
-      if (ipCounter && ipCounter.count > 0 && ipCounter.windowExpiresAt > new Date()) {
+      if (
+        ipCounter &&
+        ipCounter.count > 0 &&
+        ipCounter.windowExpiresAt > new Date()
+      ) {
         // Add 5 risk points per recent failure from this IP, capped at 30
         score += Math.min(ipCounter.count * 5, 30);
       }
@@ -1004,19 +1021,25 @@ export class PatternDetectionService {
 
     // 3. STATISTICAL USER BASELINES
     if (attempt.emailAttempted) {
-      const userResult = await this.loginAttemptRepository.createQueryBuilder('attempt')
+      const userResult = await this.loginAttemptRepository
+        .createQueryBuilder('attempt')
         .leftJoinAndSelect('attempt.user', 'user')
-        .where('attempt.emailAttempted = :email', { email: attempt.emailAttempted })
+        .where('attempt.emailAttempted = :email', {
+          email: attempt.emailAttempted,
+        })
         .getOne();
 
       if (userResult && userResult.user) {
         const profile = await this.userBehaviorProfileRepository.findOne({
-          where: { userId: userResult.user.id }
+          where: { userId: userResult.user.id },
         });
 
         if (profile) {
           // Check Time Baseline
-          if (profile.typicalLoginHours && profile.typicalLoginHours.length === 24) {
+          if (
+            profile.typicalLoginHours &&
+            profile.typicalLoginHours.length === 24
+          ) {
             const currentHour = new Date().getUTCHours();
             if (!profile.typicalLoginHours[currentHour]) {
               score += 20; // Unusual login hour for this specific user
@@ -1024,14 +1047,22 @@ export class PatternDetectionService {
           }
 
           // Check IP/Location Baseline
-          if (attempt.ipAddress && profile.knownIps && profile.knownIps.length > 0) {
+          if (
+            attempt.ipAddress &&
+            profile.knownIps &&
+            profile.knownIps.length > 0
+          ) {
             if (!profile.knownIps.includes(attempt.ipAddress)) {
               score += 15; // Unrecognized IP address for this user
             }
           }
 
           // Check Device Baseline
-          if (attempt.userAgent && profile.knownUserAgents && profile.knownUserAgents.length > 0) {
+          if (
+            attempt.userAgent &&
+            profile.knownUserAgents &&
+            profile.knownUserAgents.length > 0
+          ) {
             if (!profile.knownUserAgents.includes(attempt.userAgent)) {
               score += 10; // Unrecognized device/browser for this user
             }
@@ -1055,19 +1086,24 @@ export class PatternDetectionService {
     // 1. Track IP-level failures (Brute Force / Credential Stuffing)
     await this.incrementRateLimit(
       ipKey,
-      this.thresholds.bruteForceTimeWindowMinutes * 60 * 1000
+      this.thresholds.bruteForceTimeWindowMinutes * 60 * 1000,
     );
   }
 
-  private async incrementRateLimit(key: string, windowMs: number): Promise<void> {
-    let counter = await this.rateLimitCounterRepository.findOne({ where: { key } });
+  private async incrementRateLimit(
+    key: string,
+    windowMs: number,
+  ): Promise<void> {
+    let counter = await this.rateLimitCounterRepository.findOne({
+      where: { key },
+    });
     const now = new Date();
 
     if (!counter) {
       counter = this.rateLimitCounterRepository.create({
         key,
         count: 1,
-        windowExpiresAt: new Date(now.getTime() + windowMs)
+        windowExpiresAt: new Date(now.getTime() + windowMs),
       });
     } else {
       if (counter.windowExpiresAt < now) {
@@ -1087,9 +1123,13 @@ export class PatternDetectionService {
    * Updates the statistical baseline for a user after a successful login.
    * Tracks their typical hours, known IPs, and known User-Agents.
    */
-  async trackSuccessfulLoginBehavior(userId: number, ipAddress: string, userAgent: string): Promise<void> {
+  async trackSuccessfulLoginBehavior(
+    userId: number,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<void> {
     let profile = await this.userBehaviorProfileRepository.findOne({
-      where: { userId }
+      where: { userId },
     });
 
     if (!profile) {
@@ -1097,13 +1137,14 @@ export class PatternDetectionService {
         userId,
         typicalLoginHours: new Array(24).fill(false),
         knownIps: [],
-        knownUserAgents: []
+        knownUserAgents: [],
       });
     }
 
     // 1. Update Typical Hours
     const currentHour = new Date().getUTCHours();
-    if (!profile.typicalLoginHours) profile.typicalLoginHours = new Array(24).fill(false);
+    if (!profile.typicalLoginHours)
+      profile.typicalLoginHours = new Array(24).fill(false);
     profile.typicalLoginHours[currentHour] = true;
 
     // 2. Update Known IPs (keep last 10)
@@ -1134,7 +1175,9 @@ export class PatternDetectionService {
     const result = await this.rateLimitCounterRepository
       .createQueryBuilder('counter')
       .where('counter.key LIKE :keyPattern', { keyPattern: `ip:%` })
-      .andWhere('counter.count >= :threshold', { threshold: this.thresholds.bruteForceAttempts })
+      .andWhere('counter.count >= :threshold', {
+        threshold: this.thresholds.bruteForceAttempts,
+      })
       .andWhere('counter.windowExpiresAt > :now', { now: startTime })
       .getMany();
 
@@ -1426,14 +1469,15 @@ export class PatternDetectionService {
   private isForeignIP(ipAddress: string): boolean {
     const geo = geoip.lookup(ipAddress);
 
-    // If we can't look it up, assume it's private/local. 
+    // If we can't look it up, assume it's private/local.
     // If it's found but the country is not US (or standard operating country), flag as foreign
     if (geo && geo.country && geo.country !== 'US') {
       return true;
     }
 
     // Standard private IP check fallback
-    const privateIPPattern = /^(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
+    const privateIPPattern =
+      /^(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
     return !privateIPPattern.test(ipAddress) && !geo;
   }
 
@@ -1441,7 +1485,7 @@ export class PatternDetectionService {
     const geo = geoip.lookup(ipAddress);
 
     // geoip-lite sometimes flags hosting/datacenter ranges in its DB
-    // A more advanced integration might use a dedicated proxy ASN list, but we can 
+    // A more advanced integration might use a dedicated proxy ASN list, but we can
     // also use our known fallback list.
     const knownVPNRanges = [
       /^185\./, // Common VPN ranges
@@ -1522,10 +1566,10 @@ export class PatternDetectionService {
 
     const attempts = await this.loginAttemptRepository.find({
       where: {
-        attemptedAt: MoreThan(startTime)
+        attemptedAt: MoreThan(startTime),
       },
       relations: ['user'],
-      order: { attemptedAt: 'DESC' }
+      order: { attemptedAt: 'DESC' },
     });
 
     // Group by user/email to avoid spamming
@@ -1536,17 +1580,24 @@ export class PatternDetectionService {
 
       const hour = attempt.attemptedAt.getHours();
       // Flag logins between 1 AM and 5 AM
-      if (hour >= 1 && hour < 5 && !processedEmails.has(attempt.emailAttempted)) {
+      if (
+        hour >= 1 &&
+        hour < 5 &&
+        !processedEmails.has(attempt.emailAttempted)
+      ) {
         processedEmails.add(attempt.emailAttempted);
 
         // Find all attempts for this user during unusual hours
-        const userAnomalies = attempts.filter(a =>
-          a.emailAttempted === attempt.emailAttempted &&
-          a.attemptedAt.getHours() >= 1 &&
-          a.attemptedAt.getHours() < 5
+        const userAnomalies = attempts.filter(
+          (a) =>
+            a.emailAttempted === attempt.emailAttempted &&
+            a.attemptedAt.getHours() >= 1 &&
+            a.attemptedAt.getHours() < 5,
         );
 
-        const uniqueIPs = [...new Set(userAnomalies.map(a => a.ipAddress).filter(Boolean))] as string[];
+        const uniqueIPs = [
+          ...new Set(userAnomalies.map((a) => a.ipAddress).filter(Boolean)),
+        ] as string[];
 
         patterns.push({
           type: PatternType.TIME_ANOMALY,
@@ -1557,19 +1608,20 @@ export class PatternDetectionService {
             attemptCount: userAnomalies.length,
             timeRange: {
               start: userAnomalies[userAnomalies.length - 1].attemptedAt,
-              end: userAnomalies[0].attemptedAt
+              end: userAnomalies[0].attemptedAt,
             },
-            attempts: userAnomalies.map(a => ({
+            attempts: userAnomalies.map((a) => ({
               timestamp: a.attemptedAt,
               status: a.status,
-              ipAddress: a.ipAddress
-            }))
+              ipAddress: a.ipAddress,
+            })),
           },
           timestamp: new Date(),
           ipAddress: attempt.ipAddress,
-          ipAddresses: uniqueIPs.length > 0 ? uniqueIPs : [attempt.ipAddress || 'unknown'],
+          ipAddresses:
+            uniqueIPs.length > 0 ? uniqueIPs : [attempt.ipAddress || 'unknown'],
           emails: [attempt.emailAttempted],
-          userId: attempt.user?.id
+          userId: attempt.user?.id,
         });
       }
     }

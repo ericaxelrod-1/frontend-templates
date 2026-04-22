@@ -10,7 +10,7 @@ export class RoleUtils {
    * @param defaultValue Optional default value if the key doesn't exist
    * @returns The role value or default value
    */
-  static safeGetRole(roleKey: string | null | undefined, defaultValue: string = ''): string {
+  static safeGetRole(roleKey: string | null | undefined, defaultValue = ''): string {
     if (!roleKey) {
       return defaultValue;
     }
@@ -63,9 +63,9 @@ export class RoleUtils {
    * @returns true if the user has the role, false otherwise
    */
   static hasRole(
-    userRoles: Array<{ name: string } | string> | null | undefined,
+    userRoles: ({ name: string } | string)[] | null | undefined,
     roleToCheck: string | null | undefined,
-    caseSensitive: boolean = false
+    caseSensitive = false
   ): boolean {
     if (!userRoles || !roleToCheck) {
       return false;
@@ -88,7 +88,7 @@ export class RoleUtils {
    * @param roles Array of role objects
    * @returns Array of role names
    */
-  static extractRoleNames(roles: Array<{ name: string }> | null | undefined): string[] {
+  static extractRoleNames(roles: { name: string }[] | null | undefined): string[] {
     if (!roles || !Array.isArray(roles)) {
       return [];
     }
@@ -103,7 +103,7 @@ export class RoleUtils {
    * @param roles Array of role objects or strings
    * @returns Comma-separated string of role names
    */
-  static formatRoleNames(roles: Array<{ name: string } | string> | null | undefined): string {
+  static formatRoleNames(roles: ({ name: string } | string)[] | null | undefined): string {
     if (!roles || !Array.isArray(roles) || roles.length === 0) {
       return '';
     }

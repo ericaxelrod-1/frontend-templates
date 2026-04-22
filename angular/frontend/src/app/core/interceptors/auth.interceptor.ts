@@ -31,9 +31,6 @@ export class AuthInterceptor implements HttpInterceptor {
     // If token exists, add it and proceed
     if (currentToken) {
       request = this.addAuthenticationToken(request, currentToken, this.authService.csrfToken);
-    } else {
-      // Log if proceeding without a token (useful for debugging)
-      console.log(`AuthInterceptor: No token found. Proceeding without auth header for request: ${request.url}`);
     }
 
     // Handle the request (passing the potentially modified request)
@@ -46,13 +43,11 @@ export class AuthInterceptor implements HttpInterceptor {
       catchError((error: HttpErrorResponse) => {
         // Special handling for logout - don't retry on 400 errors during logout
         if (request.url.includes('/api/auth/logout') && error.status === 400) {
-          console.log('AuthInterceptor: Ignoring 400 from logout endpoint.');
           return of(new HttpResponse({ status: 200, body: { success: true, message: 'Logged out successfully' } }));
         }
         
         // Handle 401 - unauthorized errors (potential token refresh)
         if (error.status === 401 && !request.url.includes('/api/auth/refresh')) {
-           console.log(`AuthInterceptor: Received 401 for ${request.url}. Attempting token refresh.`);
           return this.handle401Error(request, next, error);
         }
 
@@ -94,26 +89,18 @@ export class AuthInterceptor implements HttpInterceptor {
     
     const isPublicEndpoint = skipUrls.some(url => request.url.includes(url));
     
-    if (isPublicEndpoint) {
-      console.log(`AuthInterceptor: Skipping token for public endpoint: ${request.url}`);
-    }
-    
     return isPublicEndpoint;
   }
 
   private handle401Error(request: HttpRequest<unknown>, next: HttpHandler, originalError: HttpErrorResponse): Observable<HttpEvent<unknown>> {
     // If this is a public endpoint, don't try to refresh the token
     if (this.shouldSkipToken(request)) {
-      console.log(`AuthInterceptor: Received 401 for public endpoint ${request.url}, not attempting token refresh`);
       return throwError(() => originalError);
     }
     
     // Avoid infinite loop of token refresh
     if (request.url.includes('/api/auth/refresh')) {
-      // Call logout and ignore the result as we're going to throw anyway
-      this.authService.logout().subscribe(() => {
-        console.log('Logged out after refresh token failure during refresh attempt');
-      });
+      this.authService.logout().subscribe();
       return throwError(() => originalError);
     }
     
@@ -131,12 +118,8 @@ export class AuthInterceptor implements HttpInterceptor {
     this.refreshTokenInProgress = true;
     this.refreshTokenSubject.next(null);
     
-    // Try to refresh the token
-    console.log(`AuthInterceptor: Attempting to refresh token for endpoint: ${request.url}`);
     return from(this.authService.refreshAccessToken().pipe(
       switchMap(response => {
-        // Token refresh successful - notify waiters and retry the request
-        console.log('AuthInterceptor: Token refresh successful, retrying original request');
         this.refreshTokenInProgress = false;
         this.refreshTokenSubject.next(response.accessToken);
         
@@ -147,14 +130,9 @@ export class AuthInterceptor implements HttpInterceptor {
         ));
       }),
       catchError((refreshError) => {
-        // Token refresh failed - proceed to logout
-        console.error('AuthInterceptor: Token refresh failed:', refreshError.status, refreshError.message);
         this.refreshTokenInProgress = false;
         this.refreshTokenSubject.next(null);
-        // Call logout and ignore the result as we're going to throw anyway
-        this.authService.logout().subscribe(() => {
-          console.log('Logged out after refresh token failure');
-        });
+        this.authService.logout().subscribe();
         
         return throwError(() => originalError);
       }),

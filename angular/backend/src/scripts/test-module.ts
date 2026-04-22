@@ -42,9 +42,26 @@ import { SharedModule } from '../shared/shared.module';
       type: 'sqlite',
       database: ':memory:',
       entities: [
-        User, LoginAttempt, IPReputation, Captcha, Role, Group, GroupPermission, UserPermission, Permission,
-        Action, Resource, UiComponent, FrontendRoute, ApiEndpoint, RolePermission,
-        RateLimitCounter, UserBehaviorProfile, SecurityAlert, SecurityDetectedPattern, PatternLoginAttempt
+        User,
+        LoginAttempt,
+        IPReputation,
+        Captcha,
+        Role,
+        Group,
+        GroupPermission,
+        UserPermission,
+        Permission,
+        Action,
+        Resource,
+        UiComponent,
+        FrontendRoute,
+        ApiEndpoint,
+        RolePermission,
+        RateLimitCounter,
+        UserBehaviorProfile,
+        SecurityAlert,
+        SecurityDetectedPattern,
+        PatternLoginAttempt,
       ],
       synchronize: true,
       logging: false,
@@ -55,4 +72,4 @@ import { SharedModule } from '../shared/shared.module';
     UserModule,
   ],
 })
-export class TestModule { }
+export class TestModule {}

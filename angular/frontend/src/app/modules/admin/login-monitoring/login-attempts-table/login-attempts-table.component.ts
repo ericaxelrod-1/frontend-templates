@@ -172,7 +172,7 @@ export class LoginAttemptsTableComponent implements OnInit, AfterViewInit, OnDes
    * Following 150-angular-server-side-sorting rule
    */
   private getSortField(sortHeaderId: string): string {
-    const fieldMapping: { [key: string]: string } = {
+    const fieldMapping: Record<string, string> = {
       'timestamp': 'createdAt',        // Frontend column -> Backend field
       'createdAt': 'createdAt',        
       'details': 'failureReason',

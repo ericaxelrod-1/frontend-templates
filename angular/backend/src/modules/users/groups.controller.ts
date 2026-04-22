@@ -38,12 +38,16 @@ export class UpdateGroupSettingsDto {
   settings: any;
 }
 
+export class SetParentDto {
+  parentId: number | null;
+}
+
 @ApiTags('groups')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly groupsService: GroupsService) { }
+  constructor(private readonly groupsService: GroupsService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all groups' })
@@ -57,7 +61,12 @@ export class GroupsController {
     @Query('sortBy') sortBy?: string,
     @Query('sortDirection') sortDirection?: 'asc' | 'desc',
     @Query('search') search?: string,
-  ): Promise<{ items: Group[]; total: number; page: number; pageSize: number }> {
+  ): Promise<{
+    items: Group[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     return this.groupsService.findAll(
       page ? +page : 0,
       pageSize ? +pageSize : 10,
@@ -212,5 +221,60 @@ export class GroupsController {
       updateGroupSettingsDto.settings,
       currentUser,
     );
+  }
+
+  @Get(':id/ancestors')
+  @ApiOperation({ summary: 'Get all ancestor groups' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of ancestor groups',
+    type: [Group],
+  })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  getAncestors(@Param('id', ParseIntPipe) id: number): Promise<Group[]> {
+    return this.groupsService.getAncestors(id);
+  }
+
+  @Get(':id/descendants')
+  @ApiOperation({ summary: 'Get all descendant groups' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of descendant groups',
+    type: [Group],
+  })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  getDescendants(@Param('id', ParseIntPipe) id: number): Promise<Group[]> {
+    return this.groupsService.getDescendants(id);
+  }
+
+  @Get(':id/hierarchy-path')
+  @ApiOperation({ summary: 'Get hierarchy path from root to this group' })
+  @ApiResponse({
+    status: 200,
+    description: 'Hierarchy path from root to group',
+    type: [Group],
+  })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  getHierarchyPath(@Param('id', ParseIntPipe) id: number): Promise<Group[]> {
+    return this.groupsService.getHierarchyPath(id);
+  }
+
+  @Put(':id/parent')
+  @ApiOperation({ summary: 'Set parent group' })
+  @ApiResponse({
+    status: 200,
+    description: 'Parent group set successfully',
+    type: Group,
+  })
+  @ApiResponse({ status: 404, description: 'Group or parent not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid parent (circular reference or self-reference)',
+  })
+  setParent(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() setParentDto: SetParentDto,
+  ): Promise<Group> {
+    return this.groupsService.setParent(id, setParentDto.parentId);
   }
 }
