@@ -4,11 +4,15 @@ import { Repository } from 'typeorm';
 import { PrivacyTicket, PrivacyRequestType, PrivacyRegulation, PrivacyTicketStatus } from './entities/privacy-ticket.entity';
 import { PrivacyJob, PrivacyJobStatus } from './entities/privacy-job.entity';
 import { User } from '../users/entities/user.entity';
+import { PrivacyJurisdictionService } from './privacy-jurisdiction.service';
+import { PrivacyMagicLinkService } from './privacy-magic-link.service';
 
 export interface CreateTicketDto {
   requestType: PrivacyRequestType;
-  regulation: PrivacyRegulation;
+  regulation?: PrivacyRegulation;
   email?: string;
+  ipAddress?: string;
+  declaredRegion?: string;
 }
 
 @Injectable()
@@ -18,19 +22,23 @@ export class PrivacyTicketService {
     private readonly ticketRepository: Repository<PrivacyTicket>,
     @InjectRepository(PrivacyJob)
     private readonly jobRepository: Repository<PrivacyJob>,
+    private readonly jurisdictionService: PrivacyJurisdictionService,
+    private readonly magicLinkService: PrivacyMagicLinkService,
   ) {}
 
   async createTicket(
-    userId: number,
+    userId: number | null,
     dto: CreateTicketDto,
   ): Promise<PrivacyTicket> {
-    const slaDeadline = new Date();
-    slaDeadline.setDate(slaDeadline.getDate() + 30); // 30 days SLA
+    const regulation = dto.regulation || 
+      this.jurisdictionService.resolveRegulation(dto.ipAddress, dto.declaredRegion);
+    
+    const slaDeadline = this.jurisdictionService.getSlaDeadline(regulation);
 
     const ticket = this.ticketRepository.create({
       userId,
       requestType: dto.requestType,
-      regulation: dto.regulation,
+      regulation,
       email: dto.email,
       slaDeadline,
       status: PrivacyTicketStatus.PENDING,
@@ -46,6 +54,31 @@ export class PrivacyTicketService {
     await this.jobRepository.save(job);
 
     return savedTicket;
+  }
+
+  async createPublicTicket(dto: CreateTicketDto): Promise<{ ticket: PrivacyTicket; magicLink: string }> {
+    const ticket = await this.createTicket(null, dto);
+    const token = this.magicLinkService.generateToken(ticket.id, dto.email);
+    const magicLink = this.magicLinkService.generateUrl(token);
+    
+    // In a real app, you'd send an email here.
+    console.log(`[Privacy] Magic link for ${dto.email}: ${magicLink}`);
+    
+    return { ticket, magicLink };
+  }
+
+  async getTicketByToken(token: string): Promise<PrivacyTicket> {
+    const payload = this.magicLinkService.verifyToken(token);
+    const ticket = await this.ticketRepository.findOne({
+      where: { id: payload.ticketId, email: payload.email },
+      relations: ['jobs'],
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    return ticket;
   }
 
   async getUserTickets(userId: number): Promise<PrivacyTicket[]> {

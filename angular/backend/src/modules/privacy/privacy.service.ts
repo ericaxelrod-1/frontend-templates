@@ -11,6 +11,7 @@ import { LoginAttempt } from '../auth/entities/login-attempt.entity';
 import { UserBehaviorProfile } from '../auth/entities/user-behavior-profile.entity';
 import { SecurityAlert } from '../auth/entities/security-alert.entity';
 import { UsersService } from '../users/users.service';
+import { PrivacyRegistryService } from './privacy-registry.service';
 
 export interface UserDataExport {
   profile: {
@@ -91,6 +92,7 @@ export class PrivacyService {
     private readonly securityAlertRepository: Repository<SecurityAlert>,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
+    private readonly privacyRegistry: PrivacyRegistryService,
   ) {}
 
   async exportUserData(userId: number): Promise<UserDataExport> {
@@ -166,8 +168,43 @@ export class PrivacyService {
     };
   }
 
+  async getExportPreview(userId: number): Promise<Record<string, number>> {
+    const userIdStr = userId.toString();
+    const providers = this.privacyRegistry.getProviders();
+
+    const results = await Promise.all(
+      providers.map(async (provider) => {
+        try {
+          return await provider.getPreview(userIdStr);
+        } catch (error) {
+          return {};
+        }
+      }),
+    );
+
+    return results.reduce((acc, curr) => {
+      Object.entries(curr).forEach(([key, value]) => {
+        acc[key] = (acc[key] || 0) + value;
+      });
+      return acc;
+    }, {});
+  }
+
   async deleteAccount(userId: number): Promise<DeleteAccountResult> {
     const user = await this.usersService.findOne(userId);
+    const userIdStr = userId.toString();
+
+    // Polymorphic Purge
+    const providers = this.privacyRegistry.getProviders();
+    await Promise.allSettled(
+      providers.map(async (provider) => {
+        try {
+          await provider.onDelete(userIdStr);
+        } catch (error) {
+          // Log error but continue with other providers
+        }
+      }),
+    );
 
     await this.userRepository.update(userId, {
       isDeleted: true,

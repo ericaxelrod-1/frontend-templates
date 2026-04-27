@@ -61,6 +61,10 @@ export class PrivacyService {
     return this.http.get<PrivacyPreferences>(`${this.apiUrl}/preferences`);
   }
 
+  getExportPreview(): Observable<Record<string, number>> {
+    return this.http.get<Record<string, number>>(`${this.apiUrl}/export/preview`);
+  }
+
   exportData(): Observable<UserDataExport> {
     return this.http.get<UserDataExport>(`${this.apiUrl}/export`);
   }
@@ -91,6 +95,10 @@ export class PrivacyService {
 
   updateDoNotSell(doNotSell: boolean): Observable<any> {
     return this.http.patch(`${this.apiUrl}/do-not-sell`, { doNotSell });
+  }
+
+  createPublicTicket(data: { email: string; requestType: string; description: string; captchaToken: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/tickets/public`, data);
   }
 
   createTicket(requestType: string, description: string, additionalData?: Record<string, any>): Observable<PrivacyTicket> {

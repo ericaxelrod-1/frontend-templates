@@ -55,10 +55,11 @@ export class PrivacyRegistryService implements OnModuleInit {
     // Verify contract compliance (simple check for methods)
     if (
       typeof provider.onExport !== 'function' ||
-      typeof provider.onDelete !== 'function'
+      typeof provider.onDelete !== 'function' ||
+      typeof provider.getPreview !== 'function'
     ) {
       this.logger.error(
-        `Provider ${provider.providerName} does not implement IPrivacyProvider correctly.`,
+        `Provider ${provider.providerName} does not implement IPrivacyProvider correctly (missing onExport, onDelete, or getPreview).`,
       );
       return;
     }

@@ -85,6 +85,11 @@ export class PrivacyController {
     return this.privacyService.getPrivacyPreferences(req.user.id);
   }
 
+  @Get('export/preview')
+  async getExportPreview(@Req() req: AuthenticatedRequest) {
+    return this.privacyService.getExportPreview(req.user.id);
+  }
+
   @Get('export')
   async exportData(@Req() req: AuthenticatedRequest) {
     const data = await this.privacyService.exportUserData(req.user.id);

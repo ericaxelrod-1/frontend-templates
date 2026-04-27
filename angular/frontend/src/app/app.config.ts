@@ -8,7 +8,7 @@ import { NgxsFormPluginModule } from '@ngxs/form-plugin';
 import { NgxsReduxDevtoolsPluginModule } from '@ngxs/devtools-plugin';
 import { provideHttpClient, withInterceptorsFromDi, withFetch } from '@angular/common/http';
 import { httpInterceptorProviders } from './core/interceptors';
-import { AuthState, AuthActions } from './store';
+import { AuthState, AuthActions, PrivacyState } from './store';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { AppConfigService } from './core/services/app-config.service';
 import { LoggerService } from './services/logging/logger.service';
@@ -86,7 +86,7 @@ export const appConfig: ApplicationConfig = {
     },
     importProvidersFrom(
       NgxsModule.forRoot(
-        [AuthState], 
+        [AuthState, PrivacyState], 
         { 
           developmentMode: !environment.production,
           selectorOptions: {

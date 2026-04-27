@@ -36,6 +36,7 @@ import { RlsScopeTemplate } from './modules/permissions/entities/rls-scope-templ
 import { RolesModule } from './modules/roles/roles.module';
 import { SchemaModule } from './modules/schema/schema.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
+import { SystemModule } from './modules/system/system.module';
 import { GeoBlockMiddleware } from './common/middleware/geo-block.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -98,6 +99,7 @@ import { AppService } from './app.service';
     SchemaModule,
     RolesModule,
     PrivacyModule,
+    SystemModule,
   ],
   controllers: [AppController],
   providers: [AppService],
