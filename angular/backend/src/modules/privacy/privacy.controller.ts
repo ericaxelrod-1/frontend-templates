@@ -11,9 +11,11 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PrivacyService } from './privacy.service';
+import { PrivacyRegistryService } from './privacy-registry.service';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
@@ -47,7 +49,36 @@ interface DoNotSellBody {
 @Controller('privacy')
 @UseGuards(AuthGuard('jwt'))
 export class PrivacyController {
-  constructor(private readonly privacyService: PrivacyService) {}
+  constructor(
+    private readonly privacyService: PrivacyService,
+    private readonly registryService: PrivacyRegistryService,
+  ) {}
+
+  @Get('providers')
+  async getProviders(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ) {
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 10;
+
+    const allProviders = this.registryService.getProviders().map((p) => ({
+      name: p.providerName,
+    }));
+
+    const total = allProviders.length;
+    const data = allProviders.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    return {
+      data,
+      meta: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    };
+  }
 
   @Get('preferences')
   async getPreferences(@Req() req: AuthenticatedRequest) {

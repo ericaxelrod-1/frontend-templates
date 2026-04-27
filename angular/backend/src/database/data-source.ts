@@ -29,6 +29,8 @@ import { UserBehaviorProfile } from '../modules/auth/entities/user-behavior-prof
 import { SecurityAlert } from '../modules/auth/entities/security-alert.entity';
 import { SecurityDetectedPattern } from '../modules/auth/entities/security-detected-pattern.entity';
 import { PatternLoginAttempt } from '../modules/auth/entities/pattern-login-attempt.entity';
+import { PrivacyTicket } from '../modules/privacy/entities/privacy-ticket.entity';
+import { PrivacyJob } from '../modules/privacy/entities/privacy-job.entity';
 
 // Load environment variables from .env file
 config();
@@ -64,6 +66,8 @@ export const dataSourceOptions: DataSourceOptions = {
     RlsJoinPath,
     RlsJoinCondition,
     RlsScopeTemplate,
+    PrivacyTicket,
+    PrivacyJob,
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false, // Disable synchronize as we're handling schema manually
