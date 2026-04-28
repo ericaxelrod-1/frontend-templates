@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { PrivacyModule } from '../privacy.module';
-import { PrivacyRegistryService } from '../services/privacy-registry.service';
+import { PrivacyRegistryService } from '../privacy-registry.service';
 import * as fs from 'fs';
 import * as path from 'path';
 

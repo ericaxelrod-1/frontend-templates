@@ -1,6 +1,6 @@
 import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { SystemHealthService } from './services/system-health.service';
+import { SystemHealthService } from '../system/services/system-health.service';
 import { PrivacyTicketService } from '../privacy/privacy-ticket.service';
 
 @Controller('admin/system-health')
@@ -13,13 +13,24 @@ export class SystemHealthController {
 
   @Get()
   async getHealth() {
-    const stats = await this.healthService.getStats();
+    const diskUsage = this.healthService.getDiskUsage();
+    const status = this.healthService.getHealthStatus();
     const activeTickets = await this.privacyTicketService.getUserTickets(0); // Mock for global tickets
 
     return {
-      status: this.healthService.isHealthy() ? 'Healthy' : 'Warning',
-      disk: stats.disk,
-      memory: stats.memory,
+      status: status === 'NORMAL' ? 'Healthy' : status,
+      disk: {
+        total: 0, // fs.statfs total bytes not directly exposed in simple getter
+        used: 0,
+        free: 0,
+        percentage: Math.round(diskUsage),
+      },
+      memory: {
+        total: process.memoryUsage().heapTotal,
+        used: process.memoryUsage().heapUsed,
+        free: process.memoryUsage().heapTotal - process.memoryUsage().heapUsed,
+        percentage: Math.round((process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100),
+      },
       activeJobs: activeTickets.filter(t => t.status === 'pending').length,
       lastCheck: new Date().toISOString(),
     };

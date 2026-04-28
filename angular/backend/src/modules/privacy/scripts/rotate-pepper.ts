@@ -1,11 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { PrivacyModule } from '../privacy.module';
-import { PrivacyAuditService } from '../services/privacy-audit.service';
+// Removed: import { PrivacyAuditService } from '../services/privacy-audit.service';
 import * as crypto from 'crypto';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(PrivacyModule);
-  const auditService = app.get(PrivacyAuditService);
+  // Removed: const auditService = app.get(PrivacyAuditService);
 
   console.log('--- Privacy HMAC Pepper Rotation Tool ---');
   

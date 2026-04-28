@@ -10,7 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PrivacyService } from './privacy.service';
-import { CaptchaSelectorComponent } from '../../shared/components/captcha-selector/captcha-selector.component';
+import { CaptchaSelectorComponent } from '../../shared/components/captcha/advanced/captcha-selector.component';
 
 @Component({
   selector: 'app-public-privacy-request',
@@ -172,8 +172,8 @@ export class PublicPrivacyComponent implements OnInit {
 
   ngOnInit(): void {}
 
-  onCaptchaResolved(token: string): void {
-    this.captchaToken = token;
+  onCaptchaResolved(event: any): void {
+    this.captchaToken = typeof event === 'string' ? event : event?.token || null;
   }
 
   submitRequest(): void {

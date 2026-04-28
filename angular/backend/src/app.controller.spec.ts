@@ -16,16 +16,20 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should redirect to /api', () => {
-      // Mock Response object
+      // Mock FastifyReply object
       const res = {
-        redirect: jest.fn().mockReturnThis(),
+        status: jest.fn().mockReturnThis(),
+        header: jest.fn().mockReturnThis(),
+        send: jest.fn().mockReturnThis(),
       };
 
       // Call the redirect method
       appController.redirect(res as any);
 
-      // Verify redirect was called with '/api'
-      expect(res.redirect).toHaveBeenCalledWith('/api');
+      // Verify methods were called correctly for redirection
+      expect(res.status).toHaveBeenCalledWith(302);
+      expect(res.header).toHaveBeenCalledWith('Location', '/api');
+      expect(res.send).toHaveBeenCalled();
     });
   });
 });

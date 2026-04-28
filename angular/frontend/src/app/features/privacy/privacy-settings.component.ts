@@ -36,6 +36,9 @@ import { map, take } from 'rxjs/operators';
 export class PrivacySettingsComponent implements OnInit {
   @Select(PrivacyState.getPreferences) preferences$!: Observable<PrivacyPreferences>;
   @Select(PrivacyState.isLoading) loading$!: Observable<boolean>;
+  saving = false;
+  preferences: PrivacyPreferences | null = null;
+  loading = false;
 
   restrictions = {
     restrictAnalytics: false,
@@ -63,6 +66,7 @@ export class PrivacySettingsComponent implements OnInit {
     this.store.dispatch(new PrivacyActions.FetchPreferences());
     
     this.preferences$.subscribe(data => {
+      this.preferences = data;
       if (data) {
         if (data.privacyRestrictions) {
           this.restrictions = {
@@ -77,6 +81,8 @@ export class PrivacySettingsComponent implements OnInit {
         }
       }
     });
+
+    this.loading$.subscribe(loading => this.loading = loading);
   }
 
   onMarketingConsentChange(event: any): void {

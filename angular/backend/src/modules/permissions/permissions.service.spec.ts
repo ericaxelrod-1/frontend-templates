@@ -62,13 +62,19 @@ describe('PermissionsService', () => {
       scanAndUpdateRegistry: jest.fn(),
     } as unknown as ManifestService;
 
+    const mockRolesService = {
+      getEffectivePermissions: jest.fn().mockResolvedValue([
+        { permission: 'users:view', isGranted: true }
+      ]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PermissionsService,
         {
           provide: ModuleRef,
           useValue: {
-            get: jest.fn(),
+            get: jest.fn().mockReturnValue(mockRolesService),
           },
         },
         {
@@ -182,32 +188,22 @@ describe('PermissionsService', () => {
 
       const user = {
         id: userId,
-        roles: [
-          {
-            id: 'role1',
-            rolePermissions: [
-              {
-                permission: { resourceName: 'users', actionName: 'view' },
-                granted: true,
-              },
-            ],
-          },
-        ],
+        roles: [{ id: 1, name: 'admin' }],
         groups: [
           {
             id: 'group1',
             groupPermissions: [
               {
-                permission: { resourceName: 'tasks', actionName: 'write' },
-                granted: true,
+                permission: { name: 'tasks:write' },
+                isGranted: true,
               },
             ],
           },
         ],
         userPermissions: [
           {
-            permission: { resourceName: 'projects', actionName: 'delete' },
-            granted: true,
+            permission: { name: 'projects:delete' },
+            isGranted: true,
           },
         ],
       };
@@ -222,13 +218,13 @@ describe('PermissionsService', () => {
         where: { id: userId },
         relations: [
           'roles',
-          'roles.rolePermissions',
-          'roles.rolePermissions.permission',
           'groups',
           'groups.groupPermissions',
           'groups.groupPermissions.permission',
+          'groups.groupPermissions.permission.actionEntity',
           'userPermissions',
           'userPermissions.permission',
+          'userPermissions.permission.actionEntity',
         ],
       });
 

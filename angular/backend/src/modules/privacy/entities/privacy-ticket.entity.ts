@@ -15,6 +15,8 @@ export enum PrivacyRequestType {
   ERASURE = 'erasure',
   RESTRICTION = 'restriction',
   OBJECTION = 'objection',
+  CORRECTION = 'correction',
+  PORTABILITY = 'portability',
 }
 
 export enum PrivacyTicketStatus {
@@ -69,6 +71,9 @@ export class PrivacyTicket {
 
   @Column({ name: 'accrued_paused_time', type: 'integer', default: 0 })
   accruedPausedTime: number;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

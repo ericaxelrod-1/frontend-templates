@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { RbacFeatureComponent } from './rbac-feature.component';
+import { TestingModule } from '../../../tests/test-utils';
 
 describe('RbacFeatureComponent', () => {
   let component: RbacFeatureComponent;
@@ -8,7 +8,7 @@ describe('RbacFeatureComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [RbacFeatureComponent]
+      imports: [RbacFeatureComponent, TestingModule]
     })
     .compileComponents();
 

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { SecurityFeatureComponent } from './security-feature.component';
+import { TestingModule } from '../../../tests/test-utils';
 
 describe('SecurityFeatureComponent', () => {
   let component: SecurityFeatureComponent;
@@ -8,7 +8,7 @@ describe('SecurityFeatureComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SecurityFeatureComponent]
+      imports: [SecurityFeatureComponent, TestingModule]
     })
     .compileComponents();
 

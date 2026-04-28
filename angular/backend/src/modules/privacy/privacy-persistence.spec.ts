@@ -4,6 +4,18 @@ import { Repository, DataSource } from 'typeorm';
 import { PrivacyJob, PrivacyJobStatus } from './entities/privacy-job.entity';
 import { PrivacyTicket, PrivacyTicketStatus, PrivacyRequestType, PrivacyRegulation } from './entities/privacy-ticket.entity';
 import { User } from '../users/entities/user.entity';
+import { Role } from '../users/entities/role.entity';
+import { Permission } from '../permissions/entities/permission.entity';
+import { Group } from '../users/entities/group.entity';
+import { GroupPermission } from '../permissions/entities/group-permission.entity';
+import { Action } from '../permissions/entities/action.entity';
+import { RolePermission } from '../permissions/entities/role-permission.entity';
+import { UserPermission } from '../permissions/entities/user-permission.entity';
+import { Resource } from '../permissions/entities/resource.entity';
+import { UiComponent } from '../permissions/entities/ui-component.entity';
+import { FrontendRoute } from '../permissions/entities/frontend-route.entity';
+import { ApiEndpoint } from '../permissions/entities/api-endpoint.entity';
+import { Route } from '../permissions/entities/route.entity';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 describe('Privacy Persistence Integration', () => {
@@ -12,34 +24,55 @@ describe('Privacy Persistence Integration', () => {
   let userRepository: Repository<User>;
   let dataSource: DataSource;
 
+  const entities = [
+    PrivacyTicket, 
+    PrivacyJob, 
+    User, 
+    Role, 
+    Permission, 
+    Group, 
+    GroupPermission, 
+    Action, 
+    RolePermission, 
+    UserPermission, 
+    Resource,
+    UiComponent,
+    FrontendRoute,
+    ApiEndpoint,
+    Route
+  ];
+
   beforeAll(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleRef = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
           type: 'sqlite',
           database: ':memory:',
-          entities: [PrivacyTicket, PrivacyJob, User],
+          entities: entities,
           synchronize: true,
           namingStrategy: new SnakeNamingStrategy(),
         }),
-        TypeOrmModule.forFeature([PrivacyTicket, PrivacyJob, User]),
+        TypeOrmModule.forFeature(entities),
       ],
     }).compile();
 
-    ticketRepository = module.get<Repository<PrivacyTicket>>(getRepositoryToken(PrivacyTicket));
-    jobRepository = module.get<Repository<PrivacyJob>>(getRepositoryToken(PrivacyJob));
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    dataSource = module.get<DataSource>(DataSource);
-  });
+    ticketRepository = moduleRef.get<Repository<PrivacyTicket>>(getRepositoryToken(PrivacyTicket));
+    jobRepository = moduleRef.get<Repository<PrivacyJob>>(getRepositoryToken(PrivacyJob));
+    userRepository = moduleRef.get<Repository<User>>(getRepositoryToken(User));
+    dataSource = moduleRef.get<DataSource>(DataSource);
+  }, 30000);
 
   afterAll(async () => {
-    await dataSource.destroy();
+    if (dataSource) {
+      await dataSource.destroy();
+    }
   });
 
   it('should persist a privacy ticket and its jobs', async () => {
     // 1. Create a user
     const user = userRepository.create({
       email: 'privacy-test@example.com',
+      username: 'privacytest',
       password: 'hashed-password',
       firstName: 'Privacy',
       lastName: 'Test',
@@ -53,6 +86,7 @@ describe('Privacy Persistence Integration', () => {
       user: user,
       regulation: PrivacyRegulation.GDPR,
       slaDeadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      description: 'Test export request',
     });
     const savedTicket = await ticketRepository.save(ticket);
 
@@ -89,6 +123,7 @@ describe('Privacy Persistence Integration', () => {
         status: PrivacyTicketStatus.PENDING,
         regulation: PrivacyRegulation.CCPA,
         slaDeadline: new Date(),
+        description: 'Test erasure request',
       })
     );
 
