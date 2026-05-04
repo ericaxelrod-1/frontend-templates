@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { Captcha } from '../entities/captcha.entity';
 import * as crypto from 'crypto';
-import * as canvas from 'canvas';
 
 // Define captcha types
 type CaptchaType = 'text' | 'image' | 'math' | 'puzzle';
@@ -36,77 +35,78 @@ export class CaptchaService {
     return { challenge: `${num1} + ${num2} = ?`, solution };
   }
 
-  private async generateImageChallenge(): Promise<{
-    challenge: string;
-    solution: string;
-  }> {
-    const solution = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    // Create canvas
+  // Generate SVG CAPTCHA image (pure JavaScript, no canvas)
+  private generateSvgChallenge(): { challenge: string; solution: string } {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const length = 6;
+    const solution = Array.from(
+      { length },
+      () => chars[Math.floor(Math.random() * chars.length)],
+    ).join('');
+    
     const width = 200;
-    const height = 80;
-    const canvasInstance = canvas.createCanvas(width, height);
-    const ctx = canvasInstance.getContext('2d');
-
-    // Fill background
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, width, height);
-
-    // Add noise
-    for (let i = 0; i < 50; i++) {
-      ctx.strokeStyle = `rgba(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255},0.2)`;
-      ctx.beginPath();
-      ctx.moveTo(Math.random() * width, Math.random() * height);
-      ctx.lineTo(Math.random() * width, Math.random() * height);
-      ctx.stroke();
+    const height = 70;
+    const textChars = solution.split('');
+    let charactersSvg = '';
+    
+    for (let i = 0; i < textChars.length; i++) {
+      const x = 20 + i * 28;
+      const y = 45 + (Math.random() - 0.5) * 10;
+      const rotation = (Math.random() - 0.5) * 0.3;
+      const fontSize = 32 + Math.floor(Math.random() * 8);
+      const fill = `rgb(${Math.floor(30 + Math.random() * 40)},${Math.floor(30 + Math.random() * 40)},${Math.floor(30 + Math.random() * 40)})`;
+      charactersSvg += `<text x="${x}" y="${y}" transform="rotate(${rotation}, ${x}, ${y})" fill="${fill}" font-size="${fontSize}" font-family="Arial, sans-serif" font-weight="bold">${textChars[i]}</text>`;
     }
-
-    // Add text
-    ctx.font = '40px Arial';
-    ctx.fillStyle = 'black';
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-
-    // Add distortion to text
-    for (let i = 0; i < solution.length; i++) {
-      const x = (width / (solution.length + 1)) * (i + 1);
-      const y = height / 2 + Math.random() * 10 - 5;
-      const rotation = (Math.random() - 0.5) * 0.4;
-
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rotation);
-      ctx.fillText(solution[i], 0, 0);
-      ctx.restore();
+    
+    let noiseSvg = '';
+    for (let i = 0; i < 8; i++) {
+      const x1 = Math.random() * width;
+      const y1 = Math.random() * height;
+      const x2 = Math.random() * width;
+      const y2 = Math.random() * height;
+      const stroke = `rgba(${Math.floor(Math.random() * 255)},${Math.floor(Math.random() * 255)},${Math.floor(Math.random() * 255)},0.2)`;
+      noiseSvg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="1"/>`;
     }
-
-    return {
-      challenge: canvasInstance.toDataURL(),
-      solution,
-    };
+    
+    for (let i = 0; i < 15; i++) {
+      const cx = Math.random() * width;
+      const cy = Math.random() * height;
+      const r = 1 + Math.random() * 2;
+      const fill = `rgba(${Math.floor(Math.random() * 255)},${Math.floor(Math.random() * 255)},${Math.floor(Math.random() * 255)},0.15)`;
+      noiseSvg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`;
+    }
+    
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" fill="#f8f8f8"/>
+      ${noiseSvg}
+      ${charactersSvg}
+    </svg>`;
+    
+    const challenge = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+    
+    return { challenge, solution };
   }
 
   async create(
-    type: CaptchaType = 'text',
+    type: CaptchaType = 'image',
     ipAddress?: string,
   ): Promise<Captcha> {
-    let challenge: { challenge: string; solution: string };
+    // Use SVG image CAPTCHA (pure JavaScript, no canvas)
+    let challengeData: { challenge: string; solution: string };
 
-    switch (type) {
-      case 'math':
-        challenge = this.generateMathChallenge();
-        break;
-      case 'text':
-      default:
-        challenge = this.generateTextChallenge();
-        break;
+    if (type === 'math') {
+      challengeData = this.generateMathChallenge();
+    } else if (type === 'image') {
+      challengeData = this.generateSvgChallenge();
+    } else {
+      challengeData = this.generateTextChallenge();
     }
 
     const captcha = this.captchaRepository.create({
       type,
       token: this.generateToken(),
-      challenge: challenge.challenge,
-      solution: challenge.solution,
+      challenge: challengeData.challenge,
+      solution: challengeData.solution,
       ipAddress,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes expiration
     });
@@ -123,13 +123,25 @@ export class CaptchaService {
       return false;
     }
 
-    const isValid = captcha.solution === solution;
+    const isValid = captcha.solution.toLowerCase() === solution.toLowerCase();
     if (isValid) {
       captcha.isUsed = true;
       await this.captchaRepository.save(captcha);
     }
 
     return isValid;
+  }
+
+  async validateToken(token: string): Promise<boolean> {
+    const captcha = await this.captchaRepository.findOne({
+      where: { token },
+    });
+
+    if (!captcha || captcha.isUsed || captcha.expiresAt < new Date()) {
+      return false;
+    }
+
+    return true;
   }
 
   async cleanupExpired(): Promise<void> {
