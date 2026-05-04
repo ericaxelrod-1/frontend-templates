@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface PrivacyPreferences {
   marketingConsent: boolean;
@@ -53,7 +54,7 @@ export interface PrivacyTicket {
   providedIn: 'root'
 })
 export class PrivacyService {
-  private apiUrl = '/api/privacy';
+  private apiUrl = `${environment.apiUrl}/privacy`;
 
   constructor(private http: HttpClient) {}
 

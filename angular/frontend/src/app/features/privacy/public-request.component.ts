@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -10,7 +10,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PrivacyService } from './privacy.service';
-import { CaptchaSelectorComponent } from '../../shared/components/captcha/advanced/captcha-selector.component';
+import { StandardCaptchaComponent } from '../../shared/components/captcha/standard/standard-captcha.component';
+import { CustomValidators } from '../../core/validators/custom-validators';
+import { LoggerService } from '../../services/logging/logger.service';
 
 @Component({
   selector: 'app-public-privacy-request',
@@ -26,7 +28,7 @@ import { CaptchaSelectorComponent } from '../../shared/components/captcha/advanc
     MatIconModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
-    CaptchaSelectorComponent
+    StandardCaptchaComponent
   ],
   template: `
     <div class="public-privacy-container">
@@ -39,43 +41,53 @@ import { CaptchaSelectorComponent } from '../../shared/components/captcha/advanc
         <mat-card-content>
           <form [formGroup]="requestForm" (ngSubmit)="submitRequest()" *ngIf="!submitted">
             <p class="instruction">
-              Use this form to request access, deletion, or portability of your personal data. 
+              Use this form to request access, deletion, or portability of your personal data.
               We will send a verification link to your email to confirm your identity.
             </p>
 
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Email Address</mat-label>
               <input matInput formControlName="email" type="email" placeholder="email@example.com">
-              <mat-error *ngIf="requestForm.get('email')?.hasError('required')">Email is required</mat-error>
-              <mat-error *ngIf="requestForm.get('email')?.hasError('email')">Please enter a valid email</mat-error>
+              <mat-error *ngIf="f['email']?.hasError('required')">Email is required</mat-error>
+              <mat-error *ngIf="f['email']?.hasError('email')">Please enter a valid email</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Request Type</mat-label>
               <mat-select formControlName="requestType">
-                <mat-option value="access">Right to Access (Export)</mat-option>
-                <mat-option value="deletion">Right to Erasure (Delete)</mat-option>
+                <mat-option value="export">Right to Access (Export)</mat-option>
+                <mat-option value="erasure">Right to Erasure (Delete)</mat-option>
                 <mat-option value="correction">Right to Rectification (Correct)</mat-option>
                 <mat-option value="portability">Data Portability</mat-option>
                 <mat-option value="objection">Object to Processing</mat-option>
               </mat-select>
-              <mat-error *ngIf="requestForm.get('requestType')?.hasError('required')">Request type is required</mat-error>
+              <mat-error *ngIf="f['requestType']?.hasError('required')">Request type is required</mat-error>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Request Details</mat-label>
-              <textarea matInput formControlName="description" rows="4" 
+              <textarea matInput formControlName="description" rows="4"
                         placeholder="Please provide details about your request..."></textarea>
-              <mat-error *ngIf="requestForm.get('description')?.hasError('required')">Details are required</mat-error>
+              <mat-error *ngIf="f['description']?.hasError('required')">Details are required</mat-error>
+              <mat-error *ngIf="f['description']?.hasError('minlength')">
+                Please provide more details (minimum 10 characters)
+              </mat-error>
             </mat-form-field>
 
             <div class="captcha-section">
-              <app-captcha-selector (captchaResolved)="onCaptchaResolved($event)"></app-captcha-selector>
+              <label>Verify you're human</label>
+              <app-standard-captcha #captcha
+                  formControlName="captcha"
+                  [ngClass]="{ 'is-invalid': submitted && f['captcha'].errors }">
+              </app-standard-captcha>
+              <mat-error *ngIf="submitted && f['captcha'].errors">
+                Please solve the CAPTCHA correctly.
+              </mat-error>
             </div>
 
             <div class="actions">
-              <button mat-raised-button color="primary" type="submit" 
-                      [disabled]="requestForm.invalid || !captchaToken || loading">
+              <button mat-raised-button color="primary" type="submit"
+                      [disabled]="loading">
                 <mat-spinner diameter="20" *ngIf="loading" class="spinner"></mat-spinner>
                 Submit Request
               </button>
@@ -86,7 +98,7 @@ import { CaptchaSelectorComponent } from '../../shared/components/captcha/advanc
             <mat-icon class="success-icon">mark_email_read</mat-icon>
             <h3>Request Submitted!</h3>
             <p>
-              We have sent a verification link to <strong>{{ requestForm.get('email')?.value }}</strong>.
+              We have sent a verification link to <strong>{{ f['email'].value }}</strong>.
               Please click the link in that email to confirm your request.
             </p>
             <p class="note">
@@ -121,6 +133,11 @@ import { CaptchaSelectorComponent } from '../../shared/components/captcha/advanc
     .captcha-section {
       margin: 1.5rem 0;
     }
+    .captcha-section label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
     .actions {
       display: flex;
       justify-content: flex-end;
@@ -153,56 +170,75 @@ import { CaptchaSelectorComponent } from '../../shared/components/captcha/advanc
   `]
 })
 export class PublicPrivacyComponent implements OnInit {
+  @ViewChild('captcha') captcha!: StandardCaptchaComponent;
   requestForm: FormGroup;
   loading = false;
   submitted = false;
-  captchaToken: string | null = null;
 
   constructor(
     private fb: FormBuilder,
     private privacyService: PrivacyService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private logger: LoggerService
   ) {
     this.requestForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
+      email: ['', [Validators.required, CustomValidators.email()]],
       requestType: ['', [Validators.required]],
-      description: ['', [Validators.required, Validators.minLength(10)]]
+      description: ['', [Validators.required, Validators.minLength(10)]],
+      captcha: [null, Validators.required]
     });
   }
 
   ngOnInit(): void {}
 
-  onCaptchaResolved(event: any): void {
-    this.captchaToken = typeof event === 'string' ? event : event?.token || null;
-  }
+  get f() { return this.requestForm.controls; }
 
   submitRequest(): void {
-    if (this.requestForm.valid && this.captchaToken) {
-      this.loading = true;
-      const data = {
-        ...this.requestForm.value,
-        captchaToken: this.captchaToken
-      };
+    this.submitted = true;
+    this.requestForm.markAllAsTouched();
 
-      this.privacyService.createPublicTicket(data).subscribe({
-        next: () => {
-          this.loading = false;
-          this.submitted = true;
-        },
-        error: (err) => {
-          this.loading = false;
-          this.snackBar.open('Failed to submit request. Please try again.', 'Close', { duration: 5000 });
-        }
-      });
+    if (this.requestForm.invalid) {
+      return;
     }
+
+    const captchaData = this.requestForm.get('captcha')?.value;
+    if (!captchaData) {
+      return;
+    }
+
+    this.loading = true;
+
+    const data = {
+      email: this.requestForm.value.email,
+      requestType: this.requestForm.value.requestType,
+      description: this.requestForm.value.description,
+      captchaToken: captchaData.captchaToken,
+      captchaSolution: captchaData.captchaSolution
+    };
+
+    this.privacyService.createPublicTicket(data).subscribe({
+      next: () => {
+        this.loading = false;
+        this.submitted = true;
+      },
+      error: (err) => {
+        this.loading = false;
+        this.submitted = false; // Reset to allow retry
+        const errorMsg = err?.error?.message || 'Failed to submit request.';
+        this.snackBar.open(errorMsg, 'Close', { duration: 5000 });
+        this.captcha?.refreshChallenge();
+      }
+    });
   }
 
   reset(): void {
     this.submitted = false;
-    this.captchaToken = null;
     this.requestForm.reset({
+      email: '',
       requestType: '',
-      description: ''
+      description: '',
+      captcha: null
     });
+    this.captcha?.refreshChallenge();
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PrivacyTicket, PrivacyRequestType, PrivacyRegulation, PrivacyTicketStatus } from './entities/privacy-ticket.entity';
@@ -6,6 +6,7 @@ import { PrivacyJob, PrivacyJobStatus } from './entities/privacy-job.entity';
 import { User } from '../users/entities/user.entity';
 import { PrivacyJurisdictionService } from './privacy-jurisdiction.service';
 import { PrivacyMagicLinkService } from './privacy-magic-link.service';
+import { UsersService } from '../users/users.service';
 
 export interface CreateTicketDto {
   requestType: PrivacyRequestType;
@@ -13,6 +14,7 @@ export interface CreateTicketDto {
   email?: string;
   ipAddress?: string;
   declaredRegion?: string;
+  description?: string;
 }
 
 @Injectable()
@@ -24,15 +26,29 @@ export class PrivacyTicketService {
     private readonly jobRepository: Repository<PrivacyJob>,
     private readonly jurisdictionService: PrivacyJurisdictionService,
     private readonly magicLinkService: PrivacyMagicLinkService,
+    @Inject(forwardRef(() => UsersService))
+    private readonly usersService: UsersService,
   ) {}
 
   async createTicket(
     userId: number | null,
     dto: CreateTicketDto,
   ): Promise<PrivacyTicket> {
-    const regulation = dto.regulation || 
-      this.jurisdictionService.resolveRegulation(dto.ipAddress, dto.declaredRegion);
-    
+    let profileRegion: string | undefined;
+
+    if (userId) {
+      const user = await this.usersService.findOne(userId);
+      if (user && user.preferences && user.preferences.region) {
+        profileRegion = user.preferences.region;
+      }
+    }
+
+    const regulation = this.jurisdictionService.resolveRegulation(
+      dto.ipAddress,
+      dto.declaredRegion,
+      profileRegion,
+    );
+
     const slaDeadline = this.jurisdictionService.getSlaDeadline(regulation);
 
     const ticket = this.ticketRepository.create({
@@ -42,6 +58,7 @@ export class PrivacyTicketService {
       email: dto.email,
       slaDeadline,
       status: PrivacyTicketStatus.PENDING,
+      description: dto.description,
     });
 
     const savedTicket = await this.ticketRepository.save(ticket);
