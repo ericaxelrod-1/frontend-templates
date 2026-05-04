@@ -115,13 +115,24 @@ export class PrivacyTicketService {
       throw new NotFoundException('Ticket not found');
     }
 
+    if (ticket.status !== PrivacyTicketStatus.UNVERIFIED) {
+      return ticket;
+    }
+
     // SLA clock starts only after verification
-    const windowHours = this.configService.get<number>('privacy.verificationWindowHours') || 24;
-    ticket.verifiedAt = new Date();
-    ticket.slaDeadline = new Date(Date.now() + windowHours * 60 * 60 * 1000);
+    ticket.slaDeadline = this.jurisdictionService.getSlaDeadline(ticket.regulation);
     ticket.status = PrivacyTicketStatus.PENDING;
     
-    return this.ticketRepository.save(ticket);
+    await this.ticketRepository.save(ticket);
+
+    // Release to the background worker queue
+    const job = this.jobRepository.create({
+      ticketId: ticket.id,
+      status: PrivacyJobStatus.PENDING,
+    });
+    await this.jobRepository.save(job);
+
+    return ticket;
   }
 
   async getUserTickets(userId: number): Promise<PrivacyTicket[]> {

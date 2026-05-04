@@ -13,6 +13,7 @@ import { PrivacyService } from './privacy.service';
 import { StandardCaptchaComponent } from '../../shared/components/captcha/standard/standard-captcha.component';
 import { CustomValidators } from '../../core/validators/custom-validators';
 import { LoggerService } from '../../services/logging/logger.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-public-privacy-request',
@@ -102,7 +103,7 @@ import { LoggerService } from '../../services/logging/logger.service';
               Please click the link in that email to confirm your request.
             </p>
             <p class="note">
-              Verification links are valid for 24 hours. Check your spam folder if you don't see it.
+              Verification links are valid for {{ verificationWindowHours }} hours. Check your spam folder if you don't see it.
             </p>
             <button mat-button color="primary" (click)="reset()">Submit Another Request</button>
           </div>
@@ -174,6 +175,7 @@ export class PublicPrivacyComponent implements OnInit {
   requestForm: FormGroup;
   loading = false;
   submitted = false;
+  verificationWindowHours = environment.privacy.verificationWindowHours;
 
   constructor(
     private fb: FormBuilder,

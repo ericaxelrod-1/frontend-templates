@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { PrivacyJob, PrivacyJobStatus } from './entities/privacy-job.entity';
-import { PrivacyTicket, PrivacyTicketStatus } from './entities/privacy-ticket.entity';
+import { PrivacyTicket, PrivacyTicketStatus, PrivacyRequestType } from './entities/privacy-ticket.entity';
 import { PrivacyRegistryService } from './privacy-registry.service';
 import { SecurityAlertService } from '../auth/services/security-alert.service';
 import { pipeline } from 'stream/promises';
