@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { PrivacyTicket, PrivacyRequestType, PrivacyRegulation, PrivacyTicketStatus } from './entities/privacy-ticket.entity';
 import { PrivacyJob, PrivacyJobStatus } from './entities/privacy-job.entity';
 import { User } from '../users/entities/user.entity';
@@ -28,6 +29,7 @@ export class PrivacyTicketService {
     private readonly magicLinkService: PrivacyMagicLinkService,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
+    private readonly configService: ConfigService,
   ) {}
 
   async createTicket(
@@ -75,7 +77,9 @@ export class PrivacyTicketService {
 
   async createPublicTicket(dto: CreateTicketDto): Promise<{ ticket: PrivacyTicket; magicLink: string }> {
     const ticket = await this.createTicket(null, dto);
-    const token = this.magicLinkService.generateToken(ticket.id, dto.email);
+
+    const windowHours = this.configService.get<number>('privacy.verificationWindowHours') || 24;
+    const token = this.magicLinkService.generateToken(ticket.id, dto.email, `${windowHours}h`);
     const magicLink = this.magicLinkService.generateUrl(token);
     
     // In a real app, you'd send an email here.

@@ -15,10 +15,10 @@ export class PrivacyMagicLinkService {
     private readonly configService: ConfigService,
   ) {}
 
-  generateToken(ticketId: number, email: string): string {
+  generateToken(ticketId: number, email: string, expiresIn?: string): string {
     const payload: MagicLinkPayload = { ticketId, email, type: 'privacy_status' };
     return this.jwtService.sign(payload, {
-      expiresIn: '24h',
+      expiresIn: expiresIn || '24h',
       secret: this.configService.get<string>('PRIVACY_MAGIC_LINK_SECRET', 'privacy-magic-secret'),
     });
   }

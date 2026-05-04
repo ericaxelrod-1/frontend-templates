@@ -23,6 +23,7 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
 import environmentConfig from './config/environment.config';
 import databaseConfig from './config/database.config';
 import emailConfig from './config/email.config';
+import privacyConfig from './config/privacy.config';
 import { PermissionsService } from './modules/permissions/services/permissions.service';
 import { Logger } from '@nestjs/common';
 import { UsersSharedModule } from './modules/users/shared/users-shared.module';
@@ -45,7 +46,7 @@ import { AppService } from './app.service';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [environmentConfig, databaseConfig, emailConfig],
+      load: [environmentConfig, databaseConfig, emailConfig, privacyConfig],
     }),
     ClsModule.forRoot({
       global: true,
