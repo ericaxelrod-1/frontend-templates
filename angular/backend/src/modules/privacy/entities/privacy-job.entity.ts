@@ -12,6 +12,7 @@ export enum PrivacyJobStatus {
   PROCESSING = 'processing',
   COMPLETED = 'completed',
   FAILED = 'failed',
+  PARTIAL_SUCCESS = 'partial_success',
 }
 
 @Entity('privacy_jobs')

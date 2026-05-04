@@ -1,12 +1,14 @@
 import { NestFactory } from '@nestjs/core';
-import { PrivacyModule } from '../privacy.module';
+import { AppModule } from '../../../app.module';
 import { PrivacyRegistryService } from '../privacy-registry.service';
+import { PrivacyAuditService } from '../privacy-audit.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(PrivacyModule);
+  const app = await NestFactory.createApplicationContext(AppModule);
   const registry = app.get(PrivacyRegistryService);
+  const auditService = app.get(PrivacyAuditService);
 
   console.log('--- Automated Privacy Policy Generator ---');
   
@@ -17,10 +19,15 @@ async function bootstrap() {
   
   policyContent += `## 1. Data Collection\n\nWe collect data through the following services:\n\n`;
   
-  providers.forEach(p => {
+  providers.forEach((p) => {
     policyContent += `### ${p.providerName}\n`;
     policyContent += `Internal ID: \`${p.providerName}\`\n`;
-    policyContent += `Purpose: Standard service data processing.\n\n`;
+    // ID 11: Dynamic disclosure extraction from providers
+    const disclosure =
+      typeof p.getDisclosure === 'function'
+        ? p.getDisclosure()
+        : 'Standard service data processing.';
+    policyContent += `Disclosure: ${disclosure}\n\n`;
   });
 
   policyContent += `## 2. Your Rights\n\n`;
@@ -33,6 +40,8 @@ async function bootstrap() {
   // Write BOM-free for PowerShell compatibility
   fs.writeFileSync(outputPath, policyContent, { encoding: 'utf8' });
   
+  await auditService.logAction(0, null, 'Privacy Policy Generated');
+  
   console.log(`\nSuccessfully generated: ${outputPath}`);
   console.log(`Included ${providers.length} registered privacy providers.`);
   
@@ -40,3 +49,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+

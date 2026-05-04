@@ -15,6 +15,7 @@ describe('PrivacyRegistryService', () => {
     onExport: jest.fn().mockResolvedValue(new Readable()),
     onDelete: jest.fn().mockResolvedValue(undefined),
     getPreview: jest.fn().mockResolvedValue({ records: 5 }),
+    getDisclosure: jest.fn().mockReturnValue('Test disclosure'),
   };
 
   beforeEach(async () => {

@@ -23,4 +23,9 @@ export interface IPrivacyProvider {
    * @param userId The ID of the user.
    */
   getPreview(userId: string): Promise<Record<string, number>>;
+
+  /**
+   * Returns a markdown-formatted legal disclosure snippet for the privacy policy.
+   */
+  getDisclosure(): string;
 }

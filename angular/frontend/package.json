@@ -37,6 +37,8 @@
     "@angular/platform-server": "18.2.13",
     "@angular/router": "18.2.13",
     "@angular/ssr": "^18.2.20",
+    "@casl/ability": "^6.8.1",
+    "@casl/angular": "^9.0.6",
     "@ngxs/devtools-plugin": "18.1.6",
     "@ngxs/form-plugin": "18.1.6",
     "@ngxs/router-plugin": "18.1.6",

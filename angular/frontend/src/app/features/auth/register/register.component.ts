@@ -13,12 +13,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { AppConfigService } from '../../../core/services';
 import { AuthService } from '../../../core/services/auth.service';
-import { CaptchaSelectorComponent } from '../../../shared/components/captcha/advanced/captcha-selector.component';
+import { StandardCaptchaComponent } from '../../../shared/components/captcha/standard/standard-captcha.component';
 import { CaptchaService } from '../../../core/services/captcha.service';
-import { AdvancedCaptchaService } from '../../../core/services/advanced-captcha.service';
 import { LoggerService } from '../../../services/logging/logger.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthResponse } from '../../../models';
+import { CustomValidators } from '../../../core/validators/custom-validators';
 
 // Custom validator for password strength
 export function passwordStrengthValidator(): ValidatorFn {
@@ -67,11 +67,11 @@ export function passwordMatchValidator(): ValidatorFn {
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
-    CaptchaSelectorComponent
+    StandardCaptchaComponent
   ]
 })
 export class RegisterComponent implements OnInit, OnDestroy {
-  @ViewChild('captchaSelector') captchaSelector!: CaptchaSelectorComponent;
+  @ViewChild('captcha') captcha!: StandardCaptchaComponent;
 
   // Pre-initialize all properties to avoid undefined issues
   registerForm: FormGroup;
@@ -123,14 +123,13 @@ export class RegisterComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private el: ElementRef,
     private captchaService: CaptchaService,
-    private advancedCaptchaService: AdvancedCaptchaService,
     private logger: LoggerService
   ) {
     // Pre-initialize the form to avoid undefined issues
     this.registerForm = this.formBuilder.group({
       firstName: ['', [Validators.required]],
       lastName: ['', [Validators.required]],
-      email: ['', [Validators.required, Validators.email]],
+      email: ['', [Validators.required, CustomValidators.email()]],
       password: ['', [
         Validators.required,
         Validators.minLength(8),
@@ -178,7 +177,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.registerForm = this.formBuilder.group({
       firstName: ['', [Validators.required]],
       lastName: ['', [Validators.required]],
-      email: ['', [Validators.required, Validators.email]],
+      email: ['', [Validators.required, CustomValidators.email()]],
       password: ['', [
         Validators.required,
         Validators.minLength(8),
@@ -378,68 +377,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Get CAPTCHA data directly from the selector component
-    const captchaData = this.captchaSelector.getCaptchaData();
-    if (!captchaData) {
-      console.warn('CAPTCHA data is missing');
-      this.error = 'CAPTCHA verification is required. Please complete the CAPTCHA.';
-      return;
-    }
-
-    console.log('Verifying CAPTCHA before registration');
-    this.loading = true;
-
-    // Determine CAPTCHA type and verify with the appropriate service
-    const captchaType = this.determineCaptchaType(captchaData);
-
-    this.advancedCaptchaService.verifyAdvancedCaptcha(
-      captchaData.challengeId,
-      captchaData.selectedAnswer,
-      captchaType
-    ).subscribe({
-      next: (response) => {
-        console.log('CAPTCHA verification response:', response);
-        if (response.success) {
-          console.log('CAPTCHA verification successful, proceeding with registration');
-          this.handleRegistration();
-        } else {
-          console.warn('CAPTCHA verification failed');
-          this.error = 'CAPTCHA verification failed. Please try again.';
-          this.loading = false;
-          // Refresh the captcha
-          const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-          if (activeCaptcha?.refreshChallenge) {
-            activeCaptcha.refreshChallenge();
-          }
-        }
-      },
-      error: (err) => {
-        console.error('Error verifying CAPTCHA:', err);
-        this.error = 'An error occurred while verifying CAPTCHA. Please try again.';
-        this.loading = false;
-        // Refresh the captcha
-        const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-        if (activeCaptcha?.refreshChallenge) {
-          activeCaptcha.refreshChallenge();
-        }
-      }
-    });
-  }
-
-  // Determine the CAPTCHA type based on the captcha data structure
-  private determineCaptchaType(captchaData: any): string {
-    if (captchaData.challengeId && captchaData.challengeId.startsWith('vr_')) {
-      return 'visual-reasoning';
-    } else if (captchaData.challengeId && captchaData.challengeId.startsWith('pw_')) {
-      return 'physical-world';
-    }
-    return 'visual-reasoning'; // Default to visual-reasoning captcha
+    this.handleRegistration();
   }
 
   private handleRegistration() {
     // Set loading state
     this.loading = true;
     this.logger.info('Submitting registration form');
+
+    const captchaData = this.registerForm.get('captcha')?.value;
 
     // Create registration data object
     const registrationData = {
@@ -449,7 +395,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
       requiresPasswordChange: false,
       firstName: this.f['firstName']?.value || '',
       lastName: this.f['lastName']?.value || '',
-      recaptchaToken: this.f['captcha'].value || 'verified-via-advanced-captcha'
+      recaptchaToken: 'verified-via-captcha',
+      captchaToken: captchaData?.captchaToken,
+      captchaSolution: captchaData?.captchaSolution
     };
 
     this.logger.debug('Registration data prepared', registrationData);
@@ -485,8 +433,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
           this.logger.error('Registration failed', { error });
 
           // Refresh the captcha
-          if (this.captchaSelector?.getActiveCaptchaComponent()?.refreshChallenge) {
-            this.captchaSelector.getActiveCaptchaComponent().refreshChallenge();
+          if (this.captcha?.refreshChallenge) {
+            this.captcha.refreshChallenge();
           }
         }
       });

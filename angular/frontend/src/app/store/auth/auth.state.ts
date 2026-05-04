@@ -15,7 +15,9 @@ export namespace AuthActions {
     constructor(
       public email: string, 
       public password: string,
-      public recaptchaToken?: string
+      public recaptchaToken?: string,
+      public captchaToken?: string,
+      public captchaSolution?: string
     ) {}
   }
 
@@ -278,7 +280,9 @@ export class AuthState {
     return this.authService.login({
       email: action.email,
       password: action.password,
-      recaptchaToken: action.recaptchaToken
+      recaptchaToken: action.recaptchaToken,
+      captchaToken: action.captchaToken,
+      captchaSolution: action.captchaSolution
     }).pipe(
       tap(response => {
         ctx.dispatch(new AuthActions.LoginSuccess(response.user));

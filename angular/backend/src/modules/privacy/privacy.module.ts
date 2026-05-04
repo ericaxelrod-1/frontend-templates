@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrivacyController } from './privacy.controller';
 import { PrivacyService } from './privacy.service';
+import { PrivacyAuditService } from './privacy-audit.service';
 import { PrivacyRegistryService } from './privacy-registry.service';
 import { PrivacyHousekeepingService } from './privacy-housekeeping.service';
 import { PrivacyCleanupService } from './privacy-cleanup.service';
@@ -19,6 +20,7 @@ import { UserBehaviorProfile } from '../auth/entities/user-behavior-profile.enti
 import { SecurityAlert } from '../auth/entities/security-alert.entity';
 import { PrivacyTicket } from './entities/privacy-ticket.entity';
 import { PrivacyJob } from './entities/privacy-job.entity';
+import { PrivacyAuditLog } from './entities/privacy-audit-log.entity';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 
@@ -31,6 +33,7 @@ import { AuthModule } from '../auth/auth.module';
       SecurityAlert,
       PrivacyTicket,
       PrivacyJob,
+      PrivacyAuditLog,
     ]),
     DiscoveryModule,
     JwtModule.registerAsync({
@@ -49,6 +52,7 @@ import { AuthModule } from '../auth/auth.module';
   controllers: [PrivacyController, PrivacyTicketController, PrivacyPublicController],
   providers: [
     PrivacyService,
+    PrivacyAuditService,
     PrivacyTicketService,
     PrivacyRegistryService,
     PrivacyHousekeepingService,
@@ -58,6 +62,7 @@ import { AuthModule } from '../auth/auth.module';
   ],
   exports: [
     PrivacyService,
+    PrivacyAuditService,
     PrivacyTicketService,
     PrivacyRegistryService,
     PrivacyHousekeepingService,

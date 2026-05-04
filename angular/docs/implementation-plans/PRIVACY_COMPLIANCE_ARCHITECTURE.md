@@ -53,6 +53,13 @@ The Privacy Compliance system requires a "Privacy-by-Design" architecture that i
 **Decision:** Use `NGXS_FEATURE_MODULE` to inject `PrivacyState`.
 **Rationale:** Aligns with existing project patterns and ensures consistent "Processing" states across dashboard widgets.
 
+### ADR-006: Identity Verification & SLA Clock Pausing
+**Decision:** Unauthenticated privacy requests enter a "Pending Verification" state via Magic Link, pausing the SLA clock. Unverified requests are automatically hard-deleted after 24 hours.
+**Rationale:** 
+- **Legal Mandate:** GDPR (Art 12(6)) and CCPA/CPRA require identity verification ("verifiable consumer request"). Fulfilling unverified requests risks a data breach.
+- **SLA Clock:** The 30-day (GDPR) or 45-day (CCPA) statutory clock does not begin (or is paused) until the user clicks the verification link.
+- **Data Minimization:** Retaining unverified email addresses indefinitely violates data minimization principles and opens the system to malicious bot spam. A 24-hour expiration followed by a scheduled hard-delete prevents this.
+
 ---
 
 ## Implementation Patterns & Consistency Rules

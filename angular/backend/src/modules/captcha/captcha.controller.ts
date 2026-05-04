@@ -5,8 +5,10 @@ import {
   Body,
   Query,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
-import { CaptchaService } from './captcha.service';
+import { CaptchaService } from '../auth/services/captcha.service';
+import { Request } from 'express';
 import {
   CaptchaResult,
   CaptchaVerifyRequest,
@@ -21,24 +23,39 @@ export class CaptchaController {
    * Generate a new CAPTCHA
    */
   @Get('generate')
-  generateCaptcha(@Query('debug') debug?: string): CaptchaResult {
+  async generateCaptcha(
+    @Req() req: Request,
+    @Query('type') type: any = 'image',
+    @Query('debug') debug?: string,
+  ): Promise<CaptchaResult> {
+    const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string);
+    const captcha = await this.captchaService.create(type, ipAddress);
+
     const includeTextInResponse =
       debug === 'true' && process.env.NODE_ENV !== 'production';
-    return this.captchaService.generateCaptcha(includeTextInResponse);
+
+    return {
+      token: captcha.token,
+      challenge: captcha.challenge,
+      type: captcha.type,
+      ...(includeTextInResponse && { text: captcha.solution }),
+    };
   }
 
   /**
    * Verify a CAPTCHA response
    */
   @Post('verify')
-  verifyCaptcha(@Body() body: CaptchaVerifyRequest): CaptchaVerifyResponse {
-    const { captchaId, userInput } = body;
+  async verifyCaptcha(
+    @Body() body: CaptchaVerifyRequest,
+  ): Promise<CaptchaVerifyResponse> {
+    const { captchaToken, captchaSolution } = body;
 
-    if (!captchaId || !userInput) {
-      throw new BadRequestException('captchaId and userInput are required');
+    if (!captchaToken || !captchaSolution) {
+      throw new BadRequestException('captchaToken and captchaSolution are required');
     }
 
-    const isValid = this.captchaService.verifyCaptcha(captchaId, userInput);
+    const isValid = await this.captchaService.validate(captchaToken, captchaSolution);
 
     return {
       success: isValid,

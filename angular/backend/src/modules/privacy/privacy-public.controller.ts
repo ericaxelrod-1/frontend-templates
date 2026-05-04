@@ -61,4 +61,20 @@ export class PrivacyPublicController {
   async getTicketStatus(@Query('token') token: string) {
     return this.privacyTicketService.getTicketByToken(token);
   }
+
+  @Get('verify')
+  async verifyTicket(@Query('token') token: string) {
+    if (!token) throw new BadRequestException('Verification token is required');
+    
+    // This starts the SLA clock and queues the privacy job
+    const payload = await this.privacyTicketService.getTicketByToken(token); // Verify token and get ticket ID
+    const ticket = await this.privacyTicketService.verifyTicket(payload.id);
+    
+    return {
+      success: true,
+      message: 'Identity verified. Your privacy request is now processing.',
+      ticketId: ticket.id,
+      slaDeadline: ticket.slaDeadline
+    };
+  }
 }

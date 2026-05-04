@@ -16,6 +16,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { PrivacyService } from './privacy.service';
 import { PrivacyRegistryService } from './privacy-registry.service';
+import { HeavyRoute } from '../system/decorators/heavy-route.decorator';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
@@ -91,6 +92,7 @@ export class PrivacyController {
   }
 
   @Get('export')
+  @HeavyRoute() // ID 2: Resource guarding for potentially large data assembly
   async exportData(@Req() req: AuthenticatedRequest) {
     const data = await this.privacyService.exportUserData(req.user.id);
     return {
@@ -101,6 +103,7 @@ export class PrivacyController {
   }
 
   @Post('export/download')
+  @HeavyRoute() // ID 2: Resource guarding
   async downloadData(@Req() req: AuthenticatedRequest) {
     const data = await this.privacyService.exportUserData(req.user.id);
     return data;
@@ -120,6 +123,17 @@ export class PrivacyController {
     if (!body.restrictions || typeof body.restrictions !== 'object') {
       throw new BadRequestException('Restrictions must be an object');
     }
+
+    // ID 4: Security - Basic key validation for restrictions
+    const invalidKeys = Object.keys(body.restrictions).filter(
+      (key) => !VALID_PROCESSING_TYPES.includes(key),
+    );
+    if (invalidKeys.length > 0) {
+      throw new BadRequestException(
+        `Invalid restriction keys: ${invalidKeys.join(', ')}. Must be one of: ${VALID_PROCESSING_TYPES.join(', ')}`,
+      );
+    }
+
     return this.privacyService.updatePrivacyRestrictions(req.user.id, {
       restrictions: body.restrictions,
     });
