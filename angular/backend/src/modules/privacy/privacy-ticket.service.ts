@@ -35,6 +35,7 @@ export class PrivacyTicketService {
   async createTicket(
     userId: number | null,
     dto: CreateTicketDto,
+    isPublic: boolean = false,
   ): Promise<PrivacyTicket> {
     let profileRegion: string | undefined;
 
@@ -51,7 +52,12 @@ export class PrivacyTicketService {
       profileRegion,
     );
 
-    const slaDeadline = this.jurisdictionService.getSlaDeadline(regulation);
+    const windowHours = this.configService.get<number>('privacy.verificationWindowHours') || 24;
+
+    // Public requests start in UNVERIFIED state - SLA clock doesn't start until email is confirmed
+    // Authenticated requests go directly to PENDING with SLA deadline
+    const status = isPublic ? PrivacyTicketStatus.UNVERIFIED : PrivacyTicketStatus.PENDING;
+    const slaDeadline = isPublic ? null : this.jurisdictionService.getSlaDeadline(regulation);
 
     const ticket = this.ticketRepository.create({
       userId,
@@ -59,7 +65,7 @@ export class PrivacyTicketService {
       regulation,
       email: dto.email,
       slaDeadline,
-      status: PrivacyTicketStatus.PENDING,
+      status,
       description: dto.description,
     });
 
@@ -76,7 +82,7 @@ export class PrivacyTicketService {
   }
 
   async createPublicTicket(dto: CreateTicketDto): Promise<{ ticket: PrivacyTicket; magicLink: string }> {
-    const ticket = await this.createTicket(null, dto);
+    const ticket = await this.createTicket(null, dto, true);
 
     const windowHours = this.configService.get<number>('privacy.verificationWindowHours') || 24;
     const token = this.magicLinkService.generateToken(ticket.id, dto.email, `${windowHours}h`);
@@ -100,6 +106,22 @@ export class PrivacyTicketService {
     }
 
     return ticket;
+  }
+
+  async verifyTicket(ticketId: number): Promise<PrivacyTicket> {
+    const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
+    
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    // SLA clock starts only after verification
+    const windowHours = this.configService.get<number>('privacy.verificationWindowHours') || 24;
+    ticket.verifiedAt = new Date();
+    ticket.slaDeadline = new Date(Date.now() + windowHours * 60 * 60 * 1000);
+    ticket.status = PrivacyTicketStatus.PENDING;
+    
+    return this.ticketRepository.save(ticket);
   }
 
   async getUserTickets(userId: number): Promise<PrivacyTicket[]> {

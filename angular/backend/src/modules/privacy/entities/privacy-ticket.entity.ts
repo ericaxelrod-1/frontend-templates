@@ -20,10 +20,12 @@ export enum PrivacyRequestType {
 }
 
 export enum PrivacyTicketStatus {
+  UNVERIFIED = 'unverified',
   PENDING = 'pending',
   IN_REVIEW = 'in_review',
   COMPLETED = 'completed',
   FAILED = 'failed',
+  PARTIAL_SUCCESS = 'partial_success',
 }
 
 export enum PrivacyRegulation {
@@ -66,11 +68,14 @@ export class PrivacyTicket {
   })
   regulation: PrivacyRegulation;
 
-  @Column({ name: 'sla_deadline', type: 'datetime' })
-  slaDeadline: Date;
+  @Column({ name: 'sla_deadline', type: 'datetime', nullable: true })
+  slaDeadline: Date | null;
 
   @Column({ name: 'accrued_paused_time', type: 'integer', default: 0 })
   accruedPausedTime: number;
+
+  @Column({ name: 'verified_at', type: 'datetime', nullable: true })
+  verifiedAt: Date | null;
 
   @Column({ type: 'text', nullable: true })
   description: string;
