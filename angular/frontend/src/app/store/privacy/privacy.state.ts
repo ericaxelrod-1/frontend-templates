@@ -35,6 +35,11 @@ export class PrivacyState {
     return state.activeTickets;
   }
 
+  @Selector([PrivacyState.getActiveTickets])
+  static getActiveTicketsCount(activeTickets: PrivacyTicket[]) {
+    return activeTickets?.length || 0;
+  }
+
   @Selector()
   static isLoading(state: PrivacyStateModel) {
     return state.isLoading;
