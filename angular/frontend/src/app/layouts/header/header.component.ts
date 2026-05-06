@@ -16,6 +16,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatBadgeModule } from '@angular/material/badge';
 import { LoggerService } from '../../services/logging/logger.service';
+import { NotificationBellComponent } from '../../shared/components/notifications/notification-bell.component';
 
 /**
  * Header Component - Simplified for Custom Layout System
@@ -40,7 +41,8 @@ import { LoggerService } from '../../services/logging/logger.service';
     MatIconModule,
     MatMenuModule,
     MatDividerModule,
-    MatBadgeModule
+    MatBadgeModule,
+    NotificationBellComponent
   ],
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.scss']

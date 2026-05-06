@@ -48,6 +48,14 @@ export interface PrivacyTicket {
   description: string;
   createdAt: Date;
   updatedAt: Date;
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+  };
+  regulation?: string;
+  slaDeadline?: Date;
+  email?: string; // For public requests
 }
 
 @Injectable({
@@ -116,5 +124,9 @@ export class PrivacyService {
 
   getTicket(id: number): Observable<PrivacyTicket> {
     return this.http.get<PrivacyTicket>(`${this.apiUrl}/tickets/${id}`);
+  }
+
+  getAllTickets(): Observable<PrivacyTicket[]> {
+    return this.http.get<PrivacyTicket[]>(`${this.apiUrl}/tickets/all`);
   }
 }

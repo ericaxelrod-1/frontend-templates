@@ -446,6 +446,19 @@ export class UsersService implements IPrivacyProvider {
   }
 
   /**
+   * Find all users with admin or superadmin roles
+   */
+  async findAdmins(): Promise<User[]> {
+    return this.userRepository.find({
+      where: [
+        { roles: { name: SystemRoles.ADMIN } },
+        { roles: { name: SystemRoles.SUPERADMIN } },
+      ],
+      relations: ['roles'],
+    });
+  }
+
+  /**
    * Check if a user has a specific permission
    * @param userId The user ID to check
    * @param resource The resource part of the permission

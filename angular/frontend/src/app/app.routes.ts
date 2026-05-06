@@ -175,6 +175,14 @@ export const routes: Routes = [
             data: {
               permissions: 'rls:admin'
             }
+          },
+          {
+            path: 'privacy-requests',
+            loadComponent: () => import('./features/admin/privacy-management/privacy-admin.component').then(c => c.PrivacyAdminComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'privacy:read'
+            }
           }
         ]
       }

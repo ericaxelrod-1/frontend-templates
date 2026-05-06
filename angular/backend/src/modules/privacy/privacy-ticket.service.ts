@@ -8,6 +8,8 @@ import { User } from '../users/entities/user.entity';
 import { PrivacyJurisdictionService } from './privacy-jurisdiction.service';
 import { PrivacyMagicLinkService } from './privacy-magic-link.service';
 import { UsersService } from '../users/users.service';
+import { NotificationsService } from '../notifications/services/notifications.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 
 export interface CreateTicketDto {
   requestType: PrivacyRequestType;
@@ -30,6 +32,7 @@ export class PrivacyTicketService {
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createTicket(
@@ -77,6 +80,22 @@ export class PrivacyTicketService {
       status: PrivacyJobStatus.PENDING,
     });
     await this.jobRepository.save(job);
+
+    // Notify admins about new privacy request
+    try {
+      const admins = await this.usersService.findAdmins();
+      for (const admin of admins) {
+        await this.notificationsService.create(admin.id, {
+          title: 'New Privacy Request',
+          message: `A new ${dto.requestType} request has been submitted.`,
+          type: NotificationType.PRIVACY,
+          link: '/app/admin/privacy-requests',
+        });
+      }
+    } catch (error) {
+      // Don't fail ticket creation if notification fails
+      console.error('Failed to notify admins about new privacy ticket:', error);
+    }
 
     return savedTicket;
   }
@@ -139,6 +158,13 @@ export class PrivacyTicketService {
     return this.ticketRepository.find({
       where: { userId },
       relations: ['jobs'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getAllTickets(): Promise<PrivacyTicket[]> {
+    return this.ticketRepository.find({
+      relations: ['jobs', 'user'],
       order: { createdAt: 'DESC' },
     });
   }

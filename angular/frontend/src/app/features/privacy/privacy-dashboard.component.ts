@@ -5,12 +5,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Store, Select } from '@ngxs/store';
 import { Observable } from 'rxjs';
 import { PrivacyState, PrivacyStateModel } from '../../store/privacy/privacy.state';
 import { PrivacyActions } from '../../store/privacy/privacy.actions';
 import { PrivacyTicket, PrivacyPreferences } from './privacy.service';
 import { RouterModule } from '@angular/router';
+import { SupportTicketDialogComponent } from './support-ticket-dialog.component';
 
 @Component({
   selector: 'app-privacy-dashboard',
@@ -22,6 +24,7 @@ import { RouterModule } from '@angular/router';
     MatIconModule,
     MatChipsModule,
     MatProgressBarModule,
+    MatDialogModule,
     RouterModule
   ],
   template: `
@@ -80,6 +83,9 @@ import { RouterModule } from '@angular/router';
           </mat-card-content>
           <mat-card-actions>
             <button mat-button color="primary">VIEW ALL REQUESTS</button>
+            <button mat-raised-button color="primary" (click)="openRequestDialog()">
+              <mat-icon>add</mat-icon> SUBMIT REQUEST
+            </button>
           </mat-card-actions>
         </mat-card>
 
@@ -184,11 +190,24 @@ export class PrivacyDashboardComponent implements OnInit {
   @Select(PrivacyState.getPreferences) preferences$!: Observable<PrivacyPreferences>;
   @Select(PrivacyState.isLoading) isLoading$!: Observable<boolean>;
 
-  constructor(private store: Store) {}
+  constructor(
+    private store: Store,
+    private dialog: MatDialog
+  ) {}
 
   ngOnInit(): void {
     this.store.dispatch(new PrivacyActions.FetchActiveTickets());
     this.store.dispatch(new PrivacyActions.FetchPreferences());
+  }
+
+  openRequestDialog(): void {
+    const dialogRef = this.dialog.open(SupportTicketDialogComponent, {
+      width: '500px'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      this.store.dispatch(new PrivacyActions.FetchActiveTickets());
+    });
   }
 
   getStatusColor(status: string): string {
