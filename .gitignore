@@ -350,3 +350,5 @@ fix_role_permissions_*.sql
 audit_reports/*.json
 audit_reports/*.log
 .env.gmail
+
+.worktrees/
