@@ -42,8 +42,18 @@ export const routes: Routes = [
       },
       {
         path: 'privacy',
-        loadComponent: () => import('./features/privacy/privacy-settings.component').then(c => c.PrivacySettingsComponent),
-        canActivate: [AuthGuard]
+        children: [
+          {
+            path: '',
+            loadComponent: () => import('./features/privacy/privacy-dashboard.component').then(c => c.PrivacyDashboardComponent),
+            canActivate: [AuthGuard]
+          },
+          {
+            path: 'settings',
+            loadComponent: () => import('./features/privacy/privacy-settings.component').then(c => c.PrivacySettingsComponent),
+            canActivate: [AuthGuard]
+          }
+        ]
       },
       {
         path: 'profile/change-password',
@@ -127,6 +137,14 @@ export const routes: Routes = [
             }
           },
           {
+            path: 'system-health',
+            loadComponent: () => import('./features/admin/system-health/system-health.component').then(c => c.SystemHealthComponent),
+            canActivate: [PermissionGuard],
+            data: {
+              permissions: 'system:admin'
+            }
+          },
+          {
             path: 'rls-rules',
             loadComponent: () => import('./features/admin/rls-management/rls-admin.component').then(c => c.RlsAdminComponent),
             canActivate: [PermissionGuard],
@@ -202,6 +220,10 @@ export const routes: Routes = [
       {
         path: 'privacy-policy',
         loadComponent: () => import('./features/legal/privacy-policy/privacy-policy.component').then(c => c.PrivacyPolicyComponent)
+      },
+      {
+        path: 'privacy/request',
+        loadComponent: () => import('./features/privacy/public-request.component').then(c => c.PublicPrivacyComponent)
       },
       {
         path: 'blocked',

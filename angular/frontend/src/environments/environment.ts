@@ -30,5 +30,8 @@ export const environment: Environment = {
     difficulty: 'medium', // Set to medium for production
     skipForDevelopment: false // Don't skip CAPTCHA in production
   },
+  privacy: {
+    verificationWindowHours: 24 // Hours before unverified privacy requests expire
+  },
   debugMode: true
 }; 

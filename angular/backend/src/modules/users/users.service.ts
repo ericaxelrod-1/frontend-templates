@@ -17,9 +17,15 @@ import { PasswordValidationService } from '../auth/password-validation.service';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { Group } from '../permissions/entities/group.entity';
+import { Readable } from 'stream';
+import { IPrivacyProvider } from '../../common/contracts/privacy/privacy-provider.interface';
+import { PrivacyProvider } from '../../common/decorators/privacy-provider.decorator';
 
+@PrivacyProvider()
 @Injectable()
-export class UsersService {
+export class UsersService implements IPrivacyProvider {
+  readonly providerName = 'users';
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -814,4 +820,47 @@ export class UsersService {
       emailVerifiedAt: new Date(),
     });
   }
+
+  // --- IPrivacyProvider Implementation ---
+
+  async getPreview(userId: string): Promise<Record<string, number>> {
+    // Return count of major privacy-sensitive fields
+    return { 'User Profile': 5 };
+  }
+
+  getDisclosure(): string {
+    return 'We collect and process your primary account information (username, email, name) to provide core authentication and profile services. Role and group memberships are tracked for access control.';
+  }
+
+  async onExport(userId: string): Promise<Readable> {
+    const id = parseInt(userId);
+    const s = new Readable();
+    if (isNaN(id)) {
+      s.push('{}');
+      s.push(null);
+      return s;
+    }
+    const user = await this.findOne(id);
+    s.push(JSON.stringify(user, null, 2));
+    s.push(null);
+    return s;
+  }
+
+  async onDelete(userId: string): Promise<void> {
+    const id = parseInt(userId);
+    if (isNaN(id)) {
+      return;
+    }
+    await this.userRepository.update(id, {
+      email: `deleted_${id}@example.com`,
+      firstName: 'Deleted',
+      lastName: 'User',
+      username: `deleted_${id}`,
+      password: 'ANONYMIZED',
+      isActive: false,
+      isDeleted: true,
+      deletedAt: new Date()
+    });
+  }
 }
+

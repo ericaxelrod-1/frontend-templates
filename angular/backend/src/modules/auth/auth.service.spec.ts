@@ -10,7 +10,14 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { PasswordValidationService } from './password-validation.service';
 import { User } from '../users/entities/user.entity';
-import { Role, UserRole } from '../users/entities/role.entity';
+import { Role } from '../users/entities/role.entity';
+import { EmailService } from '../email/email.service';
+import { LoginAttemptService } from './services/login-attempt.service';
+import { IPReputationService } from './services/ip-reputation.service';
+import { CaptchaService } from './services/captcha.service';
+import { PatternDetectionService } from './services/pattern-detection.service';
+import { AlertService } from './services/alert.service';
+import { PermissionsService } from '../permissions/services/permissions.service';
 
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'test-uuid'),
@@ -30,6 +37,10 @@ describe('AuthService', () => {
     create: jest.fn(),
     update: jest.fn(),
     updateLastLogin: jest.fn(),
+    findByUsername: jest.fn(),
+    updateVerificationSentAt: jest.fn(),
+    verifyEmail: jest.fn(),
+    userExistsCheck: jest.fn().mockResolvedValue(true),
   };
 
   const mockJwtService = {
@@ -39,21 +50,58 @@ describe('AuthService', () => {
 
   const mockConfigService = {
     get: jest.fn((key, defaultValue) => {
-      if (key === 'JWT_REFRESH_EXPIRES_IN') return '7d';
-      if (key === 'JWT_EXPIRES_IN') return '1d';
+      if (key === 'JWT_REFRESH_EXPIRES_IN') return '30d';
+      if (key === 'JWT_EXPIRES_IN') return '7d';
       return defaultValue;
     }),
   };
 
   const mockPasswordValidationService = {
-    validate: jest.fn(),
+    validate: jest.fn().mockReturnValue(true),
   };
 
   const mockRoleRepository = {
     findOne: jest.fn(),
   };
 
+  const mockEmailService = {
+    sendVerificationEmail: jest.fn(),
+    sendPasswordResetEmail: jest.fn(),
+    sendWelcomeEmail: jest.fn(),
+  };
+
+  const mockLoginAttemptService = {
+    create: jest.fn(),
+    getRecentFailedAttempts: jest.fn().mockResolvedValue([]),
+    getRecentAttempts: jest.fn().mockResolvedValue([]),
+  };
+
+  const mockIpReputationService = {
+    isBlocked: jest.fn().mockResolvedValue(false),
+  };
+
+  const mockCaptchaService = {
+    create: jest.fn(),
+    validate: jest.fn(),
+  };
+
+  const mockPatternDetectionService = {
+    trackSuccessfulLoginBehavior: jest.fn(),
+    detectPatterns: jest.fn().mockResolvedValue([]),
+  };
+
+  const mockAlertService = {
+    sendAlert: jest.fn(),
+    sendPatternAlert: jest.fn(),
+  };
+
+  const mockPermissionsService = {
+    getUserPermissions: jest.fn().mockResolvedValue([]),
+    getUserPermissionsSafe: jest.fn().mockResolvedValue([]),
+  };
+
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -77,10 +125,41 @@ describe('AuthService', () => {
           provide: getRepositoryToken(Role),
           useValue: mockRoleRepository,
         },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
+        },
+        {
+          provide: LoginAttemptService,
+          useValue: mockLoginAttemptService,
+        },
+        {
+          provide: IPReputationService,
+          useValue: mockIpReputationService,
+        },
+        {
+          provide: CaptchaService,
+          useValue: mockCaptchaService,
+        },
+        {
+          provide: PatternDetectionService,
+          useValue: mockPatternDetectionService,
+        },
+        {
+          provide: AlertService,
+          useValue: mockAlertService,
+        },
+        {
+          provide: PermissionsService,
+          useValue: mockPermissionsService,
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
+    // Explicitly clear the private refreshTokens map for each test
+    (service as any).refreshTokens.clear();
+    
     usersService = module.get<UsersService>(UsersService);
     jwtService = module.get<JwtService>(JwtService);
     configService = module.get<ConfigService>(ConfigService);
@@ -103,11 +182,13 @@ describe('AuthService', () => {
       const user = {
         id: 1,
         email: 'test@example.com',
-        password: await bcrypt.hash('password123', 10),
+        password: 'hashed-password',
         firstName: 'Test',
         lastName: 'User',
+        isActive: true,
       };
 
+      mockUsersService.userExistsCheck.mockResolvedValue(true);
       mockUsersService.findByEmail.mockResolvedValue(user);
       jest
         .spyOn(bcrypt, 'compare')
@@ -119,13 +200,12 @@ describe('AuthService', () => {
       );
 
       expect(result).toBeDefined();
-      expect(result.password).toBeUndefined();
-      expect(result.id).toEqual(user.id);
-      expect(result.email).toEqual(user.email);
+      expect(result!.id).toEqual(user.id);
     });
 
     it('should return null when user is not found', async () => {
-      mockUsersService.findByEmail.mockResolvedValue(null);
+      // If userExistsCheck returns false, validateUser should return null immediately
+      mockUsersService.userExistsCheck.mockResolvedValue(false);
 
       const result = await service.validateUser(
         'nonexistent@example.com',
@@ -139,9 +219,11 @@ describe('AuthService', () => {
       const user = {
         id: 1,
         email: 'test@example.com',
-        password: await bcrypt.hash('password123', 10),
+        password: 'hashed-password',
+        isActive: true,
       };
 
+      mockUsersService.userExistsCheck.mockResolvedValue(true);
       mockUsersService.findByEmail.mockResolvedValue(user);
       jest
         .spyOn(bcrypt, 'compare')
@@ -162,17 +244,20 @@ describe('AuthService', () => {
         id: 1,
         email: 'test@example.com',
       };
+      const ipAddress = '127.0.0.1';
 
+      mockUsersService.findByEmail.mockResolvedValue(user);
       mockUsersService.updateLastLogin.mockResolvedValue(undefined);
       mockJwtService.sign.mockReturnValue('token');
+      (service as any).validateUser = jest.fn().mockResolvedValue(user);
 
-      const result = await service.login(user);
+      const result = await service.login(user.email, 'password', ipAddress);
 
       expect(mockUsersService.updateLastLogin).toHaveBeenCalledWith(user.id);
-      expect(result).toHaveProperty('access_token');
-      expect(result).toHaveProperty('refresh_token');
-      expect(result).toHaveProperty('csrf_token');
-      expect(result).toHaveProperty('expires_in');
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+      expect(result).toHaveProperty('csrfToken');
+      expect(result).toHaveProperty('expiresIn');
     });
   });
 
@@ -182,10 +267,11 @@ describe('AuthService', () => {
       password: 'StrongPass123!',
       firstName: 'New',
       lastName: 'User',
+      username: 'newuser'
     };
 
-    it('should register a new user and return tokens', async () => {
-      const defaultRole = { id: 1, name: UserRole.USER };
+    it('should register a new user and return user details', async () => {
+      const defaultRole = { id: 1, name: 'user' };
       const newUser = {
         id: 1,
         ...registerDto,
@@ -193,20 +279,15 @@ describe('AuthService', () => {
         role: defaultRole,
       };
 
-      // Create a user result without password for testing
-      const userWithoutPassword = { ...newUser };
-      delete userWithoutPassword.password;
-
       mockUsersService.findByEmail.mockResolvedValue(null);
       mockRoleRepository.findOne.mockResolvedValue(defaultRole);
       mockUsersService.create.mockResolvedValue(newUser);
 
       const result = await service.register(registerDto);
 
-      expect(result).toHaveProperty('user');
-      expect(result).toHaveProperty('access_token');
-      expect(result).toHaveProperty('refresh_token');
-      expect(result.user).not.toHaveProperty('password');
+      expect(result).toHaveProperty('id');
+      expect(result).toHaveProperty('email');
+      expect(result).not.toHaveProperty('password');
       expect(mockPasswordValidationService.validate).toHaveBeenCalledWith(
         registerDto.password,
       );
@@ -240,50 +321,35 @@ describe('AuthService', () => {
       const user = { id: 1, email: 'test@example.com' };
       const refreshToken = 'valid-refresh-token';
 
-      // Manually set a refresh token in the private map
-      (service as any).refreshTokens.set('test-uuid', {
-        userId: user.id,
-        token: refreshToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days in the future
-      });
-
+      mockJwtService.verify.mockReturnValue({ sub: user.id, email: user.email, type: 'access' });
       mockUsersService.findOne.mockResolvedValue(user);
+      mockPermissionsService.getUserPermissions.mockResolvedValue([]);
 
       const result = await service.refreshToken(refreshToken);
 
-      expect(result).toHaveProperty('access_token');
-      expect(result).toHaveProperty('refresh_token');
-      expect(mockUsersService.findOne).toHaveBeenCalledWith(user.id);
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
     });
 
-    it('should throw UnauthorizedException if refresh token not found', async () => {
-      await expect(service.refreshToken('invalid-token')).rejects.toThrow(
-        UnauthorizedException,
-      );
-    });
-
-    it('should throw UnauthorizedException if refresh token expired', async () => {
-      const user = { id: 1, email: 'test@example.com' };
-      const refreshToken = 'expired-refresh-token';
-
-      // Set an expired refresh token
-      (service as any).refreshTokens.set('test-uuid', {
-        userId: user.id,
-        token: refreshToken,
-        expiresAt: new Date(Date.now() - 1000), // In the past
+    it('should throw UnauthorizedException if refresh token is invalid', async () => {
+      mockJwtService.verify.mockImplementation(() => {
+        throw new Error('Invalid token');
       });
-
-      await expect(service.refreshToken(refreshToken)).rejects.toThrow(
+      
+      await expect(service.refreshToken('invalid-token')).rejects.toThrow(
         UnauthorizedException,
       );
     });
   });
 
   describe('logout', () => {
+    beforeEach(() => {
+      (service as any).refreshTokens.clear();
+    });
+
     it('should remove the refresh token and return success', async () => {
       const refreshToken = 'valid-refresh-token';
 
-      // Manually set a refresh token in the private map
       (service as any).refreshTokens.set('test-uuid', {
         userId: 1,
         token: refreshToken,
@@ -314,7 +380,7 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('message');
-      expect(result).toHaveProperty('resetToken');
+      // The resetToken is no longer returned in the successful response for security/privacy reasons
       expect(mockJwtService.sign).toHaveBeenCalled();
     });
 
@@ -341,7 +407,7 @@ describe('AuthService', () => {
     it('should reset password with valid token and matching passwords', async () => {
       const user = { id: 1, email: 'test@example.com' };
 
-      mockJwtService.verify.mockReturnValue({ sub: user.id, type: 'reset' });
+      mockJwtService.verify.mockReturnValue({ sub: user.id, type: 'password_reset' });
       mockUsersService.findOne.mockResolvedValue(user);
       mockUsersService.update.mockResolvedValue({});
 

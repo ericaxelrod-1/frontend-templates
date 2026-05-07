@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { createCanvas } from 'canvas';
 import * as crypto from 'crypto';
 import { CaptchaResult } from './captcha.models';
 
@@ -38,8 +37,9 @@ export class CaptchaService {
 
     // Return result (optionally including text for debugging)
     return {
-      captchaId,
-      imageBase64,
+      token: captchaId,
+      challenge: imageBase64,
+      type: 'image',
       ...(includeTextInResponse && { text }),
     };
   }
@@ -47,8 +47,8 @@ export class CaptchaService {
   /**
    * Verify a CAPTCHA response
    */
-  verifyCaptcha(captchaId: string, userInput: string): boolean {
-    const captcha = this.captchas.get(captchaId);
+  verifyCaptcha(captchaToken: string, captchaSolution: string): boolean {
+    const captcha = this.captchas.get(captchaToken);
 
     // Check if CAPTCHA exists and hasn't expired
     if (!captcha || captcha.expiresAt < new Date()) {
@@ -56,73 +56,61 @@ export class CaptchaService {
     }
 
     // Case-insensitive comparison
-    const isValid = captcha.text.toLowerCase() === userInput.toLowerCase();
+    const isValid = captcha.text.toLowerCase() === captchaSolution.toLowerCase();
 
     // Remove the CAPTCHA after validation attempt (one-time use)
-    this.captchas.delete(captchaId);
+    this.captchas.delete(captchaToken);
 
     return isValid;
   }
 
   /**
-   * Generate an SVG image with the CAPTCHA text
+   * Generate an SVG image with the CAPTCHA text (no canvas dependency)
    */
   private generateCaptchaImage(text: string): string {
-    // Create canvas
     const width = 200;
     const height = 70;
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-
-    // Fill background
-    ctx.fillStyle = '#f0f0f0';
-    ctx.fillRect(0, 0, width, height);
-
-    // Add noise (random dots)
-    for (let i = 0; i < 100; i++) {
-      ctx.fillStyle = `rgba(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255},0.5)`;
-      ctx.beginPath();
-      ctx.arc(
-        Math.random() * width,
-        Math.random() * height,
-        Math.random() * 2,
-        0,
-        Math.PI * 2,
-      );
-      ctx.fill();
+    
+    // Split text into characters with individual transforms
+    const chars = text.split('');
+    let charactersSvg = '';
+    
+    for (let i = 0; i < chars.length; i++) {
+      const x = 20 + i * 28;
+      const y = 45 + (Math.random() - 0.5) * 10;
+      const rotation = (Math.random() - 0.5) * 0.3;
+      const fontSize = 32 + Math.floor(Math.random() * 8);
+      const fill = `rgb(${Math.floor(30 + Math.random() * 40)},${Math.floor(30 + Math.random() * 40)},${Math.floor(30 + Math.random() * 40)})`;
+      charactersSvg += `<text x="${x}" y="${y}" transform="rotate(${rotation}, ${x}, ${y})" fill="${fill}" font-size="${fontSize}" font-family="Arial, sans-serif" font-weight="bold">${chars[i]}</text>`;
     }
-
-    // Add lines for noise
-    for (let i = 0; i < 5; i++) {
-      ctx.strokeStyle = `rgba(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255},0.5)`;
-      ctx.beginPath();
-      ctx.moveTo(Math.random() * width, Math.random() * height);
-      ctx.lineTo(Math.random() * width, Math.random() * height);
-      ctx.stroke();
+    
+    // Add noise lines
+    let noiseSvg = '';
+    for (let i = 0; i < 8; i++) {
+      const x1 = Math.random() * width;
+      const y1 = Math.random() * height;
+      const x2 = Math.random() * width;
+      const y2 = Math.random() * height;
+      const stroke = `rgba(${Math.floor(Math.random() * 255)},${Math.floor(Math.random() * 255)},${Math.floor(Math.random() * 255)},0.2)`;
+      noiseSvg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="1"/>`;
     }
-
-    // Add text
-    ctx.font = '40px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Apply different colors, angles, and positions to each character
-    for (let i = 0; i < text.length; i++) {
-      // Random color
-      ctx.fillStyle = `rgb(${Math.floor(Math.random() * 80)},${Math.floor(Math.random() * 80)},${Math.floor(Math.random() * 80)})`;
-
-      // Random angle
-      const angle = (Math.random() - 0.5) * 0.4;
-
-      ctx.save();
-      ctx.translate(30 + i * 25, height / 2);
-      ctx.rotate(angle);
-      ctx.fillText(text[i], 0, 0);
-      ctx.restore();
+    
+    // Add noise circles
+    for (let i = 0; i < 15; i++) {
+      const cx = Math.random() * width;
+      const cy = Math.random() * height;
+      const r = 1 + Math.random() * 2;
+      const fill = `rgba(${Math.floor(Math.random() * 255)},${Math.floor(Math.random() * 255)},${Math.floor(Math.random() * 255)},0.15)`;
+      noiseSvg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`;
     }
-
-    // Return as base64 data URL
-    return canvas.toDataURL('image/png');
+    
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" fill="#f8f8f8"/>
+      ${noiseSvg}
+      ${charactersSvg}
+    </svg>`;
+    
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
   }
 
   /**

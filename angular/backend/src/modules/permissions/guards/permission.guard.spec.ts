@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard, PERMISSIONS_KEY } from './permission.guard';
@@ -15,10 +16,11 @@ describe('PermissionGuard', () => {
 
   const mockPermissionsService = {
     checkUserPermission: jest.fn(),
-    getRoleNamesForUser: jest.fn().mockReturnValue(['user']),
+    getRoleNamesForUser: jest.fn(),
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PermissionGuard,
@@ -39,6 +41,17 @@ describe('PermissionGuard', () => {
     reflector = module.get<Reflector>(Reflector);
     permissionsService = module.get<PermissionsService>(PermissionsService);
   });
+
+
+  const mockExecutionContext = {
+    switchToHttp: jest.fn().mockReturnValue({
+      getRequest: jest.fn().mockReturnValue({
+        user: { id: 1, email: 'test@example.com' },
+      }),
+    }),
+    getHandler: jest.fn(),
+    getClass: jest.fn(),
+  } as unknown as ExecutionContext;
 
   it('should be defined', () => {
     expect(guard).toBeDefined();
@@ -86,7 +99,7 @@ describe('PermissionGuard', () => {
   it('should allow access if user has any required permission', async () => {
     // Arrange
     jest.spyOn(reflector, 'get').mockReturnValue(['users:view', 'users:write']);
-    permissionsService.checkUserPermission
+    (permissionsService.checkUserPermission as any)
       .mockResolvedValueOnce(false) // First permission check fails
       .mockResolvedValueOnce(true); // Second permission check succeeds
 
@@ -108,14 +121,14 @@ describe('PermissionGuard', () => {
     );
   });
 
-  it('should throw UnauthorizedException if user does not have any required permission', async () => {
+  it('should throw ForbiddenException if user does not have any required permission', async () => {
     // Arrange
     jest.spyOn(reflector, 'get').mockReturnValue(['users:view']);
-    permissionsService.checkUserPermission.mockResolvedValue(false);
+    (permissionsService.checkUserPermission as any).mockResolvedValue(false);
 
     // Act & Assert
     await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
-      UnauthorizedException,
+      ForbiddenException,
     );
     expect(permissionsService.checkUserPermission).toHaveBeenCalledWith(
       1,
@@ -129,7 +142,9 @@ describe('PermissionGuard', () => {
     jest
       .spyOn(reflector, 'get')
       .mockReturnValue({ all: ['users:view', 'roles:view'] });
-    permissionsService.checkUserPermission
+    
+    (permissionsService.checkUserPermission as any).mockReset();
+    (permissionsService.checkUserPermission as any)
       .mockResolvedValueOnce(true) // First permission check succeeds
       .mockResolvedValueOnce(true); // Second permission check succeeds
 
@@ -141,18 +156,20 @@ describe('PermissionGuard', () => {
     expect(permissionsService.checkUserPermission).toHaveBeenCalledTimes(2);
   });
 
-  it('should throw UnauthorizedException if user does not have all required permissions in ALL case', async () => {
+  it('should throw ForbiddenException if user does not have all required permissions in ALL case', async () => {
     // Arrange
     jest
       .spyOn(reflector, 'get')
       .mockReturnValue({ all: ['users:view', 'roles:view'] });
-    permissionsService.checkUserPermission
+    
+    (permissionsService.checkUserPermission as any).mockReset();
+    (permissionsService.checkUserPermission as any)
       .mockResolvedValueOnce(true) // First permission check succeeds
       .mockResolvedValueOnce(false); // Second permission check fails
 
     // Act & Assert
     await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
-      UnauthorizedException,
+      ForbiddenException,
     );
     expect(permissionsService.checkUserPermission).toHaveBeenCalledTimes(2);
   });
@@ -176,7 +193,7 @@ describe('PermissionGuard', () => {
       .mockReturnValueOnce(['users:write']) // Handler permissions
       .mockReturnValueOnce(['users:view']); // Controller permissions
 
-    permissionsService.checkUserPermission
+    (permissionsService.checkUserPermission as any)
       .mockResolvedValueOnce(false) // First permission check fails
       .mockResolvedValueOnce(true); // Second permission check succeeds
 

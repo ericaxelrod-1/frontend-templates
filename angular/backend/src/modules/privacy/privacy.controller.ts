@@ -11,9 +11,12 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PrivacyService } from './privacy.service';
+import { PrivacyRegistryService } from './privacy-registry.service';
+import { HeavyRoute } from '../system/decorators/heavy-route.decorator';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
@@ -47,14 +50,49 @@ interface DoNotSellBody {
 @Controller('privacy')
 @UseGuards(AuthGuard('jwt'))
 export class PrivacyController {
-  constructor(private readonly privacyService: PrivacyService) {}
+  constructor(
+    private readonly privacyService: PrivacyService,
+    private readonly registryService: PrivacyRegistryService,
+  ) {}
+
+  @Get('providers')
+  async getProviders(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ) {
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 10;
+
+    const allProviders = this.registryService.getProviders().map((p) => ({
+      name: p.providerName,
+    }));
+
+    const total = allProviders.length;
+    const data = allProviders.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    return {
+      data,
+      meta: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    };
+  }
 
   @Get('preferences')
   async getPreferences(@Req() req: AuthenticatedRequest) {
     return this.privacyService.getPrivacyPreferences(req.user.id);
   }
 
+  @Get('export/preview')
+  async getExportPreview(@Req() req: AuthenticatedRequest) {
+    return this.privacyService.getExportPreview(req.user.id);
+  }
+
   @Get('export')
+  @HeavyRoute() // ID 2: Resource guarding for potentially large data assembly
   async exportData(@Req() req: AuthenticatedRequest) {
     const data = await this.privacyService.exportUserData(req.user.id);
     return {
@@ -65,6 +103,7 @@ export class PrivacyController {
   }
 
   @Post('export/download')
+  @HeavyRoute() // ID 2: Resource guarding
   async downloadData(@Req() req: AuthenticatedRequest) {
     const data = await this.privacyService.exportUserData(req.user.id);
     return data;
@@ -84,6 +123,17 @@ export class PrivacyController {
     if (!body.restrictions || typeof body.restrictions !== 'object') {
       throw new BadRequestException('Restrictions must be an object');
     }
+
+    // ID 4: Security - Basic key validation for restrictions
+    const invalidKeys = Object.keys(body.restrictions).filter(
+      (key) => !VALID_PROCESSING_TYPES.includes(key),
+    );
+    if (invalidKeys.length > 0) {
+      throw new BadRequestException(
+        `Invalid restriction keys: ${invalidKeys.join(', ')}. Must be one of: ${VALID_PROCESSING_TYPES.join(', ')}`,
+      );
+    }
+
     return this.privacyService.updatePrivacyRestrictions(req.user.id, {
       restrictions: body.restrictions,
     });

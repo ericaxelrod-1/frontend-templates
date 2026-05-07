@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { PublicFooterComponent } from './public-footer.component';
+import { TestingModule } from '../../../tests/test-utils';
 
 describe('PublicFooterComponent', () => {
   let component: PublicFooterComponent;
@@ -8,7 +8,7 @@ describe('PublicFooterComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PublicFooterComponent]
+      imports: [PublicFooterComponent, TestingModule]
     })
     .compileComponents();
 

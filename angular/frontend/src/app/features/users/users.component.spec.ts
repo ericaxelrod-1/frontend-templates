@@ -4,11 +4,14 @@ import { TestingModule, mockUser, setupTestConfiguration } from '../../tests/tes
 import { AuthService } from '../../core/services/auth.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { UserService } from '../../services/user.service';
+import { GroupService } from '../../services/group.service';
+import { RoleService } from '../../services/role.service';
 import { of } from 'rxjs';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatSortModule } from '@angular/material/sort';
 import { Group } from '../../models/group.model';
+import { Role } from '../../services/role.service';
 
 describe('UsersComponent', () => {
   let component: UsersComponent;
@@ -16,22 +19,48 @@ describe('UsersComponent', () => {
   let authService: AuthService;
   let permissionService: PermissionService;
   let userService: jasmine.SpyObj<UserService>;
+  let groupService: jasmine.SpyObj<GroupService>;
+  let roleService: jasmine.SpyObj<RoleService>;
 
   const mockGroup: Group = {
     id: 1,
     name: 'Test Group',
     description: 'Test Group Description',
     owner: 'test@example.com',
-    members: [],
+    users: [mockUser],
+    permissions: []
+  };
+
+  const mockRole: Role = {
+    id: 1,
+    name: 'admin',
+    description: 'Admin role',
     permissions: []
   };
 
   beforeEach(async () => {
-    const userServiceSpy = jasmine.createSpyObj('UserService', ['getUsers', 'deleteUser', 'addUserToGroup', 'removeUserFromGroup']);
-    userServiceSpy.getUsers.and.returnValue(of([mockUser]));
-    userServiceSpy.deleteUser.and.returnValue(of(void 0));
-    userServiceSpy.addUserToGroup.and.returnValue(of(void 0));
-    userServiceSpy.removeUserFromGroup.and.returnValue(of(void 0));
+    const userServiceSpy = jasmine.createSpyObj('UserService', ['getUsers', 'getUser', 'deleteUser', 'addUserToGroup', 'removeUserFromGroup']);
+    userServiceSpy.getUsers.and.returnValue(of([{ ...mockUser, groups: [] }]));
+    userServiceSpy.getUser.and.returnValue(of(mockUser));
+    userServiceSpy.deleteUser.and.returnValue(of({ success: true, message: 'User deleted' }));
+    userServiceSpy.addUserToGroup.and.returnValue(of({ 
+      success: true, 
+      message: 'Added to group', 
+      user: { id: mockUser.id }, 
+      group: { name: mockGroup.name } 
+    }));
+    userServiceSpy.removeUserFromGroup.and.returnValue(of({ 
+      success: true, 
+      message: 'Removed from group', 
+      user: { id: mockUser.id }, 
+      group: { name: mockGroup.name } 
+    }));
+
+    const groupServiceSpy = jasmine.createSpyObj('GroupService', ['getGroups']);
+    groupServiceSpy.getGroups.and.returnValue(of({ items: [mockGroup], total: 1 }));
+
+    const roleServiceSpy = jasmine.createSpyObj('RoleService', ['getRoles']);
+    roleServiceSpy.getRoles.and.returnValue(of({ items: [mockRole], total: 1 }));
 
     await TestBed.configureTestingModule({
       imports: [
@@ -42,7 +71,9 @@ describe('UsersComponent', () => {
         MatSortModule
       ],
       providers: [
-        { provide: UserService, useValue: userServiceSpy }
+        { provide: UserService, useValue: userServiceSpy },
+        { provide: GroupService, useValue: groupServiceSpy },
+        { provide: RoleService, useValue: roleServiceSpy }
       ]
     }).compileComponents();
 
@@ -51,6 +82,8 @@ describe('UsersComponent', () => {
     authService = TestBed.inject(AuthService);
     permissionService = TestBed.inject(PermissionService);
     userService = TestBed.inject(UserService) as jasmine.SpyObj<UserService>;
+    groupService = TestBed.inject(GroupService) as jasmine.SpyObj<GroupService>;
+    roleService = TestBed.inject(RoleService) as jasmine.SpyObj<RoleService>;
     fixture.detectChanges();
   });
 
@@ -97,7 +130,7 @@ describe('UsersComponent', () => {
         name: 'Group 1',
         description: 'Group 1 Description',
         owner: 'test@example.com',
-        members: [],
+        users: [],
         permissions: []
       },
       {
@@ -105,7 +138,7 @@ describe('UsersComponent', () => {
         name: 'Group 2',
         description: 'Group 2 Description',
         owner: 'test@example.com',
-        members: [],
+        users: [],
         permissions: []
       }
     ];

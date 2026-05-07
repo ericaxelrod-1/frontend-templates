@@ -4,12 +4,14 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { RouterTestingModule } from '@angular/router/testing';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatDialogModule } from '@angular/material/dialog';
 import { AuthService } from '../core/services/auth.service';
 import { PermissionService } from '../core/services/permission.service';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { User, Permission } from '../models/user.model';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgxsModule, Store } from '@ngxs/store';
 
 // Mock User for testing
 export const mockUser: User = {
@@ -21,21 +23,22 @@ export const mockUser: User = {
   isVerified: true,
   permissions: [
     {
-      id: '1',
+      id: 1,
       name: 'Create User',
       description: 'Can create users',
       resourceName: 'user',
       actionName: 'create'
     },
     {
-      id: '2',
+      id: 2,
       name: 'Read User',
       description: 'Can read users',
       resourceName: 'user',
       actionName: 'read'
     }
   ],
-  roles: ['USER'] // Kept for backward compatibility
+  roles: ['USER' as any], // Cast to satisfy complex Role interface in testing
+  groups: []
 };
 
 // Mock AuthService
@@ -78,20 +81,15 @@ export class MockPermissionService {
   }
 
   hasPermission(resource: string, action?: string): Observable<boolean> {
-    // Convert to permission string if resource and action provided separately
     const permissionString = action ? `${resource}:${action}` : resource;
-    
-    // Return from cache if available
     if (this.permissionCache.has(permissionString)) {
       return of(this.permissionCache.get(permissionString)!);
     }
-    
     const hasPermission = mockUser.permissions?.some(
       p => action ? 
         (p.resourceName === resource && p.actionName === action) :
         `${p.resourceName}:${p.actionName}` === permissionString
     ) ?? false;
-    
     this.permissionCache.set(permissionString, hasPermission);
     return of(hasPermission);
   }
@@ -130,9 +128,11 @@ export function setupHttpTesting(): HttpTestingController {
   imports: [
     CommonModule,
     HttpClientTestingModule,
-    RouterTestingModule,
+    RouterTestingModule.withRoutes([]),
     BrowserAnimationsModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatDialogModule,
+    NgxsModule.forRoot([], { developmentMode: true })
   ],
   providers: [
     { provide: AuthService, useClass: MockAuthService },
@@ -141,17 +141,24 @@ export function setupHttpTesting(): HttpTestingController {
       provide: ActivatedRoute, 
       useValue: {
         params: of({ id: '1' }),
+        queryParams: of({}),
+        data: of({}),
         snapshot: {
-          paramMap: {
-            get: (key: string) => '1'
-          }
+          params: { id: '1' },
+          queryParams: {},
+          data: {},
+          paramMap: { get: (key: string) => '1' }
         }
       }
     },
     {
       provide: Router,
       useValue: {
-        navigate: jasmine.createSpy('navigate')
+        navigate: jasmine.createSpy('navigate'),
+        events: of([]),
+        createUrlTree: () => ({}),
+        serializeUrl: () => '',
+        routerState: { root: { firstChild: null } }
       }
     }
   ],
@@ -160,12 +167,12 @@ export function setupHttpTesting(): HttpTestingController {
     HttpClientTestingModule,
     RouterTestingModule,
     BrowserAnimationsModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatDialogModule
   ]
 })
 export class TestingModule { }
 
-// Helper function to setup common test configuration
 export function setupTestConfiguration(additionalImports: any[] = [], additionalProviders: any[] = []) {
   return {
     imports: [

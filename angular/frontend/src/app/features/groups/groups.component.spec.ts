@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { GroupsComponent } from './groups.component';
+import { TestingModule } from '../../tests/test-utils';
 
 describe('GroupsComponent', () => {
   let component: GroupsComponent;
@@ -8,7 +8,7 @@ describe('GroupsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GroupsComponent]
+      imports: [GroupsComponent, TestingModule]
     })
     .compileComponents();
 

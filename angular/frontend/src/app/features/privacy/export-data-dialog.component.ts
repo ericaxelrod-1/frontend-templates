@@ -23,7 +23,12 @@ import { PrivacyService, UserDataExport } from './privacy.service';
     <mat-dialog-content>
       <div *ngIf="!exportedData && !loading && !error" class="export-info">
         <p>You can download a copy of all your personal data including:</p>
-        <ul>
+        <ul *ngIf="preview">
+          <li *ngFor="let item of preview | keyvalue">
+            <strong>{{ item.key | titlecase }}:</strong> {{ item.value }} records
+          </li>
+        </ul>
+        <ul *ngIf="!preview">
           <li>Profile information</li>
           <li>Login history</li>
           <li>Privacy preferences</li>
@@ -98,6 +103,7 @@ export class ExportDataDialogComponent implements OnInit {
   loading = false;
   exportedData: UserDataExport | null = null;
   error: string | null = null;
+  preview: Record<string, number> | null = null;
 
   constructor(
     private privacyService: PrivacyService,
@@ -105,7 +111,12 @@ export class ExportDataDialogComponent implements OnInit {
     private snackBar: MatSnackBar
   ) {}
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.privacyService.getExportPreview().subscribe({
+      next: (data) => this.preview = data,
+      error: (err) => console.error('Failed to fetch export preview', err)
+    });
+  }
 
   requestExport(): void {
     this.loading = true;

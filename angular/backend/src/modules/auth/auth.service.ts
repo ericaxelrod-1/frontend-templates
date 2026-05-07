@@ -161,13 +161,10 @@ export class AuthService {
         );
       }
 
-      // DEVELOPMENT MODE: Skip CAPTCHA validation if environment is development
-      const skipCaptcha = process.env.NODE_ENV === 'development' || true; // Set to true for now until we fix CAPTCHA issues
-
       // Check if CAPTCHA is required
       const recentAttempts =
         await this.loginAttemptService.getRecentFailedAttempts(ipAddress, 30);
-      if (recentAttempts.length >= 3 && !skipCaptcha) {
+      if (recentAttempts.length >= 3) {
         if (!captchaToken || !captchaSolution) {
           const captcha = await this.captchaService.create('text', ipAddress);
           await this.loginAttemptService.create({

@@ -82,6 +82,8 @@ describe('EmailService', () => {
           verificationUrl: expectedUrl,
           token,
           expiresIn: '24 hours',
+          appName: expect.any(String),
+          currentYear: expect.any(String),
         },
       });
     });
@@ -125,6 +127,8 @@ describe('EmailService', () => {
           resetUrl: expectedUrl,
           token,
           expiresIn: '1 hour',
+          appName: expect.any(String),
+          currentYear: expect.any(String),
         },
       });
     });
@@ -150,6 +154,8 @@ describe('EmailService', () => {
         context: {
           userName,
           loginUrl: expectedUrl,
+          appName: expect.any(String),
+          currentYear: expect.any(String),
         },
       });
     });
@@ -171,7 +177,11 @@ describe('EmailService', () => {
         to,
         subject,
         template,
-        context,
+        context: {
+          ...context,
+          appName: expect.any(String),
+          currentYear: expect.any(String),
+        },
       });
     });
   });

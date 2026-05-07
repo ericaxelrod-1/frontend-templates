@@ -28,5 +28,8 @@ export interface Environment {
     difficulty: 'easy' | 'medium' | 'hard';
     skipForDevelopment?: boolean;
   };
+  privacy: {
+    verificationWindowHours: number;
+  };
   debugMode: boolean;
 } 

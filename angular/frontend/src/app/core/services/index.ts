@@ -4,6 +4,5 @@ export * from './app-config.service';
 export * from './notification.service';
 export * from './dialog-theming.service';
 export * from './captcha.service';
-export * from './advanced-captcha.service';
 export * from './password-generator.service';
 export * from './page-title.service';

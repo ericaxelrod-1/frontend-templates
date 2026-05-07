@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface PrivacyPreferences {
   marketingConsent: boolean;
@@ -53,12 +54,16 @@ export interface PrivacyTicket {
   providedIn: 'root'
 })
 export class PrivacyService {
-  private apiUrl = '/api/privacy';
+  private apiUrl = `${environment.apiUrl}/privacy`;
 
   constructor(private http: HttpClient) {}
 
   getPreferences(): Observable<PrivacyPreferences> {
     return this.http.get<PrivacyPreferences>(`${this.apiUrl}/preferences`);
+  }
+
+  getExportPreview(): Observable<Record<string, number>> {
+    return this.http.get<Record<string, number>>(`${this.apiUrl}/export/preview`);
   }
 
   exportData(): Observable<UserDataExport> {
@@ -91,6 +96,10 @@ export class PrivacyService {
 
   updateDoNotSell(doNotSell: boolean): Observable<any> {
     return this.http.patch(`${this.apiUrl}/do-not-sell`, { doNotSell });
+  }
+
+  createPublicTicket(data: { email: string; requestType: string; description: string; captchaToken: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/tickets/public`, data);
   }
 
   createTicket(requestType: string, description: string, additionalData?: Record<string, any>): Observable<PrivacyTicket> {

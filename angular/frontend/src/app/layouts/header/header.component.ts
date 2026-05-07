@@ -1,18 +1,20 @@
 import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
-import { Store } from '@ngxs/store';
+import { Store, Select } from '@ngxs/store';
 import { Observable, Subscription, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { AppConfigService } from '../../core/services/app-config.service';
 import { PageTitleService } from '../../core/services/page-title.service';
 import { User } from '../../models/user.model';
 import { AuthActions } from '../../store/auth/auth.state';
+import { PrivacyState } from '../../store/privacy/privacy.state';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatBadgeModule } from '@angular/material/badge';
 import { LoggerService } from '../../services/logging/logger.service';
 
 /**
@@ -37,7 +39,8 @@ import { LoggerService } from '../../services/logging/logger.service';
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
-    MatDividerModule
+    MatDividerModule,
+    MatBadgeModule
   ],
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.scss']
@@ -49,6 +52,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   @Output() sidebarToggle = new EventEmitter<void>();
   @Output() userMenuToggle = new EventEmitter<void>();
 
+  @Select(PrivacyState.getActiveTicketsCount) pendingTicketsCount$!: Observable<number>;
   isAuthenticated$: Observable<boolean>;
   currentUser$: Observable<User | null>;
   pageTitle$: Observable<string>;
@@ -77,6 +81,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.isAuthenticated$ = this.authService.currentUser$.pipe(
       map(user => !!user)
     );
+    this.pendingTicketsCount$ = this.store.select(PrivacyState.getActiveTicketsCount);
   }
 
   ngOnInit(): void {
@@ -127,7 +132,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   getDisplayName(user: User | null): string {
     if (!user) return '';
     if (user.firstName || user.lastName) {
-      return `${user.firstName || ''} ${user.lastName || ''} `.trim();
+      return `${user.firstName || ''} ${user.lastName || ''}`.trim();
     }
     return user.email;
   }

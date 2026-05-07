@@ -8,7 +8,7 @@ import { NgxsFormPluginModule } from '@ngxs/form-plugin';
 import { NgxsReduxDevtoolsPluginModule } from '@ngxs/devtools-plugin';
 import { provideHttpClient, withInterceptorsFromDi, withFetch } from '@angular/common/http';
 import { httpInterceptorProviders } from './core/interceptors';
-import { AuthState, AuthActions } from './store';
+import { AuthState, AuthActions, PrivacyState, SystemHealthState } from './store';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { AppConfigService } from './core/services/app-config.service';
 import { LoggerService } from './services/logging/logger.service';
@@ -16,7 +16,6 @@ import { environment } from '../environments/environment';
 import { AuthService } from './core/services/auth.service';
 import { firstValueFrom, Observable, of } from 'rxjs';
 import { CaptchaService } from './core/services/captcha.service';
-import { AdvancedCaptchaService } from './core/services/advanced-captcha.service';
 import { RolesConstantsService } from './core/constants/roles';
 import { Injectable } from '@angular/core';
 
@@ -70,7 +69,6 @@ export const appConfig: ApplicationConfig = {
     AppConfigService,
     LoggerService,
     CaptchaService,
-    AdvancedCaptchaService,
     RolesConstantsService,
     {
       provide: APP_INITIALIZER,
@@ -86,7 +84,7 @@ export const appConfig: ApplicationConfig = {
     },
     importProvidersFrom(
       NgxsModule.forRoot(
-        [AuthState], 
+        [AuthState, PrivacyState, SystemHealthState], 
         { 
           developmentMode: !environment.production,
           selectorOptions: {

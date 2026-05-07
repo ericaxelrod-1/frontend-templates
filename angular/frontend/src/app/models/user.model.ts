@@ -48,7 +48,9 @@ export interface User {
 export interface UserLogin {
   email: string;
   password: string;
-  recaptchaToken?: string;
+  captchaToken?: string;
+  captchaSolution?: string;
+  recaptchaToken?: string; // Keep for backward compatibility
 }
 
 export interface UserRegistration {
@@ -57,6 +59,8 @@ export interface UserRegistration {
   firstName?: string;
   lastName?: string;
   privacyConsent?: boolean;
+  captchaToken?: string;
+  captchaSolution?: string;
 }
 
 export interface AuthResponse {
