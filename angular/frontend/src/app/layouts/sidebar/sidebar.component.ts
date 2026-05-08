@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { RouterModule } from '@angular/router';
-import { Subject, takeUntil, Observable } from 'rxjs';
+import { Subject, takeUntil, Observable, map } from 'rxjs';
 import { Store, Select } from '@ngxs/store';
 import { AuthService } from '../../core/services/auth.service';
 import { PermissionService } from '../../core/services/permission.service';
@@ -31,26 +31,26 @@ export interface NavItem {
   styleUrl: './sidebar.component.scss'
 })
 export class SidebarComponent implements OnInit, OnDestroy {
-  @Input() isCollapsed = false; // Controls whether sidebar shows only icons or full text
-  @Input() isAdminContext = false; // Indicates if we're in admin context
+  @Input() isCollapsed = false;
+  @Input() isAdminContext = false;
   
   @Select(SystemHealthState.getStatus) healthStatus$!: Observable<string>;
   
   currentUser: User | null = null;
   private destroy$ = new Subject<void>();
   
-  commonNavItems: NavItem[] = [
+  private commonNavItems: NavItem[] = [
     { label: 'Dashboard', route: '/', icon: 'dashboard' },
-    { label: 'Privacy Preferences', route: '/privacy-preferences', icon: 'privacy_tip' }
+    { label: 'Privacy Preferences', route: '/app/privacy/settings', icon: 'privacy_tip' }
   ];
 
-  adminNavItems: NavItem[] = [
+  private adminNavItems: NavItem[] = [
     { label: 'User Management', route: '/admin/users', icon: 'people', permission: 'users:read' },
     { label: 'Role Management', route: '/admin/roles', icon: 'security', permission: 'roles:read' },
     { label: 'Groups', route: '/app/groups', icon: 'group_work', permission: 'groups:view' }
   ];
 
-  adminItems: NavItem[] = [
+  private adminItems: NavItem[] = [
     { label: 'Login Attempts', route: '/app/admin/login-attempts', icon: 'login', permission: 'login-monitoring:read' },
     { label: 'Pattern Detection', route: '/app/admin/pattern-detection', icon: 'pattern', permission: 'login-monitoring:read' },
     { label: 'Security Alerts', route: '/app/admin/security-alerts', icon: 'warning', permission: 'login-monitoring:read' },
@@ -60,16 +60,15 @@ export class SidebarComponent implements OnInit, OnDestroy {
     { label: 'Join Paths', route: '/app/admin/join-paths', icon: 'account_tree', permission: 'rls:admin' },
     { label: 'Scope Templates', route: '/app/admin/scope-templates', icon: 'layers', permission: 'rls:admin' },
     { label: 'Permission Inspector', route: '/app/admin/permission-inspector', icon: 'search', permission: 'rls:admin' },
-    { label: 'Privacy Dashboard', route: '/admin/privacy', icon: 'policy', permission: 'privacy:admin' },
+    { label: 'Privacy Dashboard', route: '/app/admin/privacy', icon: 'policy', permission: 'privacy:read' },
     { label: 'System Health', route: '/admin/health', icon: 'health_and_safety', permission: 'system:health' }
   ];
 
-  get isAdminOrManager(): boolean {
-    return this.permissionService.hasPermissionSync('users:read') || 
-           this.permissionService.hasPermissionSync('roles:read') ||
-           this.permissionService.hasPermissionSync('groups:view') ||
-           this.permissionService.hasPermissionSync('system:admin');
-  }
+  filteredCommonNavItems$!: Observable<NavItem[]>;
+  filteredAdminNavItems$!: Observable<NavItem[]>;
+  filteredAdminItems$!: Observable<NavItem[]>;
+  isAdminOrManager$!: Observable<boolean>;
+  hasAdminAccess$!: Observable<boolean>;
   
   constructor(
     private authService: AuthService,
@@ -78,32 +77,49 @@ export class SidebarComponent implements OnInit, OnDestroy {
   ) {}
   
   ngOnInit() {
-    // Subscribe to current user changes
     this.authService.currentUser$
       .pipe(takeUntil(this.destroy$))
       .subscribe(user => {
         this.currentUser = user;
       });
 
+    // Reactive visibility and filtering
+    const permissions$ = this.permissionService.userPermissions$;
+
+    this.isAdminOrManager$ = permissions$.pipe(
+      map(perms => perms.includes('users:read') || 
+                   perms.includes('roles:read') || 
+                   perms.includes('groups:view') || 
+                   perms.includes('system:admin'))
+    );
+
+    this.hasAdminAccess$ = permissions$.pipe(
+      map(perms => perms.includes('system:admin') || perms.includes('system:health'))
+    );
+
+    this.filteredCommonNavItems$ = permissions$.pipe(
+      map(perms => this.commonNavItems.filter(item => !item.permission || perms.includes(item.permission)))
+    );
+
+    this.filteredAdminNavItems$ = permissions$.pipe(
+      map(perms => this.adminNavItems.filter(item => !item.permission || perms.includes(item.permission)))
+    );
+
+    this.filteredAdminItems$ = permissions$.pipe(
+      map(perms => this.adminItems.filter(item => !item.permission || perms.includes(item.permission)))
+    );
+
     // Start polling health status if user has admin access
-    if (this.hasAdminAccess()) {
-      this.store.dispatch(new SystemHealthActions.FetchHealth());
-    }
+    this.hasAdminAccess$.pipe(takeUntil(this.destroy$)).subscribe(hasAccess => {
+      if (hasAccess) {
+        this.store.dispatch(new SystemHealthActions.FetchHealth());
+      }
+    });
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  hasPermission(permission: string | undefined): boolean {
-    if (!permission) return true;
-    return this.permissionService.hasPermissionSync(permission);
-  }
-
-  hasAdminAccess(): boolean {
-    return this.permissionService.hasPermissionSync('admin:access') || 
-           this.permissionService.hasPermissionSync('system:health');
   }
 
   /**

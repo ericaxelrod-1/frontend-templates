@@ -29,14 +29,7 @@
     <div class="right-section">
       <ng-container *ngIf="isAuthenticated$ | async; else loginButton">
         <!-- Notification Bell -->
-        <button mat-icon-button class="notification-button" routerLink="/app/admin/privacy" 
-          aria-label="View privacy notifications">
-          <mat-icon [matBadge]="pendingTicketsCount$ | async" 
-                    [matBadgeHidden]="(pendingTicketsCount$ | async) === 0" 
-                    matBadgeColor="warn">
-            notifications
-          </mat-icon>
-        </button>
+        <app-notification-bell></app-notification-bell>
 
         <ng-container *ngIf="currentUser$ | async as currentUser">
           <button mat-button type="button" class="user-menu-button" (click)="onUserMenuToggle()"

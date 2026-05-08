@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, FindOptionsWhere, In } from 'typeorm';
 import { User } from './entities/user.entity';
-import { Role } from './entities/role.entity';
+import { Role, SystemRoles } from '../roles/entities/role.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RoleMembershipResult } from './dto/role-membership-result.dto';
@@ -442,6 +442,19 @@ export class UsersService implements IPrivacyProvider {
         { lastName: Like(`%${query}%`) },
       ],
       select: ['id', 'email', 'firstName', 'lastName'],
+    });
+  }
+
+  /**
+   * Find all users with admin or superadmin roles
+   */
+  async findAdmins(): Promise<User[]> {
+    return this.userRepository.find({
+      where: [
+        { roles: { name: SystemRoles.ADMIN } },
+        { roles: { name: SystemRoles.SUPERADMIN } },
+      ],
+      relations: ['roles'],
     });
   }
 

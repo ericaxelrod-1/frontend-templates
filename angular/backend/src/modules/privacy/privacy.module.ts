@@ -23,6 +23,8 @@ import { PrivacyJob } from './entities/privacy-job.entity';
 import { PrivacyAuditLog } from './entities/privacy-audit-log.entity';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { AuthModule } from '../auth/auth.module';
     }),
     forwardRef(() => UsersModule),
     forwardRef(() => AuthModule),
+    NotificationsModule,
+    forwardRef(() => PermissionsModule),
   ],
   controllers: [PrivacyController, PrivacyTicketController, PrivacyPublicController],
   providers: [

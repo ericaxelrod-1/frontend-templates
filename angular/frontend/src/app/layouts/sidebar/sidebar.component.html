@@ -20,9 +20,8 @@
       <h3 class="section-title" id="primary-nav-heading" *ngIf="!isCollapsed">Navigation</h3>
       
       <ul class="nav-list" role="menu" aria-labelledby="primary-nav-heading">
-        <li *ngFor="let item of commonNavItems">
-          <a *ngIf="!item.permission || hasPermission(item.permission)" 
-             [routerLink]="item.route" 
+        <li *ngFor="let item of filteredCommonNavItems$ | async">
+          <a [routerLink]="item.route" 
              routerLinkActive="active"
              [attr.aria-label]="'Navigate to ' + item.label"
              class="nav-link"
@@ -35,13 +34,12 @@
     </div>
 
     <!-- Management Section -->
-    <div class="nav-section" *ngIf="isAdminOrManager">
+    <div class="nav-section" *ngIf="isAdminOrManager$ | async">
       <h3 class="section-title" id="management-nav-heading" *ngIf="!isCollapsed">Management</h3>
       
       <ul class="nav-list" role="menu" aria-labelledby="management-nav-heading">
-        <li *ngFor="let item of adminNavItems">
-          <a *ngIf="hasPermission(item.permission)" 
-             [routerLink]="item.route" 
+        <li *ngFor="let item of filteredAdminNavItems$ | async">
+          <a [routerLink]="item.route" 
              routerLinkActive="active"
              [attr.aria-label]="'Navigate to ' + item.label"
              class="nav-link"
@@ -54,18 +52,17 @@
     </div>
 
     <!-- Admin Section -->
-    <div class="nav-section" *ngIf="hasAdminAccess()" [class.admin-context-active]="isAdminContext">
+    <div class="nav-section" *ngIf="hasAdminAccess$ | async" [class.admin-context-active]="isAdminContext">
       <h3 class="section-title" id="admin-nav-heading" *ngIf="!isCollapsed">Administration</h3>
       
       <ul class="nav-list" role="menu" aria-labelledby="admin-nav-heading">
-        <li *ngFor="let item of adminItems">
-          <a *ngIf="hasPermission(item.permission)" 
-             [routerLink]="item.route" 
+        <li *ngFor="let item of filteredAdminItems$ | async">
+          <a [routerLink]="item.route" 
              routerLinkActive="active"
              [attr.aria-label]="'Navigate to ' + item.label + ' (Admin section)'"
              class="nav-link"
              role="menuitem">
-            <span class="nav-icon" [attr.aria-hidden]="true">{{ item.icon }}</span>
+            <span class="nav-icon" [attr.aria-hidden]="true" [ngClass]="getIconColor(item, healthStatus$ | async)">{{ item.icon }}</span>
             <span class="nav-text" *ngIf="!isCollapsed">{{ item.label }}</span>
           </a>
         </li>

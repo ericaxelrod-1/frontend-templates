@@ -2,6 +2,7 @@ export * from './auth.service';
 export * from './permission.service';
 export * from './app-config.service';
 export * from './notification.service';
+export * from './notification-center.service';
 export * from './dialog-theming.service';
 export * from './captcha.service';
 export * from './password-generator.service';

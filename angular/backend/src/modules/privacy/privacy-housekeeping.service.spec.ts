@@ -5,6 +5,7 @@ import { PrivacyJob, PrivacyJobStatus } from './entities/privacy-job.entity';
 import { PrivacyTicket, PrivacyRequestType } from './entities/privacy-ticket.entity';
 import { PrivacyRegistryService } from './privacy-registry.service';
 import { SecurityAlertService } from '../auth/services/security-alert.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('PrivacyHousekeepingService', () => {
   let service: PrivacyHousekeepingService;
@@ -42,6 +43,12 @@ describe('PrivacyHousekeepingService', () => {
           provide: SecurityAlertService,
           useValue: {
             createAlert: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
           },
         },
       ],
