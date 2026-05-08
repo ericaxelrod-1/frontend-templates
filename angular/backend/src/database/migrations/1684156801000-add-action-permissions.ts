@@ -79,17 +79,13 @@ export class AddActionPermissions1684156801000 implements MigrationInterface {
 
     // Insert default actions
     await queryRunner.query(`
-      INSERT INTO actions (name, description, action_name, icon)
+      INSERT OR REPLACE INTO actions (name, description, action_code, icon)
       VALUES 
         ('create', 'Create new resources', 'create', 'add'),
         ('read', 'Read resources', 'read', 'visibility'),
         ('update', 'Update existing resources', 'update', 'edit'),
         ('delete', 'Delete resources', 'delete', 'delete'),
         ('manage', 'Full control over resources', 'manage', 'settings')
-      ON DUPLICATE KEY UPDATE 
-        description = VALUES(description),
-        action_name = VALUES(action_name),
-        icon = VALUES(icon)
     `);
   }
 

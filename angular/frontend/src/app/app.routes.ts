@@ -22,7 +22,7 @@ import { PublicLayoutComponent } from './layouts/public-layout/public-layout.com
 export const routes: Routes = [
   {
     path: 'app',
-    component: CustomLayoutComponent,
+    loadComponent: () => import('./layouts/custom-layout/custom-layout.component').then(c => c.CustomLayoutComponent),
     canActivate: [AuthGuard],
     children: [
       {
@@ -190,7 +190,7 @@ export const routes: Routes = [
   },
   {
     path: '',
-    component: PublicLayoutComponent,
+    loadComponent: () => import('./layouts/public-layout/public-layout.component').then(c => c.PublicLayoutComponent),
     children: [
       {
         path: '',

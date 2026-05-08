@@ -6,6 +6,8 @@ import { PrivacyJob } from './entities/privacy-job.entity';
 import { PrivacyJurisdictionService } from './privacy-jurisdiction.service';
 import { PrivacyMagicLinkService } from './privacy-magic-link.service';
 import { UsersService } from '../users/users.service';
+import { ConfigService } from '@nestjs/config';
+import { NotificationsService } from '../notifications/services/notifications.service';
 
 describe('PrivacyTicketService', () => {
   let service: PrivacyTicketService;
@@ -52,6 +54,22 @@ describe('PrivacyTicketService', () => {
           provide: UsersService,
           useValue: {
             findOne: jest.fn().mockResolvedValue({ id: 1, preferences: { region: 'US-CA' } }),
+            findAdmins: jest.fn().mockResolvedValue([{ id: 2, email: 'admin@example.com' }]),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockImplementation((key) => {
+              if (key === 'privacy.magicLinkExpiresIn') return '24h';
+              return null;
+            }),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            create: jest.fn().mockResolvedValue({}),
           },
         },
       ],
@@ -93,7 +111,7 @@ describe('PrivacyTicketService', () => {
         email: 'test@example.com',
       });
 
-      expect(magicLinkService.generateToken).toHaveBeenCalledWith(1, 'test@example.com');
+      expect(magicLinkService.generateToken).toHaveBeenCalledWith(1, 'test@example.com', '24h');
       expect(magicLinkService.generateUrl).toHaveBeenCalledWith('mock-token');
       expect(result.magicLink).toBe('http://mock-url');
     });

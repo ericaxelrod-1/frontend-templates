@@ -5,9 +5,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { NotificationCenterService } from '../../../../core/services/notification-center.service';
+import { NotificationCenterService } from '../../../core/services/notification-center.service';
 import { NotificationItemComponent } from './notification-item.component';
-import { Notification } from '../../../../models/notification.model';
+import { Notification } from '../../../models/notification.model';
 import { Observable } from 'rxjs';
 
 @Component({

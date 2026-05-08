@@ -4,7 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatMenuModule } from '@angular/material/menu';
-import { NotificationCenterService } from '../../../../core/services/notification-center.service';
+import { NotificationCenterService } from '../../../core/services/notification-center.service';
 import { NotificationDropdownComponent } from './notification-dropdown.component';
 import { Observable } from 'rxjs';
 

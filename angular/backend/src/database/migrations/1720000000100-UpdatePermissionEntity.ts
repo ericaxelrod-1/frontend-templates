@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddUserBlockingFields1735000000000 implements MigrationInterface {
-  name = 'AddUserBlockingFields1735000000000';
+export class UpdatePermissionEntity1720000000100 implements MigrationInterface {
+  name = 'UpdatePermissionEntity1720000000100';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Skipping problematic migration

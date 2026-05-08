@@ -1,10 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddUserBlockingFields1735000000000 implements MigrationInterface {
-  name = 'AddUserBlockingFields1735000000000';
+export class ConvertRemainingUUIDsToNumeric1720000000003 implements MigrationInterface {
+  name = 'ConvertRemainingUUIDsToNumeric1720000000003';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Skipping problematic migration
+    // Skipping redundant migration
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

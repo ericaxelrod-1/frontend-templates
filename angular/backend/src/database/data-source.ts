@@ -31,6 +31,8 @@ import { SecurityDetectedPattern } from '../modules/auth/entities/security-detec
 import { PatternLoginAttempt } from '../modules/auth/entities/pattern-login-attempt.entity';
 import { PrivacyTicket } from '../modules/privacy/entities/privacy-ticket.entity';
 import { PrivacyJob } from '../modules/privacy/entities/privacy-job.entity';
+import { Notification } from '../modules/notifications/entities/notification.entity';
+import { NotificationPreference } from '../modules/notifications/entities/notification-preference.entity';
 
 // Load environment variables from .env file
 config();
@@ -68,6 +70,8 @@ export const dataSourceOptions: DataSourceOptions = {
     RlsScopeTemplate,
     PrivacyTicket,
     PrivacyJob,
+    Notification,
+    NotificationPreference,
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false, // Disable synchronize as we're handling schema manually
