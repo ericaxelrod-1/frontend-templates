@@ -226,38 +226,131 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
   references it.
 - Index anything you filter or sort on, including `jsonb` paths (GIN).
 
-## B2. Authorization — three axes, three mechanisms, never mixed
+## B2. Authorization — three axes, three mechanisms, composing per operation
 
 **Scope and capability are orthogonal.** A role-based check can be satisfied by a
 valid role no matter which site the caller is standing in, so it can never express
 "your site's rows." Forcing one mechanism to carry both is why the previous
 permissions module could not do row-level security at all (ADR-0023).
 
+**Orthogonal inputs, one composed expression.** The axes are separate *sources of
+truth*; they are not separate *expressions*. Every policy that needs both carries
+both, in one statement, per operation. See the correction below — the previous
+version of this section forbade that, and the ban shipped a privilege escalation.
+
+> **CORRECTED after executed design testing.** This heading used to read "never
+> mixed", and the invariant under it said scope and capability must "never appear
+> in the same expression". **That was wrong and it caused a real, silent security
+> bug** — a `FOR ALL` scope policy OR-ed a capability gate away entirely, so a
+> user with zero capabilities could `DELETE` and `INSERT` with no error. The rule,
+> the failure it produced, and the corrected rule are recorded in full under
+> §Scope below. Read that before writing any policy.
+
 | Axis | Question | Mechanism | Keyed on |
 |---|---|---|---|
 | **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `site_id` claim |
 | **Operation** | Which *verbs*? | table + column `GRANT` | DB `role` claim |
-| **Feature** | Which *features*? | guards in the thin app | capability role |
+| **Feature / capability** | Which *features*? | per-operation RLS policies | capability table |
 
 **The two role vocabularies are different things.**
 
 | Vocabulary | Values | Used by |
 |---|---|---|
 | DB role (scope tier) | `app_anon`, `app_member`, `app_admin` | PostgREST impersonation, RLS, grants |
-| Capability role | `ic`, `site_manager`, `admin` | thin-app guards, feature checks |
+| Capability role (a **label**, not a DB role) | `ic`, `site_manager`, `admin` | thin-app guards, feature checks |
+
+> **CORRECTED.** The second row previously read "Used by: thin-app guards". It now
+> also reads them, but capability is **enforced in the database** — a capability is
+> a row in `role_capability`, checked by `has_capability()` from a per-operation
+> RLS policy composed with the scope policy. `ic` / `site_manager` / `admin` remain
+> the vocabulary the thin app's guards *speak*, and remain **not** database
+> roles. See §Capability.
 
 - **An `ic` and a `site_manager` are the *same* DB role — `app_member`.** They
   reach the same features and are scoped to their own site by the *identical*
-  policy. Their only difference is capability, enforced above RLS.
-- **Never create DB roles named after capabilities** (`ic`, `site_manager`). That
-  fuses the axes, forces a policy per role per table, and reinvents the coupling
-  this model exists to remove.
-- **Never both.** If an operation is a table verb, the database grants it. If it
-  is application logic, a guard checks it. Applying both to one operation means
-  two places to update and two ways to disagree.
-- **Invariant, and it is greppable:** you must be unable to write one query or
-  guard that filters by site **and** by feature. Confirm no capability role appears
-  in any policy or grant.
+  policy. Their only difference is capability.
+- **Never create DB roles named after capabilities** (`ic`, `site_manager`).
+  Capability lives in a **table**, not in roles — see §Capability below. Modelling
+  a capability as a role is not merely inelegant, it is arithmetically dead: five
+  capabilities need **31** additional roles (§Capability).
+- **Never both mechanisms on one operation.** If an operation is a table verb,
+  the database grants it. If it is application logic, a thin-app guard checks it.
+  Applying both means two places to update and two ways to disagree. This is a
+  statement about *mechanisms for one operation*, and it is unaffected by the
+  correction below — scope and capability compose because both are **RLS**, one
+  mechanism.
+- **CORRECTED — the separation rule was WRONG and it shipped a security bug.**
+  This section used to say, as a greppable invariant: *"you must be unable to
+  write one query or guard that filters by site **and** by feature."* That rule
+  **caused a silent privilege escalation**, and it is withdrawn. Enforcement was
+  correct and the shape the rule forced was wrong.
+
+  **The failure it produced.** Splitting the two axes across two policies is the
+  natural reading of "never in the same expression". So scope was written as one
+  `FOR ALL` policy and each capability gate as its own per-operation policy:
+
+  ```sql
+  -- the WRONG shape, and it is wrong in a way no test of each half would catch
+  CREATE POLICY scope_only ON t FOR ALL          USING (<scope>);
+  CREATE POLICY cap_delete ON t FOR DELETE USING (<capability>);
+  ```
+
+  **Multiple PERMISSIVE policies on one operation are OR-ed.** `scope_only`
+  covers `DELETE`, so it admits every in-scope `DELETE` on its own, and
+  `cap_delete` can only ever widen. Verified end to end: a member holding **zero**
+  capabilities ran `DELETE` — **1 row deleted** — and `INSERT` — **1 row
+  inserted** — with **no error and no warning**. The capability gate was not
+  weak; it was absent, and every component of it was individually correct.
+
+  - The same holds for `FOR INSERT`: a `FOR ALL` policy's `USING` expression
+    falls back to govern `WITH CHECK`, so it admits inserts outright.
+  - Two policies on one operation therefore **widen** access. Never split one
+    operation's requirements across two permissive policies.
+
+  **The corrected rule. Scope and capability COMPOSE, in ONE policy per
+  operation.** They remain separate *inputs* — never derived from one another,
+  never inferred from each other, and never a source for the other — but they are
+  combined deliberately in the same expression:
+
+  ```sql
+  -- scope AND capability, one policy per operation
+  CREATE POLICY user_delete ON users FOR DELETE USING (
+      has_capability('user.delete')
+      AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
+  );
+  CREATE POLICY user_insert ON users FOR INSERT
+      WITH CHECK (
+      has_capability('user.create')
+      AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
+  );
+  ```
+
+  **The only correct way to get two policies on one operation is
+  `AS RESTRICTIVE`, which ANDs with the permissive set.** A permissive scope
+  policy plus a restrictive capability policy is equivalent to the single composed
+  policy above, and is the right structure when the scope half is shared by many
+  tables:
+
+  ```sql
+  CREATE POLICY scope_only ON t FOR ALL USING (<scope>);           -- permissive
+  CREATE POLICY cap_delete ON t AS RESTRICTIVE FOR DELETE
+      USING (has_capability('user.delete'));                       -- ANDs
+  ```
+
+  Verified both shapes. Two permissive `SELECT` policies (`unit_id = 2` and
+  `unit_id = 9`) returned **2** rows to a member scoped to unit 2; adding a
+  `RESTRICTIVE` policy on `unit_id = 2` dropped it to **1**.
+
+  - **What survives of the old rule, and is still greppable:** no capability is
+    *derived from* scope and none from the DB role. `has_capability()` reads
+    `current_user` and a capability table; `unit_tree_ids()` reads the site
+    claim. Neither is computed from the other, and a policy never infers "you
+    are an IC" from "you are scoped to a site".
+  - **What is gone:** the claim that the two can never meet in one expression.
+    They must meet. Keeping them apart is what removed the gate.
+  - Name tests after the attack: *"a member with no `user.delete` capability
+    cannot delete a row in its own site"* — that is the case both wrong shapes
+    fail, and neither per-half test ever ran.
 
 ### Scope — Postgres RLS only
 
@@ -353,8 +446,35 @@ CREATE POLICY row_scope ON projects USING (
   names; `app.user_id` is invisible to a policy built on `request.jwt.claims`.
 - **Hierarchy functions must return a scalar array, not `SETOF`.** Postgres rejects
   set-returning functions in policy expressions. Use `RETURNS uuid[]` with
-  `array_agg`, and expect **per-row evaluation** — a 400k-row scan cost 400,001
-  calls. Mark them `PARALLEL UNSAFE`; `PARALLEL SAFE` cost ~170× on the same scan.
+  `array_agg`.
+- **The hierarchy walk IS evaluated per row — confirmed, keep expecting this.**
+  Measured with `pg_stat_user_functions` against the shipped shape
+  (`STABLE SECURITY DEFINER`): **400,001 calls over 400,000 rows**, and 20,411
+  over 20,410. `EXPLAIN` shows the call inside the Seq Scan's `Filter`.
+  - **CORRECTED — the cause was wrong, twice over.** An earlier version of this
+    file blamed `VOLATILE`, and then claimed `PARALLEL SAFE` cost "~170×". Both
+    are withdrawn, measured on PostgreSQL 15.19 with identical function bodies:
+    - `STABLE` **12.5 s** vs `VOLATILE` **21.9 s** on the same 400k scan.
+      `VOLATILE` is ~1.7× slower and **neither is hoisted**. `STABLE` means
+      "same answer within this statement", **not** "called once". A `STABLE`
+      function in a qual that also references a column is called per candidate
+      row. A separate claim that `STABLE` is "hoisted into a one-time InitPlan —
+      2 invocations for 20,040 rows" **did not reproduce**; the same function on
+      a 20,410-row table was called 20,411 times.
+    - `PARALLEL SAFE` **5.8 s** vs `PARALLEL UNSAFE` **12.5 s** — `PARALLEL SAFE`
+      was **faster**, not 170× slower. It permits a `Gather` over a `Parallel Seq
+      Scan`; it does not force single-threaded evaluation. Keep `PARALLEL UNSAFE`
+      for a `SECURITY DEFINER` helper, but because it is the default and a
+      privileged helper should not be relaxed on the strength of one benchmark —
+      not for the performance reason that was written down.
+  - **Do not denormalise the scope to "fix" this.** That advice is withdrawn. It
+    invited optimising a function whose *single-call* cost is sub-millisecond, and
+    it would not have bought anything: the cost is per-row **repetition**, not
+    per-call cost. Rewriting the hierarchy storage to reduce a repetition count is
+    a data-model change made for a benchmark number.
+  - The honest statement of the trade: the cost is linear in rows scanned. If that
+    ever matters, the fix is a narrower predicate or an index, measured — not a
+    speculative rewrite of the hierarchy.
 - **A hierarchy function that walks the tree its own policy protects must be
   `SECURITY DEFINER`, and the tree table must NOT be `FORCE`d.** These are one
   decision, not two. With `SECURITY INVOKER` the walk reads a table whose policy
@@ -383,6 +503,31 @@ CREATE POLICY row_scope ON projects USING (
 - **Hierarchy is a function, not a policy.** Scope derives from position in a tree
   via one recursive helper — `LANGUAGE sql STABLE`. Adding a level is a data
   change, not a code change.
+- **The hierarchy decision, and the three designs rejected in its place.** All
+  three were built and executed, not argued about.
+  - **KEPT: the shipped recursive `STABLE` function.** Its cost is linear in rows
+    scanned (above) and its single-call cost is sub-millisecond.
+  - **REJECTED AS A VULNERABILITY, not a trade-off: a per-session scope cache.**
+    Cache the resolved scope in a GUC for the session and read it from the policy.
+    A member **widened its own scope**: a policy reading
+    `current_setting('app.scope', true)` returned **50 rows**; the same member
+    then called `set_config('app.scope', '{150,…,159}', true)` on **its own
+    custom GUC** and read **500 rows** across ten units. No error, no warning.
+    Custom (dot-prefixed) GUCs have **no privilege control at all**, and `SET
+    LOCAL` gives **no** protection — the caller sets it. Strictly worse than the
+    alternative *and* no faster. **Never cache authorization scope in a GUC the
+    caller can set.**
+  - **REJECTED: a closure table.** Faster than the recursive walk, and its
+    incremental repair **silently disagreed with the tree**: comparing every
+    unit's closure against the recursive walk found **5 differing ancestor/
+    descendant pairs across 9 roots, with no error raised**. Root 1 had the
+    *same count* on both sides (241) and different membership, so any
+    count-based sanity check passes. Repair logic that can be wrong without
+    complaining is a worse trade than a slower walk.
+  - **REJECTED: `ltree`.** Its `UNIQUE` constraint on `path` makes the obvious
+    repair **fail outright** — re-parenting a node onto an occupied path raises
+    `duplicate key value violates unique constraint "org_ltree_path_key"`.
+    Verified. See `docs/rebase.md` §6.6.2 for the full record.
 - **Default deny.** `REVOKE ALL ... FROM PUBLIC` before any grant. Tables intended
   to be globally readable are listed explicitly.
 - **The claims setting only reaches the database if PostgREST is configured to
@@ -429,19 +574,68 @@ GRANT  SELECT (id, site_id, name)  TO app_member;       -- `secret` unreadable
   revoking after the fact.
 - **A test asserts `SELECT` is denied** — not merely omitted from a response.
 
-### Feature — thin-app guards
+### Capability — per-operation RLS policies over a capability table
 
-Pages, exports and workflow actions are application logic, so they are guarded in
-the thin app, keyed on capability role. This is the **only** axis that reads the
-capability role.
+**Decided and executed: capability is enforced in the database, by per-operation
+RLS policies, with capability living in a TABLE — not in roles.** This replaced
+the previous answer in this section ("feature guards in the thin app", keyed on a
+capability role), because the thin-app answer could not be composed with scope,
+and composing them is mandatory (§Scope).
+
+```sql
+CREATE TABLE role_capability (
+  db_role    text NOT NULL,
+  capability text NOT NULL,
+  PRIMARY KEY (db_role, capability)
+);
+
+CREATE FUNCTION has_capability(cap text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT EXISTS (SELECT 1 FROM role_capability rc
+                 WHERE rc.db_role = current_user AND rc.capability = cap)
+$$;
+```
+
+- **Confirmed expressible: `FOR INSERT WITH CHECK` and `FOR DELETE USING`
+  discriminate by operation.** Postgres evaluates a different policy per verb,
+  so the capability requirement for `INSERT` cannot be satisfied by the one for
+  `DELETE`. Verified against the four policies on the `users` fixture: `SELECT`,
+  `UPDATE` (with `USING` *and* `WITH CHECK`), `INSERT` (`WITH CHECK` only) and
+  `DELETE` (`USING` only) each carried their own scope expression, and
+  `INSERT`/`DELETE` carried the capability term as well.
+- **Grants-as-capability is a dead end — enumerated, not asserted.** A policy can
+  only test `current_user`, so a capability modelled as a role needs one role per
+  distinct capability set. With the **five** capabilities in the executed fixture
+  (`financial.read`, `user.create`, `user.deactivate`, `user.delete`,
+  `user.read`) that is 2⁵ = **32** distinct sets; the empty set is already served
+  by the base role, so **31 additional database roles**, each needing a policy per
+  table, plus `GRANT role TO authenticator` entries that are cluster-scoped and
+  need `ADMIN OPTION` — a superuser statement per role.
+- **Role inheritance cannot help. It only ever adds, never subtracts.** Verified:
+  grant a privilege to the parent role and the child inherits it; then
+  `REVOKE` that privilege **from the child** and it is still `t` — inheritance
+  puts it straight back. There is no way to express "this role has that
+  capability *except* this one". And every serving role here is `NOINHERIT`
+  (verified: `app_anon`, `app_member`, `app_admin`, `app_auditor`, `cap_auth`,
+  `cap_owner` all `rolinherit = f`), which makes membership **inert** for
+  privilege resolution in the first place.
+- **A new capability inside an existing tier is one inserted row, no migration.**
+  Verified: `INSERT INTO role_capability VALUES ('app_auditor',
+  'financial.export')` and the tier has it, with no DDL and no policy change. The
+  operation policies reference capabilities **by name**, so a new name is not a
+  code change either.
+- **A new tier that is not a superset of an existing one is a new database role** —
+  and therefore a bootstrap change, an `ADMIN OPTION` grant, and a decision about
+  what that role may reach. Say so before designing one.
 - Do not build query-builder proxies, `Proxy` wrappers, or CLS-based scope
   propagation. The previous implementation of this was ~2,400 lines that
   silently enforced nothing.
-- Tables intended to be globally readable must be listed explicitly in the
-  policy set. Default is deny.
 - **Every policy has a test**: permitted case returns rows, denied case returns
   none, and the denied case is proven for each access path. An LLM writing
   `USING (true)` is otherwise invisible.
+  - **Add the cross-axis test, which is the one that actually catches the bug
+    above:** a member with **no** capability must be denied, *in its own scope*.
+    Per-half tests pass against both the correct and the broken shape.
 
 ## B3. API contract — the spec is generated from the live schema
 

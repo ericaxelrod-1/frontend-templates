@@ -109,8 +109,52 @@ $$;
 -- functions in policy expressions outright: "set-returning functions are not
 -- allowed in policy expressions". The policy below therefore never compiled.
 --
--- uuid[] scalar, not SETOF. PARALLEL UNSAFE is deliberate: PARALLEL SAFE forced
--- single-threaded evaluation and cost ~170x on a 400k-row scan.
+-- uuid[] scalar, not SETOF.
+--
+-- CORRECTED. This comment used to say: "PARALLEL UNSAFE is deliberate: PARALLEL
+-- SAFE forced single-threaded evaluation and cost ~170x on a 400k-row scan."
+-- That is withdrawn — it is close to backwards, and it was never measured.
+--
+-- Re-measured on PostgreSQL 15.19 against the 400,000-row fixture in
+-- hypothesis_test.h3_big, identical function bodies, only the marking changed:
+--
+--   PARALLEL UNSAFE   12.5 s
+--   PARALLEL SAFE      5.8 s   <-- FASTER, not 170x slower
+--
+-- PARALLEL SAFE is faster because it changes the PLAN, not the function: it
+-- permits a Gather with 4 launched workers over a Parallel Seq Scan. It does not
+-- "force single-threaded evaluation" — the exact opposite happened.
+--
+-- PARALLEL UNSAFE is KEPT, but on its own merits and not that reason:
+--   1. It is the DEFAULT for a new function (proparallel = 'u'). Writing it out
+--      documents intent rather than inheriting an accident.
+--   2. This function is SECURITY DEFINER. Marking a privileged helper parallel-
+--      safe because one benchmark was faster is exactly the kind of benchmark-
+--      driven security relaxation that should not be made silently. The parallel
+--      plan above was only reachable after forcing parallel_setup_cost=0 and
+--      min_parallel_table_scan_size=0 — a hostile default, not a real one.
+--
+-- CONFIRMED, and it is worth keeping: the walk IS evaluated per row, exactly as
+-- claimed. Measured with pg_stat_user_functions on this shape
+-- (STABLE SECURITY DEFINER) over 400,000 rows: 400,001 calls. Over 20,410 rows:
+-- 20,411 calls. EXPLAIN shows it inside the Seq Scan's Filter, not hoisted.
+--
+-- What was WRONG in the belief that it was per-row: the cause. It is not VOLATILE.
+-- STABLE is also per-row in a qual that also contains a column reference —
+-- "STABLE" means "same answer within this statement", NOT "called once".
+-- Measured: STABLE 12.5 s vs VOLATILE 21.9 s on the same 400k scan — VOLATILE is
+-- about 1.7x slower, and neither is hoisted.
+--
+-- A previous draft of this file also claimed a STABLE function is "hoisted into a
+-- one-time InitPlan (2 invocations for 20,040 rows)". Withdrawn too: it was not
+-- reproducible. STABLE in a policy qual is called once per candidate row.
+--
+-- CONSEQUENCE: an earlier version of this comment told the next maintainer to
+-- "denormalise the scope instead of recursing per row". Withdrawn — it invited
+-- optimising a function whose single-call cost is sub-millisecond, and it would
+-- have bought nothing: the cost here is per-row REPETITION, not per-call cost.
+-- Changing the hierarchy storage to fix a repetition count is a data-model
+-- change made for a benchmark number.
 --
 -- CORRECTED, and this is the subtle one. The tree walk READS `sites`, and the
 -- `sites` policy below calls this function. With SECURITY INVOKER (the documented

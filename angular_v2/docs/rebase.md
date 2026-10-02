@@ -538,8 +538,9 @@ than no doc.
 | W04 | N1 | Doc-claims checker: every command in `development.md` exists in a `package.json` script | The checker runs in `verify` |
 | W05 | N7 | **PostgREST/RLS spike** — table → policy → PostgREST → JWT → curl → `openapi.json` → types | Five curl checks: per-claim RLS, anon not a leak, spec served |
 | W06 | N2 | `postgrest.conf`: `db-anon-role`, `jwt-role-claim-key`, shared secret. **Four** roles: a migration/owner role plus `app_anon`/`app_member`/`app_admin` | `curl /` returns the spec; a wrong secret is refused; **no request-serving role owns a table** |
-| W07 | N2 | Native RLS policies per ADR-0023: one policy per table, `request.jwt.claims`, fail-closed, plus `FORCE ROW LEVEL SECURITY` — **except on the tree table, which must not be `FORCE`d** (§6.6 item 8) | Permitted returns rows; denied returns none; per access path; **and the policy still applies when run as the owner role** |
+| W07 | N2 | Native RLS policies per ADR-0023: **one composed policy per operation**, `request.jwt.claims`, fail-closed, plus `FORCE ROW LEVEL SECURITY` — **except on the tree table, which must not be `FORCE`d** (§6.6 item 8). **Scope and capability compose; never split one operation across two permissive policies** (§6.6.2) | Permitted returns rows; denied returns none; per access path; **and the policy still applies when run as the owner role**. Plus: a member with **no** capability is denied **in its own scope**, and no `(relid, cmd)` pair carries two `polpermissive` rows |
 | W08 | N2 | Column + table grants; `REVOKE ALL FROM PUBLIC` first, then `REVOKE SELECT` **at table level** before the column list | Assert `SELECT` is **denied**, not merely omitted. The column-revoke-only order fails **open** — verified |
+| W08a | N2 | **Capability as a table, enforced by per-operation policies.** Recorded by executed design testing, not by argument | Five capabilities need **31** roles as grants; a new capability in an existing tier is **one inserted row**; hierarchy alternatives (scope cache, closure table, `ltree`) each rejected with evidence — §6.6.2 |
 | W09 | N2 | Plain-SQL migrations, one directory, one table; `NOTIFY pgrst, 'reload schema'` after commit | Every migrated table is reachable at its endpoint |
 | W10 | N2 | `seed.ts` using PostgREST or `psql`, never TypeORM; seeds the three DB roles and an admin user | A fresh `setup` reaches a logged-in state |
 | W11 | N2 | Thin Nest app: JWT issuance, login orchestration, password reset, email, CAPTCHA, cron | Each route has a test; the six security tests in W13 |
@@ -631,6 +632,12 @@ Checked against PostgREST documentation and upstream issues rather than assumed:
 A spike ran against a real install, not documentation. Three of the four findings
 change the design.
 
+> **Read this with §6.6.2.** The findings below are about RLS mechanics. A later
+> round of executed design testing found that a rule in `AGENTS.md` B2 and
+> ADR-0023 — "scope and capability never appear in the same expression" — caused
+> a silent privilege escalation, and that two documented performance claims were
+> false. Neither was visible from the spike.
+
 | | |
 |---|---|
 | PostgreSQL | **15.19** via `apt-get install postgresql` |
@@ -674,6 +681,11 @@ named `pgrst_smoke`. None of it is template material.
 
 Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicated
 `hypothesis_test` database. Three of my documented claims were **wrong**.
+
+> **A fourth batch followed — §6.6.2.** These ten are about RLS mechanics. A later
+> round found that a *rule* in ADR-0023 and `AGENTS.md` B2 caused a real privilege
+> escalation, and that two performance claims written down here were false. The
+> section below is correct as far as it goes and incomplete about authorization.
 
 | # | Verdict |
 |---|---|
@@ -821,6 +833,135 @@ Also confirmed: a token with **no `exp` claim is accepted**; forged, unsigned an
 expired tokens are rejected. PostgREST caches **schema and grants** — `NOTIFY` is
 required for both, but `postgrest.conf` and `db-pre-request` changes need a
 restart.
+
+### 6.6.2 Executed design testing — capability, and what was withdrawn
+
+The §6.6 hypotheses were about RLS mechanics. These are about the **authorization
+model** — executed against PostgreSQL 15.19 in `cap_proof`, and re-measured
+against `hypothesis_test`. One finding is a **security bug caused by our own
+documentation**, and it is the reason this section exists.
+
+#### The rule that shipped a privilege escalation — WITHDRAWN
+
+`AGENTS.md` B2 and ADR-0023 both said scope and capability must **"never appear in
+the same expression"**, and `security.md` said the same. It read like a safety
+property. It was a correctness hazard, because it is precisely the arrangement in
+which a capability check gets OR-ed out of existence.
+
+Splitting the axes across policies — the obvious reading of the rule — produces:
+
+```sql
+CREATE POLICY scope_only  ON t FOR ALL          USING (<scope>);        -- permissive
+CREATE POLICY cap_delete  ON t FOR DELETE USING (<capability>);        -- permissive
+```
+
+**Multiple PERMISSIVE policies on one operation are OR-ed.** `scope_only` covers
+`DELETE` by itself, so `cap_delete` can only widen the set. Executed, as a member
+holding **zero** capabilities:
+
+| | correct shape | rule-compliant shape |
+|---|---|---|
+| `DELETE` a row in its own unit | **0 rows** | **`DELETE 1`** |
+| `INSERT` a row in its own unit | rejected | **`INSERT 0 1`** |
+| errors raised | — | **none** |
+
+`INSERT` fails the same way because a `FOR ALL` policy's `USING` expression is
+reused as its `WITH CHECK`. The gate was not weak — it was absent, and every
+component of it was individually correct.
+
+Semantics, verified directly:
+
+| Shape | Combination | Result |
+|---|---|---|
+| two **permissive** `SELECT` policies (`unit_id = 2`, `unit_id = 9`) | **OR** | member scoped to unit 2 saw **2** rows |
+| + `CREATE POLICY … AS RESTRICTIVE … USING (unit_id = 2)` | **AND** | **1** row |
+
+**Corrected rule: scope and capability COMPOSE, in one policy per operation.** Two
+policies on one operation are only correct with `AS RESTRICTIVE`. They remain
+separate *inputs* — neither derived from the other — but they meet on purpose.
+
+#### Capability: decided, and the alternatives enumerated
+
+Enforced in the database by per-operation RLS policies, capability in a **table**
+(`role_capability(db_role, capability)`), never in roles.
+
+- **Confirmed expressible.** `FOR INSERT WITH CHECK` and `FOR DELETE USING`
+  discriminate by operation. Verified against the four policies on `users`:
+  `SELECT`, `UPDATE` (`USING` + `WITH CHECK`), `INSERT` (`WITH CHECK` only),
+  `DELETE` (`USING` only), each with its own scope and capability terms.
+- **Grants-as-capability is a dead end — enumerated, not asserted.** A policy can
+  only test `current_user`, so a capability modelled as a role needs one role per
+  distinct set. With the **five** capabilities in the fixture
+  (`financial.read`, `user.create`, `user.deactivate`, `user.delete`, `user.read`)
+  that is 2⁵ = 32 sets, the empty one already served by the base role, so **31
+  additional roles** — each a policy per table plus an `ADMIN OPTION` cluster
+  grant.
+- **Role inheritance cannot help: it only adds, never subtracts.** Verified — a
+  child inherits a parent's grant, then `REVOKE` from the child leaves it `t`.
+  Every serving role is `NOINHERIT` (`rolinherit = f` for all six), so membership
+  is inert for privilege resolution anyway.
+- **A new capability inside an existing tier = one inserted row, no migration.**
+- **A new tier that is not a superset = a new database role** — a bootstrap change
+  and an `ADMIN OPTION` grant.
+
+#### Hierarchy: kept, and three alternatives built and rejected
+
+- **KEPT: the recursive `STABLE` function.**
+- **Per-session scope cache — REJECTED AS A VULNERABILITY, not a trade-off.** A
+  member honestly scoped to one unit read **50** rows, then called
+  `set_config('app.scope', '{150,…,159}', true)` on **its own** custom GUC and read
+  **500**. Custom GUCs have no privilege control; `SET LOCAL` gives no protection
+  because the caller is the one setting it. Strictly worse than the alternative
+  and no faster.
+- **Closure table — rejected.** Its incremental repair **silently disagreed with
+  the tree**: 5 ancestor/descendant pairs missing one way and 5 the other, across
+  **9 roots, with zero errors raised**. Root 1 had the *same count* both sides
+  (241) and different membership, so count-based checks pass.
+- **`ltree` — rejected.** Its `UNIQUE` constraint on `path` makes the obvious
+  repair fail outright: `duplicate key value violates unique constraint
+  "org_ltree_path_key"`. Verified.
+  > **A correction to an earlier draft of this record.** It justified rejecting
+  > `ltree` by claiming `postgresql-contrib` is not installed on this host.
+  > **That is false** — `postgresql-contrib 15+248+deb12u1` is installed and
+  > `ltree 1.2` is already an extension in `cap_proof`. The real reason is the
+  > `UNIQUE` constraint, and it stands alone.
+
+#### Performance claims re-measured — two were false, one correction went further
+
+Measured on PostgreSQL 15.19, 400,000 rows, identical function bodies, only the
+declaration changed:
+
+| Previously documented | Verdict | Measured |
+|---|---|---|
+| "400,000 rows cost 400,001 calls" | **TRUE — kept** | 400,001 calls, via `pg_stat_user_functions` |
+| "`PARALLEL SAFE` cost ~170×" | **FALSE — withdrawn** | `PARALLEL SAFE` **5.8 s** vs `PARALLEL UNSAFE` **12.5 s** — **faster** |
+| "`PARALLEL SAFE` forces single-threaded evaluation" | **FALSE — withdrawn** | it permits `Gather` + `Parallel Seq Scan`, 4 workers launched |
+| per-row evaluation is caused by `VOLATILE` | **FALSE — withdrawn** | `STABLE` **12.5 s** vs `VOLATILE` **21.9 s**; neither is hoisted |
+| a `STABLE` function is "hoisted into a one-time InitPlan — 2 invocations for 20,040 rows" | **FALSE — withdrawn** | same function on 20,410 rows: **20,411 calls** |
+| "denormalise the scope instead of recursing per row" | **WITHDRAWN as advice** | invites optimising a ~3 ms call; the cost is repetition, not per-call cost |
+
+`STABLE` means *"the same answer within this statement"* — **not** "called once".
+In a qual that also references a column it is evaluated per candidate row.
+
+> **A note on how this was checked, because it changed the outcome.** The first
+> attempt instrumented the function with a `setval` side effect and produced a
+> number that did not survive a second attempt. `pg_stat_user_functions.calls` is
+> the authoritative counter and needs no cooperation from the function body. Any
+> performance claim in this document that was not taken from it, or from
+> `EXPLAIN (ANALYZE)`, should be treated as unverified.
+
+### 6.6.3 Open: revocation while a session is live
+
+**Nobody has tested what happens when a permission or a membership is revoked while
+a session is live.** It is the seam between the capability mechanism and the
+hierarchy mechanism, and the two have different revocation latency *by
+construction*: capability resolves per statement from a table read at that moment,
+while hierarchy scope resolves from a **signed JWT claim** verified once at the
+start of the transaction. A claim can carry a scope that no longer exists.
+
+Recorded as an explicit unknown, with the required cases listed as a specification
+in `docs/testing.md` under *Required, and not yet written*. Until they are written
+and executed, treat live-session revocation as **not implemented**.
 
 ---
 

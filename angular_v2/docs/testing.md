@@ -75,14 +75,63 @@ one that was found **after** the docs claimed it was handled:
    for site B returns only site B.
 3. **Operation** — `app_member` may `SELECT` and `INSERT` but `UPDATE` and
    `DELETE` are refused by grants, not by application code.
-4. **Vocabulary** — no DB role is named after a capability role; no policy or grant
-   mentions `ic` or `site_manager`.
-5. **Separation** — no policy or guard filters by scope *and* capability together.
+4. **Vocabulary** — capability lives in a table, not in roles; no DB role is named
+   after a capability; no policy or grant mentions `ic` or `site_manager`.
+5. **Composition, not separation** — scope and capability appear **together**, in
+   one policy per operation. The previous version of this line said "no policy or
+   guard filters by scope *and* capability together". **That rule caused a silent
+   privilege escalation** (`adr.md` ADR-0023), and these replace it:
+   - **A member with no capability is denied, in its own scope** — must fail to
+     `DELETE` and to `INSERT` rows belonging to *its own* unit. This is the only
+     assertion that separates the correct shape from the broken one: when scope
+     and capability sit in two permissive policies, every other test on this page
+     still passes while the capability check has been OR-ed away entirely.
+   - **No operation carries two permissive policies.** Assert against `pg_policy`
+     that no `(relid, cmd)` pair has more than one `polpermissive` row. Where two
+     policies are wanted, one must be `AS RESTRICTIVE`.
 6. **Policy totality** — empty, absent and malformed claims all yield zero rows and
    no error; an admin token with a garbage `site_id` still sees everything.
 7. **Not superuser** — every serving role is `NOSUPERUSER NOBYPASSRLS`, asserted
    against the catalogue. `FORCE ROW LEVEL SECURITY` does not bind either.
 8. **No public function execution** — every function's `proacl` excludes `PUBLIC`.
+9. **Hierarchy** — the walk returns the right set for a known root (root→3, mid→2,
+   unrelated→**1**, unknown→0), and **the caller cannot widen its own scope**:
+   `set_config('app.scope', …)` on a caller-writable GUC must not change what the
+   policy returns. The per-session scope cache was rejected as a vulnerability
+   precisely because it fails this test.
+
+### Required, and not yet written: revocation while a session is live
+
+**This is an explicit unknown, recorded here because nobody has tested it.**
+
+- **What is unknown:** what happens when a **permission or a membership is revoked
+  while a session is live**. Nothing in the executed design testing covers it.
+- **Why it matters precisely:** it is the seam between the two mechanisms this
+  template rests on, and the two have **different revocation latency by
+  construction**. The capability mechanism resolves per *statement*, from
+  `current_user` and a table read at that moment, so a revoked capability row
+  should bite on the very next request. The hierarchy mechanism resolves scope
+  from a **signed JWT claim** (`request.jwt.claims.site_id`), which PostgREST
+  verifies once at the start of the transaction. A claim carries a scope that may
+  no longer exist in the database, and nothing reconciles the two. Which one wins
+  has not been measured.
+- **The cases that must be covered:**
+  1. A **capability** revoked mid-session → the next request is denied. Expected
+     to work, because `has_capability()` reads the table live. **Unverified.**
+  2. A **site membership** revoked mid-session → the next request must not see the
+     old scope. Expected **not** to hold if the scope rides in the token, because
+     the token was already signed. **Unverified, and this is the one that
+     matters.**
+  3. Access token still valid, **refresh token** revoked → refresh refused, session
+     cannot be extended.
+  4. A user **removed from a unit** whose descendants they were reaching → no rows
+     from that subtree on the next request.
+  5. The claim references a **deleted** site → a denial, never an error.
+- **Assertion discipline as everywhere else:** bodies and row counts, never the
+  status code alone, and prove each test can go red.
+- Until these exist and are executed, treat live-session revocation as **not
+  implemented**, and do not present the access token's TTL as if it bounds the
+  exposure.
 
 ### Assert on the body, never the status
 

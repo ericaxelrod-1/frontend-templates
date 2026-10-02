@@ -249,31 +249,62 @@ CREATE POLICY tenant_isolation ON projects USING (
 - Application code must not build query-builder proxies, `Proxy` wrappers, or
   CLS-based scope propagation. Enforcement below the application is the point.
 
-### Scope is one axis; capability is another
+### Scope and capability are separate inputs that COMPOSE
 
-ADR-0023 defines the whole model. **Row scope and capability never appear in the
-same expression.**
+ADR-0023 defines the whole model. ~~**Row scope and capability never appear in the
+same expression.**~~ **That rule is withdrawn — it caused a silent privilege
+escalation.** Two axes written into two policies is the one arrangement in which
+a capability check is silently OR-ed out of existence, and it was verified: a
+member with **zero** capabilities deleted a row and inserted a row, no error.
+
+**The corrected rule: they compose, in one policy per operation.**
+
+```sql
+CREATE POLICY user_delete ON users FOR DELETE USING (
+    has_capability('user.delete')
+    AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
+);
+CREATE POLICY user_insert ON users FOR INSERT WITH CHECK (
+    has_capability('user.create')
+    AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
+);
+```
+
+They remain **separate inputs** — capability is never derived from scope, nor from
+the DB role — but they meet in one expression on purpose. Two policies on one
+operation are only correct with **`AS RESTRICTIVE`**, which ANDs with the
+permissive set: two *permissive* policies are **OR**ed, so they always **widen**
+access.
 
 | Axis | Question | Mechanism | Keyed on |
 |---|---|---|---|
 | Scope | Which rows? | RLS policy | `site_id` claim |
 | Operation | Which verbs? | table `GRANT` | DB `role` claim |
-| Feature | Which features? | thin-app guards | capability role |
+| Capability / feature | Which features? | per-operation RLS policy | capability **table** |
 
 **An IC and a site manager are the same DB role — `app_member`.** They reach the same
 features and are scoped to their own site by the *identical* policy. Their only
-difference is capability, enforced above RLS. An admin is recognised by
-`current_user = 'app_admin'`, **not** by an absent `site_id` and not by a claim —
-so the admin branch matches every row for a reason that cannot be forged.
+difference is capability, enforced in the database by a row in a capability table.
+An admin is recognised by `current_user = 'app_admin'`, **not** by an absent
+`site_id` and not by a claim — so the admin branch matches every row for a reason
+that cannot be forged.
 
-Never create DB roles named after capabilities (`ic`, `site_manager`). That fuses
-the axes and forces a policy per role per table.
+Never create DB roles named after capabilities (`ic`, `site_manager`). Modelling a
+capability as a role needs **one role per distinct capability set** — five
+capabilities means **31** additional roles — and role inheritance cannot help
+because it only adds and never subtracts.
 
 For a hierarchy, scope derives from position in a tree via one recursive function —
 `RETURNS uuid[]` with `array_agg` (`SETOF uuid` is **rejected** in a policy
-expression), indexed on `sites(parent_id)`, and `PARALLEL UNSAFE`. It is
-evaluated **per row** — 400,000 rows cost 400,001 calls — so large tables should
-denormalise the scope instead. Adding a level is a data change.
+expression), indexed on `sites(parent_id)`. The walk **is** evaluated per row —
+confirmed at 400,001 calls over 400,000 rows — so do not denormalise the scope to
+"fix" it; the cost is per-row repetition, not per-call cost, and a single call
+costs ~3 ms. Adding a level is a data change.
+
+**Never cache resolved scope in a GUC the caller can set.** A per-session scope
+cache was built and rejected as a vulnerability, not a trade-off: a member read 50
+rows, called `set_config('app.scope', …)` on its own custom GUC, and read **500**.
+Custom GUCs have no privilege control and `SET LOCAL` gives no protection.
 
 The walk is **self-inclusive**: a member scoped to a site sees its own row plus its
 descendants, and a member scoped to an unrelated site sees **its own single row and

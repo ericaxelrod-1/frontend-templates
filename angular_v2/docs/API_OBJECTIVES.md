@@ -46,6 +46,9 @@ ADR-0023.
 | A policy is **total**: empty, absent and malformed claims deny, never error | `current_setting(...,true)` returns `''`, and `''::json` raises. `OR` does **not** short-circuit past a raising operand, so a garbage `site_id` broke an admin too — only a guarded accessor (`EXCEPTION … RETURN NULL`) makes it total |
 | A hierarchy function that walks the table its own policy protects is `SECURITY DEFINER`, **and that table is not `FORCE`d** | One decision, not two. Under `SECURITY INVOKER` every non-superuser query died with `stack depth limit exceeded`; `FORCE` on that table causes it rather than fixing it |
 | Hierarchy scope derives from a recursive function, not duplicated policy logic | `site_tree_ids()` test; the policy contains no `WITH RECURSIVE`. Counts: root→3, mid→2, unrelated→**1** (the walk is self-inclusive), unknown→0, admin→all |
+| **The walk is evaluated per row, and the cost is per-row repetition — not a reason to denormalise** | Measured: 400,001 calls over 400,000 rows; a single call costs ~3 ms. `STABLE` is **not** hoisted (see `rebase.md` §6.6.2) |
+| **`PARALLEL UNSAFE` is the default and the safe marking for a `SECURITY DEFINER` helper — not a ~170× performance fix** | Measured: `PARALLEL SAFE` **5.8 s** vs `PARALLEL UNSAFE` **12.5 s** on the same 400k scan. The previous "~170× slower" claim was backwards |
+| **Resolved scope is never cached in a GUC the caller can set** | A per-session scope cache let a member read 50 rows, then **500** after one `set_config` on its own custom GUC. Rejected as a vulnerability, not a trade-off |
 | The `role` claim is validated at minting | Necessary but **not sufficient** — it protects only the issuer |
 | The issuer always sets `exp` | A token with no `exp` is **accepted** by PostgREST |
 | Denials are asserted on the body, not the status | A correct denial, a full leak and a partial 3-of-5 leak were **all HTTP 200** |
@@ -58,7 +61,13 @@ ADR-0023.
 | Internal columns revoked with column-level `GRANT`, **after** a table-level `REVOKE SELECT` | Assert `SELECT` is **denied**, not merely omitted. The wrong order fails open at `200` with the value intact |
 | An admin token carries no `site_id`, so scope cannot narrow it | Admin sees rows across every site in one test, and is recognised by `current_user` rather than by a missing claim |
 | An `ic` and a `site_manager` are the same DB role | A `grep` gate asserts no DB role is named after a capability |
-| **No query filters by site *and* by feature** | Grep: no capability role appears in any policy or grant |
+| **Capability lives in a table, enforced by per-operation RLS policies** | `FOR INSERT WITH CHECK` / `FOR DELETE USING` verified to discriminate by operation. Not enforced by a thin-app guard — a guard above the database cannot be composed with the policy below it |
+| **Capability is NOT modelled as a database role** | Five capabilities need **31** additional roles (2⁵ sets, empty set already served). Role inheritance only adds and never subtracts, and is inert under `NOINHERIT` |
+| **A new capability inside an existing tier is one inserted row, no migration** | Policies name capabilities, so a new name needs no DDL. A new **tier** that is not a superset is a new role — a bootstrap and `ADMIN OPTION` change |
+| ~~**No query filters by site *and* by feature**~~ **WITHDRAWN — this caused a privilege escalation** | Two permissive policies on one operation are **OR**ed, so a `FOR ALL` scope policy discarded the capability gate: a member with **zero** capabilities `DELETE`d and `INSERT`ed, no error. Scope and capability now **compose in one policy per operation** |
+| **No operation carries two permissive policies**; two policies require `AS RESTRICTIVE` | Assert on `pg_policy` that no `(relid, cmd)` pair has two `polpermissive` rows. Verified: two permissive `SELECT` policies → 2 rows; adding `RESTRICTIVE` → 1 |
+| **A member with no capability is denied, in its own scope** | The cross-axis test. Every per-half test passes against both the correct and the broken shape; only this one fails |
+| **Live-session revocation is an explicit unknown** | Untested and unwritten (`testing.md`): capability resolves per statement, hierarchy scope resolves from a signed claim — different latency by construction |
 | **The RLS suite is proven able to fail** | Disabling `ENABLE ROW LEVEL SECURITY`, dropping the column `REVOKEs`, and inverting the boundary `GRANT` each turn `verify` red at step 7 of 8 (`rebase.md` §6.6.1) |
 | Thin-app routes default deny | A new controller without `@Public()` or a guard fails a test |
 
