@@ -11,6 +11,13 @@ const frontendRoot = resolve(backendRoot, '..', 'frontend');
  * first failure ends the run with that step's exit code, so a broken step is
  * never reported as a later one. Every step inherits stdio: output is the real
  * output of the real tool, not a summary of it.
+ *
+ * The row-level security proof is a gating step, not a nicety. It is the only
+ * thing in this list that would catch a policy regression: the other seven steps
+ * stay green while every row-level security policy in the database is dropped.
+ * It needs a live PostgreSQL and a PostgREST binary, and it fails loudly when
+ * either is absent — there is no skip, because a security suite that passes
+ * without exercising its subject reports a false green (`AGENTS.md` §2.2).
  */
 const steps = [
   { name: 'typecheck (backend)', cwd: backendRoot, args: ['run', 'typecheck'] },
@@ -19,6 +26,7 @@ const steps = [
   { name: 'unit tests (backend)', cwd: backendRoot, args: ['test'] },
   { name: 'unit tests (frontend)', cwd: frontendRoot, args: ['test', '--', '--watch=false'] },
   { name: 'integration tests', cwd: backendRoot, args: ['run', 'test:e2e'] },
+  { name: 'row-level security proof', cwd: backendRoot, args: ['run', 'test:rls'] },
   { name: 'database smoke check', cwd: backendRoot, args: ['run', 'smoke'] },
 ];
 
@@ -42,7 +50,7 @@ function run() {
     return 1;
   }
 
-  console.log('npm run verify — typecheck, lint, unit, integration, database smoke');
+  console.log('npm run verify — typecheck, lint, unit, integration, RLS proof, database smoke');
 
   for (const [index, step] of steps.entries()) {
     banner(index + 1, steps.length, step.name);

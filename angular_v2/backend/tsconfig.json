@@ -33,6 +33,7 @@
     "test/**/*.ts",
     "vitest.config.ts",
     "vitest.config.e2e.ts",
+    "vitest.config.rls.ts",
     "vitest.config.smoke.ts"
   ],
   "exclude": [

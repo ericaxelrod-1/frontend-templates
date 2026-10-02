@@ -102,6 +102,7 @@ against a live database.
 | `npm run lint` | ESLint, both projects |
 | `npm test` | Unit tests |
 | `npm run test:e2e` | Integration tests against a throwaway schema |
+| `npm run test:rls` | Row-level security proof — real Postgres, real PostgREST |
 | `npm run generate:client` | Regenerate the Angular client from `openapi.json` |
 | `npm run migration:run` | Apply migrations |
 | `npm run migration:revert` | Revert the last migration |
@@ -124,12 +125,40 @@ npm test
 # Integration, with a throwaway schema per suite
 npm run test:e2e
 
+# Row-level security proof
+npm run test:rls
+
 # Single concern
 npm test -- rls
 ```
 
 Never point tests at a developer's working data. Each integration suite creates and
 drops its own schema.
+
+### The row-level security proof
+
+`npm run test:rls` is a **gating step of `verify`**, and it needs more than the
+other suites do:
+
+- a running PostgreSQL, reachable with the credentials in `backend/.env`;
+- `sudo -u postgres psql`, because role bootstrap needs `CREATEROLE`;
+- the `postgrest` binary on `PATH` at `/usr/local/bin/postgrest`.
+
+If any of those is missing the suite **fails**. It never skips: a security suite
+that passes without exercising its subject is a false green, which is the exact
+failure mode this suite exists to prevent.
+
+It rebuilds its own `rls_proof` database from nothing on every run, applies both
+SQL files, seeds a three-level site tree, starts a PostgREST on port **3005** and
+tears it down afterwards. It refuses to run if something else already answers on
+that port, and it never touches the other PostgREST instance on 3002.
+
+The test names are the documentation. Each one names the attack it prevents —
+"a validly-signed token naming the table-owning role is refused, and the row
+survives" — because that is what a reader six months from now needs to know.
+Assertions are on bodies and row counts, never on status codes alone: with a
+table-level grant in place a leaked column comes back at HTTP 200 with its value
+intact, and a status-only test passes on the leak.
 
 ---
 

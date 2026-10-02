@@ -281,7 +281,9 @@ code.**
 - One policy per table, and it must be **total** — every `OR` branch is
   evaluated, so a cast in any branch can take the whole query down. Never write
   a bare `current_setting(...,true)::json`; it **raises** on an empty string
-  rather than denying. Use a defensive accessor and `nullif` on the uuid cast:
+  rather than denying. Use a defensive accessor, and **never cast a caller-supplied
+  value to `uuid` inside a policy** — a malformed claim raises
+  `invalid input syntax for type uuid` and takes the whole query down with it:
 
 ```sql
 CREATE FUNCTION request_claims() RETURNS jsonb
@@ -289,30 +291,74 @@ LANGUAGE sql STABLE PARALLEL SAFE AS $$
   SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
 $$;
 
+-- The uuid cast is guarded. A malformed site_id yields NULL, which flows into
+-- site_tree_ids(NULL), which walks no rows — a denial, not an error.
+CREATE FUNCTION claim_site_id() RETURNS uuid
+LANGUAGE plpgsql STABLE PARALLEL SAFE AS $$
+DECLARE raw text;
+BEGIN
+  raw := request_claims()->>'site_id';
+  IF raw IS NULL OR raw = '' THEN RETURN NULL; END IF;
+  RETURN raw::uuid;
+EXCEPTION WHEN others THEN RETURN NULL;   -- never raise on attacker input
+END $$;
+
 CREATE POLICY row_scope ON projects USING (
-    request_claims()->>'role' = 'admin'
-    OR site_id = nullif(request_claims()->>'site_id', '')::uuid
+    current_user = 'app_admin'
+    OR site_id = ANY (site_tree_ids(claim_site_id()))
 );
 ```
 
-- **An `admin` token carries no `site_id`**, so the admin branch matches every row
-  and `nullif(...)::uuid` yields `NULL` — `TRUE OR NULL` is `TRUE`. A *malformed*
-  `site_id` on an admin token is therefore harmless, because the right-hand cast
-  never completes.
+- **Key the admin branch on `current_user`, never on the `role` claim.** The
+  claim is caller-supplied and signed by whoever holds the secret; `current_user`
+  is set by Postgres from the `SET ROLE` the escalation boundary already
+  constrained. Reading the admin tier out of the token re-opens the very hole
+  this policy exists to close — verified: a member who put `"role":"admin"` in
+  their own validly-signed token saw every row.
+- **The DB role vocabulary is `app_anon` / `app_member` / `app_admin`.** A
+  capability role (`ic`, `site_manager`, `admin`) is a *different* vocabulary and
+  is not a database role. Writing `request_claims()->>'role' = 'admin'` produces
+  a **dead branch** that never matches, because no token ever carries the bare
+  string `admin`. Verified over HTTP: a valid `app_admin` token got `200 []` and
+  saw nothing at all.
+- **A malformed `site_id` must not break an admin either.** It is tempting to
+  reason that `TRUE OR NULL` is `TRUE` and "the failing cast never completes" —
+  that reasoning is **wrong**. `OR` does not short-circuit past an expression
+  that raises; both operands are evaluated and the error wins. Verified: an
+  admin token with `"site_id":"garbage"` returned
+  `invalid input syntax for type uuid`. Only the guarded accessor above makes the
+  policy total for every input, admin included.
 - Absent, empty, or `{}` claims → both branches false → **zero rows**, no error.
+- **A policy is evaluated for EVERY role that reaches the table, including
+  `app_anon`.** So `EXECUTE` on the policy's helper functions must be granted to
+  `app_anon` too — verified, omitting it made unauthenticated reads fail with
+  `permission denied for function site_tree_ids` instead of returning zero rows.
+  A policy that errors is a denial-of-service surface and an oracle.
 - **`SET LOCAL app.user_id` is not an alternative.** A policy reads the setting it
   names; `app.user_id` is invisible to a policy built on `request.jwt.claims`.
 - **Hierarchy functions must return a scalar array, not `SETOF`.** Postgres rejects
   set-returning functions in policy expressions. Use `RETURNS uuid[]` with
   `array_agg`, and expect **per-row evaluation** — a 400k-row scan cost 400,001
   calls. Mark them `PARALLEL UNSAFE`; `PARALLEL SAFE` cost ~170× on the same scan.
+- **A hierarchy function that walks the tree its own policy protects must be
+  `SECURITY DEFINER`, and the tree table must NOT be `FORCE`d.** These are one
+  decision, not two. With `SECURITY INVOKER` the walk reads a table whose policy
+  calls the walk, and every request as a non-superuser role dies with
+  `stack depth limit exceeded`. `FORCE` on that table does not fix it — it makes
+  it worse, because then the owner inside the function is itself subject to the
+  policy. Only DEFINER plus leaving that table un-`FORCE`d terminates.
+  **This is the weakest link in the pattern:** an owner can read the tree table
+  unrestricted. Keep tenant payload out of it, and record the trade in a comment
+  where the next maintainer will hit it.
 - **`EXECUTE` is granted to `PUBLIC` on new functions by default.** `REVOKE
   EXECUTE … FROM PUBLIC` on every function, or any `SECURITY DEFINER` helper is
   anonymously reachable. Verified: 7 of 9 test functions had `NULL proacl`.
+  **A revoke is not a policy** — revoking from `PUBLIC` while granting to nobody
+  is strictly worse than doing nothing, because it turns every scoped request into
+  a 42501. Revoke and grant, always together.
 - **Hierarchy is a function, not a policy.** Scope derives from position in a tree
-  via one recursive `customer_tree(root)` — `LANGUAGE sql STABLE`, `SECURITY
-  INVOKER` (default), with an index on `customers(parent_id)`. Adding a level is a
-  data change, not a code change.
+  via one recursive helper — `LANGUAGE sql STABLE`. Adding a level is a data
+  change, not a code change.
 - **Default deny.** `REVOKE ALL ... FROM PUBLIC` before any grant. Tables intended
   to be globally readable are listed explicitly.
 - PostgREST exposes JWT claims as a transaction-scoped setting; policies read
@@ -412,6 +458,20 @@ capability role.
 
 - **PostgREST verifies the JWT** from the shared secret and performs role
   impersonation via the `role` claim. Set `jwt-role-claim-key` explicitly.
+- **`jwt-role-claim-key` must be a JSPath: `.role`, not `role`.** The bare claim
+  name makes PostgREST 16.4 **PANIC on boot** rather than fall back — verified,
+  `failed to parse role-claim-key value (role) ... unexpected "r" / expecting "."`.
+  The leading dot is the entire fix. `$.role` is a later JSONPath spelling and
+  **also** panics on 16.4 — do not "modernise" the value.
+- **PostgREST gives environment variables precedence over its config file.** A
+  `PGRST_JWT_SECRET` inherited from `backend/.env` silently overrides the value
+  in `postgrest.conf`, and a server started that way verifies tokens with the
+  wrong secret. Every request then fails `PGRST301 "None of the keys was able to
+  decode the JWT"` while the config file looks correct. Verified — and it cost
+  more time to find than any SQL bug here, because nothing in the file is wrong.
+  When spawning PostgREST, strip inherited `PGRST_*` keys rather than overriding
+  them: `spawn` stringifies env values, so `undefined` reaches PostgREST as the
+  literal text `"undefined"`.
 - **The thin app registers `JwtAuthGuard` via `APP_GUARD`. Default deny.** Public
   routes opt out with `@Public()`. Per-controller `@UseGuards` is not an
   authorization model — a new controller that forgets the decorator is fully
@@ -426,14 +486,36 @@ capability role.
     mitigation must hold even if another code path ever issues a token.
   - **The control is the grant, and nothing else:**
     `GRANT app_anon, app_member, app_admin TO authenticator;` — with that alone a
-    token claiming an owner role gets `403` (verified).
+    token claiming an owner role gets `403` with
+    `permission denied to set role "app"` (verified).
+  - **The GRANT needs `ADMIN OPTION`, so it cannot be run by a migration role.**
+    Verified: applying it as the owner fails with
+    `must have admin option on role "app_anon"`. The one statement that *is* the
+    boundary is therefore a superuser statement, and it belongs in the role
+    bootstrap rather than the migration. Assert it there by reading
+    `pg_auth_members` and raising — otherwise its absence surfaces far away as an
+    unrelated-looking `permission denied to set role` from deep inside a fixture.
+  - **The `role` claim is a DB role name, not a capability.** Tokens carry
+    `app_member` / `app_admin`, never `ic` / `site_manager` / `admin`. Writing a
+    policy or a test against the bare capability name produces a branch that can
+    never match.
   - **`REVOKE SET ON PARAMETER role` is inert on PostgreSQL 15.** Never rely on it.
   - **Never use `REVOKE <owner> FROM <authenticator>` as the boundary.** It is a
     per-role denylist, bypassed by any role not yet revoked.
   - Every serving role is `NOSUPERUSER NOBYPASSRLS NOINHERIT`.
+  - **The authenticator must be `LOGIN`.** It is the one role PostgREST
+    connects *as*, and a `NOLOGIN` role cannot be connected to — verified, and
+    the failure is "the server cannot serve at all", not a subtle one. The other
+    four stay `NOLOGIN`, because nothing ever connects as them; PostgREST reaches
+    them with `SET ROLE`.
   - **The issuer must always set `exp`** — a token with no `exp` is accepted.
   - A test asserts a token naming each non-granted role is refused, and checks the
     row count afterwards.
+  - **Assert the row count through an UNFILTERED read.** A count taken through a
+    filtered path cannot distinguish "nothing was deleted" from "I can see
+    nothing", which makes every denial assertion in the suite vacuous. Concretely:
+    under `FORCE`, a claimless owner read returns **0 rows**, not the true count —
+    verified — so an owner-connection count helper silently reads zero forever.
 - **No default JWT secret.** Assert `JWT_SECRET` is present and sufficiently
   long at bootstrap; throw if not.
 - Access tokens short-lived (~15–30 min). Permissions are read from the
@@ -499,8 +581,28 @@ Every app forked from this needs these. They must actually work.
   hide schema and policy bugs — the reason the previous security suite had
   1,700 lines of "tests" that could not fail. Use a dedicated test database or a
   throwaway schema per suite; never point tests at a developer's working data.
-- **Every RLS policy has a test**: permitted case returns rows, denied case
-  returns none, and the denied case is proven for each access path.
+- **Every RLS policy has a test**: permitted case returns rows, denied case returns
+  none, and the denied case is proven for each access path.
+- **Name a test after the attack it prevents, not after what it calls.**
+  "a validly-signed token naming the table-owning role is refused, and the row
+  survives" tells a reader in six months which claim is load-bearing; "rls works"
+  tells them nothing. `rls.spec.ts` is a fine *filename* — the `it()` titles are
+  what a human reads when a step goes red.
+- **Assert on bodies and row counts, never on status codes alone.** The specific
+  way this bites: with a table-level `SELECT` grant in place, a column that was
+  meant to be hidden comes back at **HTTP 200 with its value intact**, and a
+  status-only assertion passes on the leak. Verified.
+- **Prove a security test can fail.** Remove the control and confirm the matching
+  test goes red — a suite whose tests all pass whether or not the protection
+  exists is the exact failure this file exists to prevent. `npm run test:rls` is a
+  **gating step of `verify`**, because the other steps stay green while every
+  policy in the database is dropped (verified: disabling `ENABLE ROW LEVEL
+  SECURITY` fails 11 tests and ends `verify` at step 7/8).
+- **Never start a test server on a port something else may already hold.** The
+  readiness probe succeeds against the *other* server, and the suite then quietly
+  tests a database it did not create. Refuse to start if the port answers, and
+  report the conflict. Same reasoning for `DROP DATABASE`: terminate existing
+  backends first, or the drop fails naming a connection the operator cannot see.
 - No test targets a non-existent API. If a spec and an implementation
   disagree, the spec is wrong or the implementation is unfinished — resolve it,
   do not leave a false green.

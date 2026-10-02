@@ -683,18 +683,43 @@ Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicate
 3. **`SET LOCAL app.user_id` is not an alternative** to `request.jwt.claims`;
    ADR-0023 offered them as "or".
 4. **`request.jwt.claims` returns `''`, not `NULL`, after any `SET LOCAL`** — so the
-   documented policy **errored** instead of denying, and a garbage `site_id` broke
-   admins. `AGENTS.md` B2 and ADR-0023 are corrected.
+   documented policy **errored** instead of denying. `AGENTS.md` B2 and ADR-0023 are
+   corrected.
 5. **`EXECUTE` is granted to `PUBLIC` on new functions by default** — 7 of 9 test
    functions had `NULL proacl`, so any `SECURITY DEFINER` helper is anonymously
    reachable.
+6. **A malformed `site_id` breaks admins too.** Item 4 stopped at the `json` cast.
+   The `uuid` cast raises independently, and `OR` does **not** short-circuit past
+   a raising operand — verified, `invalid input syntax for type uuid: "garbage"`
+   for an admin token. The `TRUE OR NULL` reasoning in ADR-0023 is invalid.
+7. **The documented admin branch is dead code.** It matched
+   `request_claims()->>'role' = 'admin'`, but no token ever carries `admin`; the DB
+   role is `app_admin`. Verified over HTTP: a valid admin token got `200 []`.
 
-**Highest severity: H7.** The mitigation this project documented — validate the
+**Corrected in W07**, which is where each of these was proven rather than
+reasoned about. Beyond the list above, four further defects were found by
+executing the corrected file — recorded here because the pattern, not the
+instance, is the lesson:
+
+8. **Revoking `EXECUTE` from `PUBLIC` and granting it to nobody** is worse than
+   doing nothing: every scoped request became
+   `403 permission denied for function request_claims`. A revoke is not a policy.
+9. **Omitting `EXECUTE` for `app_anon`** made unauthenticated reads raise rather
+   than deny. A policy is evaluated for every role that reaches the table.
+10. **The column-grant order failed open.** With a table-level `SELECT` in place,
+    `has_column_privilege(..., 'internal_notes', 'SELECT')` was `t`. A column
+    revoke under a table grant is silently a no-op.
+11. **The escalation-boundary `GRANT` cannot be run by a migration role** —
+    `must have admin option on role "app_anon"`. The one statement that is the
+    boundary is necessarily a superuser statement.
+
+Highest severity: H7. The mitigation this project documented — validate the
 claim at mint — protects only the issuer. The real boundary is
 `GRANT app_anon, app_member, app_admin TO authenticator` and nothing else.
 `REVOKE SET ON PARAMETER role` is inert on PG15. `REVOKE <owner> FROM <auth>` is a
 denylist and is bypassed by any unlisted role. **It must be a test, not a
-migration comment.**
+migration comment** — and it now is: `backend/test/rls/` runs as a gating step of
+`verify`, and disabling `ENABLE ROW LEVEL SECURITY` fails 11 of its 33 tests.
 
 Also confirmed: a token with **no `exp` claim is accepted**; forged, unsigned and
 expired tokens are rejected. PostgREST caches **schema and grants** — `NOTIFY` is

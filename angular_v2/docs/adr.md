@@ -842,15 +842,35 @@ CREATE POLICY row_scope ON projects USING (
 
 | Input | Result |
 |---|---|
-| `{"role":"member","site_id":"…"}` | that site's rows only |
-| `{"role":"admin"}` | **every row** — the second branch yields `NULL`, and `TRUE OR NULL` is `TRUE` |
-| `{"role":"admin","site_id":"garbage"}` | **every row** — the admin branch is `TRUE`, so the failing cast on the right never matters |
-| absent, `''`, or `{}` | **zero rows** — no cast throws, both branches are false |
-| `nullif(...,'')::uuid` where absent | `NULL`, so the row is not visible |
+| `{"role":"app_member","site_id":"…"}` | that site's rows only |
+| `{"role":"app_admin"}` | **every row** |
+| `{"role":"app_admin","site_id":"garbage"}` | **every row**, no error |
+| absent, `''`, or `{}` | **zero rows** — both branches false, nothing casts |
+| `{"role":"app_member","site_id":"garbage"}` | **zero rows**, no error |
 
 The `coalesce`/`nullif` pair is load-bearing. Without it a bare
 `current_setting(...,true)::json` **raises** `invalid input syntax for type json`
 rather than denying — verified.
+
+> **Corrected after the W07 proof.** Two rows of this table were wrong, and both
+> had been carried here as settled fact.
+>
+> 1. `{"role":"admin"}` is **not** a real input. The DB role vocabulary is
+>    `app_anon` / `app_member` / `app_admin`; no token ever carries the bare
+>    capability name `admin`. A policy written against it has a **dead admin
+>    branch** — verified over HTTP, a valid `app_admin` token received `200 []`
+>    and saw nothing at all. The policy discriminates on `current_user =
+>    'app_admin'` instead, which Postgres sets from the `SET ROLE` the
+>    escalation boundary already constrained.
+> 2. "the admin branch is `TRUE`, so the failing cast on the right never
+>    matters" is **wrong**. `OR` does not short-circuit past an expression that
+>    raises; both operands are evaluated and the error wins. Verified: an admin
+>    token carrying `"site_id":"garbage"` returned
+>    `invalid input syntax for type uuid: "garbage"`. The `TRUE OR NULL`
+>    reasoning holds only for a branch that yields `NULL` — which requires the
+>    cast to *succeed* and return `NULL`, not to raise. Totality therefore needs
+>    a **guarded accessor** (`claim_site_id()`, `EXCEPTION WHEN others THEN
+>    RETURN NULL`), not a defensive `nullif`.
 
 ### The hierarchy
 
@@ -893,11 +913,22 @@ scope instead of recursing per row.
 );
 ```
 
-`STABLE` and `SECURITY INVOKER` (the default) are required: `STABLE` so the
-planner may call it once per query, `INVOKER` so RLS on `customers` still applies
-inside it. Adding a level to the hierarchy is a **data** change, not a code
-change — which is what "hierarchical foundation" has to mean if the hierarchy is
-data-driven.
+`STABLE` is required so the planner may call it once per query.
+Adding a level to the hierarchy is a **data** change, not a code change — which is
+what "hierarchical foundation" has to mean if the hierarchy is data-driven.
+
+> **Corrected after the W07 proof: `SECURITY INVOKER` is not usable here.** A
+> hierarchy function walks the tree table, and the tree table's own policy calls
+> the hierarchy function. Under `INVOKER` that is unbounded recursion — verified,
+> every query as a non-superuser role aborted with
+> `stack depth limit exceeded` after roughly 100 frames. It must be
+> `SECURITY DEFINER`, **and the tree table must not be `FORCE`d**, because
+> `FORCE` would make the owner inside the function subject to the very policy the
+> function is being called from. Those two facts are one decision.
+>
+> The cost is real and is the weakest link in the pattern: an owner can read the
+> tree table unrestricted. Keep tenant payload out of that table and record the
+> trade in a comment where the next maintainer will trip over it.
 
 Direction is a product decision, not a mechanism one: descendants by default (a
 regional manager sees their region's sites). Change the function, not the policy.
