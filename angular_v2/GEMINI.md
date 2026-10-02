@@ -23,7 +23,10 @@ docs/        rebase.md (the build plan), adr.md (23 decisions), and the rest
 - `../angular/` is the **old** implementation, kept for reference only. Do not
   modify it, and do not follow its conventions.
 - **`npm run verify` at `backend/` is the gate** — typecheck, lint, unit,
-  integration, database smoke. It fails loudly when Postgres is unreachable.
+  integration, **row-level security proof**, database smoke. It fails loudly when
+  Postgres is unreachable. The RLS proof is step 7 of 8 and is the only step that
+  can see a policy regression; everything before it stays green with every policy
+  dropped.
 
 ## Things that will bite you
 
@@ -31,8 +34,12 @@ docs/        rebase.md (the build plan), adr.md (23 decisions), and the rest
   expressible as CRUD over a table. There is no ORM — no TypeORM, Sequelize or
   Prisma — so application code cannot issue SQL at all.
 - **RLS is bypassed for the table owner.** Migrations run as an owner role that
-  never serves requests; request roles own nothing. Every protected table has
-  `FORCE ROW LEVEL SECURITY`. See `AGENTS.md` B2.
+  never serves requests; request roles own nothing. Every protected data table has
+  `FORCE ROW LEVEL SECURITY` — **except the site-tree table, which must NOT be
+  `FORCE`d.** Its hierarchy helper is `SECURITY DEFINER` and reads that table, so
+  `FORCE` puts the owner inside the function back under the policy that called it:
+  every query dies with `stack depth limit exceeded`. Adding `FORCE` there
+  re-introduces a total outage that passes a code review. See `AGENTS.md` B2.
 - **There are two role vocabularies.** `app_anon` / `app_member` / `app_admin` are
   database roles. `ic` / `site_manager` / `admin` are capability roles. An `ic`
   and a `site_manager` are both `app_member`. Never create a database role named

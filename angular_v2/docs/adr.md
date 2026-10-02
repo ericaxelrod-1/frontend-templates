@@ -80,6 +80,16 @@ filters. It enforces nothing:
 migrations, passing identity via `SET LOCAL app.user_id` and reading it with
 `current_setting('app.user_id', true)`.
 
+> **Corrected after execution — the identity mechanism, not the layer.** The
+> *decision* (RLS in the database, below the application) stands and is the reason
+> this ADR exists. The **mechanism** named above does not: PostgREST exposes the
+> verified JWT claims as `request.jwt.claims`, and **a policy reads the setting it
+> names.** A policy built on `request.jwt.claims` is completely blind to
+> `app.user_id`, so setting it admits nothing — verified: the owner is still
+> rejected under `FORCE`, and seeding still fails. ADR-0023 now reads the claims
+> setting and derives identity from the token PostgREST actually verified, which
+> is also what makes the boundary auditable from one place.
+
 **Rationale.** Three reasons, in order of weight:
 
 1. **Wrong layer.** Application enforcement is only as strong as every future
@@ -798,13 +808,23 @@ This is the crux of the answer, and getting it wrong collapses the model.
 
 | Vocabulary | Values | Used by |
 |---|---|---|
-| **DB role** (scope tier) | `anon`, `member`, `admin` | PostgREST impersonation, RLS, grants |
+| **DB role** (scope tier) | `app_anon`, `app_member`, `app_admin` | PostgREST impersonation, RLS, grants |
 | **Capability role** | `ic`, `site_manager`, `admin` | app guards, feature checks |
 
-**An IC and a site manager are the *same* DB role — `member`.** They differ *only*
-in capability, which lives above RLS. So:
+> **Corrected after execution.** This table originally read `anon` / `member` /
+> `admin` for the DB role vocabulary. **The names are load-bearing, not
+> shorthand.** The values that actually reach Postgres are the ones PostgREST
+> `SET ROLE`s to, and they are the `app_`-prefixed names; a policy written against
+> the bare vocabulary produces a branch that can never match (see §Why
+> `current_user` discriminates the admin tier). Note that `admin` appears in
+> *both* columns and means two unrelated things — which is exactly why collapsing
+> them failed silently rather than loudly.
 
-- *Same features* → yes, because both are `member` and both reach the same tables.
+**An IC and a site manager are the *same* DB role — `app_member`.** They differ
+*only* in capability, which lives above RLS. So:
+
+- *Same features* → yes, because both are `app_member` and both reach the same
+  tables.
 - *Same rows* → no, and correctly so; both are scoped to their own site by the
   identical policy.
 - *Different capabilities* → yes, distinguished only in the app layer.
@@ -815,14 +835,18 @@ the exact coupling this ADR exists to remove.
 
 ### Row scope
 
-> **Corrected after execution.** The original form of this policy was written from
-> documentation and had two defects that only a live test exposed: it **errored**
-> instead of failing closed when the claims setting was empty, and its admin branch
-> did not survive a malformed `site_id`. Both are fixed below. See
-> `rebase.md` §6.6.
+> **Withdrawn after execution.** The policy this section originally prescribed was
+> written from documentation and had three defects that only a live test exposed:
+> it **errored** instead of failing closed when the claims setting was empty, its
+> admin branch never matched anything, and its `site_id` cast could raise on
+> caller-supplied input. None of the three was visible by reading it. It is kept
+> below, labelled, because a decision record that deletes its own reversals is not
+> a record. See `rebase.md` §6.6.
 
 One policy per table. It must be **total** — every `OR` branch is evaluated, so a
-cast in any branch can take the whole query down:
+cast in any branch can take the whole query down.
+
+**WITHDRAWN — this is what this ADR originally prescribed, and it does not ship:**
 
 ```sql
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
@@ -834,43 +858,91 @@ LANGUAGE sql STABLE PARALLEL SAFE AS $$
   SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
 $$;
 
+-- BOTH BRANCHES ARE WRONG, in ways reading this cannot tell you:
+--   the admin branch never matches a real token, and
+--   the right-hand cast raises on a malformed site_id.
 CREATE POLICY row_scope ON projects USING (
     request_claims()->>'role' = 'admin'
     OR site_id = nullif(request_claims()->>'site_id', '')::uuid
 );
 ```
 
+**What ships** (`backend/database/migrations/0001_rls_foundation.sql`):
+
+```sql
+-- Total by construction: the uuid cast is inside an EXCEPTION block, so a
+-- malformed claim returns NULL instead of raising. NULL flows into
+-- site_tree_ids(NULL), which walks no rows — a denial, not an error.
+CREATE FUNCTION claim_site_id() RETURNS uuid
+LANGUAGE plpgsql STABLE PARALLEL SAFE AS $$
+DECLARE raw text;
+BEGIN
+  raw := request_claims()->>'site_id';
+  IF raw IS NULL OR raw = '' THEN RETURN NULL; END IF;
+  RETURN raw::uuid;
+EXCEPTION WHEN others THEN RETURN NULL;   -- never raise on attacker input
+END $$;
+
+CREATE POLICY row_scope ON projects USING (
+    current_user = 'app_admin'
+    OR site_id = ANY (site_tree_ids(claim_site_id()))
+);
+```
+
+The `coalesce`/`nullif` pair in `request_claims()` is load-bearing and survives:
+without it a bare `current_setting(...,true)::json` **raises**
+`invalid input syntax for type json` rather than denying — verified.
+
 | Input | Result |
 |---|---|
-| `{"role":"app_member","site_id":"…"}` | that site's rows only |
+| `{"role":"app_member","site_id":"…"}` | that site's rows and subtree only |
 | `{"role":"app_admin"}` | **every row** |
-| `{"role":"app_admin","site_id":"garbage"}` | **every row**, no error |
+| `{"role":"app_admin","site_id":"garbage"}` | **every row**, no error — see §Why a guarded accessor, not `nullif` |
 | absent, `''`, or `{}` | **zero rows** — both branches false, nothing casts |
 | `{"role":"app_member","site_id":"garbage"}` | **zero rows**, no error |
 
-The `coalesce`/`nullif` pair is load-bearing. Without it a bare
-`current_setting(...,true)::json` **raises** `invalid input syntax for type json`
-rather than denying — verified.
+#### Why `current_user` discriminates the admin tier
 
-> **Corrected after the W07 proof.** Two rows of this table were wrong, and both
-> had been carried here as settled fact.
+> **Corrected after the W07 proof.** The withdrawn policy above keyed its admin
+> branch on `request_claims()->>'role' = 'admin'`. **That branch was dead code.**
+> The role claim PostgREST actually receives is the DB role name — `app_admin`,
+> `app_member`, `app_anon` — never the bare capability name `admin`. The two role
+> vocabularies (above) had been collapsed into one, and the result was a policy
+> whose admin tier matched nothing: **verified over HTTP, a valid `app_admin` token
+> received `200 []` and saw no rows at all.** A policy that grants no access to the
+> administrator is not a defect that announces itself.
 >
-> 1. `{"role":"admin"}` is **not** a real input. The DB role vocabulary is
->    `app_anon` / `app_member` / `app_admin`; no token ever carries the bare
->    capability name `admin`. A policy written against it has a **dead admin
->    branch** — verified over HTTP, a valid `app_admin` token received `200 []`
->    and saw nothing at all. The policy discriminates on `current_user =
->    'app_admin'` instead, which Postgres sets from the `SET ROLE` the
->    escalation boundary already constrained.
-> 2. "the admin branch is `TRUE`, so the failing cast on the right never
->    matters" is **wrong**. `OR` does not short-circuit past an expression that
->    raises; both operands are evaluated and the error wins. Verified: an admin
->    token carrying `"site_id":"garbage"` returned
->    `invalid input syntax for type uuid: "garbage"`. The `TRUE OR NULL`
->    reasoning holds only for a branch that yields `NULL` — which requires the
->    cast to *succeed* and return `NULL`, not to raise. Totality therefore needs
->    a **guarded accessor** (`claim_site_id()`, `EXCEPTION WHEN others THEN
->    RETURN NULL`), not a defensive `nullif`.
+> The discriminator is now **`current_user`**, which Postgres sets from the
+> `SET ROLE` PostgREST performs — and which the escalation boundary (below) has
+> already constrained to three roles. That matters beyond correctness: **a claim is
+> caller-supplied and signed by whoever holds the secret; `current_user` is
+> neither.** A member who forges `"role":"admin"` into their own validly-signed
+> token gets **zero rows** — verified — because nothing reads that field. Keying
+> the admin tier on the token would re-open the exact escalation hole this policy
+> exists to close.
+
+#### Why a guarded accessor, not `nullif`
+
+> **WITHDRAWN.** This ADR argued that a garbage `site_id` was harmless on an admin
+> token because *"`TRUE OR NULL` is `TRUE`, so the failing cast on the right never
+> matters."* **That reasoning is invalid and is withdrawn.** `OR` does not
+> short-circuit past an expression that raises: both operands are evaluated and
+> the error wins. **Verified — in the withdrawn policy, an admin token carrying
+> `"site_id":"garbage"` returned
+> `invalid input syntax for type uuid: "garbage"`, and so did a member token.**
+> The admin branch being `TRUE` changed nothing: the cast was evaluated anyway and
+> the error won. `TRUE OR NULL` is only true for an operand that yields `NULL`,
+> which requires the cast to *succeed* and return `NULL` — never for one that
+> raises.
+>
+> **What the implementation does instead.** Totality comes from a **guarded
+> accessor**, not from defensive `nullif`: `claim_site_id()` returns `NULL` for an
+> absent, empty or malformed value by catching the cast failure, and `NULL` flows
+> into `site_tree_ids(NULL)`, which walks no rows. The admin branch is then
+> `TRUE OR FALSE` — decided by a predicate that cannot raise — so the admin keeps
+> unrestricted access while a member with a malformed claim is denied. Every
+> claims shape a caller can send is asserted in `backend/test/rls/rls.spec.ts`,
+> under each serving role, including `'not json at all'`.
 
 ### The hierarchy
 
@@ -880,12 +952,17 @@ is tree-derived rather than equality.
 > **Corrected after execution.** `RETURNS SETOF uuid` **cannot be used in a policy
 > expression** — Postgres rejects set-returning functions there with *"set-returning
 > functions are not allowed in policy expressions"*. The original example was never
-> executed. The function must return a single array value.
+> executed, so **this policy never compiled**. The function must return a single
+> array value.
+
+**WITHDRAWN — the example this section originally gave:**
 
 ```sql
 CREATE INDEX ON customers(parent_id);
 
--- Returns uuid[] (a scalar), not SETOF uuid.
+-- Three defects, all invisible by reading: SETOF cannot appear in a policy;
+-- PARALLEL SAFE costs ~170x; and under the default SECURITY INVOKER the walk
+-- recurses through its own policy until the stack dies (see below).
 CREATE FUNCTION customer_tree_ids(root uuid) RETURNS uuid[]
 LANGUAGE sql STABLE PARALLEL SAFE AS $$
   WITH RECURSIVE t AS (
@@ -902,16 +979,57 @@ CREATE POLICY row_scope ON projects USING (
 );
 ```
 
-Scoping is correct once it compiles — verified root→3 rows, mid-level→2,
-unrelated→2, admin→5, unknown→0.
+**What ships** (`backend/database/migrations/0001_rls_foundation.sql`):
+
+```sql
+CREATE INDEX IF NOT EXISTS sites_parent_id_idx ON sites (parent_id);
+
+-- Returns uuid[] (a scalar), not SETOF uuid.
+-- PARALLEL UNSAFE is deliberate: PARALLEL SAFE forced single-threaded evaluation.
+-- SECURITY DEFINER is load-bearing — see the note below. It is safe here only
+-- because the function reads no caller-supplied table and returns no
+-- caller-supplied data: it walks from `root` and returns ids.
+CREATE FUNCTION site_tree_ids(root uuid) RETURNS uuid[]
+LANGUAGE sql STABLE PARALLEL UNSAFE SECURITY DEFINER AS $$
+  WITH RECURSIVE t AS (
+    SELECT id, parent_id FROM sites WHERE id = root
+    UNION ALL
+    SELECT s.id, s.parent_id FROM sites s JOIN t ON s.parent_id = t.id
+  )
+  SELECT coalesce(array_agg(id), '{}'::uuid[]) FROM t
+$$;
+
+CREATE POLICY row_scope ON projects USING (
+    current_user = 'app_admin'
+    OR site_id = ANY (site_tree_ids(claim_site_id()))
+);
+```
+
+**Verified row counts** over a five-row fixture (a root → mid → leaf chain, one
+unrelated site, one second root):
+
+| Claim | Rows | Note |
+|---|---|---|
+| `site_id` = root | **3** | the whole subtree |
+| `site_id` = mid | **2** | mid + leaf |
+| `site_id` = unrelated | **1** | **its own row, and none of the subtree** |
+| `site_id` = a well-formed uuid matching no site | **0** | the walk is empty |
+| `role: app_admin` | **all 5** | the admin branch |
+
+> **Corrected after execution.** The original claim here was *"root→3, mid→2,
+> unrelated→2"*, and the **unrelated→2 figure is wrong**. `site_tree_ids()` is
+> **self-inclusive**: its anchor selects the `root` row itself, so a member scoped
+> to a site outside the tree sees its **own** row and none of its subtree — one
+> row, not two and not zero. This is correct behaviour, not a leak (the site is
+> the caller's own), and the suite asserts it explicitly so it cannot drift
+> silently in either direction. "Unrelated→0" would be wrong too: the test is what
+> distinguishes *scoped* from *broken*.
 
 **Performance is a real constraint, not a footnote.** The function is evaluated
 **per row**: a 400,000-row scan produced **400,001 calls**. And `PARALLEL SAFE`
 must be omitted (`PARALLEL UNSAFE`) or the planner falls back to single-threaded
 evaluation — measured at roughly **170× slower**. For large tables, denormalise the
 scope instead of recursing per row.
-);
-```
 
 `STABLE` is required so the planner may call it once per query.
 Adding a level to the hierarchy is a **data** change, not a code change — which is
@@ -920,18 +1038,68 @@ what "hierarchical foundation" has to mean if the hierarchy is data-driven.
 > **Corrected after the W07 proof: `SECURITY INVOKER` is not usable here.** A
 > hierarchy function walks the tree table, and the tree table's own policy calls
 > the hierarchy function. Under `INVOKER` that is unbounded recursion — verified,
-> every query as a non-superuser role aborted with
-> `stack depth limit exceeded` after roughly 100 frames. It must be
-> `SECURITY DEFINER`, **and the tree table must not be `FORCE`d**, because
-> `FORCE` would make the owner inside the function subject to the very policy the
-> function is being called from. Those two facts are one decision.
+> **every query as a non-superuser role aborted with
+> `stack depth limit exceeded` after roughly 100 frames**, with no policy error
+> and no partial result. The whole API was dead, and the only symptom was a stack
+> trace in the server log.
 >
-> The cost is real and is the weakest link in the pattern: an owner can read the
-> tree table unrestricted. Keep tenant payload out of that table and record the
-> trade in a comment where the next maintainer will trip over it.
+> **These are one decision, not two:** the function is `SECURITY DEFINER` **and**
+> the tree table is deliberately **not `FORCE`d**. `FORCE` on that table does not
+> fix the recursion — it *causes* it, because the owner inside the function would
+> then be subject to the very policy the function is called from. Only DEFINER
+> plus leaving that table un-`FORCE`d terminates, and the suite asserts both halves
+> together, because either one alone passes.
+>
+> **Why `SECURITY DEFINER` is safe here and nowhere else by default:** the function
+> reads no caller-supplied table and returns no caller-supplied data. `root` is a
+> uuid, not a query. It is not a general licence to make helpers privileged — a
+> function that interpolated a claim into SQL would be an anonymous escalation the
+> moment `PUBLIC` could execute it.
+>
+> **The cost is real, and this is the weakest link in the pattern:** because `sites`
+> is not `FORCE`d, an owner can read it unrestricted. `sites` is the tree itself
+> and holds no tenant payload — no names, contacts or records — so the blast radius
+> is the shape of the org chart. A deployment that cannot accept even that must
+> move the tree into a `SECURITY DEFINER`-only function over a table with RLS
+> disabled and re-derive scope from a signed claim. Either way, record the trade in
+> a comment where the next maintainer will trip over it.
 
 Direction is a product decision, not a mechanism one: descendants by default (a
 regional manager sees their region's sites). Change the function, not the policy.
+
+### Function privileges are part of the boundary, and a revoke is not a policy
+
+The policies above call three helper functions. Those calls are subject to
+Postgres function privileges, which means **a policy can be correct and still not
+evaluate at all** — and the failure looks nothing like a policy bug.
+
+| Statement | Verified result |
+|---|---|
+| *(nothing)* | Postgres grants `EXECUTE` on a new function to `PUBLIC` by default. **7 of 9** functions in the spike had `NULL proacl`, so `request_claims()` and the `SECURITY DEFINER` tree walk were anonymously callable — the latter is an anonymous privilege escalation, not just a read leak |
+| `REVOKE EXECUTE … FROM PUBLIC` and **nothing else** | **Every scoped request `403`s**: `permission denied for function request_claims`. Row scoping was **100% non-functional** while every policy, grant and test on the page still looked correct |
+| revoke + `GRANT EXECUTE … TO app_anon, app_member, app_admin` | works |
+
+> **Corrected after the W07 proof.** Two defects, in opposite directions, both
+> invisible by reading the policy.
+>
+> 1. **A revoke is not a policy.** The obvious fix for the `PUBLIC` grant is to
+>    revoke it. Revoking from `PUBLIC` and granting to *nobody* is strictly worse
+>    than doing nothing: it converts every scoped request into a `42501` at
+>    `permission denied for function …`. Both halves are required, in this order,
+>    and the second half is the one that is easy to forget.
+> 2. **`app_anon` needs `EXECUTE` too.** A policy expression is evaluated for
+>    **every** role that reaches the table, the anonymous one included — and that
+>    expression calls the tree walk. Without the anonymous grant, an
+>    unauthenticated read fails with `permission denied for function
+>    site_tree_ids`: a **`42501` on a read that should have returned zero rows**.
+>    A denial must arrive as a denial. An erroring policy is a denial-of-service
+>    surface and an oracle — it tells an unauthenticated caller that a policy
+>    exists, and which function to look for.
+>
+> The suite asserts both halves separately: no function in the schema is executable
+> by `PUBLIC`, **and** all three helpers are executable by each role whose requests
+> evaluate the policy, `app_anon` included. Either assertion alone passes against a
+> broken configuration.
 
 ### RLS does not apply to the table owner — verified
 
@@ -973,8 +1141,8 @@ This is not a reason to drop `FORCE`. It is a reason to decide where writes come
 from:
 
 - **Preferred:** the migration role owns the schema but does not write rows. Seeding
-  runs as a role that sets `request.jwt.claims` (or `SET LOCAL app.user_id`) to a
-  value the policy admits.
+  runs **through the escalation boundary** as `pgrst_authenticator`, which
+  `SET ROLE app_admin` for the duration of one transaction.
 - **Acceptable for DDL migrations:** DDL is not subject to RLS. Only `DML` is, so
   `CREATE TABLE`, `ALTER TABLE`, `CREATE POLICY` and index changes are unaffected.
 - **Not acceptable:** disabling `row_security` during seeding. It reopens the owner
@@ -986,13 +1154,28 @@ examples in this ADR rely on that deliberately, so one expression governs both
 visibility and insertability.
 
 **Confirmed by execution.** Owner `INSERT` is rejected with `new row violates
-row-level security policy`; DDL is unaffected; and seeding succeeds via
-`SET LOCAL request.jwt.claims` to a value the policy admits.
+row-level security policy`; DDL is unaffected; and seeding succeeds by assuming
+`app_admin` through the boundary.
 
-> **Correction.** This section previously offered `SET LOCAL app.user_id` as an
+> **Correction (1).** This section previously offered `SET LOCAL app.user_id` as an
 > alternative. It is **not** one. A policy reads the GUC it names — a policy built
 > on `request.jwt.claims` ignores `app.user_id` entirely. Seed by setting the same
 > setting the policy reads.
+
+> **Correction (2) — the seeding route changed, and the old one stopped working.**
+> The route above used to be "set `request.jwt.claims` to a value the policy
+> admits". **That no longer admits anything.** The admin branch discriminates on
+> `current_user`, not on a claim (see §Why `current_user` discriminates the admin
+> tier), so a claim can no longer buy write access — which is the point of that
+> correction, applied consistently. Claims alone now only ever *narrow* scope.
+>
+> So the sanctioned seed is: connect as `pgrst_authenticator`, the one role allowed
+> to receive a request and granted nothing else, and `SET LOCAL ROLE app_admin`
+> inside the transaction. It goes **through** the boundary, not around it, and the
+> suite proves the owner is rejected and this path is accepted — two tests, because
+> "the owner is refused" and "the documented workaround works" are separate claims.
+> `SET row_security = off` would also make the insert succeed and is used nowhere:
+> it reopens the owner bypass for every later session on that backend.
 
 ### The role claim is an escalation vector — GRANT is the control
 
@@ -1019,6 +1202,8 @@ else:**
 
 ```sql
 -- The authenticator PostgREST connects as may assume these three roles.
+-- NOT in a migration — see the correction below. This lives in
+-- backend/database/bootstrap/001_roles.sql and runs once as a superuser.
 GRANT app_anon, app_member, app_admin TO authenticator;
 ```
 
@@ -1034,6 +1219,28 @@ a role with `BYPASSRLS` ignores policies entirely.
 
 This belongs in a **test**, not a migration comment: assert that a token naming
 each non-granted role is refused, and assert the row count afterwards.
+
+> **Corrected after the W07 proof: this statement cannot run in a migration.**
+> `GRANT <role> TO <role>` requires **ADMIN OPTION on every role granted**, and a
+> migration role has none of it — **verified: applying it as the migration/owner
+> role fails with `must have admin option on role "app_anon"`.** Only a superuser
+> can build the grant chain.
+>
+> That is an uncomfortable result and it should not be smoothed over: **the one
+> statement that *is* the security boundary is a superuser statement**, and it
+> cannot live in the file that a forker is most likely to re-run. It therefore
+> lives in `database/bootstrap/001_roles.sql`, which runs once, as a superuser,
+> before any migration. Two things follow, both mandatory:
+>
+> 1. **Assert the boundary where it is granted.** The bootstrap ends with a `DO`
+>    block that reads `pg_auth_members` and raises unless the reachable set is
+>    exactly `app_admin, app_anon, app_member`. Without it, a missing or altered
+>    `GRANT` surfaces much later as an unrelated-looking
+>    `permission denied to set role "app_admin"` from inside a test fixture, and
+>    the suite reports a fixture error instead of naming the missing control.
+> 2. **Prove it can fail.** Adding the table-owning role to that `GRANT` turns
+>    `verify` red at the RLS step — three tests, including the one asserting the
+>    row survives the escalation attempt (`rebase.md` §6.6.1).
 
 Also verified: forged, unsigned and expired tokens are rejected — **but a token
 with no `exp` claim is accepted.** The issuer must always set `exp`.
@@ -1063,13 +1270,32 @@ REVOKE ALL ON projects FROM PUBLIC;          -- default deny first
 GRANT SELECT, INSERT              ON projects TO app_member;   -- no UPDATE, no DELETE
 GRANT SELECT, INSERT, UPDATE, DELETE ON projects TO app_admin;
 
-REVOKE SELECT (secret) ON projects TO app_member;             -- column-level
-GRANT  SELECT (id, site_id, name)  TO app_member;
+REVOKE SELECT ON projects FROM app_member;                  -- table level, FIRST
+GRANT  SELECT (id, site_id, name)  TO app_member;           -- then columns
 ```
 
 PostgREST then cannot offer an operation the grants withhold, even by accident.
 Order matters — revoke the table-level grant **before** applying column grants, or
 the column revoke silently does nothing (`AGENTS.md` B1).
+
+> **Corrected after the W07 proof: `REVOKE SELECT (col)` is not a way to hide a
+> column.** The example this section originally carried hid `secret` with
+> `REVOKE SELECT (secret) ON projects FROM app_member;` **on top of** a standing
+> table-level `SELECT`. A column privilege can only **narrow** a table grant that
+> has already been taken away; it cannot **subtract** from one. The statement is
+> accepted, exits 0, and changes nothing.
+>
+> **Verified: with the table grant still in place,
+> `has_column_privilege('app_member','customers','internal_notes','SELECT')` was
+> `t`** — `internal_notes` fully readable, returned at **HTTP 200 with its value
+> intact**, and a status-only assertion passed on the leak. `t` before the
+> table-level revoke, `f` after.
+>
+> So the shape above — `REVOKE ALL`, then the verb grants, then **`REVOKE SELECT` at
+> table level**, and only then the column list — is the one that works, and both
+> orders are asserted against each other in the suite so they cannot both be
+> "right". One consequence to design around: a column-restricted role cannot use
+> `select=*`, so requests against that table must name columns explicitly.
 
 ### Feature-level security, above the database
 
@@ -1095,7 +1321,7 @@ policies and grants, and confirm no capability role appears in any of them.
   reflect instantly, replace it with a `site_members` lookup and an `EXISTS`
   subquery — same policy shape, always current.
 - Capability roles are a separate table from DB roles, and a documented mapping
-  `capability_role → db_role`. `ic` and `site_manager` both map to `member`.
+  `capability_role → db_role`. `ic` and `site_manager` both map to `app_member`.
 - Every table needs a policy and grants. That is deliberate: default deny is
   cheaper to achieve than default allow.
 - This ADR supersedes nothing, but it **does** retire the assumption that a

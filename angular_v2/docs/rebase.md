@@ -386,8 +386,13 @@ capability exists and has been verified.
 ### 5.5 Backend — `packages/nestjs-typeorm-rls/` (30 files, 2,411 LOC)
 
 **Disposition: DELETE THE ENTIRE PACKAGE.** Replaced by ~150 lines of
-`CREATE POLICY` in `src/database/migrations/` plus a `SET LOCAL app.user_id`
-helper.
+`CREATE POLICY` in `database/migrations/`, reading the claims PostgREST already
+verified.
+
+> **CORRECTED.** This originally said "plus a `SET LOCAL app.user_id` helper".
+> **That mechanism does not exist and never worked** — a policy reads the setting
+> it names, so a policy built on `request.jwt.claims` is blind to `app.user_id`
+> (§6.6, finding 3). ADR-0002 carried the same error and is corrected in place.
 
 `rls.module.ts`, `query-builder.proxy.ts`, `entity-manager.proxy.ts`,
 `bypass.service.ts`, `rls-scope.types.ts`, `rls.constants.ts`, `index.ts` and
@@ -533,8 +538,8 @@ than no doc.
 | W04 | N1 | Doc-claims checker: every command in `development.md` exists in a `package.json` script | The checker runs in `verify` |
 | W05 | N7 | **PostgREST/RLS spike** — table → policy → PostgREST → JWT → curl → `openapi.json` → types | Five curl checks: per-claim RLS, anon not a leak, spec served |
 | W06 | N2 | `postgrest.conf`: `db-anon-role`, `jwt-role-claim-key`, shared secret. **Four** roles: a migration/owner role plus `app_anon`/`app_member`/`app_admin` | `curl /` returns the spec; a wrong secret is refused; **no request-serving role owns a table** |
-| W07 | N2 | Native RLS policies per ADR-0023: one policy per table, `request.jwt.claims`, fail-closed, plus `FORCE ROW LEVEL SECURITY` | Permitted returns rows; denied returns none; per access path; **and the policy still applies when run as the owner role** |
-| W08 | N2 | Column + table grants; `REVOKE ALL FROM PUBLIC` first, `REVOKE SELECT (secret)` for internal columns | Assert `SELECT` is **denied**, not merely omitted |
+| W07 | N2 | Native RLS policies per ADR-0023: one policy per table, `request.jwt.claims`, fail-closed, plus `FORCE ROW LEVEL SECURITY` — **except on the tree table, which must not be `FORCE`d** (§6.6 item 8) | Permitted returns rows; denied returns none; per access path; **and the policy still applies when run as the owner role** |
+| W08 | N2 | Column + table grants; `REVOKE ALL FROM PUBLIC` first, then `REVOKE SELECT` **at table level** before the column list | Assert `SELECT` is **denied**, not merely omitted. The column-revoke-only order fails **open** — verified |
 | W09 | N2 | Plain-SQL migrations, one directory, one table; `NOTIFY pgrst, 'reload schema'` after commit | Every migrated table is reachable at its endpoint |
 | W10 | N2 | `seed.ts` using PostgREST or `psql`, never TypeORM; seeds the three DB roles and an admin user | A fresh `setup` reaches a logged-in state |
 | W11 | N2 | Thin Nest app: JWT issuance, login orchestration, password reset, email, CAPTCHA, cron | Each route has a test; the six security tests in W13 |
@@ -587,7 +592,7 @@ The four capabilities views were carrying, and where each lives now:
 | Capability | Mechanism | Verification |
 |---|---|---|
 | Field naming | One convention: `user_id` in Postgres, on the wire, in types (W21) | No transform exists; assert generated field names match column names |
-| Internal columns hidden | `REVOKE SELECT (col) FROM app_member` (W22) — **note: table-level grant must be revoked first, and `select=*` then breaks on that table** | Test asserts `select` is **denied** — not merely omitted |
+| Internal columns hidden | `REVOKE SELECT ON <table> FROM app_member` **first**, then `GRANT SELECT (cols)` (W08) — a column revoke under a standing table grant is a silent no-op, and `select=*` then breaks on that table | Test asserts `select` is **denied** — not merely omitted |
 | Derived fields | Generated columns or RPC functions (W23) | Test asserts the computed value matches |
 | API decoupled from schema | **Not available, deliberately.** A column rename is a breaking change | `verify` fails at compile time until the client is regenerated |
 
@@ -646,13 +651,21 @@ protected table. W06 and W07 now assert it.
 converted spec is committed, so only the regenerator needs the tool.
 
 **3. The JWT `role` claim selects the database role.** PostgREST issues
-`SET ROLE` to it, so the issuer must validate on mint — an unknown role fails the
-request rather than falling back.
+`SET ROLE` to it, so an unknown role fails the request rather than falling back.
 
-Also noted: an unauthenticated `GET` returns **`200 []`**, not `401`. Correctly
-fail-closed, because the denial comes from RLS and column privileges rather than
-the auth layer — but tests must assert on the response **body**, never the status
-code alone.
+> **Corrected after the W07 proof.** "The issuer must validate on mint" is
+> necessary and **nowhere near sufficient** — it protects only the issuer. A
+> validly-signed token naming a table-owning role escalated completely (§6.6, H7).
+> The control is the grant on the authenticator, asserted in a test.
+
+Also noted: an unauthenticated `GET` returns **`200 []`**, not `401`.
+
+> **Corrected after the W07 proof.** This was the spike's shape, where a grant
+> existed and the policy denied. With **no grant at all** — the shipped posture for
+> `app_anon`, which receives no table grant — the answer is **`401`**, because the
+> grant layer refuses before the policy is ever evaluated. Both are fail-closed; the
+> status differs. Neither tells you whether a row leaked, which is why the suite
+> asserts on bodies and row counts.
 
 **Caveat.** The spike used throwaway secrets and passwords, and its database is
 named `pgrst_smoke`. None of it is template material.
@@ -664,9 +677,9 @@ Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicate
 
 | # | Verdict |
 |---|---|
-| H1 `FORCE` blocks owner DML | **Confirmed** — `new row violates row-level security policy`; DDL unaffected; seeding works via `SET LOCAL request.jwt.claims` |
+| H1 `FORCE` blocks owner DML | **Confirmed** — `new row violates row-level security policy`; DDL unaffected. *Seeding route later changed* — see item 13 below |
 | H2 `WITH CHECK` omitted → `USING` governs inserts | **Confirmed** — `with_check IS NULL`, re-checked on `UPDATE` |
-| H3 hierarchy policy | **REFUTED as written** — `SETOF uuid` is rejected in a policy expression. Scoping correct once it returns `uuid[]`; root→3, mid→2, unrelated→2, admin→5, unknown→0 |
+| H3 hierarchy policy | **REFUTED as written** — `SETOF uuid` is rejected in a policy expression. Scoping correct once it returns `uuid[]`; root→3, mid→2, unrelated→**1**, admin→all 5, unknown→0 |
 | H4 `INVOKER` vs `DEFINER` | **Confirmed** — `INVOKER` returned 1 row, owner-owned `DEFINER` returned the whole tree |
 | H5 column grants break `select=*` | **Confirmed** — `403 42501`; explicit columns `200`. Wrong grant order → **`200` with `secret` fully readable** |
 | H6 table grants withhold verbs | **Confirmed** — GET 200, POST 201, PATCH/PUT/DELETE `403`, row unchanged |
@@ -675,7 +688,7 @@ Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicate
 | H9 `openapi-mode` | `follow-privileges` is role-dependent. **Recommend `ignore-privileges`** — deterministic, and it does not reflect column grants anyway |
 | H10 denial signalling | **Partial** — no grant → `401`; RLS denial → `200 []`. **A status-only test passes on a real leak** |
 
-**Five findings that were not on the list at all:**
+**Seven findings that were not on the list at all:**
 
 1. **The documented hierarchy policy does not compile.** Never executed until now.
 2. **`FORCE` does not bind a superuser or `BYPASSRLS` role** — `postgres` read 5/5
@@ -691,35 +704,118 @@ Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicate
 6. **A malformed `site_id` breaks admins too.** Item 4 stopped at the `json` cast.
    The `uuid` cast raises independently, and `OR` does **not** short-circuit past
    a raising operand — verified, `invalid input syntax for type uuid: "garbage"`
-   for an admin token. The `TRUE OR NULL` reasoning in ADR-0023 is invalid.
+   for an admin token. **The `TRUE OR NULL` reasoning in ADR-0023 is invalid and is
+   withdrawn**; totality now comes from a guarded accessor (`claim_site_id()`,
+   `EXCEPTION WHEN others THEN RETURN NULL`).
 7. **The documented admin branch is dead code.** It matched
    `request_claims()->>'role' = 'admin'`, but no token ever carries `admin`; the DB
    role is `app_admin`. Verified over HTTP: a valid admin token got `200 []`.
+8. **The hierarchy function recursed through its own policy.** `site_tree_ids()`
+   reads `sites`, and the `sites` policy called it. Under the documented default
+   `SECURITY INVOKER` that is unbounded recursion: **every query as a non-superuser
+   role aborted with `stack depth limit exceeded` after ~100 frames.** The whole
+   API was dead and the only symptom was a stack trace in the server log. Fixed as
+   **one decision, not two** — `SECURITY DEFINER` *and* `sites` deliberately not
+   `FORCE`d, because `FORCE` would put the owner inside the function back under the
+   policy that called it. `SECURITY DEFINER` is safe here only because the function
+   reads no caller-supplied table and returns no caller-supplied data.
 
 **Corrected in W07**, which is where each of these was proven rather than
-reasoned about. Beyond the list above, four further defects were found by
+reasoned about. Beyond the list above, five further defects were found by
 executing the corrected file — recorded here because the pattern, not the
 instance, is the lesson:
 
-8. **Revoking `EXECUTE` from `PUBLIC` and granting it to nobody** is worse than
+9. **Revoking `EXECUTE` from `PUBLIC` and granting it to nobody** is worse than
    doing nothing: every scoped request became
    `403 permission denied for function request_claims`. A revoke is not a policy.
-9. **Omitting `EXECUTE` for `app_anon`** made unauthenticated reads raise rather
-   than deny. A policy is evaluated for every role that reaches the table.
-10. **The column-grant order failed open.** With a table-level `SELECT` in place,
+10. **Omitting `EXECUTE` for `app_anon`** made unauthenticated reads raise rather
+    than deny. A policy is evaluated for every role that reaches the table.
+11. **The column-grant order failed open.** With a table-level `SELECT` in place,
     `has_column_privilege(..., 'internal_notes', 'SELECT')` was `t`. A column
-    revoke under a table grant is silently a no-op.
-11. **The escalation-boundary `GRANT` cannot be run by a migration role** —
+    revoke under a table grant is silently a no-op, and the column came back at
+    HTTP 200 with its value intact.
+12. **The escalation-boundary `GRANT` cannot be run by a migration role** —
     `must have admin option on role "app_anon"`. The one statement that is the
-    boundary is necessarily a superuser statement.
+    boundary is necessarily a superuser statement, so it moved to
+    `database/bootstrap/001_roles.sql`, where it is asserted by reading
+    `pg_auth_members` and raising.
+13. **The migration/seeding route changed as a *consequence* of item 7.** Claims
+    alone can no longer admit a write, because the admin branch discriminates on
+    `current_user` rather than on a claim — which is the point of item 7, applied
+    consistently. So `SET LOCAL request.jwt.claims = '{"role":"app_admin"}'` now
+    buys nothing, and the documented seeding route in ADR-0023 and `AGENTS.md` B1
+    silently stopped working. The seeder now **connects as `pgrst_authenticator`
+    and `SET ROLE app_admin`** inside one transaction: through the escalation
+    boundary rather than around it. A correction to a policy can invalidate a
+    procedure documented two sections earlier, which is why both are recorded here.
 
-Highest severity: H7. The mitigation this project documented — validate the
-claim at mint — protects only the issuer. The real boundary is
-`GRANT app_anon, app_member, app_admin TO authenticator` and nothing else.
+**A corrected claim, in the same class.** `site_tree_ids` is **self-inclusive**:
+its anchor selects the `root` row itself. So a member scoped to a site outside the
+tree sees its **own** row and none of the subtree — **1 row, not 0 and not 2.** The
+old figure (`unrelated→2`) was wrong, and it was wrong in the direction that makes
+a leak look like a feature. "Unrelated→0" would be wrong too: the row is the
+caller's own site, and the suite asserts 1 explicitly so the number cannot drift in
+either direction.
+
+The one number every document must now agree on:
+
+| Claim | Rows visible | Why |
+|---|---|---|
+| `site_id` = root | **3** | root + mid + leaf |
+| `site_id` = mid | **2** | mid + leaf |
+| `site_id` = unrelated | **1** | its own row only — the walk is self-inclusive |
+| `site_id` = well-formed uuid, no such site | **0** | the walk is empty |
+| `role: app_admin` | **all 5** | `current_user` branch |
+
+### 6.6.1 The proof standard: the gate is verified, not asserted
+
+`npm run test:rls` is step **7 of 8** in `verify`, and its claim is stronger than
+"the tests pass": **the tests can go red when the control is removed.** A suite
+that stays green whether or not the protection exists is worse than no suite,
+because it converts an absent control into a documented one.
+
+Each row below was executed by removing one control from the shipped SQL, running
+the full gate, and restoring the file byte-for-byte. In every case the run ended at
+step 7 with the earlier steps green — which is the point: **typecheck, lint, unit
+tests (both projects), integration tests and the smoke check cannot see any of
+this.** Only step 7 can.
+
+| Control removed | Result | Failing tests |
+|---|---|---|
+| *(baseline, nothing removed)* | `verify passed` | — (33 RLS tests green) |
+| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | `verify failed at step 7/8` | **12 of 33** |
+| the two `REVOKE SELECT ON … FROM app_member/app_admin` lines deleted | `verify failed at step 7/8` | **2 of 33** — both the leak assertion and the `has_column_privilege` check |
+| the boundary `GRANT` widened to reach the table-owning role | `verify failed at step 7/8` | **3 of 33** — the two escalation tests and the whole-cluster allowlist test |
+
+Two things about that table are worth stating rather than leaving implicit:
+
+- **`verify` stops at the first failing step, so step 8 never runs in a tampered
+  run.** "The other seven steps stay green" means the six that run before it are
+  green and the run never reaches the eighth. Read the numbers, not the slogan.
+- **The boundary test is about the role that actually owns the tables.** The first
+  attempt at that tamper granted `app_migrator` — the placeholder the bootstrap
+  creates — which owns nothing and holds no grants. `verify` stayed **completely
+  green**: the suite proves the boundary for the owning role, and granting an
+  unused role is not an escalation. Recorded because "we tampered and it stayed
+  green" is exactly the result that gets quietly dropped when it is inconvenient.
+- **Restoring the file does not restore the cluster — and this one failed open.**
+  Role membership is **cluster-scoped**, and `001_roles.sql` only ever `GRANT`s;
+  it never revokes. So after the boundary tamper, restoring the SQL file left the
+  live `pgrst_authenticator` **still a member of the table-owning role**, and the
+  next full `verify` was **red at step 7 with the shipped, unmodified SQL in the
+  tree** — the confirmed exploit, back again, with a clean checkout. The tamper has
+  to be undone with `REVOKE <role> FROM pgrst_authenticator` as a superuser, and
+  membership re-checked against `pg_auth_members` before the run counts as
+  restored.
+  > A tamper run that leaves the environment worse than it found it is not a
+  > verification step. Check the *cluster*, not the diff.
+
+Highest severity among these: H7. The mitigation this project documented — validate
+the claim at mint — protects only the issuer. The real boundary is
+`GRANT app_anon, app_member, app_admin TO pgrst_authenticator` and nothing else.
 `REVOKE SET ON PARAMETER role` is inert on PG15. `REVOKE <owner> FROM <auth>` is a
-denylist and is bypassed by any unlisted role. **It must be a test, not a
-migration comment** — and it now is: `backend/test/rls/` runs as a gating step of
-`verify`, and disabling `ENABLE ROW LEVEL SECURITY` fails 11 of its 33 tests.
+denylist and is bypassed by any unlisted role. **It must be a test, not a migration
+comment** — and it now is: `backend/test/rls/` runs as a gating step of `verify`.
 
 Also confirmed: a token with **no `exp` claim is accepted**; forged, unsigned and
 expired tokens are rejected. PostgREST caches **schema and grants** — `NOTIFY` is
@@ -737,7 +833,8 @@ Per phase. Nothing advances until its gate passes.
 npm run verify            # build + typecheck + lint + test + smoke
 
 # P1 — API layer
-npm run test -- rls       # every policy: permitted returns rows, denied returns none
+npm run test:rls          # gating step 7 of 8: every policy permitted returns rows, denied returns none
+                           # and the gate is proven able to fail — see §6.6.1 before trusting it
 npm run generate:client   # PostgREST spec → client regenerates cleanly
 curl $PGRST_URL/ | jq .   # PostgREST is serving; OpenAPI is present
 grep -rn "typeorm" package.json   # must be absent

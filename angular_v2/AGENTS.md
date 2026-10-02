@@ -209,6 +209,14 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
   `/rpc/fn_name`.
 - **Migrations are the only schema authority.** Plain SQL, one directory, one
   migrations table name. Never edit columns without a migration.
+- **Role creation is not a migration.** `CREATE ROLE` needs `CREATEROLE` and roles
+  are cluster-scoped while migrations are database-scoped, so roles live in
+  `database/bootstrap/001_roles.sql`, run once **as a superuser**. The
+  escalation-boundary `GRANT` lives there for the same reason: `GRANT <role> TO
+  <role>` needs `ADMIN OPTION`, so it *cannot* run in a migration — verified:
+  `must have admin option on role "app_anon"`. **The one statement that is the
+  security boundary is necessarily a superuser statement.** Do not move it into a
+  migration to make the file self-contained.
 - Every migration needs a working `down()`.
 - Store arrays and objects as `jsonb` (or a real Postgres array type). JSON blobs
   must be queryable.
@@ -268,10 +276,16 @@ code.**
       read 5/5 from a `FORCE`d table. Every role that can reach a protected table
       must be `NOSUPERUSER NOBYPASSRLS`, asserted in a test.
   - **That includes the migration role for `DML`.** DDL is unaffected, but seeding
-    is `INSERT`, so the owner is now rejected by the policy (`new row violates
-    row-level security policy` — verified). Seed from a role that sets
-    `request.jwt.claims` to a value the policy admits. **Never disable
-    `row_security` to seed** — that reopens the bypass.
+    is `INSERT`, so the owner is rejected by the policy (`new row violates
+    row-level security policy` — verified). **Seed through the boundary:** connect
+    as `pgrst_authenticator` and `SET LOCAL ROLE app_admin` in one transaction.
+    **Never disable `row_security` to seed** — that reopens the bypass.
+    - **CORRECTED after the W07 proof.** This used to say "seed from a role that
+      sets `request.jwt.claims` to a value the policy admits." **That route stopped
+      working** when the admin branch was fixed to key on `current_user` rather
+      than on a claim — claims alone can only ever *narrow* scope now. A correction
+      to a policy can silently invalidate a procedure documented elsewhere; check
+      the policy before trusting any seeding instruction.
   - Omitting `WITH CHECK` is safe: Postgres falls back to the `USING` expression
     for inserts, so one expression governs both visibility and insertability.
   - A test asserts the policy applies when run as the migration role, not only as
@@ -313,8 +327,9 @@ CREATE POLICY row_scope ON projects USING (
   claim is caller-supplied and signed by whoever holds the secret; `current_user`
   is set by Postgres from the `SET ROLE` the escalation boundary already
   constrained. Reading the admin tier out of the token re-opens the very hole
-  this policy exists to close — verified: a member who put `"role":"admin"` in
-  their own validly-signed token saw every row.
+  this policy exists to close. Verified in the shipped policy: a member who forged
+  `"role":"admin"` into their own validly-signed token got **zero rows**, because
+  no branch reads that field.
 - **The DB role vocabulary is `app_anon` / `app_member` / `app_admin`.** A
   capability role (`ic`, `site_manager`, `admin`) is a *different* vocabulary and
   is not a database role. Writing `request_claims()->>'role' = 'admin'` produces
@@ -344,12 +359,21 @@ CREATE POLICY row_scope ON projects USING (
   `SECURITY DEFINER`, and the tree table must NOT be `FORCE`d.** These are one
   decision, not two. With `SECURITY INVOKER` the walk reads a table whose policy
   calls the walk, and every request as a non-superuser role dies with
-  `stack depth limit exceeded`. `FORCE` on that table does not fix it — it makes
-  it worse, because then the owner inside the function is itself subject to the
+  `stack depth limit exceeded` — verified, after ~100 frames, with no policy error
+  and no partial result. `FORCE` on that table does not fix it — it makes it
+  worse, because then the owner inside the function is itself subject to the
   policy. Only DEFINER plus leaving that table un-`FORCE`d terminates.
+  `SECURITY DEFINER` is safe here **only** because the function reads no
+  caller-supplied table and returns no caller-supplied data; it is not a general
+  licence to make helpers privileged.
   **This is the weakest link in the pattern:** an owner can read the tree table
   unrestricted. Keep tenant payload out of it, and record the trade in a comment
   where the next maintainer will hit it.
+- **The hierarchy walk is self-inclusive.** It anchors on the `root` row itself, so
+  a member scoped to a site sees its own row plus its descendants, and a member
+  scoped to an unrelated site sees **its own single row and none of the subtree**.
+  Verified counts over the five-row proof fixture: root→3, mid→2, unrelated→**1**,
+  unknown→0, admin→all 5. Anyone documenting "unrelated→0" is describing a bug.
 - **`EXECUTE` is granted to `PUBLIC` on new functions by default.** `REVOKE
   EXECUTE … FROM PUBLIC` on every function, or any `SECURITY DEFINER` helper is
   anonymously reachable. Verified: 7 of 9 test functions had `NULL proacl`.
@@ -361,10 +385,18 @@ CREATE POLICY row_scope ON projects USING (
   change, not a code change.
 - **Default deny.** `REVOKE ALL ... FROM PUBLIC` before any grant. Tables intended
   to be globally readable are listed explicitly.
+- **The claims setting only reaches the database if PostgREST is configured to
+  produce it, and the one setting that decides it will `PANIC` a server rather
+  than fall back.** `jwt-role-claim-key = "role"` (bare) aborts PostgREST 16.4 on
+  boot: `failed to parse role-claim-key value (role) … unexpected "r" / expecting
+  "."`. Only the **JSPath** `".role"` works; `$.role` panics on 16.4 too. A policy
+  suite can be perfect and every request still fails, because nothing reaches the
+  policy. See B5 and `docs/development.md` troubleshooting.
 - PostgREST exposes JWT claims as a transaction-scoped setting; policies read
   them with `current_setting('request.jwt.claims', true)::json->>'sub'`.
-- The thin Nest app passes identity with `SET LOCAL app.user_id = ...` inside a
-  transaction.
+- The thin Nest app has no SQL path at all (no ORM), so it passes no identity to
+  a policy: PostgREST does that from the verified token. `SET LOCAL app.user_id`
+  appears nowhere and would be ignored if it did.
 - `db-pre-request` is the hook for **revocation** — verified: a revoked token gets
   a clean `401`/`PT401`, no 500 loop. It is **not** a throttle (read-only
   transaction, above). An unreadable revocation table makes revocation **silently
@@ -595,9 +627,28 @@ Every app forked from this needs these. They must actually work.
 - **Prove a security test can fail.** Remove the control and confirm the matching
   test goes red — a suite whose tests all pass whether or not the protection
   exists is the exact failure this file exists to prevent. `npm run test:rls` is a
-  **gating step of `verify`**, because the other steps stay green while every
-  policy in the database is dropped (verified: disabling `ENABLE ROW LEVEL
-  SECURITY` fails 11 tests and ends `verify` at step 7/8).
+  **gating step of `verify`** (step 7 of 8), and the claim is verified rather than
+  asserted: each of these was executed by removing one control from the shipped
+  SQL, running the whole gate, and restoring the file —
+
+  | Control removed | Result |
+  |---|---|
+  | *(nothing — baseline)* | `verify passed`, 33 RLS tests green |
+  | `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | red at step 7/8, **12 of 33** |
+  | the `REVOKE SELECT ON … FROM app_member/app_admin` lines | red at step 7/8, **2 of 33** |
+  | the boundary `GRANT` widened to reach the table-owning role | red at step 7/8, **3 of 33** |
+
+  The other steps cannot see any of it: typecheck, lint and both unit suites stay
+  green with every policy in the database disabled. `verify` stops at the first
+  failing step, so a tampered run ends at 7 and never reaches 8. Re-run this
+  table whenever a control moves — a gate whose load-bearing status was proved
+  once, three defects ago, is a claim again (`rebase.md` §6.6.1).
+  - **A tampered run can leave the cluster worse than it found it.** Role
+    membership is cluster-scoped and the bootstrap only ever `GRANT`s, so
+    restoring the SQL file does **not** undo a widened boundary `GRANT` — the next
+    run is red with a clean tree, and the live escalation is back. Undo it with
+    `REVOKE <role> FROM pgrst_authenticator` as a superuser and re-read
+    `pg_auth_members`. Check the cluster, not the diff.
 - **Never start a test server on a port something else may already hold.** The
   readiness probe succeeds against the *other* server, and the suite then quietly
   tests a database it did not create. Refuse to start if the port answers, and

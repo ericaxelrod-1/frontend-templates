@@ -39,21 +39,27 @@ ADR-0023.
 | **No request-serving role owns a table**, and `FORCE ROW LEVEL SECURITY` is set | Test asserts the policy still applies when queried as the owner role |
 | **No serving role is `SUPERUSER` or `BYPASSRLS`** | `FORCE` does not bind either; a `postgres` session read 5/5 from a `FORCE`d table |
 | **The authenticator may assume only the three app roles** | A token naming a table-owning role must be `403`. It read everything and its `DELETE` removed the row |
+| That boundary `GRANT` is a **superuser statement in the bootstrap**, asserted by reading `pg_auth_members` | It cannot run in a migration: `must have admin option on role "app_anon"` |
 | `REVOKE SET ON PARAMETER role` is **not** the control | Inert on PostgreSQL 15 |
-| Every function has `EXECUTE` revoked from `PUBLIC` | `PUBLIC` gets it by default — any `SECURITY DEFINER` helper is anonymously reachable |
-| A policy is **total**: empty, absent and malformed claims deny, never error | `current_setting(...,true)` returns `''`, and `''::json` raises. A garbage `site_id` must not break an admin |
-| The `role` claim is validated at minting | A token with an unrecognised role is refused, not downgraded |
+| Every function has `EXECUTE` revoked from `PUBLIC` **and granted to `app_anon`, `app_member` and `app_admin`** | `PUBLIC` gets it by default (7 of 9 functions had `NULL proacl`), so a `SECURITY DEFINER` helper is anonymously reachable — but a revoke with no grant 403s every scoped request and leaves scoping 100% non-functional |
+| **The admin branch is keyed on `current_user`, not the `role` claim** | A claim-keyed branch is **dead code**: no token carries the bare string `admin`, so a valid `app_admin` token got `200 []` and saw nothing. A forged `"role":"admin"` in a member's own validly-signed token gets zero rows |
+| A policy is **total**: empty, absent and malformed claims deny, never error | `current_setting(...,true)` returns `''`, and `''::json` raises. `OR` does **not** short-circuit past a raising operand, so a garbage `site_id` broke an admin too — only a guarded accessor (`EXCEPTION … RETURN NULL`) makes it total |
+| A hierarchy function that walks the table its own policy protects is `SECURITY DEFINER`, **and that table is not `FORCE`d** | One decision, not two. Under `SECURITY INVOKER` every non-superuser query died with `stack depth limit exceeded`; `FORCE` on that table causes it rather than fixing it |
+| Hierarchy scope derives from a recursive function, not duplicated policy logic | `site_tree_ids()` test; the policy contains no `WITH RECURSIVE`. Counts: root→3, mid→2, unrelated→**1** (the walk is self-inclusive), unknown→0, admin→all |
+| The `role` claim is validated at minting | Necessary but **not sufficient** — it protects only the issuer |
 | The issuer always sets `exp` | A token with no `exp` is **accepted** by PostgREST |
 | Denials are asserted on the body, not the status | A correct denial, a full leak and a partial 3-of-5 leak were **all HTTP 200** |
 | Missing claims yield **zero rows**, never an error | Policy test with a claim-less token |
-| Hierarchy scope derives from a recursive function, not duplicated policy logic | `customer_tree()` test; policy contains no `WITH RECURSIVE` |
+| Seeding goes **through** the boundary: `pgrst_authenticator` + `SET ROLE app_admin` | Claims alone can no longer admit a write, and `row_security = off` is used nowhere — it reopens the owner bypass |
+| `jwt-role-claim-key` is the JSPath `".role"` | `"role"` and `"$.role"` **panic** PostgREST 16.4 on boot |
 | **No ORM**, therefore no raw-query escape hatch | `pg`, `typeorm`, `sequelize`, `prisma` absent from `package.json` |
 | **No database views** | Superuser-created views bypass RLS silently — migration test asserts none exist |
 | Identity reaches policies via `current_setting('request.jwt.claims', true)` | A policy test runs as a non-superuser role |
-| Internal columns revoked with column-level `GRANT` | Test asserts `SELECT` is **denied**, not merely omitted |
-| An admin token carries no `site_id`, so scope cannot narrow it | Admin sees rows across every site in one test |
+| Internal columns revoked with column-level `GRANT`, **after** a table-level `REVOKE SELECT` | Assert `SELECT` is **denied**, not merely omitted. The wrong order fails open at `200` with the value intact |
+| An admin token carries no `site_id`, so scope cannot narrow it | Admin sees rows across every site in one test, and is recognised by `current_user` rather than by a missing claim |
 | An `ic` and a `site_manager` are the same DB role | A `grep` gate asserts no DB role is named after a capability |
 | **No query filters by site *and* by feature** | Grep: no capability role appears in any policy or grant |
+| **The RLS suite is proven able to fail** | Disabling `ENABLE ROW LEVEL SECURITY`, dropping the column `REVOKEs`, and inverting the boundary `GRANT` each turn `verify` red at step 7 of 8 (`rebase.md` §6.6.1) |
 | Thin-app routes default deny | A new controller without `@Public()` or a guard fails a test |
 
 ---

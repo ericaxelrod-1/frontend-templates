@@ -160,6 +160,27 @@ Assertions are on bodies and row counts, never on status codes alone: with a
 table-level grant in place a leaked column comes back at HTTP 200 with its value
 intact, and a status-only test passes on the leak.
 
+**The gate is verified, not asserted.** Each of these was executed by removing one
+control from the shipped SQL, running the full gate, and restoring the file:
+
+| Control removed | Result |
+|---|---|
+| *(nothing — baseline)* | `verify passed`, 33 RLS tests green |
+| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | `verify failed at step 7/8`, 12 of 33 red |
+| the `REVOKE SELECT ON … FROM app_member/app_admin` lines | `verify failed at step 7/8`, 2 of 33 red |
+| the boundary `GRANT` widened to reach the table owner | `verify failed at step 7/8`, 3 of 33 red |
+
+The other steps cannot see any of this: typecheck, lint and both unit suites stay
+green with every policy in the database disabled. Note also that `verify` stops at
+the first failing step, so a tampered run ends at step 7 and never reaches step 8.
+`rebase.md` §6.6.1 has the detail, including one tamper that did **not** turn the
+gate red and why.
+
+Seeding inside the proof suite connects as `pgrst_authenticator` and
+`SET ROLE app_admin` — through the escalation boundary, not around it. A claim
+alone can no longer admit a write, because the admin branch discriminates on
+`current_user`.
+
 ---
 
 ## Why there is no CI
@@ -197,3 +218,12 @@ add CI on top; the template does not need any.
 | Prerender throws `ReferenceError: localStorage` | A browser global on a server-executed path. Guard it or remove it. |
 | Frontend types out of sync | Run `npm run generate:client`. |
 | RLS test returns zero rows unexpectedly | Check the `SET LOCAL` identity is set and the policy's `USING` clause. |
+| **PostgREST panics on boot:** `failed to parse role-claim-key value (role) … unexpected "r" / expecting "."` | `jwt-role-claim-key` must be a **JSPath**. Use `".role"`. The bare `"role"` does not fall back — it aborts startup. `$.role` panics too on 16.4, so do not "modernise" it. |
+| `PGRST301 "None of the keys was able to decode the JWT"` while `postgrest.conf` looks correct | **Environment beats config.** An inherited `PGRST_JWT_SECRET` from `backend/.env` silently overrides the file. Strip inherited `PGRST_*` keys when spawning PostgREST — `spawn` stringifies `undefined` into the literal text `"undefined"`. |
+| `403 permission denied for function request_claims` on every scoped request | `EXECUTE` was revoked from `PUBLIC` and granted to nobody. **A revoke is not a policy** — revoke *and* grant to `app_anon`, `app_member`, `app_admin`. Scoping is 100% non-functional until you do. |
+| `permission denied for function site_tree_ids` on an *unauthenticated* read | `EXECUTE` was not granted to `app_anon`. A policy is evaluated for every role that reaches the table, including the anonymous one; the denial must arrive as zero rows, not as a `42501`. |
+| `stack depth limit exceeded` on any query as a non-superuser role | The hierarchy function reads the table its own policy protects. It must be `SECURITY DEFINER` **and** that table must not be `FORCE`d — one decision, not two. |
+| `must have admin option on role "app_anon"` | The escalation-boundary `GRANT` cannot run as the migration role. Run `database/bootstrap/001_roles.sql` **as a superuser** — the one statement that *is* the boundary is necessarily a superuser statement. |
+| `new row violates row-level security policy` when seeding | `FORCE` binds the owner for `DML`. Seed through the boundary: connect as `pgrst_authenticator`, `SET ROLE app_admin`. **Never** `SET row_security = off` — it reopens the owner bypass. |
+| An internal column comes back at HTTP 200 | Column grants only *narrow* a table grant that is already gone. `REVOKE ALL`, re-grant the verbs, then `REVOKE SELECT` at table level, and only then the column list. |
+| `port 3005 is already serving` and the suite would have tested the wrong database | Something else holds the proof port. The suite refuses to start; kill the other process rather than removing the guard. |
