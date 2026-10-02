@@ -108,8 +108,9 @@ generated. The frontend hand-declares types and URLs: ~126 hand-written HTTP
 calls, `Role` declared 4× with `id` typed `number`, `string`, and `number?`, and
 6 calls to endpoints that do not exist.
 
-**Decision.** The spec is generated from the **live database** by PostgREST and
-committed as `openapi.json`. `openapi-typescript` generates the Angular types from it.
+**Decision.** The spec is generated from the **live database** by PostgREST,
+converted from **Swagger 2.0 to OpenAPI 3.0** by `swagger2openapi`, and committed
+as `openapi.json`. `openapi-typescript` generates the Angular types from it.
 Hand-written URLs and response interfaces are forbidden. Where a public shape must
 differ from the stored shape — camelCase columns, computed fields, redacted
 columns — expose a **generated column** or a `STABLE` function via RPC. Naming is
@@ -133,7 +134,24 @@ transformers."* A mutator is compile-time and would technically work, but it is
 custom machinery this template would have to maintain.
 
 `openapi-typescript` emits types exactly as the spec states — snake_case — with
-**zero runtime dependencies** and no assumed data-fetching library. That is
+**zero runtime dependencies** and no assumed data-fetching library.
+
+**PostgREST emits Swagger 2.0, not OpenAPI 3.x — a conversion step is required.**
+Verified on PostgREST 16.4: `GET /` returns `{"swagger": "2.0", …}` with
+`definitions` and `basePath`, despite the `application/openapi+json` content type.
+No PostgREST config option changes this (`openapi-mode`,
+`openapi-security-active`, `openapi-server-proxy-uri` are the only OpenAPI
+settings). The chain was verified end to end:
+
+```
+PostgREST 16.4 → Swagger 2.0 → swagger2openapi → OpenAPI 3.0.0
+              → openapi-typescript 7.13.0 → snake_case types
+```
+
+Conversion preserved all definitions and paths, and generated field names were
+**spec-verbatim with zero camelCase leakage** — which is the property ADR-0022
+depends on. The converted spec is committed, so only the regenerator needs
+`swagger2openapi`; frontend builds do not. That is
 exactly the requirement: naming decided at build time, nothing at runtime, so
 nothing can corrupt a `jsonb` payload on the way through.
 
@@ -843,6 +861,43 @@ data-driven.
 
 Direction is a product decision, not a mechanism one: descendants by default (a
 regional manager sees their region's sites). Change the function, not the policy.
+
+### RLS does not apply to the table owner — verified
+
+This was found empirically on a live PostgREST 16.4 + PostgreSQL 15.19 install,
+and it invalidates the naive reading of every example above:
+
+> Postgres exempts a table's owner from its row-level security policies.
+
+A smoke test using the same JWT claim returned **5 of 5 rows** when queried as the
+table owner and **2 of 5** as a non-owner. No error, no warning — the policy
+simply did not apply.
+
+Two consequences, both mandatory:
+
+1. **Two distinct roles, always.** A migration/owner role that never serves
+   requests, and a request-serving role that owns no tables. Collapsing them —
+   which is the obvious thing to do for a template — disables RLS entirely.
+2. **`ALTER TABLE … FORCE ROW LEVEL SECURITY`** on every protected table, so the
+   owner is subject to the policy too.
+
+Without both, every policy in this ADR is decorative. This is the same failure
+class as the deleted RLS proxy: an enforcement mechanism that reports success
+while enforcing nothing.
+
+### The role claim is caller-supplied
+
+PostgREST performs role impersonation by issuing `SET ROLE` to the value of the
+JWT's `role` claim. The claim originates from the caller, so **the token issuer
+must validate it** and emit only `app_anon`, `app_member`, `app_admin`. An
+unrecognised role must fail the request rather than fall back to a default.
+
+### Anonymous requests return 200 with an empty array
+
+Verified: an unauthenticated `GET` returns `200 []`, not `401`. The denial comes
+from RLS and column privileges, not from the auth layer. That is correctly
+fail-closed, but **a 200 must not be read as success** — the response body is the
+only signal. Tests assert on the body, never the status code alone.
 
 ### Operation-level security, also in the database
 

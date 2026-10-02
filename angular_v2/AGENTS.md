@@ -247,6 +247,16 @@ permissions module could not do row-level security at all (ADR-0023).
 **Row-level security is enforced by Postgres policies. Never in application
 code.**
 
+- **VERIFIED ON A LIVE INSTALL: a table's owner bypasses its RLS policies.**
+  Postgres exempts owners from RLS. If the migration role also serves requests,
+  every policy is a no-op and **nothing errors** — verified: the same JWT claim
+  returned 5 of 5 rows as owner and 2 of 5 as a non-owner.
+  - **Two distinct roles, always.** A migration/owner role that never receives
+    requests, and a request-serving role that owns nothing.
+  - **`ALTER TABLE … FORCE ROW LEVEL SECURITY`** on every protected table, so
+    even the owner is subject to the policy.
+  - A test asserts the policy applies when run as the migration role, not only as
+    the request role.
 - Write `CREATE POLICY` in a migration. RLS sits below the application, so no
   forgotten guard, new endpoint, or future runtime can bypass it.
 - One policy per table, one readable expression, fail-closed when claims are
@@ -366,6 +376,11 @@ capability role.
   public.
 - Both runtimes read the **same** secret. If `PGRST_JWT_SECRET` and `JWT_SECRET`
   diverge, fail loudly at boot rather than issuing tokens nothing accepts.
+- **The `role` claim selects the database role.** PostgREST does
+  `SET ROLE` to whatever the token names (ADR-0023). The issuer must therefore
+  **only ever emit `app_anon`, `app_member` or `app_admin`** — validate on mint,
+  never pass through an unvalidated claim. An unknown role must fail the request,
+  not fall back.
 - **No default JWT secret.** Assert `JWT_SECRET` is present and sufficiently
   long at bootstrap; throw if not.
 - Access tokens short-lived (~15–30 min). Permissions are read from the

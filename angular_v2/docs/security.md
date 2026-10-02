@@ -162,6 +162,14 @@ The thin Nest app passes identity with `SET LOCAL app.user_id = ...` inside a
 transaction.
 
 - Tables intended to be globally readable are listed explicitly. Default is deny.
+- **VERIFIED: a table's owner bypasses its policies, silently.** Four roles are
+  mandatory — a migration/owner role that never serves requests, plus
+  `app_anon` / `app_member` / `app_admin` — and `FORCE ROW LEVEL SECURITY` goes on
+  every protected table. Otherwise every policy here is decorative.
+- **The JWT `role` claim selects the database role** (PostgREST issues `SET ROLE`
+  to it). Validate on mint; an unknown role fails the request, never falls back.
+- An unauthenticated `GET` returns `200 []`, not `401`. Denials come from RLS and
+  column privileges. **Assert on the response body, never the status code.**
 - **Every policy has a test**: the permitted case returns rows, the denied case
   returns none, and the denied case is proven for each access path. An LLM writing
   `USING (true)` is otherwise invisible.

@@ -532,8 +532,8 @@ than no doc.
 | W03 | N1 | Document-level link checker: every relative link in `docs/` and `AGENTS.md` resolves | The checker runs in CI-equivalent `verify` |
 | W04 | N1 | Doc-claims checker: every command in `development.md` exists in a `package.json` script | The checker runs in `verify` |
 | W05 | N7 | **PostgREST/RLS spike** — table → policy → PostgREST → JWT → curl → `openapi.json` → types | Five curl checks: per-claim RLS, anon not a leak, spec served |
-| W06 | N2 | `postgrest.conf`: DB roles `app_anon`/`app_member`/`app_admin`, `db-schemas`, `jwt-role-claim-key`, shared secret | `curl /` returns the spec; a wrong secret returns 401 |
-| W07 | N2 | Native RLS policies per ADR-0023: one policy per table, `request.jwt.claims`, fail-closed | Permitted case returns rows; denied returns none; per access path |
+| W06 | N2 | `postgrest.conf`: `db-anon-role`, `jwt-role-claim-key`, shared secret. **Four** roles: a migration/owner role plus `app_anon`/`app_member`/`app_admin` | `curl /` returns the spec; a wrong secret is refused; **no request-serving role owns a table** |
+| W07 | N2 | Native RLS policies per ADR-0023: one policy per table, `request.jwt.claims`, fail-closed, plus `FORCE ROW LEVEL SECURITY` | Permitted returns rows; denied returns none; per access path; **and the policy still applies when run as the owner role** |
 | W08 | N2 | Column + table grants; `REVOKE ALL FROM PUBLIC` first, `REVOKE SELECT (secret)` for internal columns | Assert `SELECT` is **denied**, not merely omitted |
 | W09 | N2 | Plain-SQL migrations, one directory, one table; `NOTIFY pgrst, 'reload schema'` after commit | Every migrated table is reachable at its endpoint |
 | W10 | N2 | `seed.ts` using PostgREST or `psql`, never TypeORM; seeds the three DB roles and an admin user | A fresh `setup` reaches a logged-in state |
@@ -541,7 +541,7 @@ than no doc.
 | W12 | N2 | Rate limiting for PostgREST routes via `db-pre-request` or a reverse proxy | Sustained requests are throttled; PostgREST does not throttle alone |
 | W13 | N2 | Six security tests: audit row · 5-failure block · blocked-before-credentials · IP normalization · per-account · allowlist | Each **fails** against the old code, passes after |
 | W14 | N2 | Delete `packages/nestjs-typeorm-rls/`, TypeORM, Passport, Swagger, and both migration trees | `grep` gates are empty; `npm ls` shows none installed |
-| W15 | N3 | `openapi.json` committed; `openapi-typescript` generates Angular types | Regeneration is a no-op on a clean tree |
+| W15 | N3 | `openapi.json` committed — PostgREST Swagger 2.0 → `swagger2openapi` → OpenAPI 3.0 → `openapi-typescript` | Regeneration is a no-op on a clean tree; generated fields are spec-verbatim |
 | W16 | N3 | Delete `app/models/**` and all hand-written URLs | `grep` finds no literal API path in `src/` |
 | W17 | N3 | Standalone + OnPush + signals across 78 components; delete 25 manual CD calls and the circuit breaker | `grep` for `detectChanges\|markForCheck\|NgZone` is empty |
 | W18 | N3 | `provideClientHydration(withEventReplay())`; remove 9 client-only template guards | No hydration mismatch in the SSR smoke test |
@@ -579,6 +579,83 @@ The rule for deciding which runtime owns a route:
 
 Nothing is served by both. A resource that is pure CRUD does not appear in the
 Nest application at all.
+
+### 6.2 Consequences of ADR-0022 (no views)
+
+The four capabilities views were carrying, and where each lives now:
+
+| Capability | Mechanism | Verification |
+|---|---|---|
+| Field naming | One convention: `user_id` in Postgres, on the wire, in types (W21) | No transform exists; assert generated field names match column names |
+| Internal columns hidden | `REVOKE SELECT (col) FROM api_role` (W22) — **note: table-level grant must be revoked first, and `select=*` then breaks on that table** | Test asserts `select` is **denied** — not merely omitted |
+| Derived fields | Generated columns or RPC functions (W23) | Test asserts the computed value matches |
+| API decoupled from schema | **Not available, deliberately.** A column rename is a breaking change | `verify` fails at compile time until the client is regenerated |
+
+### 6.3 Naming — the three rejections, verified
+
+| Option | Disqualifying evidence |
+|---|---|
+| **Views** | Superuser-created views bypass all RLS silently. PostgREST: *"When created by a SUPERUSER role, all row-level security policies will be bypassed."* A real leak is recorded in PostgREST #2124. Writes also unreliable: no PK, so upsert needs explicit keys; PATCH/DELETE *"only works for tables, not views"* (PR #2195); *"Deleting more rows than were requested"* |
+| **Client key transform** | Rewrites keys inside `jsonb`, breaking passthrough payloads (porsager/postgres #983). PostgREST returns `jsonb` as nested objects so the transform reaches inside. Already tried and deleted in `angular/` after a 35-task refactor |
+| **Quoted camelCase columns** | Postgres folds unquoted identifiers to lowercase; every identifier needs quotes, and the mismatch surfaces only when something else references it |
+
+Codegen tooling, also verified:
+
+| Claim | Verdict |
+|---|---|
+| Orval `namingConvention` covers schema properties | **False.** It covers file names (`output.namingConvention`) and enum keys (`override.namingConvention.enum`). Property conversion needs a custom mutator — requested in orval#2381 |
+| Orval supports Angular | **True**, and signal-first via `override.angular.retrievalClient: 'httpResource'`. Not chosen because of the property-naming gap |
+| `openapi-typescript` emits spec-verbatim with zero runtime | **True.** Naming resolved at build time, so nothing can corrupt `jsonb` at runtime |
+
+### 6.4 Verified against upstream
+
+Checked against PostgREST documentation and upstream issues rather than assumed:
+
+| Claim | Verdict |
+|---|---|
+| RLS works with PostgREST | **Confirmed.** Policies read claims via `current_setting('request.jwt.claims', true)::json` |
+| PostgREST verifies the JWT itself | **Confirmed.** Role impersonation via the `role` claim, configurable with `jwt-role-claim-key` |
+| PostgREST does **not** rate-limit | **Confirmed.** Upstream states you must put a reverse proxy in front; docs ship an Nginx `limit_req` example. W8 stands |
+| PostgREST emits column names verbatim, no auto-transform | **Confirmed.** The feature was explicitly declined upstream |
+| Column renaming works on reads | **Confirmed, but read-only** — `?select=alias:column`. Writes still require real column names, so aliases cannot solve naming end-to-end |
+| Column privileges replace views for hiding columns | **Confirmed with a caveat we under-weighted** — `select=*` breaks, and grant order matters |
+| A client-side key transform corrupts `jsonb` passthrough | **Confirmed.** Reproduced by others; PostgREST returns `jsonb` as nested objects, so a recursive transform reaches inside them. Reinforces dropping the transform |
+
+### 6.5 Verified on a live install
+
+A spike ran against a real install, not documentation. Three of the four findings
+change the design.
+
+| | |
+|---|---|
+| PostgreSQL | **15.19** via `apt-get install postgresql` |
+| PostgREST | **16.4**, static binary. The only OpenAPI settings are `openapi-mode`, `openapi-security-active`, `openapi-server-proxy-uri` — **no version switch** |
+| RLS per-claim | **Works.** Site A token → only site A rows; site B token → only site B |
+| Spec generation | **Works.** `GET /` serves the spec |
+| Schema reload | `NOTIFY pgrst, 'reload schema'` is **mandatory and sufficient** — no restart (§5.3.1) |
+| Contract chain | **Works.** Swagger 2.0 → OpenAPI 3.0 → types, spec-verbatim, zero camelCase leakage |
+
+**1. A table's owner bypasses its RLS policies, silently.** The same JWT claim
+returned 5 of 5 rows as owner and 2 of 5 as non-owner. No error, no warning. This
+forces **four** roles — a migration/owner role that never serves requests, plus
+`app_anon` / `app_member` / `app_admin` — and `FORCE ROW LEVEL SECURITY` on every
+protected table. W06 and W07 now assert it.
+
+**2. PostgREST emits Swagger 2.0, not OpenAPI 3.x.** `openapi-typescript` targets
+3.x, so `swagger2openapi` is a required step in the contract chain (W15). The
+converted spec is committed, so only the regenerator needs the tool.
+
+**3. The JWT `role` claim selects the database role.** PostgREST issues
+`SET ROLE` to it, so the issuer must validate on mint — an unknown role fails the
+request rather than falling back.
+
+Also noted: an unauthenticated `GET` returns **`200 []`**, not `401`. Correctly
+fail-closed, because the denial comes from RLS and column privileges rather than
+the auth layer — but tests must assert on the response **body**, never the status
+code alone.
+
+**Caveat.** The spike used throwaway secrets and passwords, and its database is
+named `pgrst_smoke`. None of it is template material.
 
 ---
 
