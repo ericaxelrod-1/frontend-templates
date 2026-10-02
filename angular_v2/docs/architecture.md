@@ -119,20 +119,33 @@ entirely — which is how the previous implementation evaded its own RLS layer.
 Without an ORM there is no SQL path from application code; every read goes
 through PostgREST's uniform interface.
 
-### Authorization is two layers, in this order
+### Authorization is three axes, not two
 
-1. **Coarse — JWT verification and guards.** May this caller invoke this
-   endpoint? PostgREST verifies tokens from the shared secret; the thin app's
-   routes add guards. Default deny; public routes opt out explicitly.
-2. **Fine — Postgres RLS.** Which rows may this caller see? Enforced by
-   `CREATE POLICY`, with identity supplied via `SET LOCAL app.user_id` and read
-   with `current_setting('app.user_id', true)`. Cannot be bypassed by new
-   application code, because application code no longer issues SQL.
+Scope and capability are orthogonal, and forcing one mechanism to carry both is
+why the previous permissions module could not express row-level security at all
+(ADR-0023).
 
-RLS is not a layer the application calls. It is a filter applied to **every**
-query from below — which is why it holds. The application never writes a `WHERE`
-clause for tenant scoping; it supplies identity, and the policy decides. See
-ADR-0002.
+| Axis | Question | Mechanism | Keyed on |
+|---|---|---|---|
+| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `site_id` claim |
+| **Operation** | Which *verbs* and *columns*? | table + column `GRANT` | DB `role` claim |
+| **Feature** | Which *features*? | thin-app guards | capability role |
+
+RLS sits below both runtimes, so it is a filter on **every** query rather than a
+layer the application calls. Neither runtime needs to remember it — the
+application supplies identity and the policy decides.
+
+Object-level security is likewise in the database: `GRANT SELECT, INSERT ON
+projects TO app_member` means members cannot UPDATE or DELETE, enforced by grants
+rather than by a decorator someone can forget.
+
+**An `ic` and a `site_manager` are the same DB role — `app_member`.** They reach
+the same features and are scoped to their own site by the identical policy; their
+only difference is capability, enforced above RLS. An `admin` token carries no
+`site_id`, so its policy branch matches every row.
+
+The invariant, and it is greppable: **no query or guard filters by site and by
+feature at the same time.** The two keys never meet.
 
 The previous design attempted this in application code via a 2,411-line
 `Proxy`-wrapped `EntityManager`. It enforced nothing, and it failed silently.

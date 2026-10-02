@@ -198,12 +198,6 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
   `jsonb` and breaks passthrough payloads.
 - Derived field → `GENERATED ALWAYS AS (...) STORED` or a `STABLE` function via
   `/rpc/fn_name`.
-- **Column privileges have two footguns.** Revoke the **table-level** grant
-  first; revoking a column grant while a table-level grant exists silently does
-  nothing. And a column-restricted role **cannot use `select=*`** — so requests
-  against that table must name columns explicitly. Prefer keeping sensitive
-  columns out of the table's readable set from the outset rather than revoking
-  after the fact.
 - **Migrations are the only schema authority.** Plain SQL, one directory, one
   migrations table name. Never edit columns without a migration.
 - Every migration needs a working `down()`.
@@ -215,13 +209,64 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
   references it.
 - Index anything you filter or sort on, including `jsonb` paths (GIN).
 
-## B2. Row-level and group scoping — Postgres RLS only
+## B2. Authorization — three axes, three mechanisms, never mixed
+
+**Scope and capability are orthogonal.** A role-based check can be satisfied by a
+valid role no matter which site the caller is standing in, so it can never express
+"your site's rows." Forcing one mechanism to carry both is why the previous
+permissions module could not do row-level security at all (ADR-0023).
+
+| Axis | Question | Mechanism | Keyed on |
+|---|---|---|---|
+| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `site_id` claim |
+| **Operation** | Which *verbs*? | table + column `GRANT` | DB `role` claim |
+| **Feature** | Which *features*? | guards in the thin app | capability role |
+
+**The two role vocabularies are different things.**
+
+| Vocabulary | Values | Used by |
+|---|---|---|
+| DB role (scope tier) | `app_anon`, `app_member`, `app_admin` | PostgREST impersonation, RLS, grants |
+| Capability role | `ic`, `site_manager`, `admin` | thin-app guards, feature checks |
+
+- **An `ic` and a `site_manager` are the *same* DB role — `app_member`.** They
+  reach the same features and are scoped to their own site by the *identical*
+  policy. Their only difference is capability, enforced above RLS.
+- **Never create DB roles named after capabilities** (`ic`, `site_manager`). That
+  fuses the axes, forces a policy per role per table, and reinvents the coupling
+  this model exists to remove.
+- **Never both.** If an operation is a table verb, the database grants it. If it
+  is application logic, a guard checks it. Applying both to one operation means
+  two places to update and two ways to disagree.
+- **Invariant, and it is greppable:** you must be unable to write one query or
+  guard that filters by site **and** by feature. Confirm no capability role appears
+  in any policy or grant.
+
+### Scope — Postgres RLS only
 
 **Row-level security is enforced by Postgres policies. Never in application
 code.**
 
 - Write `CREATE POLICY` in a migration. RLS sits below the application, so no
   forgotten guard, new endpoint, or future runtime can bypass it.
+- One policy per table, one readable expression, fail-closed when claims are
+  absent — both branches false yields **zero rows**, not an error:
+
+```sql
+CREATE POLICY row_scope ON projects USING (
+    (current_setting('request.jwt.claims', true)::json->>'role') = 'admin'
+    OR site_id = (current_setting('request.jwt.claims', true)::json->>'site_id')::uuid
+);
+```
+
+- **An `admin` token carries no `site_id`**, so the admin branch matches every row
+  and the scope branch cannot narrow it.
+- **Hierarchy is a function, not a policy.** Scope derives from position in a tree
+  via one recursive `customer_tree(root)` — `LANGUAGE sql STABLE`, `SECURITY
+  INVOKER` (default), with an index on `customers(parent_id)`. Adding a level is a
+  data change, not a code change.
+- **Default deny.** `REVOKE ALL ... FROM PUBLIC` before any grant. Tables intended
+  to be globally readable are listed explicitly.
 - PostgREST exposes JWT claims as a transaction-scoped setting; policies read
   them with `current_setting('request.jwt.claims', true)::json->>'sub'`.
 - The thin Nest app passes identity with `SET LOCAL app.user_id = ...` inside a
@@ -230,6 +275,37 @@ code.**
   main query — token revocation, per-request throttling.
 - **No views.** A superuser-created view bypasses every RLS policy on its base
   table, silently. Never create one (ADR-0022).
+- **Every policy has a test**: permitted case returns rows, denied case returns
+  none, and the denied case is proven for each access path. An LLM writing
+  `USING (true)` is otherwise invisible.
+
+### Operation — Postgres grants, not app guards
+
+Object-level security over CRUD belongs to grants, so PostgREST cannot offer an
+operation the grants withhold even by accident:
+
+```sql
+REVOKE ALL ON projects FROM PUBLIC;                    -- default deny FIRST
+GRANT SELECT, INSERT                ON projects TO app_member;  -- no UPDATE/DELETE
+GRANT SELECT, INSERT, UPDATE, DELETE ON projects TO app_admin;
+
+REVOKE SELECT ON projects FROM app_member;             -- then columns
+GRANT  SELECT (id, site_id, name)  TO app_member;       -- `secret` unreadable
+```
+
+- Order matters: revoke the table-level grant **before** applying column grants,
+  or the column revoke silently does nothing.
+- A column-restricted role **cannot use `select=*`**, so requests against that
+  table must name columns explicitly.
+- Prefer keeping sensitive columns out of the readable set from the outset over
+  revoking after the fact.
+- **A test asserts `SELECT` is denied** — not merely omitted from a response.
+
+### Feature — thin-app guards
+
+Pages, exports and workflow actions are application logic, so they are guarded in
+the thin app, keyed on capability role. This is the **only** axis that reads the
+capability role.
 - Do not build query-builder proxies, `Proxy` wrappers, or CLS-based scope
   propagation. The previous implementation of this was ~2,400 lines that
   silently enforced nothing.

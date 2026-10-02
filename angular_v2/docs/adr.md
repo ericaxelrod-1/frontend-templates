@@ -33,6 +33,7 @@ Status key: **Accepted** — settled, to be implemented as written.
 | [0020](#adr-0020) | Optimise for fork-time state | Accepted |
 | [0021](#adr-0021) | Keep NestJS 11 → 12 upgrade in the final phase | Accepted |
 | [0022](#adr-0022) | **One naming convention end to end** — no views, no transform | Accepted (reverses an earlier view/transform decision) |
+| [0023](#adr-0023) | **Two orthogonal authorization axes** — scope in RLS, capability in grants/guards | Accepted |
 
 ---
 
@@ -733,3 +734,161 @@ old, so ecosystem compatibility (`@nestjs/swagger`, `@nestjs/config`,
 
 **Consequences.** Keep ESLint rather than adopting the oxlint default, since the
 Angular rules live in ESLint. Node ≥ 20.19 / 22.12 required.
+---
+
+<a id="adr-0023"></a>
+## ADR-0023: Two orthogonal authorization axes — scope in RLS, capability in grants and guards
+
+**Status:** Accepted. This is the model the template's authorization is built on.
+
+**Context.** `angular/` has a permissions module with object-level security —
+which features and endpoints a role may reach. Its fine-grained permissions were
+**role-based**, and they did not intersect with any row-level notion, because no
+row-level mechanism existed to intersect with. Role-based object security was
+also never implemented at all (`PermissionGuard` was never applied).
+
+The actual requirement is two-dimensional, and the two dimensions have different
+key material:
+
+- **Objects** = app features: pages, endpoints, actions.
+- **Rows** = customers, or levels of a customer hierarchy.
+- **Roles** = individual contributor, site manager, admin.
+- **Invariant required:** an IC and a site manager must reach the *same*
+  features, but must each see *only their own site*. An admin sees everything.
+
+Forcing one mechanism to carry both is what made the old system unusable: a
+role-based check can be satisfied by a valid role no matter which site the caller
+is standing in, so it can never express "your site's rows."
+
+**Decision.** Three axes, three mechanisms, three **different keys**. They never
+appear in the same expression.
+
+| Axis | Question | Mechanism | Keyed on |
+|---|---|---|---|
+| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `site_id` in the JWT |
+| **Operation** | Which *verbs*? | Postgres table `GRANT` | DB `role` claim |
+| **Feature** | Which *features/pages*? | guards in the thin app | capability role |
+
+### The two role vocabularies are different things
+
+This is the crux of the answer, and getting it wrong collapses the model.
+
+| Vocabulary | Values | Used by |
+|---|---|---|
+| **DB role** (scope tier) | `anon`, `member`, `admin` | PostgREST impersonation, RLS, grants |
+| **Capability role** | `ic`, `site_manager`, `admin` | app guards, feature checks |
+
+**An IC and a site manager are the *same* DB role — `member`.** They differ *only*
+in capability, which lives above RLS. So:
+
+- *Same features* → yes, because both are `member` and both reach the same tables.
+- *Same rows* → no, and correctly so; both are scoped to their own site by the
+  identical policy.
+- *Different capabilities* → yes, distinguished only in the app layer.
+
+**Named anti-pattern.** Do not create DB roles `ic` and `site_manager`. That
+collapses the two axes into one, forces a policy per role per table, and reinvents
+the exact coupling this ADR exists to remove.
+
+### Row scope
+
+One policy per table, one readable expression, fail-closed on missing claims:
+
+```sql
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY row_scope ON projects USING (
+    (current_setting('request.jwt.claims', true)::json->>'role') = 'admin'
+    OR site_id = (current_setting('request.jwt.claims', true)::json->>'site_id')::uuid
+);
+```
+
+- A `member` matches only the second branch — their site.
+- An `admin` matches the first — every site. **An admin token carries no
+  `site_id`**, so the second branch cannot narrow them.
+- Missing claims → both branches false → **zero rows**, not an error. Fail-closed
+  by construction, with no `NULL`-comparison trap.
+
+### The hierarchy
+
+"Levels of the customer hierarchy" is a function of position in a tree, so scope
+is tree-derived rather than equality. One recursive function is the single place
+that changes:
+
+```sql
+CREATE INDEX ON customers(parent_id);
+
+CREATE FUNCTION customer_tree(root uuid) RETURNS SETOF uuid
+LANGUAGE sql STABLE AS $$
+  WITH RECURSIVE t AS (
+    SELECT id, parent_id FROM customers WHERE id = root
+    UNION ALL
+    SELECT c.id, c.parent_id FROM customers c JOIN t ON c.parent_id = t.id
+  )
+  SELECT id FROM t
+$$;
+
+CREATE POLICY row_scope ON projects USING (
+    (current_setting('request.jwt.claims', true)::json->>'role') = 'admin'
+    OR site_id = ANY (customer_tree(
+         (current_setting('request.jwt.claims', true)::json->>'site_id')::uuid))
+);
+```
+
+`STABLE` and `SECURITY INVOKER` (the default) are required: `STABLE` so the
+planner may call it once per query, `INVOKER` so RLS on `customers` still applies
+inside it. Adding a level to the hierarchy is a **data** change, not a code
+change — which is what "hierarchical foundation" has to mean if the hierarchy is
+data-driven.
+
+Direction is a product decision, not a mechanism one: descendants by default (a
+regional manager sees their region's sites). Change the function, not the policy.
+
+### Operation-level security, also in the database
+
+Object-level security over CRUD belongs to Postgres grants, not app guards:
+
+```sql
+GRANT USAGE ON SCHEMA public TO app_anon, app_member, app_admin;
+REVOKE ALL ON projects FROM PUBLIC;          -- default deny first
+
+GRANT SELECT, INSERT              ON projects TO app_member;   -- no UPDATE, no DELETE
+GRANT SELECT, INSERT, UPDATE, DELETE ON projects TO app_admin;
+
+REVOKE SELECT (secret) ON projects TO app_member;             -- column-level
+GRANT  SELECT (id, site_id, name)  TO app_member;
+```
+
+PostgREST then cannot offer an operation the grants withhold, even by accident.
+Order matters — revoke the table-level grant **before** applying column grants, or
+the column revoke silently does nothing (`AGENTS.md` B1).
+
+### Feature-level security, above the database
+
+Pages, exports, and workflow actions are application logic, so they are the thin
+app's guards, keyed on capability role. This is the only axis that reads the
+capability role at all.
+
+**Invariant: never both.** If an operation is a table verb, the database grants
+it. If it is application logic, a guard checks it. Applying both to one operation
+means two places to update and two ways to disagree.
+
+### The testable claim
+
+> You should be unable to write a single query or guard that filters by site
+> **and** by feature. The axes never appear together.
+
+This is the property the old system lacked and it is directly checkable: grep for
+policies and grants, and confirm no capability role appears in any of them.
+
+### Consequences
+
+- `site_id` is a JWT claim. For users in many sites, or membership that must
+  reflect instantly, replace it with a `site_members` lookup and an `EXISTS`
+  subquery — same policy shape, always current.
+- Capability roles are a separate table from DB roles, and a documented mapping
+  `capability_role → db_role`. `ic` and `site_manager` both map to `member`.
+- Every table needs a policy and grants. That is deliberate: default deny is
+  cheaper to achieve than default allow.
+- This ADR supersedes nothing, but it **does** retire the assumption that a
+  permission system can express scoping. It cannot. Only a database policy can.

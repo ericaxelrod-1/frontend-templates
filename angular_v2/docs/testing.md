@@ -64,6 +64,16 @@ six fail against the old implementation:
 
 Plus one per RLS policy, permitted and denied.
 
+And four for the three-axis authorization model (ADR-0023):
+
+1. **Scope** — an `app_member` token for site A returns only site A rows; a token
+   for site B returns only site B rows.
+2. **Operation** — `app_member` may `SELECT` and `INSERT` but `UPDATE` and
+   `DELETE` are refused by grants, not by application code.
+3. **Vocabulary** — no DB role is named after a capability role; no policy or grant
+   mentions `ic` or `site_manager`.
+4. **Separation** — no policy or guard filters by scope *and* capability together.
+
 ---
 
 ## Running

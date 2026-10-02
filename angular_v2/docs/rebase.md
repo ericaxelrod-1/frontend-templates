@@ -162,14 +162,30 @@ policy — instead of five: DTO, entity, controller, service, module registratio
 Ordering is forced by one dependency: **rules must be enforceable before code
 can be corrected, and code must be clean before a version upgrade is safe.**
 
+**P4-N** etc. is the stable identifier for a phase; `W` items are the executable
+units inside them.
+
 | Phase | Work | Gate |
 |---|---|---|
-| **P0** | `angular_v2/` skeleton, `AGENTS.md`, ESLint baseline, Postgres, `npm run verify` | `verify` green on an empty app |
-| **P1** | Backend rewrite: RLS, contract pipeline, auth, security wiring | RLS policy tests pass |
-| **P2** | Frontend rewrite: standalone + OnPush + signals, generated client, hydration | frontend tests green, no manual CD |
-| **P3** | Extraction pass: pipes, shared components, layout collapse | no duplicated markup |
-| **P4** | Version upgrade: Angular 18→22, Nest 11→12, then zoneless | `verify` green, no `Eager` anywhere |
-| **P5** | Docs rewrite | every documented claim true |
+| **P0-N1** | `angular_v2/` skeleton, `AGENTS.md`, ESLint baseline, Postgres, `npm run verify` | `verify` green on an empty app |
+| **P1-N2** | Backend rewrite: RLS, contract pipeline, auth, security wiring | RLS policy tests pass |
+| **P2-N3** | Frontend rewrite: standalone + OnPush + signals, generated client, hydration | frontend tests green, no manual CD |
+| **P3-N4** | Extraction pass: pipes, shared components, layout collapse | no duplicated markup |
+| **P4-N5** | Version upgrade: Angular 18→22, Nest 11→12, then zoneless | `verify` green, no `Eager` anywhere |
+| **P5-N6** | Docs rewrite | every documented claim true |
+| **P6-N7** | PostgREST/RLS spike | all five curl checks from the spike pass |
+
+### 4.1 Item numbering
+
+Every work item carries a stable ID so any claim can be audited individually:
+
+- **`Wnn`** — a work item. Audited by: done / not started / blocked.
+- **`Pn-Nn`** — a phase. Audited by: its gate passing.
+- **`§n.m`** — a section of this document.
+
+No item may be marked complete without its verification step being run and
+recorded. An item with no stated verification is not auditable and is treated as
+not started.
 
 ### 4.1 Why upgrade is last
 
@@ -233,7 +249,7 @@ algorithms, secrets, sockets, schedules.
 |---|---|---|
 | **`auth/`** | 45 | **MOSTLY DELETE** — only issuance and orchestration remain |
 | `auth.controller.ts` | | **REWRITE (thin)** — PostgREST owns the CRUD routes; this keeps only `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/verify-email`. Drop the 4 calls to non-existent endpoints |
-| `auth.service.ts` | | **REWRITE (thin)** — remove `\|\| true`; CAPTCHA/IP checks move to the guard chain; shorten access-token TTL to ~15–30 min; stop baking permissions into the payload; validate password on reset. All user CRUD → PostgREST |
+| `auth.service.ts` | | **REWRITE (thin)** — remove `\|\| true`; CAPTCHA and IP checks are ordered **inside** the handler before `bcrypt.compare` — there is no Passport strategy and no guard chain to hook (ADR-0011); shorten access-token TTL to ~15–30 min; stop baking permissions into the payload; validate password on reset. All user CRUD → PostgREST |
 | `auth.module.ts` | | **REWRITE** — no secret fallback; assert `JWT_SECRET` length at bootstrap; share the signing secret with PostgREST |
 | `local.strategy.ts` | | **DELETE** — no Passport. `POST /auth/login` verifies the password directly via `bcrypt.compare` |
 | `jwt.strategy.ts` | | **DELETE** — PostgREST verifies tokens itself from the shared secret. Revocation uses `db-pre-request`, which runs after role impersonation and before the main query |
@@ -250,7 +266,20 @@ algorithms, secrets, sockets, schedules.
 | `services/login-attempt.service.ts` | | **KEEP + REWRITE** — add per-account counter; risk metadata to `jsonb` |
 | `services/pattern-detection.service.ts` | | **KEEP as extension point** — 1,927 lines, never fed by real failures; wire first, then trim. Document that it is triage requiring traffic |
 | `services/security-alert.service.ts` | | **KEEP + REWRITE** — add `registerAs('alerts')` so the 6 config keys resolve |
-| **`permissions/`** | 71 | **MOSTLY DELETE — the largest win in the rebase** |
+| **`permissions/`** | 71 | **SPLIT THREE WAYS by ADR-0023 — see the table below** |
+
+Under ADR-0023 this module has not one disposition but three, because it
+conflated the three authorization axes. Splitting it is the largest single win in
+the rebase:
+
+| What it did | Axis | Where it goes | Disposition |
+|---|---|---|---|
+| Injected row filters from group membership | Scope | `CREATE POLICY` migrations | **DELETE** — no application code writes scoping SQL |
+| Gated endpoints by role | Operation | table + column `GRANT`s | **DELETE** — grants withhold the verb in the database |
+| Gated endpoints by capability role | Feature | thin-app guards | **KEEP, rewritten** — the only axis that reads a capability role |
+| Managed RLS rule/scope templates | Feature (admin) | thin app | **KEEP** — it *writes* policies, so it cannot go with them |
+| Compiled join paths for policies | Scope | thin app + migrations | **KEEP** — genuine logic, with a spec |
+| CRUD over actions, permissions, grants | — | tables | **DELETE** — PostgREST serves them |
 | `actions.controller.ts` (top level) | | **DELETE** — duplicate of `controllers/actions.controller.ts` |
 | `controllers/actions.controller.ts` | | **DELETE** — becomes an `actions` table; PostgREST serves it. Resolves the `/permissions/actions` collision by deleting both |
 | `controllers/permissions.controller.ts` | | **DELETE** — becomes `permissions` + `role_permissions` tables. Resolves the 6 frontend 404s because the spec regenerates |
@@ -260,14 +289,14 @@ algorithms, secrets, sockets, schedules.
 | `controllers/rls-*.controller.ts` (3) | | **REWRITE** — admin CRUD over RLS templates; RLS enforcement itself moves to SQL |
 | `controllers/cache-sync.controller.ts` | | **DELETE** with the cache subsystem |
 | `cache-entities/*` (4 + index) | | **DELETE** — cache-on-database is the wrong mechanism; use a computed/invalidation strategy |
-| `guards/permission.guard.ts` (×2) | | **DELETE both** — PostgREST enforces authorization through RLS policies. Application-level permission guards on CRUD routes become unnecessary |
-| `decorators/require-permission*.ts` (2) | | **DELETE both** — PostgREST maps JWT claims to a role; policies read them via `current_setting`. Kills the 3-decorator / 2-`PERMISSIONS_KEY` drift |
+| `guards/permission.guard.ts` (×2) | | **DELETE both** — two classes, and neither was ever applied. Verb-level access becomes table `GRANT`s (`GRANT SELECT, INSERT ... TO app_member` withholds UPDATE/DELETE at the database), which PostgREST cannot bypass. A *new* capability guard, keyed on capability role and applied only to thin-app routes, replaces them — see `Feature` in ADR-0023 |
+| `decorators/require-permission*.ts` (2) | | **DELETE both as written** — they guard CRUD routes, which grants now govern, and they were never applied. Kills the 3-decorator / 2-`PERMISSIONS_KEY` drift. **Write exactly one replacement**, keyed on capability role, registered on the thin app only |
 | `dtos/*.ts` (7) | | **DELETE** — replaced by PostgREST's generated types |
 | `entities/*.ts` | | **REWRITE** — become table definitions in migrations |
 | `scope-compiler.service.ts` | | **KEEP** — genuine logic; compiles join paths for the RLS policy generator; add spec |
 | `rls-rule.service.ts`, `rls-scope-template.service.ts` | | **KEEP + REWRITE** — the admin surface that *writes policies* stays in Nest; the policy *evaluation* moves to SQL |
-| `permissions.service.ts` (2,353 lines) | | **DELETE** — the single biggest deletion in the rebase. Row-injection logic moves to RLS policies; the raw query at `:729` disappears with TypeORM |
-| `permissions.module.ts` | | **REWRITE** — remove `RlsContextGuard` (never applied); wire the single guard that remains |
+| `permissions.service.ts` (2,353 lines) | | **DELETE** — the single biggest deletion in the rebase. Row-injection logic moves to RLS policies; the raw query at `:729` disappears with TypeORM. **Note the split:** the row-scoping half becomes SQL, the capability half becomes guards on the thin app. Neither survives as application code writing filters |
+| `permissions.module.ts` | | **REWRITE** — remove `RlsContextGuard` (never applied). Register the single capability guard, scoped to the thin app's own routes and keyed on capability role — never on CRUD routes |
 | `cache-entities/*` (5) | | **DELETE** — cache-on-database is the wrong mechanism |
 | **`users/`** | 19 | **MOSTLY DELETE** |
 | `entities/*.entity.re-export.ts` (4) | | **DELETE** — alternate import paths make `Role`/`Group` ownership ambiguous |
@@ -318,6 +347,26 @@ entities is smaller, has a working `down()`, and is honest.
 
 Result: a baseline schema migration + a small set of `CREATE POLICY`
 migrations. Every policy gets a test (per `AGENTS.md` B8).
+
+### 5.3.1 Schema cache reload — a mandatory migration step
+
+PostgREST caches the schema. **A newly migrated table 404s until the cache is
+reloaded**, with no error message explaining why. This is the highest-likelihood
+"the template is broken" report from a fork, so it is handled in the migration
+script rather than left to documentation:
+
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+
+- `npm run migration:run` issues this automatically after the migration transaction
+  commits. Reloading is per-request-cheap and only happens when the schema changed.
+- If a table is still not served, `db-channel-enabled` must be `true` (the default)
+  and the PostgREST role must be permitted to `NOTIFY`.
+- `npm run verify` asserts every migrated table is reachable at its endpoint — so
+  a stale cache fails the build instead of confusing a developer.
+- Tradeoff to verify in the spike: under high migration frequency the NOTIFY can be
+  skipped in favour of a PostgREST restart. Either is acceptable; doing nothing is not.
 
 ### 5.4 Backend — `src/scripts/` (30 files)
 
@@ -476,72 +525,42 @@ than no doc.
 
 ## 6. Cross-cutting work items
 
-| ID | Work | Lands in |
-|---|---|---|
-| W1 | ESLint baseline: `prefer-on-push`, `prefer-standalone`, `prefer-control-flow`, `conditional-complexity`, `no-empty-lifecycle-method`, `prefer-takeuntil-destroyed` | P0 |
-| W2 | `npm run verify` at backend root: build → typecheck → lint → test → smoke against live Postgres | P0 |
-| W3 | Delete `/schema/**` (superseded by PostgREST's spec) and `/auth/diag/db-check`; JWT verification moves to PostgREST | P1 |
-| W4 | Native RLS policies + `SET LOCAL app.user_id` read via `current_setting`; delete `packages/` | P1 |
-| W5 | **PostgREST as the API layer**: `postgrest.conf`, DB role, `jwt-role-claim-key`, `db-schemas`; delete CRUD controllers, DTOs, and TypeORM | P1 |
-| W6 | Plain-SQL migrations + `seed.ts`; delete TypeORM, `data-source.ts`, both migration trees | P1 |
-| W7 | Thin Nest app: JWT issuance, login orchestration, password reset, email, CAPTCHA, rate limiting, cron | P1 |
-| W8 | Edge rate limiter for PostgREST routes — PostgREST does not throttle | P1 |
-| W9 | Generate Angular types from PostgREST's OpenAPI with `openapi-typescript`; delete `app/models/**` and all hand-written URLs | P2 |
-| W10 | Login guard chain `IpBlockGuard → CaptchaGuard`; failure recorded in the login handler's `catch` (no Passport) | P1 |
-| W11 | Six security tests: failed-attempt row · 5-failure block · blocked-before-credentials · IP normalization · per-account lock · allowlist exemption | P1 |
-| W12 | RLS policy tests: every policy has a permitted case and a denied case, per access path | P1 |
-| W13 | `provideClientHydration(withEventReplay())`; remove 9 client-only template guards | P2 |
-| W14 | Five pipes: `percent` · `truncate` · `fullName` · `iconFor` · `severityClass` | P3 |
-| W15 | Extract 3 duplicated admin tables, IP reputation card, auth header, error block, filter panel | P3 |
-| W16 | Collapse 5 frontend layouts to `core/shared/features/layouts`; move 5 component-level HTTP calls into services | P3 |
-| W17 | OnPush + signals across 78 components; delete 25 manual CD calls and the circuit breaker | P4 |
-| W18 | Angular 18→22, harvest control-flow + standalone codemods; Nest 11→12 via `nest upgrade --dry-run` | P4 |
-| W19 | Zoneless opt-in; remove `NgZone` | P4 |
-| W20 | Remove all mock services; add real tests replacing the 14 scripts | P0–P3 |
-| W21 | Generate Angular types with `openapi-typescript` from `openapi.json`. snake_case end to end — no views, no transform (ADR-0022) | P2 |
-| W22 | Column-level `REVOKE` for every internal column — `password_hash`, internal flags, soft-delete columns. A test asserts each is unreadable via the API role | P1 |
-| W23 | Replace view-derived fields with `GENERATED ALWAYS AS (...) STORED` columns or `STABLE` functions exposed at `/rpc/fn_name` | P1 |
+| ID | Phase | Work | Verified by |
+|---|---|---|---|
+| W01 | N1 | ESLint baseline: `prefer-on-push`, `prefer-standalone`, `prefer-control-flow`, `conditional-complexity`, `no-empty-lifecycle-method`, `prefer-takeuntil-destroyed` | `npm run lint` reports zero errors with no `eslint-disable` added |
+| W02 | N1 | `npm run verify`: build → typecheck → lint → test → smoke against live Postgres | Stop Postgres; assert **non-zero** exit rather than a skip |
+| W03 | N1 | Document-level link checker: every relative link in `docs/` and `AGENTS.md` resolves | The checker runs in CI-equivalent `verify` |
+| W04 | N1 | Doc-claims checker: every command in `development.md` exists in a `package.json` script | The checker runs in `verify` |
+| W05 | N7 | **PostgREST/RLS spike** — table → policy → PostgREST → JWT → curl → `openapi.json` → types | Five curl checks: per-claim RLS, anon not a leak, spec served |
+| W06 | N2 | `postgrest.conf`: DB roles `app_anon`/`app_member`/`app_admin`, `db-schemas`, `jwt-role-claim-key`, shared secret | `curl /` returns the spec; a wrong secret returns 401 |
+| W07 | N2 | Native RLS policies per ADR-0023: one policy per table, `request.jwt.claims`, fail-closed | Permitted case returns rows; denied returns none; per access path |
+| W08 | N2 | Column + table grants; `REVOKE ALL FROM PUBLIC` first, `REVOKE SELECT (secret)` for internal columns | Assert `SELECT` is **denied**, not merely omitted |
+| W09 | N2 | Plain-SQL migrations, one directory, one table; `NOTIFY pgrst, 'reload schema'` after commit | Every migrated table is reachable at its endpoint |
+| W10 | N2 | `seed.ts` using PostgREST or `psql`, never TypeORM; seeds the three DB roles and an admin user | A fresh `setup` reaches a logged-in state |
+| W11 | N2 | Thin Nest app: JWT issuance, login orchestration, password reset, email, CAPTCHA, cron | Each route has a test; the six security tests in W13 |
+| W12 | N2 | Rate limiting for PostgREST routes via `db-pre-request` or a reverse proxy | Sustained requests are throttled; PostgREST does not throttle alone |
+| W13 | N2 | Six security tests: audit row · 5-failure block · blocked-before-credentials · IP normalization · per-account · allowlist | Each **fails** against the old code, passes after |
+| W14 | N2 | Delete `packages/nestjs-typeorm-rls/`, TypeORM, Passport, Swagger, and both migration trees | `grep` gates are empty; `npm ls` shows none installed |
+| W15 | N3 | `openapi.json` committed; `openapi-typescript` generates Angular types | Regeneration is a no-op on a clean tree |
+| W16 | N3 | Delete `app/models/**` and all hand-written URLs | `grep` finds no literal API path in `src/` |
+| W17 | N3 | Standalone + OnPush + signals across 78 components; delete 25 manual CD calls and the circuit breaker | `grep` for `detectChanges\|markForCheck\|NgZone` is empty |
+| W18 | N3 | `provideClientHydration(withEventReplay())`; remove 9 client-only template guards | No hydration mismatch in the SSR smoke test |
+| W19 | N3 | Collapse 5 layouts to `core/shared/features/layouts`; move 5 component-level `HttpClient` calls into services | `grep HttpClient --include=*.component.ts` is empty |
+| W20 | N4 | Five pipes: `percent` · `truncate` · `fullName` · `iconFor` · `severityClass` | `grep` finds no method call in a template binding |
+| W21 | N4 | Extract 3 duplicated admin tables, IP reputation card, auth header, error block, filter panel | No duplicated block; the 504-line template is gone |
+| W22 | N5 | Angular 18→22, harvesting the control-flow and `standalone` codemods; Nest 11→12 via `nest upgrade --dry-run` | `verify` green; 147 `*ngIf` and 26 `*ngFor` now `@if`/`@for` |
+| W23 | N5 | Zoneless opt-in; remove `NgZone` | `NgZone.isStable`-dependent code absent; SSR still renders |
+| W24 | ALL | Remove every mock service and stub; real tests replace the 14 assertion-free scripts | `grep` for mock factories in `src/` is empty; `no-restricted-imports` active |
+| W25 | N6 | Rewrite all docs against the built system | Every command runs; every claim is true; W03/W04 pass |
 
-### 6.2 Consequences of ADR-0022 (no views)
+### 6.0.1 Audit protocol
 
-The four capabilities views were carrying, and where each lives now:
+Each item is audited independently as **done / not started / blocked**, and **done
+requires its verification column to have been executed and recorded** — not read,
+not inferred. An item with no runnable verification is treated as not started.
 
-| Capability | Mechanism | Verification |
-|---|---|---|
-| Field naming | One convention: `user_id` in Postgres, on the wire, in types (W21) | No transform exists; assert generated field names match column names |
-| Internal columns hidden | `REVOKE SELECT (col) FROM api_role` (W22) — **note: table-level grant must be revoked first, and `select=*` then breaks on that table** | Test asserts `select` is **denied** — not merely omitted |
-| Derived fields | Generated columns or RPC functions (W23) | Test asserts the computed value matches |
-| API decoupled from schema | **Not available, deliberately.** A column rename is a breaking change | `verify` fails at compile time until the client is regenerated |
-
-### 6.3 Naming — the three rejections, verified
-
-| Option | Disqualifying evidence |
-|---|---|
-| **Views** | Superuser-created views bypass all RLS silently. PostgREST: *"When created by a SUPERUSER role, all row-level security policies will be bypassed."* A real leak is recorded in PostgREST #2124. Writes also unreliable: no PK, so upsert needs explicit keys; PATCH/DELETE *"only works for tables, not views"* (PR #2195); *"Deleting more rows than were requested"* |
-| **Client key transform** | Rewrites keys inside `jsonb`, breaking passthrough payloads (porsager/postgres #983). PostgREST returns `jsonb` as nested objects so the transform reaches inside. Already tried and deleted in `angular/` after a 35-task refactor |
-| **Quoted camelCase columns** | Postgres folds unquoted identifiers to lowercase; every identifier needs quotes, and the mismatch surfaces only when something else references it |
-
-Codegen tooling, also verified:
-
-| Claim | Verdict |
-|---|---|
-| Orval `namingConvention` covers schema properties | **False.** It covers file names (`output.namingConvention`) and enum keys (`override.namingConvention.enum`). Property conversion needs a custom mutator — requested in orval#2381 |
-| Orval supports Angular | **True**, and signal-first via `override.angular.retrievalClient: 'httpResource'`. Not chosen because of the property-naming gap |
-| `openapi-typescript` emits spec-verbatim with zero runtime | **True.** Naming resolved at build time, so nothing can corrupt `jsonb` at runtime |
-
-### 6.4 Verified against upstream
-
-Checked against PostgREST documentation and upstream issues rather than assumed:
-
-| Claim | Verdict |
-|---|---|
-| RLS works with PostgREST | **Confirmed.** Policies read claims via `current_setting('request.jwt.claims', true)::json` |
-| PostgREST verifies the JWT itself | **Confirmed.** Role impersonation via the `role` claim, configurable with `jwt-role-claim-key` |
-| PostgREST does **not** rate-limit | **Confirmed.** Upstream states you must put a reverse proxy in front; docs ship an Nginx `limit_req` example. W8 stands |
-| PostgREST emits column names verbatim, no auto-transform | **Confirmed.** The feature was explicitly declined upstream |
-| Column renaming works on reads | **Confirmed, but read-only** — `?select=alias:column`. Writes still require real column names, so aliases cannot solve naming end-to-end |
-| Column privileges replace views for hiding columns | **Confirmed with a caveat we under-weighted** — `select=*` breaks, and grant order matters |
-| A client-side key transform corrupts `jsonb` passthrough | **Confirmed.** Reproduced by others; PostgREST returns `jsonb` as nested objects, so a recursive transform reaches inside them. Reinforces dropping the transform |
+`grep` gates are expected to return nothing; a non-empty result is a failure, not
+a warning.
 
 ### 6.1 Where the boundary sits
 
@@ -549,7 +568,7 @@ The rule for deciding which runtime owns a route:
 
 | If the route needs… | It belongs to |
 |---|---|
-| A table or view, CRUD-shaped | **PostgREST** |
+| A table, CRUD-shaped | **PostgREST** |
 | A JWT signed with the private key | Nest |
 | A password comparison | Nest |
 | An SMTP connection | Nest |

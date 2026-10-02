@@ -29,16 +29,22 @@ PostgREST is the API layer. A thin Nest app handles what PostgREST cannot
 
 ## Objective 1 — authorization cannot be bypassed
 
-**Enforced below application code, in the database.** ADR-0002, ADR-0009.
+**Enforced below application code, in the database.** ADR-0002, ADR-0009,
+ADR-0023.
 
 | Requirement | Verification |
 |---|---|
 | Row scoping is enforced by `CREATE POLICY`, never in application code | Every policy has a permitted-case and a denied-case test |
-| Default is deny; globally-readable tables are listed explicitly | Policy set reviewed as a whole |
-| No ORM, therefore no raw-query escape hatch | `pg`, `typeorm`, `sequelize`, `prisma` absent from `package.json` |
+| Default is deny: `REVOKE ALL ... FROM PUBLIC` before any grant | Policy and grant set reviewed as a whole |
+| Missing claims yield **zero rows**, never an error | Policy test with a claim-less token |
+| Hierarchy scope derives from a recursive function, not duplicated policy logic | `customer_tree()` test; policy contains no `WITH RECURSIVE` |
+| **No ORM**, therefore no raw-query escape hatch | `pg`, `typeorm`, `sequelize`, `prisma` absent from `package.json` |
 | **No database views** | Superuser-created views bypass RLS silently — migration test asserts none exist |
 | Identity reaches policies via `current_setting('request.jwt.claims', true)` | A policy test runs as a non-superuser role |
 | Internal columns revoked with column-level `GRANT` | Test asserts `SELECT` is **denied**, not merely omitted |
+| An admin token carries no `site_id`, so scope cannot narrow it | Admin sees rows across every site in one test |
+| An `ic` and a `site_manager` are the same DB role | A `grep` gate asserts no DB role is named after a capability |
+| **No query filters by site *and* by feature** | Grep: no capability role appears in any policy or grant |
 | Thin-app routes default deny | A new controller without `@Public()` or a guard fails a test |
 
 ---

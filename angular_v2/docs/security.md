@@ -5,7 +5,7 @@ being forked and built upon, running with zero third-party credentials.
 
 Full inventory of what was removed and why is in [`rebase.md`](./rebase.md).
 Decisions are in [`adr.md`](./adr.md) — ADR-0002, ADR-0004, ADR-0008 through
-ADR-0011, ADR-0017 and ADR-0022 cover this document.
+ADR-0011, ADR-0017, ADR-0022 and **ADR-0023** cover this document.
 
 **The security model spans two runtimes.** PostgREST verifies the JWT and serves
 CRUD; a thin Nest app issues tokens and handles everything PostgREST cannot do.
@@ -23,6 +23,7 @@ same level, because they are not equally strong.
 |---|---|---|
 | **Cannot be bypassed** | Postgres RLS | Sits below both runtimes. No request path can evade it. |
 | **Cannot be bypassed** | Column-level `REVOKE` | A revoked column is unreadable, not merely omitted |
+| **Default deny** | `REVOKE ALL ... FROM PUBLIC` before any grant | Default deny is cheaper than default allow |
 | **Default deny** | PostgREST JWT verification + `APP_GUARD` on the thin app | Forgetting auth is loud, not silent |
 | **Runs before the query** | `db-pre-request` | Revocation and per-request throttling, ahead of any data access |
 | **Fails on abuse** | Per-account counter → delay + challenge | Cannot be weaponised into a lockout DoS. |
@@ -166,6 +167,29 @@ transaction.
   `USING (true)` is otherwise invisible.
 - Application code must not build query-builder proxies, `Proxy` wrappers, or
   CLS-based scope propagation. Enforcement below the application is the point.
+
+### Scope is one axis; capability is another
+
+ADR-0023 defines the whole model. **Row scope and capability never appear in the
+same expression.**
+
+| Axis | Question | Mechanism | Keyed on |
+|---|---|---|---|
+| Scope | Which rows? | RLS policy | `site_id` claim |
+| Operation | Which verbs? | table `GRANT` | DB `role` claim |
+| Feature | Which features? | thin-app guards | capability role |
+
+**An IC and a site manager are the same DB role — `member`.** They reach the same
+features and are scoped to their own site by the *identical* policy. Their only
+difference is capability, enforced above RLS. An `admin` carries no `site_id`, so
+their policy branch matches every row.
+
+Never create DB roles named after capabilities (`ic`, `site_manager`). That fuses
+the axes and forces a policy per role per table.
+
+For a hierarchy, scope derives from position in a tree via one recursive
+function, `customer_tree(root)` — `STABLE`, `SECURITY INVOKER`, indexed on
+`customers(parent_id)`. Adding a level is a data change.
 
 ### Never create a view
 
