@@ -64,15 +64,35 @@ six fail against the old implementation:
 
 Plus one per RLS policy, permitted and denied.
 
-And four for the three-axis authorization model (ADR-0023):
+And these for the three-axis authorization model (ADR-0023) — the first is the
+one that was found **after** the docs claimed it was handled:
 
-1. **Scope** — an `app_member` token for site A returns only site A rows; a token
-   for site B returns only site B rows.
-2. **Operation** — `app_member` may `SELECT` and `INSERT` but `UPDATE` and
+1. **Escalation.** A validly-signed token whose `role` claim names a table-owning
+   role must be refused. Then assert the row count is unchanged. This is the
+   highest-severity control in the project: untested, that token read every row
+   and its `DELETE` removed one.
+2. **Scope** — an `app_member` token for site A returns only site A rows; a token
+   for site B returns only site B.
+3. **Operation** — `app_member` may `SELECT` and `INSERT` but `UPDATE` and
    `DELETE` are refused by grants, not by application code.
-3. **Vocabulary** — no DB role is named after a capability role; no policy or grant
+4. **Vocabulary** — no DB role is named after a capability role; no policy or grant
    mentions `ic` or `site_manager`.
-4. **Separation** — no policy or guard filters by scope *and* capability together.
+5. **Separation** — no policy or guard filters by scope *and* capability together.
+6. **Policy totality** — empty, absent and malformed claims all yield zero rows and
+   no error; an admin token with a garbage `site_id` still sees everything.
+7. **Not superuser** — every serving role is `NOSUPERUSER NOBYPASSRLS`, asserted
+   against the catalogue. `FORCE ROW LEVEL SECURITY` does not bind either.
+8. **No public function execution** — every function's `proacl` excludes `PUBLIC`.
+
+### Assert on the body, never the status
+
+This is not a style preference. Verified: a correct denial, a full
+`USING (true)` leak, and a **partial 3-of-5 leak** were **all HTTP 200**. A test
+that asserts only the status code passes on a real data leak. Assert row count
+and row content.
+
+Conversely, an endpoint with **no grant at all returns `401`**, not `200 []` —
+so "empty array" is not a universal denial signal either.
 
 ---
 

@@ -37,8 +37,14 @@ ADR-0023.
 | Row scoping is enforced by `CREATE POLICY`, never in application code | Every policy has a permitted-case and a denied-case test |
 | Default is deny: `REVOKE ALL ... FROM PUBLIC` before any grant | Policy and grant set reviewed as a whole |
 | **No request-serving role owns a table**, and `FORCE ROW LEVEL SECURITY` is set | Test asserts the policy still applies when queried as the owner role |
+| **No serving role is `SUPERUSER` or `BYPASSRLS`** | `FORCE` does not bind either; a `postgres` session read 5/5 from a `FORCE`d table |
+| **The authenticator may assume only the three app roles** | A token naming a table-owning role must be `403`. It read everything and its `DELETE` removed the row |
+| `REVOKE SET ON PARAMETER role` is **not** the control | Inert on PostgreSQL 15 |
+| Every function has `EXECUTE` revoked from `PUBLIC` | `PUBLIC` gets it by default — any `SECURITY DEFINER` helper is anonymously reachable |
+| A policy is **total**: empty, absent and malformed claims deny, never error | `current_setting(...,true)` returns `''`, and `''::json` raises. A garbage `site_id` must not break an admin |
 | The `role` claim is validated at minting | A token with an unrecognised role is refused, not downgraded |
-| Denials are asserted on the body, not the status | Anonymous `GET` returns `200 []`; a status-only test would pass on a leak |
+| The issuer always sets `exp` | A token with no `exp` is **accepted** by PostgREST |
+| Denials are asserted on the body, not the status | A correct denial, a full leak and a partial 3-of-5 leak were **all HTTP 200** |
 | Missing claims yield **zero rows**, never an error | Policy test with a claim-less token |
 | Hierarchy scope derives from a recursive function, not duplicated policy logic | `customer_tree()` test; policy contains no `WITH RECURSIVE` |
 | **No ORM**, therefore no raw-query escape hatch | `pg`, `typeorm`, `sequelize`, `prisma` absent from `package.json` |

@@ -1,0 +1,10 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "angular_v2",
+    "description": "PLACEHOLDER — a committed stand-in for the contract PostgREST generates from the live database. It has no paths because the template has no tables yet; the baseline migration lands in P1-N2. The real file is produced by the chain documented in README.md: PostgREST serves Swagger 2.0 at GET /, swagger2openapi converts it to OpenAPI 3.0, and that output replaces this file. The Angular types are generated from it with `npm run generate:client` in frontend/.",
+    "version": "0.0.0"
+  },
+  "paths": {},
+  "components": {}
+}

@@ -1,28 +1,46 @@
 # GEMINI.md
 
-This project uses **`@AGENTS.md`** — a single shared rule file for every agent
+This project uses **`@AGENTS.md`** — the single shared rule file for every agent
 (Kilo, Cursor, Gemini, Copilot, Claude Code).
 
-Read it in full before making any change. It is the authoritative guide and
-contains all project rules: backend (NestJS/Postgres/RLS/OpenAPI), frontend
-(Angular 18 standalone/signals/OnPush), enforcement requirements, and the
-`npm run verify` gate.
+Read it in full before making any change. It is the authoritative guide: PostgREST
+and Postgres RLS, the thin Nest app, Angular 22 (standalone, signals, OnPush,
+zoneless), the enforced ESLint baseline, and the `npm run verify` gate.
 
 **Do not duplicate rules into this file.** If a rule needs to change, change it
 in `AGENTS.md` only. A second copy is a second thing to forget to update, and
 rule drift is the failure mode this file exists to prevent.
 
-## Gemini-specific notes
+## Project layout
 
-- The project root for commands is `angular/backend/` or `angular/frontend/`.
-  There is no root `package.json`.
-- The backend uses the **Fastify** adapter. Do not import from `express`; use
-  `FastifyRequest`/`FastifyReply` and inject `DOCUMENT` rather than touching
-  `document`.
-- Prefer `npm run <script>` over raw `npx`. The package scripts carry the
-  required `ts-node`/`tsconfig-paths` flags.
-- When asked to "verify" or "check my work", run `npm run verify` and report the
-  actual output. Never infer success from having read the code.
-- This repo is a **template to be forked**, not a running application. Judge a
-  change by whether a new developer gets a correct starting point, not by
-  whether it serves production traffic.
+```
+backend/     NestJS 12 thin app + pg.  No ORM.
+frontend/    Angular 22, standalone, SSR, signals
+docs/        rebase.md (the build plan), adr.md (23 decisions), and the rest
+```
+
+- **There is no root `package.json`.** Commands run from `backend/` or `frontend/`.
+- `../angular/` is the **old** implementation, kept for reference only. Do not
+  modify it, and do not follow its conventions.
+- **`npm run verify` at `backend/` is the gate** — typecheck, lint, unit,
+  integration, database smoke. It fails loudly when Postgres is unreachable.
+
+## Things that will bite you
+
+- **PostgREST is the API layer.** Do not add a Nest controller for anything
+  expressible as CRUD over a table. There is no ORM — no TypeORM, Sequelize or
+  Prisma — so application code cannot issue SQL at all.
+- **RLS is bypassed for the table owner.** Migrations run as an owner role that
+  never serves requests; request roles own nothing. Every protected table has
+  `FORCE ROW LEVEL SECURITY`. See `AGENTS.md` B2.
+- **There are two role vocabularies.** `app_anon` / `app_member` / `app_admin` are
+  database roles. `ic` / `site_manager` / `admin` are capability roles. An `ic`
+  and a `site_manager` are both `app_member`. Never create a database role named
+  after a capability.
+- **One naming convention: `snake_case`** in columns, on the wire, and in
+  generated types. No views, no runtime key transform.
+- **Tests run against real Postgres.** A test that passes when the database is
+  unreachable is a broken test, not a passing one.
+- **Docker is not used.** A local PostgreSQL instance, no container runtime.
+- This is a **template to be forked**, not a running application. Judge a change
+  by whether a new developer gets a correct starting point.

@@ -37,9 +37,9 @@ third-party accounts or API keys**. Every feature works on a fresh clone.
 
 | | Version |
 |---|---|
-| Node.js | ≥ 22.12 |
-| TypeScript | ≥ 5.9 |
-| PostgreSQL | 16 or 17 — local instance, **no Docker** |
+| Node.js | `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0` — the Angular 22 CLI refuses to start on anything older. `frontend/.npmrc` sets `engine-strict=true`, so `npm install` fails with that message rather than failing later |
+| TypeScript | 6.0.x — pinned by both projects |
+| PostgreSQL | **15 or later** — verified on 15.19; 16/17 also fine. Local instance, **no Docker** |
 
 ---
 
@@ -53,29 +53,51 @@ cd ../frontend && npm install
 # 2. configure
 cd ../backend && cp .env.example .env     # set JWT_SECRET — the app refuses to boot without it
 
-# 3. database
-npm run migration:run
-npm run db:seed                            # prints the seeded admin credentials
-
-# 4. client
+# 3. client — regenerates the Angular types from the committed openapi.json
 cd ../frontend && npm run generate:client
-
-# 5. run
-npm run dev                                # SSR on http://localhost:4000
 ```
 
+**Not available yet.** `npm run migration:run`, `npm run migration:revert`,
+`npm run db:seed` and `npm run dev` are documented in
+[`docs/development.md`](docs/development.md) and land in phase P1-N2, with the
+migration runner, the seed and the four database roles. They are recorded as
+outstanding in `backend/test/unit/docs/doc-claims.spec.ts`, so `verify` reports
+them on every run rather than pretending they exist.
+
 Full detail: [`docs/development.md`](docs/development.md).
+
+---
+
+## The contract
+
+`openapi.json` at the root is the committed contract, and it is **generated from
+the live database** — it cannot drift from the schema. The chain is:
+
+```
+tables ──▶ PostgREST ──▶ Swagger 2.0 ──▶ swagger2openapi ──▶ openapi.json ──▶ openapi-typescript ──▶ src/app/api/schema.ts
+(PostgreSQL)              (live)          (GET /)           (committed)          (committed)
+```
+
+PostgREST 16 serves **Swagger 2.0**, not OpenAPI 3, so `swagger2openapi` is a
+required step: `openapi-typescript` targets 3.x. The converted spec is
+committed, so only the regenerator needs the tool.
+
+The file committed today is a **placeholder with no paths** — the template has no
+tables yet. It is replaced by the output of that chain once the baseline
+migration lands. The frontend types are generated from whatever is committed:
+`cd frontend && npm run generate:client`.
 
 ---
 
 ## Verify
 
 ```bash
-npm run verify
+cd backend && npm run verify
 ```
 
-Typecheck → lint → unit tests → integration tests → smoke against a live database.
-**A change is not complete until this passes.**
+Typecheck → lint → unit tests → integration tests → smoke against a live
+database. **A change is not complete until this passes.** It lints and
+type-checks both projects, so `frontend/node_modules` must exist.
 
 Never weaken a lint rule or delete a test to make it green. Fix the code.
 
@@ -88,6 +110,13 @@ angular_v2/
 ├── AGENTS.md            rules — single source of truth for every agent
 ├── GEMINI.md            imports AGENTS.md
 ├── openapi.json         generated contract, committed
+├── postgrest.conf       PostgREST configuration, committed, secret-free
+├── backend/             thin NestJS app — JWT issuance and workflows
+│   ├── src/             main.ts · app.module.ts · config/
+│   ├── test/            unit · e2e · smoke
+│   └── .env.example
+├── frontend/            Angular 22 SSR, standalone, zoneless
+│   └── src/app/         shell component + generated types
 └── docs/
     ├── rebase.md        migration scope + full file inventory
     ├── adr.md           21 decision records

@@ -657,6 +657,50 @@ code alone.
 **Caveat.** The spike used throwaway secrets and passwords, and its database is
 named `pgrst_smoke`. None of it is template material.
 
+### 6.6 Verified by hypothesis testing
+
+Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicated
+`hypothesis_test` database. Three of my documented claims were **wrong**.
+
+| # | Verdict |
+|---|---|
+| H1 `FORCE` blocks owner DML | **Confirmed** — `new row violates row-level security policy`; DDL unaffected; seeding works via `SET LOCAL request.jwt.claims` |
+| H2 `WITH CHECK` omitted → `USING` governs inserts | **Confirmed** — `with_check IS NULL`, re-checked on `UPDATE` |
+| H3 hierarchy policy | **REFUTED as written** — `SETOF uuid` is rejected in a policy expression. Scoping correct once it returns `uuid[]`; root→3, mid→2, unrelated→2, admin→5, unknown→0 |
+| H4 `INVOKER` vs `DEFINER` | **Confirmed** — `INVOKER` returned 1 row, owner-owned `DEFINER` returned the whole tree |
+| H5 column grants break `select=*` | **Confirmed** — `403 42501`; explicit columns `200`. Wrong grant order → **`200` with `secret` fully readable** |
+| H6 table grants withhold verbs | **Confirmed** — GET 200, POST 201, PATCH/PUT/DELETE `403`, row unchanged |
+| H7 role-claim safety | **REFUTED — escalation.** A token naming an owner role read everything and its `DELETE` **removed the row** |
+| H8 `db-pre-request` | **Partial** — revocation clean `401`, but the hook is read-only, and an unreadable revocation table fails **open** |
+| H9 `openapi-mode` | `follow-privileges` is role-dependent. **Recommend `ignore-privileges`** — deterministic, and it does not reflect column grants anyway |
+| H10 denial signalling | **Partial** — no grant → `401`; RLS denial → `200 []`. **A status-only test passes on a real leak** |
+
+**Five findings that were not on the list at all:**
+
+1. **The documented hierarchy policy does not compile.** Never executed until now.
+2. **`FORCE` does not bind a superuser or `BYPASSRLS` role** — `postgres` read 5/5
+   from a `FORCE`d table.
+3. **`SET LOCAL app.user_id` is not an alternative** to `request.jwt.claims`;
+   ADR-0023 offered them as "or".
+4. **`request.jwt.claims` returns `''`, not `NULL`, after any `SET LOCAL`** — so the
+   documented policy **errored** instead of denying, and a garbage `site_id` broke
+   admins. `AGENTS.md` B2 and ADR-0023 are corrected.
+5. **`EXECUTE` is granted to `PUBLIC` on new functions by default** — 7 of 9 test
+   functions had `NULL proacl`, so any `SECURITY DEFINER` helper is anonymously
+   reachable.
+
+**Highest severity: H7.** The mitigation this project documented — validate the
+claim at mint — protects only the issuer. The real boundary is
+`GRANT app_anon, app_member, app_admin TO authenticator` and nothing else.
+`REVOKE SET ON PARAMETER role` is inert on PG15. `REVOKE <owner> FROM <auth>` is a
+denylist and is bypassed by any unlisted role. **It must be a test, not a
+migration comment.**
+
+Also confirmed: a token with **no `exp` claim is accepted**; forged, unsigned and
+expired tokens are rejected. PostgREST caches **schema and grants** — `NOTIFY` is
+required for both, but `postgrest.conf` and `db-pre-request` changes need a
+restart.
+
 ---
 
 ## 7. Verification gates

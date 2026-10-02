@@ -1,0 +1,23 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Build output
+dist/
+coverage/
+.angular/
+*.tsbuildinfo
+
+# Secrets — only *.example files are committed (AGENTS.md §2.5)
+.env
+.env.*
+!.env.example
+
+# Local database files must never be committed: they contain real rows.
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+
+# Generated contract staging file
+openapi.tmp.json

@@ -110,7 +110,11 @@ calls, `Role` declared 4× with `id` typed `number`, `string`, and `number?`, an
 
 **Decision.** The spec is generated from the **live database** by PostgREST,
 converted from **Swagger 2.0 to OpenAPI 3.0** by `swagger2openapi`, and committed
-as `openapi.json`. `openapi-typescript` generates the Angular types from it.
+as `openapi.json`. Set **`openapi-mode = "ignore-privileges"`**, not
+`follow-privileges` — the latter makes the served spec depend on the requesting
+role (verified: 9.5 KB as anon, different as a member), which makes code
+generation non-deterministic. It also does not reflect column grants: `secret`
+still appears in the spec either way. `openapi-typescript` generates the Angular types from it.
 Hand-written URLs and response interfaces are forbidden. Where a public shape must
 differ from the stored shape — camelCase columns, computed fields, redacted
 columns — expose a **generated column** or a `STABLE` function via RPC. Naming is
@@ -751,7 +755,8 @@ old, so ecosystem compatibility (`@nestjs/swagger`, `@nestjs/config`,
 `@nestjs/typeorm`) must be verified before adoption.
 
 **Consequences.** Keep ESLint rather than adopting the oxlint default, since the
-Angular rules live in ESLint. Node ≥ 20.19 / 22.12 required.
+Angular rules live in ESLint. Node `^22.22.3 || ^24.15.0 || >=26` is Angular 22's
+floor; Nest 12 additionally requires ≥ 20.19 and does not support 21.x.
 ---
 
 <a id="adr-0023"></a>
@@ -810,46 +815,81 @@ the exact coupling this ADR exists to remove.
 
 ### Row scope
 
-One policy per table, one readable expression, fail-closed on missing claims:
+> **Corrected after execution.** The original form of this policy was written from
+> documentation and had two defects that only a live test exposed: it **errored**
+> instead of failing closed when the claims setting was empty, and its admin branch
+> did not survive a malformed `site_id`. Both are fixed below. See
+> `rebase.md` §6.6.
+
+One policy per table. It must be **total** — every `OR` branch is evaluated, so a
+cast in any branch can take the whole query down:
 
 ```sql
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 
+-- Read the claims once, defensively. current_setting(..., true) returns '' rather
+-- than NULL once anything has been SET LOCAL in the session, and ''::json raises.
+CREATE FUNCTION request_claims() RETURNS jsonb
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+$$;
+
 CREATE POLICY row_scope ON projects USING (
-    (current_setting('request.jwt.claims', true)::json->>'role') = 'admin'
-    OR site_id = (current_setting('request.jwt.claims', true)::json->>'site_id')::uuid
+    request_claims()->>'role' = 'admin'
+    OR site_id = nullif(request_claims()->>'site_id', '')::uuid
 );
 ```
 
-- A `member` matches only the second branch — their site.
-- An `admin` matches the first — every site. **An admin token carries no
-  `site_id`**, so the second branch cannot narrow them.
-- Missing claims → both branches false → **zero rows**, not an error. Fail-closed
-  by construction, with no `NULL`-comparison trap.
+| Input | Result |
+|---|---|
+| `{"role":"member","site_id":"…"}` | that site's rows only |
+| `{"role":"admin"}` | **every row** — the second branch yields `NULL`, and `TRUE OR NULL` is `TRUE` |
+| `{"role":"admin","site_id":"garbage"}` | **every row** — the admin branch is `TRUE`, so the failing cast on the right never matters |
+| absent, `''`, or `{}` | **zero rows** — no cast throws, both branches are false |
+| `nullif(...,'')::uuid` where absent | `NULL`, so the row is not visible |
+
+The `coalesce`/`nullif` pair is load-bearing. Without it a bare
+`current_setting(...,true)::json` **raises** `invalid input syntax for type json`
+rather than denying — verified.
 
 ### The hierarchy
 
 "Levels of the customer hierarchy" is a function of position in a tree, so scope
-is tree-derived rather than equality. One recursive function is the single place
-that changes:
+is tree-derived rather than equality.
+
+> **Corrected after execution.** `RETURNS SETOF uuid` **cannot be used in a policy
+> expression** — Postgres rejects set-returning functions there with *"set-returning
+> functions are not allowed in policy expressions"*. The original example was never
+> executed. The function must return a single array value.
 
 ```sql
 CREATE INDEX ON customers(parent_id);
 
-CREATE FUNCTION customer_tree(root uuid) RETURNS SETOF uuid
-LANGUAGE sql STABLE AS $$
+-- Returns uuid[] (a scalar), not SETOF uuid.
+CREATE FUNCTION customer_tree_ids(root uuid) RETURNS uuid[]
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
   WITH RECURSIVE t AS (
     SELECT id, parent_id FROM customers WHERE id = root
     UNION ALL
     SELECT c.id, c.parent_id FROM customers c JOIN t ON c.parent_id = t.id
   )
-  SELECT id FROM t
+  SELECT coalesce(array_agg(id), '{}') FROM t
 $$;
 
 CREATE POLICY row_scope ON projects USING (
-    (current_setting('request.jwt.claims', true)::json->>'role') = 'admin'
-    OR site_id = ANY (customer_tree(
-         (current_setting('request.jwt.claims', true)::json->>'site_id')::uuid))
+    request_claims()->>'role' = 'admin'
+    OR site_id = ANY (customer_tree_ids(nullif(request_claims()->>'site_id','')::uuid))
+);
+```
+
+Scoping is correct once it compiles — verified root→3 rows, mid-level→2,
+unrelated→2, admin→5, unknown→0.
+
+**Performance is a real constraint, not a footnote.** The function is evaluated
+**per row**: a 400,000-row scan produced **400,001 calls**. And `PARALLEL SAFE`
+must be omitted (`PARALLEL UNSAFE`) or the planner falls back to single-threaded
+evaluation — measured at roughly **170× slower**. For large tables, denormalise the
+scope instead of recursing per row.
 );
 ```
 
@@ -885,6 +925,12 @@ Without both, every policy in this ADR is decorative. This is the same failure
 class as the deleted RLS proxy: an enforcement mechanism that reports success
 while enforcing nothing.
 
+> **`FORCE` does not bind a superuser or a `BYPASSRLS` role.** Verified: a
+> `postgres` session read 5 of 5 rows from a table that had both `ENABLE` and
+> `FORCE` plus a working policy. `FORCE` closes the *owner* hole and nothing else.
+> Every role that can reach a protected table must therefore also be
+> `NOSUPERUSER NOBYPASSRLS`, and that is asserted in a test — not assumed.
+
 #### What `FORCE` costs: migrations and seeding
 
 `FORCE ROW LEVEL SECURITY` subjects the **owner** to the policy, and that
@@ -903,27 +949,77 @@ from:
 - **Not acceptable:** disabling `row_security` during seeding. It reopens the owner
   bypass, and leaves it open.
 
-Omitting `WITH CHECK` from a policy is safe — Postgres falls back to the `USING`
-expression for inserts. The examples in this ADR rely on that deliberately, so
-one expression governs both visibility and insertability.
+Omitting `WITH CHECK` from a policy is safe — verified: `with_check IS NULL` and
+the `USING` expression governs inserts (and is re-checked on `UPDATE`). The
+examples in this ADR rely on that deliberately, so one expression governs both
+visibility and insertability.
 
-> **Unverified.** Whether a migration/seed role can satisfy the policy via
-> `SET LOCAL` inside a transaction is a hypothesis, not a tested fact. W07 must
-> confirm it before this section is treated as settled.
+**Confirmed by execution.** Owner `INSERT` is rejected with `new row violates
+row-level security policy`; DDL is unaffected; and seeding succeeds via
+`SET LOCAL request.jwt.claims` to a value the policy admits.
 
-### The role claim is caller-supplied
+> **Correction.** This section previously offered `SET LOCAL app.user_id` as an
+> alternative. It is **not** one. A policy reads the GUC it names — a policy built
+> on `request.jwt.claims` ignores `app.user_id` entirely. Seed by setting the same
+> setting the policy reads.
+
+### The role claim is an escalation vector — GRANT is the control
+
+> **This section originally asserted that validating the claim at mint was the
+> mitigation. That was wrong, and a live test proved it.**
 
 PostgREST performs role impersonation by issuing `SET ROLE` to the value of the
-JWT's `role` claim. The claim originates from the caller, so **the token issuer
-must validate it** and emit only `app_anon`, `app_member`, `app_admin`. An
-unrecognised role must fail the request rather than fall back to a default.
+JWT's `role` claim. Verified behaviour:
 
-### Anonymous requests return 200 with an empty array
+| Token `role` claim | Result |
+|---|---|
+| `app_member` | correct scoping |
+| a **table-owning** role | **`200`, full read — and `DELETE` returned `204` and removed the row** |
+| `postgres` | `403` |
+| a nonexistent role | `401` |
 
-Verified: an unauthenticated `GET` returns `200 []`, not `401`. The denial comes
-from RLS and column privileges, not from the auth layer. That is correctly
-fail-closed, but **a 200 must not be read as success** — the response body is the
-only signal. Tests assert on the body, never the status code alone.
+A validly-signed token naming an owning role **full escalates**. Validating the
+claim at mint protects only the issuer — it is necessary but nowhere near
+sufficient, because the mitigation has to hold even if some other code path ever
+issues a token.
+
+**The actual control is which roles the authenticator may assume, and nothing
+else:**
+
+```sql
+-- The authenticator PostgREST connects as may assume these three roles.
+GRANT app_anon, app_member, app_admin TO authenticator;
+```
+
+With that alone, a token claiming an owner role gets `403` — verified. Two
+non-solutions, both confirmed inert:
+
+- **`REVOKE SET ON PARAMETER role`** does nothing on PostgreSQL 15.
+- **`REVOKE hyp_owner FROM hyp_auth`** works, but it is a per-role denylist and is
+  bypassed by any role not yet revoked. **Never use it as the boundary.**
+
+Every serving role must additionally be `NOSUPERUSER NOBYPASSRLS NOINHERIT` —
+a role with `BYPASSRLS` ignores policies entirely.
+
+This belongs in a **test**, not a migration comment: assert that a token naming
+each non-granted role is refused, and assert the row count afterwards.
+
+Also verified: forged, unsigned and expired tokens are rejected — **but a token
+with no `exp` claim is accepted.** The issuer must always set `exp`.
+
+### Denials are invisible in the status code
+
+> **Corrected after execution.** The original claim here was wrong in both halves.
+
+| Case | Actual |
+|---|---|
+| no grant at all | **`401`** — not `200 []` |
+| grant present, RLS denies | **`200 []`** |
+
+And the decisive result: **a status-only test passes on a real leak.** A correct
+denial, a full `USING (true)` leak, and a *partial* 3-of-5 leak were **all HTTP
+200**. Tests must assert on the response **body** — row count and content — never
+the status code alone.
 
 ### Operation-level security, also in the database
 

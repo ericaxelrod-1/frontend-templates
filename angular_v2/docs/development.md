@@ -9,14 +9,21 @@ PostgreSQL instance — no container runtime.
 
 | Tool | Version | Notes |
 |---|---|---|
-| Node.js | ≥ 22.12 (Angular 22) · ≥ 20.19 (Nest 12) | the 21.x line is unsupported by Nest 12 |
-| TypeScript | ≥ 5.9 | Angular 22 minimum |
-| PostgreSQL | 16 or 17 | local instance, no Docker |
+| Node.js | `^22.22.3 \|\| ^24.15.0 \|\| >=26` | Angular 22's floor. `frontend/.npmrc` sets `engine-strict=true`, so a forker hits this at install rather than at build. Nest 12 also requires ≥ 20.19 — the 21.x line is unsupported |
+| TypeScript | 6.0.x | pinned by Angular 22. See the codegen note below |
+| PostgreSQL | **15 or later** | verified on 15.19; 16/17 also fine. `security_invoker` views need 15+, though this template creates none |
 
 ```bash
 node --version
 psql -h localhost -U postgres -c 'select version();'
 ```
+
+### Known constraint: `openapi-typescript` and TypeScript 6
+
+`openapi-typescript@7.13.0` declares a peer dependency on `typescript@^5.x`,
+while Angular 22 pins TypeScript 6.0. It runs correctly under an npm `overrides`
+entry, which is what the backend uses today. Treat this as temporary: when
+`openapi-typescript` declares TS 6 support, remove the override (W15).
 
 ## Setup
 

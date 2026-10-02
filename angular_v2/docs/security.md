@@ -151,25 +151,40 @@ client JavaScript. Two deleted, one kept.
 Enforced by `CREATE POLICY` in migrations — below both runtimes, so nothing in
 application code can evade it.
 
-PostgREST exposes the verified claims as a transaction-scoped setting:
+PostgREST exposes the verified claims as a transaction-scoped setting. Read it
+defensively, because it returns `''` — not `NULL` — once anything has been
+`SET LOCAL` in the session, and `''::json` raises:
 
 ```sql
+CREATE FUNCTION request_claims() RETURNS jsonb
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+$$;
+
 CREATE POLICY tenant_isolation ON users
-  USING (group_id = (current_setting('request.jwt.claims', true)::json->>'group_id')::uuid);
+  USING (site_id = nullif(request_claims()->>'site_id', '')::uuid);
 ```
 
-The thin Nest app passes identity with `SET LOCAL app.user_id = ...` inside a
-transaction.
-
 - Tables intended to be globally readable are listed explicitly. Default is deny.
+- **`SET LOCAL app.user_id` is not an alternative.** A policy reads the setting it
+  names; `app.user_id` is invisible to a policy built on `request.jwt.claims`.
 - **VERIFIED: a table's owner bypasses its policies, silently.** Four roles are
   mandatory — a migration/owner role that never serves requests, plus
   `app_anon` / `app_member` / `app_admin` — and `FORCE ROW LEVEL SECURITY` goes on
   every protected table. Otherwise every policy here is decorative.
-- **The JWT `role` claim selects the database role** (PostgREST issues `SET ROLE`
-  to it). Validate on mint; an unknown role fails the request, never falls back.
-- An unauthenticated `GET` returns `200 []`, not `401`. Denials come from RLS and
-  column privileges. **Assert on the response body, never the status code.**
+- **`FORCE` does not bind a superuser or `BYPASSRLS` role** — `postgres` read 5/5
+  from a `FORCE`d table. Every role that can reach a protected table must be
+  `NOSUPERUSER NOBYPASSRLS`.
+- **`EXECUTE` is granted to `PUBLIC` on new functions by default** (7 of 9 test
+  functions had `NULL proacl`). `REVOKE EXECUTE … FROM PUBLIC` on every function,
+  or any `SECURITY DEFINER` helper is anonymously reachable.
+- **The JWT `role` claim is an escalation vector.** A validly-signed token naming
+  a table-owning role got full read, and its `DELETE` returned `204` and removed
+  the row. The control is `GRANT app_anon, app_member, app_admin TO authenticator`
+  and nothing else — mint-time validation protects only the issuer.
+- **Denials are invisible in the status code.** No grant → `401`. Grant present,
+  RLS denies → `200 []`. A full `USING (true)` leak was **also `200`** — so a
+  status-only test passes on a real leak. **Assert on the response body.**
 - **Every policy has a test**: the permitted case returns rows, the denied case
   returns none, and the denied case is proven for each access path. An LLM writing
   `USING (true)` is otherwise invisible.
@@ -195,9 +210,11 @@ their policy branch matches every row.
 Never create DB roles named after capabilities (`ic`, `site_manager`). That fuses
 the axes and forces a policy per role per table.
 
-For a hierarchy, scope derives from position in a tree via one recursive
-function, `customer_tree(root)` — `STABLE`, `SECURITY INVOKER`, indexed on
-`customers(parent_id)`. Adding a level is a data change.
+For a hierarchy, scope derives from position in a tree via one recursive function —
+`RETURNS uuid[]` with `array_agg` (`SETOF uuid` is **rejected** in a policy
+expression), indexed on `customers(parent_id)`, and `PARALLEL UNSAFE`. It is
+evaluated **per row** — 400,000 rows cost 400,001 calls — so large tables should
+denormalise the scope instead. Adding a level is a data change.
 
 ### Never create a view
 

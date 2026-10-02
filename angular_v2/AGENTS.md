@@ -158,8 +158,8 @@ are the main source of drift in this codebase's history.
 A rule that only exists in prose does not survive. When you add a convention,
 add the ESLint rule that enforces it in the same change.
 
-Required baseline (`.eslintrc.json` / `eslint.config.js` — keep both consistent,
-or delete the legacy one):
+Required baseline. One flat config only (`eslint.config.js`) — a second legacy
+`.eslintrc.json` is a second source of truth and drifts:
 
 ```
 @angular-eslint/prefer-on-push-component-change-detection
@@ -167,12 +167,21 @@ or delete the legacy one):
 @angular-eslint/template/prefer-control-flow
 @angular-eslint/template/conditional-complexity
 @angular-eslint/no-empty-lifecycle-method
+@angular-eslint/no-implicit-take-until-destroyed
 @typescript-eslint/no-explicit-any
-rxjs-angular/prefer-takeuntil-destroyed
 ```
 
+**`rxjs-angular/prefer-takeuntil-destroyed` does not exist and must not be
+listed.** The `rxjs-angular` plugin ships only `prefer-async-pipe`,
+`prefer-composition` and `prefer-takeuntil`. Its teardown rule reads
+`context.parserServices`, which ESLint 9 removed, while `angular-eslint@22`
+requires ESLint ^9||^10 — so enabling it aborts the entire lint run.
+`@angular-eslint/no-implicit-take-until-destroyed` is the substitute. The plugin
+may stay installed, but **no rule is enabled from it.**
+
 Do not add a rule and then leave existing violations in place — fix them or
-scope the rule to new code deliberately.
+scope the rule to new code deliberately. `backend/test/unit/eslint-baseline.spec.ts`
+asserts every rule in this list is actually active, and fails if one cannot be.
 
 ---
 
@@ -255,28 +264,51 @@ code.**
     requests, and a request-serving role that owns nothing.
   - **`ALTER TABLE … FORCE ROW LEVEL SECURITY`** on every protected table, so
     even the owner is subject to the policy.
+    - **`FORCE` does not bind a superuser or `BYPASSRLS` role** — verified: `postgres`
+      read 5/5 from a `FORCE`d table. Every role that can reach a protected table
+      must be `NOSUPERUSER NOBYPASSRLS`, asserted in a test.
   - **That includes the migration role for `DML`.** DDL is unaffected, but seeding
-    is `INSERT`, so the owner is now rejected by the policy. Seed from a role that
-    sets `request.jwt.claims` / `SET LOCAL app.user_id` to a value the policy
-    admits. **Never disable `row_security` to seed** — that reopens the bypass.
+    is `INSERT`, so the owner is now rejected by the policy (`new row violates
+    row-level security policy` — verified). Seed from a role that sets
+    `request.jwt.claims` to a value the policy admits. **Never disable
+    `row_security` to seed** — that reopens the bypass.
   - Omitting `WITH CHECK` is safe: Postgres falls back to the `USING` expression
     for inserts, so one expression governs both visibility and insertability.
   - A test asserts the policy applies when run as the migration role, not only as
     the request role.
 - Write `CREATE POLICY` in a migration. RLS sits below the application, so no
   forgotten guard, new endpoint, or future runtime can bypass it.
-- One policy per table, one readable expression, fail-closed when claims are
-  absent — both branches false yields **zero rows**, not an error:
+- One policy per table, and it must be **total** — every `OR` branch is
+  evaluated, so a cast in any branch can take the whole query down. Never write
+  a bare `current_setting(...,true)::json`; it **raises** on an empty string
+  rather than denying. Use a defensive accessor and `nullif` on the uuid cast:
 
 ```sql
+CREATE FUNCTION request_claims() RETURNS jsonb
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+$$;
+
 CREATE POLICY row_scope ON projects USING (
-    (current_setting('request.jwt.claims', true)::json->>'role') = 'admin'
-    OR site_id = (current_setting('request.jwt.claims', true)::json->>'site_id')::uuid
+    request_claims()->>'role' = 'admin'
+    OR site_id = nullif(request_claims()->>'site_id', '')::uuid
 );
 ```
 
 - **An `admin` token carries no `site_id`**, so the admin branch matches every row
-  and the scope branch cannot narrow it.
+  and `nullif(...)::uuid` yields `NULL` — `TRUE OR NULL` is `TRUE`. A *malformed*
+  `site_id` on an admin token is therefore harmless, because the right-hand cast
+  never completes.
+- Absent, empty, or `{}` claims → both branches false → **zero rows**, no error.
+- **`SET LOCAL app.user_id` is not an alternative.** A policy reads the setting it
+  names; `app.user_id` is invisible to a policy built on `request.jwt.claims`.
+- **Hierarchy functions must return a scalar array, not `SETOF`.** Postgres rejects
+  set-returning functions in policy expressions. Use `RETURNS uuid[]` with
+  `array_agg`, and expect **per-row evaluation** — a 400k-row scan cost 400,001
+  calls. Mark them `PARALLEL UNSAFE`; `PARALLEL SAFE` cost ~170× on the same scan.
+- **`EXECUTE` is granted to `PUBLIC` on new functions by default.** `REVOKE
+  EXECUTE … FROM PUBLIC` on every function, or any `SECURITY DEFINER` helper is
+  anonymously reachable. Verified: 7 of 9 test functions had `NULL proacl`.
 - **Hierarchy is a function, not a policy.** Scope derives from position in a tree
   via one recursive `customer_tree(root)` — `LANGUAGE sql STABLE`, `SECURITY
   INVOKER` (default), with an index on `customers(parent_id)`. Adding a level is a
@@ -287,8 +319,10 @@ CREATE POLICY row_scope ON projects USING (
   them with `current_setting('request.jwt.claims', true)::json->>'sub'`.
 - The thin Nest app passes identity with `SET LOCAL app.user_id = ...` inside a
   transaction.
-- `db-pre-request` is the hook for cross-cutting checks that must run before the
-  main query — token revocation, per-request throttling.
+- `db-pre-request` is the hook for **revocation** — verified: a revoked token gets
+  a clean `401`/`PT401`, no 500 loop. It is **not** a throttle (read-only
+  transaction, above). An unreadable revocation table makes revocation **silently
+  return `200` with data**, so the table must be `GRANT`ed to the authenticator.
 - **No views.** A superuser-created view bypasses every RLS policy on its base
   table, silently. Never create one (ADR-0022).
 - **Every policy has a test**: permitted case returns rows, denied case returns
@@ -333,7 +367,9 @@ capability role.
 
 ## B3. API contract — the spec is generated from the live schema
 
-- `openapi.json` is generated by PostgREST from the database and committed.
+- `openapi.json` is generated by PostgREST from the database and committed, with
+  `openapi-mode = "ignore-privileges"` so the served spec does not vary by the
+  requesting role.
 - The frontend client is generated from it. **Never hand-write a URL, a response
   interface, or an HTTP call.** If the spec doesn't produce it, fix the schema.
 - Regenerate after any schema or route change:
@@ -382,11 +418,22 @@ capability role.
   public.
 - Both runtimes read the **same** secret. If `PGRST_JWT_SECRET` and `JWT_SECRET`
   diverge, fail loudly at boot rather than issuing tokens nothing accepts.
-- **The `role` claim selects the database role.** PostgREST does
-  `SET ROLE` to whatever the token names (ADR-0023). The issuer must therefore
-  **only ever emit `app_anon`, `app_member` or `app_admin`** — validate on mint,
-  never pass through an unvalidated claim. An unknown role must fail the request,
-  not fall back.
+- **The `role` claim selects the database role — and it is an escalation vector.**
+  PostgREST issues `SET ROLE` to whatever the token names. Verified: a
+  validly-signed token naming a **table-owning** role got `200` with full read,
+  and its `DELETE` returned `204` and **removed the row**.
+  - **Validating the claim at mint is necessary but nowhere near sufficient.** The
+    mitigation must hold even if another code path ever issues a token.
+  - **The control is the grant, and nothing else:**
+    `GRANT app_anon, app_member, app_admin TO authenticator;` — with that alone a
+    token claiming an owner role gets `403` (verified).
+  - **`REVOKE SET ON PARAMETER role` is inert on PostgreSQL 15.** Never rely on it.
+  - **Never use `REVOKE <owner> FROM <authenticator>` as the boundary.** It is a
+    per-role denylist, bypassed by any role not yet revoked.
+  - Every serving role is `NOSUPERUSER NOBYPASSRLS NOINHERIT`.
+  - **The issuer must always set `exp`** — a token with no `exp` is accepted.
+  - A test asserts a token naming each non-granted role is refused, and checks the
+    row count afterwards.
 - **No default JWT secret.** Assert `JWT_SECRET` is present and sufficiently
   long at bootstrap; throw if not.
 - Access tokens short-lived (~15–30 min). Permissions are read from the
@@ -406,8 +453,9 @@ Every app forked from this needs these. They must actually work.
   `login`, `register`, and `forgot-password`. Use `@Throttle` / the exported
   `ThrottleSkip`, not a hand-rolled metadata key.
 - **PostgREST does not rate-limit.** Upstream states you must put a reverse proxy
-  or a `db-pre-request` function in front of it. Never rely on query volume as a
-  throttle.
+  in front of it. **`db-pre-request` cannot do it either** — it runs in a
+  read-only transaction, so a write there fails `25006` and a working request
+  returns `405`. Verified. Use the reverse proxy.
 - **Failed logins are recorded before the credential check**, not from a route
   handler that only runs on success. There is no Passport strategy to hook — the
   check lives inside `POST /auth/login` itself.
