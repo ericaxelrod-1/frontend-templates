@@ -885,6 +885,32 @@ Without both, every policy in this ADR is decorative. This is the same failure
 class as the deleted RLS proxy: an enforcement mechanism that reports success
 while enforcing nothing.
 
+#### What `FORCE` costs: migrations and seeding
+
+`FORCE ROW LEVEL SECURITY` subjects the **owner** to the policy, and that
+includes the migration role. An owner running `INSERT` against a table whose
+policy filters on `site_id` will have its rows rejected — there is no claim, so
+the predicate is false.
+
+This is not a reason to drop `FORCE`. It is a reason to decide where writes come
+from:
+
+- **Preferred:** the migration role owns the schema but does not write rows. Seeding
+  runs as a role that sets `request.jwt.claims` (or `SET LOCAL app.user_id`) to a
+  value the policy admits.
+- **Acceptable for DDL migrations:** DDL is not subject to RLS. Only `DML` is, so
+  `CREATE TABLE`, `ALTER TABLE`, `CREATE POLICY` and index changes are unaffected.
+- **Not acceptable:** disabling `row_security` during seeding. It reopens the owner
+  bypass, and leaves it open.
+
+Omitting `WITH CHECK` from a policy is safe — Postgres falls back to the `USING`
+expression for inserts. The examples in this ADR rely on that deliberately, so
+one expression governs both visibility and insertability.
+
+> **Unverified.** Whether a migration/seed role can satisfy the policy via
+> `SET LOCAL` inside a transaction is a hypothesis, not a tested fact. W07 must
+> confirm it before this section is treated as settled.
+
 ### The role claim is caller-supplied
 
 PostgREST performs role impersonation by issuing `SET ROLE` to the value of the

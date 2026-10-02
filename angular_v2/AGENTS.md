@@ -255,6 +255,12 @@ code.**
     requests, and a request-serving role that owns nothing.
   - **`ALTER TABLE … FORCE ROW LEVEL SECURITY`** on every protected table, so
     even the owner is subject to the policy.
+  - **That includes the migration role for `DML`.** DDL is unaffected, but seeding
+    is `INSERT`, so the owner is now rejected by the policy. Seed from a role that
+    sets `request.jwt.claims` / `SET LOCAL app.user_id` to a value the policy
+    admits. **Never disable `row_security` to seed** — that reopens the bypass.
+  - Omitting `WITH CHECK` is safe: Postgres falls back to the `USING` expression
+    for inserts, so one expression governs both visibility and insertability.
   - A test asserts the policy applies when run as the migration role, not only as
     the request role.
 - Write `CREATE POLICY` in a migration. RLS sits below the application, so no

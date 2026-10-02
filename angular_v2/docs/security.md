@@ -221,8 +221,8 @@ it is silent by default and version-gated.
 Use **column-level privileges**, not a projection:
 
 ```sql
-REVOKE SELECT ON users FROM api_role;              -- table level first
-GRANT  SELECT (id, email, display_name) ON users TO api_role;
+REVOKE SELECT ON users FROM app_member;            -- table level first
+GRANT  SELECT (id, email, display_name) TO app_member;
 ```
 
 Order matters: revoking a column while a table-level grant exists **silently does

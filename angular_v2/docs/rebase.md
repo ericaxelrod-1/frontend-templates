@@ -587,7 +587,7 @@ The four capabilities views were carrying, and where each lives now:
 | Capability | Mechanism | Verification |
 |---|---|---|
 | Field naming | One convention: `user_id` in Postgres, on the wire, in types (W21) | No transform exists; assert generated field names match column names |
-| Internal columns hidden | `REVOKE SELECT (col) FROM api_role` (W22) — **note: table-level grant must be revoked first, and `select=*` then breaks on that table** | Test asserts `select` is **denied** — not merely omitted |
+| Internal columns hidden | `REVOKE SELECT (col) FROM app_member` (W22) — **note: table-level grant must be revoked first, and `select=*` then breaks on that table** | Test asserts `select` is **denied** — not merely omitted |
 | Derived fields | Generated columns or RPC functions (W23) | Test asserts the computed value matches |
 | API decoupled from schema | **Not available, deliberately.** A column rename is a breaking change | `verify` fails at compile time until the client is regenerated |
 
