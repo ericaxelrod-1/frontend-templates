@@ -77,3 +77,28 @@ export function parseJsonObject(body: string): Record<string, unknown> {
   }
   return parsed as Record<string, unknown>;
 }
+
+/**
+ * The SQLSTATE PostgREST reports, or undefined when the body carries none.
+ *
+ * Assertions in this suite are on the SQLSTATE rather than the HTTP status wherever
+ * two different controls can produce the same status: PostgREST answers the ANONYMOUS
+ * role with 401 for a privilege error and answers `permission denied for table` and
+ * `permission denied for function` the same way, so the status cannot tell "the grant
+ * refused" from "the policy could not be evaluated". Returns undefined instead of
+ * throwing on a non-JSON body, because a body that is not JSON is itself the finding
+ * the caller is about to assert on.
+ */
+export function sqlStateOf(body: string): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return undefined;
+  }
+  const code = (parsed as Record<string, unknown>)['code'];
+  return typeof code === 'string' ? code : undefined;
+}

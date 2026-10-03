@@ -67,27 +67,39 @@ Full design and evidence: [`docs/adr.md`](docs/adr.md) ADR-0023, and
 
 ### What is and is not built
 
-Read this before you read the ADR as a description of working code.
+**The scope axis and the capability axis above are implemented.**
+`backend/database/migrations/0001_rls_foundation.sql` creates `groups`,
+`user_groups`, `org_closure`, `actions`, `permissions`, `roles`, `role_permissions`
+and `user_roles`, plus `actor()` and `has_permission()`. The superseded `sites` /
+`site_id`-claim design is **gone** from the tree.
+`npm run verify` gates on `backend/test/rls/rls.spec.ts`, whose **68 tests pass
+against this design**, so here a green `verify` *is* evidence for the shape above —
+unlike the previous state of this file.
 
-**None of the design above is implemented.**
-`backend/database/migrations/0001_rls_foundation.sql` still carries the
-**superseded** shape: a `sites` table, a `site_id` token claim, and a recursive
-`site_tree_ids()` walk evaluated per candidate row. There is no `groups` table,
-no `user_groups`, no `org_closure`, no `actions`, no `permissions`, no `roles`,
-no `role_permissions` and no `user_roles` anywhere in the tree today — and
-therefore **no capability axis at all**. That migration is the target to be
-rewritten, not a record of what is running.
+**Two things in that design are declared but not enforced.** Read them before
+relying on them:
 
-**The 33 passing RLS tests are not evidence for it.** `npm run verify` gates on
-`backend/test/rls/rls.spec.ts`, and those 33 tests pass — **against the
-superseded design**, because they exercise that migration. They are evidence that
-the enforcement machinery is real and that the gate can go red when a control is
-removed. They are not evidence for group scoping, for the closure, or for
-capability, because none of those exist in the shipped SQL yet.
+- **The identity source is a caller-writable setting.** `request.jwt.claims` is a
+  custom GUC and **any role may `SET` it** — verified: a member set it directly and
+  read another tenant's rows. Nothing in the schema prevents this. The only control
+  is that **no request-reachable SQL path can reach the `SET`**, and that is an
+  absence rather than a defence. **Any `pg` client, RPC or `db-pre-request` hook
+  that can set it is a P0** — and revocation via `db-pre-request` is planned work.
+- **The grant-subset rule is not implemented.** *A caller cannot grant a capability
+  it does not hold* is half-enforced: the scope half is free via `WITH CHECK`, the
+  capability half has no trigger and no policy to fall back on. `app_admin` holds
+  full `INSERT` on `role_permissions` and `user_roles` today. (`rebase.md` W08b.)
 
-So: the ADR is the design, the migration is the older thing, and the test suite
-proves the older thing. If you fork this, do not read one as describing the
-other — a green `verify` here does not mean row scoping by group is in place.
+Three more trade-offs that are deliberate, not defects: `org_closure` lives in an
+`authz` schema **outside** `db-schemas` and is **granted** to the serving roles
+(it cannot be granted to nobody — a policy's subquery runs with the querying role's
+privileges); **`app_admin` reads the complete `user_groups` table**; and
+`has_permission` is executable by `app_member`/`app_admin` but **not** `app_anon`,
+because its `who` argument makes it a disclosure oracle — measured, 63 unauthenticated
+probes recovered an administrator's whole permission set.
+
+Full record, with the measurements behind each of these: [`docs/adr.md`](docs/adr.md)
+ADR-0023 §F1, §Least privilege, §The closure matview.
 
 ---
 

@@ -157,32 +157,31 @@ If any of those is missing the suite **fails**. It never skips: a security suite
 that passes without exercising its subject is a false green, which is the exact
 failure mode this suite exists to prevent.
 
-It rebuilds its own `rls_proof` database from nothing on every run, applies both
-SQL files, seeds a **three-level `sites` tree** and a `site_id` token per
-principal, starts a PostgREST on port **3005** and tears it down afterwards. It
-refuses to run if something else already answers on that port, and it never
-touches the other PostgREST instance on 3002.
+It rebuilds its own `rls_proof` database from nothing on every run, applies the
+role bootstrap and the migration, seeds a **three-level `groups` tree** and a `sub`
+token per principal, starts a PostgREST on port **3005** and tears it down
+afterwards. It refuses to run if something else already answers on that port, and it
+never touches the other PostgREST instance on 3002.
 
-> ### ⚠ This suite currently validates the SUPERSEDED design
+> ### ⚠ The tamper figures below are from the superseded suite
 >
-> The schema it seeds is the **old** one: a `sites` table, a `site_id` claim,
-> and a recursive `site_tree_ids()` walk evaluated **once per candidate row**.
-> ADR-0023 §Row scope replaces all three with `groups` + `user_groups` +
-> `org_closure` + `actor()`, where the scoping subquery is **uncorrelated** and
-> evaluated **once per statement** (`loops = 1` at 305 and at 3305 rows).
+> The migration **has** been rewritten to the closure-join design (**W26, done**) and
+> so has this suite (**W27, done**) — **68 tests**, green, run by `verify` step 7 of 8.
+> `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `groups`,
+> `user_groups`, `authz.org_closure` and `has_permission()` are all in the tree; the
+> superseded `sites` / `site_id`-claim shape is gone. So a green `test:rls` **is**
+> evidence for the shipped design now, which it was not when this text was written.
 >
-> **There is also no capability axis at all.** No `actions`, `permissions`,
-> `roles`, `role_permissions` or `user_roles` table exists in the tree today, and
-> there is no `has_permission()` — so `security.md` §Scope and capability and
-> `testing.md` §Two-axis describe a design, not the shipped SQL.
+> **Three clauses of that design are declared and not enforced**, and this section
+> must not imply otherwise: the **grant-subset trigger** (`rebase.md` W08b),
+> **`is_system_role`** as the administrative floor (W34), and the **identity source**
+> — `request.jwt.claims` is a **caller-writable GUC**, verified exploitable by a
+> member, whose only control is the absence of a request-reachable `SET` (W37).
 >
-> **So the 33 passing tests below are not evidence for the new design.** They
-> prove the superseded design is internally consistent — and they are the reason
-> the rewrite has to rewrite the *tests*, not just the SQL. `backend/database/
-> migrations/0001_rls_foundation.sql` still ships the old shape.
->
-> The tamper table in this section was measured against that old file, so read it
-> as a **method** (remove a control, confirm the gate goes red at step 7 of 8)
+> The tamper table was measured against the **old** file and the **old** suite, so
+> read it as a **method** — remove a control, confirm the gate goes red at step 7 of
+> 8 — and not as current figures. **Re-measuring it is W33**; the `of 33` numbers
+> below are the superseded suite's.
 > rather than as current numbers. Both the migration rewrite and the suite rewrite
 > are tracked as work items; `rebase.md` §6.0.1, W06/W07 and W26/W27 have the
 > detail.
@@ -199,10 +198,17 @@ control from the shipped SQL, running the full gate, and restoring the file:
 
 | Control removed | Result |
 |---|---|
-| *(nothing — baseline)* | `verify passed`, 33 RLS tests green |
-| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | `verify failed at step 7/8`, 12 of 33 red |
-| the `REVOKE SELECT ON … FROM app_member/app_admin` lines | `verify failed at step 7/8`, 2 of 33 red |
-| the boundary `GRANT` widened to reach the table owner | `verify failed at step 7/8`, 3 of 33 red |
+| *(nothing — baseline)* | `verify passed`, **33** RLS tests green — **SUPERSEDED FIGURE, see W33** |
+| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | `verify failed at step 7/8`, **12 of 33** — superseded |
+| the `REVOKE SELECT ON … FROM app_member/app_admin` lines | `verify failed at step 7/8`, **2 of 33** — superseded |
+| the boundary `GRANT` widened to reach the table owner | `verify failed at step 7/8`, **3 of 33** — superseded |
+
+> **STALE — these numbers are from the superseded suite and must be re-measured.**
+> They were taken against the claim-keyed, per-row-walk migration. The suite has been
+> rewritten against the closure-join design and now runs **68** tests; the tamper rows
+> above have not been re-run against it, and a proof carried across a schema change
+> is a stale result wearing a current one's clothes. **Re-run the whole matrix before
+> citing any figure in it** (`rebase.md` §6.6.1, **W27**).
 
 The other steps cannot see any of this: typecheck, lint and both unit suites stay
 green with every policy in the database disabled. Note also that `verify` stops at
@@ -256,7 +262,7 @@ add CI on top; the template does not need any.
 | **PostgREST panics on boot:** `failed to parse role-claim-key value (role) … unexpected "r" / expecting "."` | `jwt-role-claim-key` must be a **JSPath**. Use `".role"`. The bare `"role"` does not fall back — it aborts startup. `$.role` panics too on 16.4, so do not "modernise" it. |
 | `PGRST301 "None of the keys was able to decode the JWT"` while `postgrest.conf` looks correct | **Environment beats config.** An inherited `PGRST_JWT_SECRET` from `backend/.env` silently overrides the file. Strip inherited `PGRST_*` keys when spawning PostgREST — `spawn` stringifies `undefined` into the literal text `"undefined"`. |
 | `403 permission denied for function request_claims` on every scoped request | `EXECUTE` was revoked from `PUBLIC` and granted to nobody. **A revoke is not a policy** — revoke *and* grant to `app_anon`, `app_member`, `app_admin`. Scoping is 100% non-functional until you do. |
-| `permission denied for function site_tree_ids` on an *unauthenticated* read | `EXECUTE` was not granted to `app_anon`. A policy is evaluated for every role that reaches the table, including the anonymous one; the denial must arrive as zero rows, not as a `42501`. **This names the superseded design** — the walk is what `0001_rsl_foundation.sql` still ships; the closure-join replacement reads a matview and has no walk to grant, so this symptom goes away with the migration rewrite. |
+| `permission denied for function site_tree_ids` on an *unauthenticated* read | `EXECUTE` was not granted to `app_anon`. A policy is evaluated for every role that reaches the table, including the anonymous one; the denial must arrive as zero rows, not as a `42501`. **This named the superseded design.** The walk is gone; the closure join reads a matview, and the equivalent symptom now names `authz.actor()` or `authz.org_closure` — both of which are granted to `app_anon` for the same reason |
 | `stack depth limit exceeded` on any query as a non-superuser role | The hierarchy function reads the table its own policy protects. It must be `SECURITY DEFINER` **and** that table must not be `FORCE`d — one decision, not two. |
 | `must have admin option on role "app_anon"` | The escalation-boundary `GRANT` cannot run as the migration role. Run `database/bootstrap/001_roles.sql` **as a superuser** — the one statement that *is* the boundary is necessarily a superuser statement. |
 | `new row violates row-level security policy` when seeding | `FORCE` binds the owner for `DML`. Seed through the boundary: connect as `pgrst_authenticator`, `SET ROLE app_admin`. **Never** `SET row_security = off` — it reopens the owner bypass. |

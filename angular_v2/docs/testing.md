@@ -136,25 +136,54 @@ one that was found **after** the docs claimed it was handled:
      Do **not** assert this from the policy text: an `EXISTS`-shaped correlated
      variant is simplified back into a hashed SubPlan. Only `loops` is evidence.
      The same assertion applies to the role-ancestor set `has_permission()` reads.
-14. **The closure matview is granted to nobody** — assert against `pg_acl` that no
-     role, `PUBLIC` included, holds `SELECT` on `org_closure`. A matview has no RLS,
-     PostgREST publishes it automatically, and `openapi-mode = "ignore-privileges"`
-     lists it in the spec regardless — so neither the spec nor a denial test can see
-     a grant that should not be there. **One `GRANT SELECT` served the entire org
-     tree to an anonymous caller.**
-15. **Referential integrity does not leak** — for each FK on a group-scoped table,
-     assert that a caller in group A cannot distinguish "group B exists" from
-     "group B does not exist" by writing a row. `23503` is an existence oracle; a
-     `UNIQUE` + `ON CONFLICT DO NOTHING` path is the same oracle **with no error at
-     all**; `ON DELETE CASCADE` is a write across RLS. Also assert no group-scoped
-     FK leaves the group-scoped set.
+14. **The closure matview is in `authz`, outside `db-schemas`, and granted to the
+     three serving roles.** Assert **both** halves: (a) `pg_acl` shows `SELECT` for
+     `app_anon`, `app_member`, `app_admin` and nobody else — it *must* be granted,
+     because a policy expression's subquery runs with the querying role's
+     privileges and without it every scoped read dies with `permission denied for
+     materialized view`; and (b) the relation is **absent from the served spec**,
+     which is what the `authz` schema buys. A matview has no RLS, PostgREST publishes
+     anything in `db-schemas` automatically, and `openapi-mode = "ignore-privileges"`
+     lists it regardless of grants — so neither half alone is evidence. **One
+     `GRANT SELECT` on a `public` closure served the entire org tree to an anonymous
+     caller.**
+15. **`groups` and `user_groups` are ENABLEd but NOT FORCEd** — and the reason is
+     asserted, not remembered. `FORCE` on `groups` makes the closure refresh (which
+     runs as the view owner) read the tree through a policy `actor()` cannot satisfy,
+     and the closure is rewritten **empty**: every tenant's scope becomes zero rows,
+     silently. Measured **0 rows**. Removing the assertion lets someone "harden" the
+     table and empty the closure without a single red test unless one exists.
+16. **A multi-row `INSERT` into `groups` cannot create a cycle** — and this one rests
+     on the command counter advancing between rows of a single command, which nothing
+     else guarantees. Load two mutually-parenting rows in **one statement** and assert
+     both are refused and neither survived.
+17. **Referential integrity does not leak** — for each FK on a group-scoped table,
+      assert that a caller in group A cannot distinguish "group B exists" from
+      "group B does not exist" by writing a row. `23503` is an existence oracle; a
+      `UNIQUE` + `ON CONFLICT DO NOTHING` path is the same oracle **with no error at
+      all**; `ON DELETE CASCADE` is a write across RLS. Also assert no group-scoped
+      FK leaves the group-scoped set.
+18. **No request-reachable surface can `SET request.jwt.claims`.** `request.jwt.claims`
+     is a custom GUC and **any role may `SET` it** — verified, a member did and read
+     another tenant's rows. There is no grant that prevents this, so the only
+     assertion available is a structural one: no `pg` client in request-handling code,
+     no RPC that accepts SQL or settings, and no `db-pre-request` hook that can reach
+     `SET`. **This is a P0 when the surface appears, and `db-pre-request` is planned.**
+19. **A bulk `has_permission` call terminates** — call it against a cyclic role graph
+     with a timeout. The resolver's recursive term must use `UNION`, not `UNION ALL`;
+     the `UNION ALL` form is **non-terminating** and hangs.
 
-### Nothing above exists yet
+### Two of the above are not implemented, and a test for them cannot pass yet
 
-**The 33 tests that currently pass exercise the superseded `sites` / `site_id` /
-`site_tree_ids()` design** in `0001_rls_foundation.sql`, and are evidence for none
-of the above. Rewriting the suite against the closed-join schema is tracked as
-`rebase.md` W27.
+- **Item 6 (the grant-subset rule) has nothing to test.** No trigger exists; the
+  migration grants `app_admin` full `INSERT` on `role_permissions` and `user_roles`
+  and records no gap. Write the failing test when **W08b** lands. `rebase.md`.
+- **Item 9's companion — `is_system_role` as the administrative floor — is now
+  enforced** by a `BEFORE` row trigger on both `roles` and `groups`. Assert a
+  `DELETE` and an `UPDATE` of a floor row are refused as `app_admin`, that the same
+  delete succeeds from a superuser session, that an `INSERT` of a floor row succeeds,
+  and that **no serving role holds `TRUNCATE`** on either table — because `TRUNCATE`
+  does not fire a row trigger, so the grant is the only thing holding that line.
 
 ### Required, and not yet written: revocation while a session is live
 

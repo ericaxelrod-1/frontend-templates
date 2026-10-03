@@ -772,9 +772,12 @@ floor; Nest 12 additionally requires ≥ 20.19 and does not support 21.x.
 <a id="adr-0023"></a>
 ## ADR-0023: Two orthogonal authorization axes — scope in RLS, capability in OLS
 
-**Status:** Accepted. This is the model the template's authorization is built on.
-**Superseded design, still shipped:** `backend/database/migrations/0001_rls_foundation.sql`
-and the 33 RLS tests exercise the pre-closure shape. See §Migration status.
+**Status:** Accepted, and **shipped**. `backend/database/migrations/0001_rls_foundation.sql`
+implements this design and `backend/test/rls/rls.spec.ts` proves it with **68**
+tests run by `npm run verify`. One clause is **not** enforced yet and is marked where
+it appears: the grant-subset rule (§Least privilege). The superseded claim-keyed design
+is recorded below, labelled, because a decision record that deletes its own
+reversals is not a record.
 
 **Context.** `angular/` has a permissions module with object-level security —
 which features and endpoints a role may reach. Its fine-grained permissions were
@@ -953,12 +956,11 @@ cast in any branch can take the whole query down.
 
 > **SUPERSEDED — the identity source, not the mechanism.** The mechanism (RLS,
 > below the application) stands and is why this section exists. The **key** does
-> not: the design documented here and in `backend/database/migrations/0001_rsl_foundation.sql`
-> keys scope on a **`site_id` JWT claim** and walks the hierarchy recursively per
-> row. Both halves were replaced after the closure-join design test. Membership is
-> a **table read**, not a token claim, and the walk is **precomputed**. The old
-> design is kept below, labelled, because a decision record that deletes its own
-> reversals is not a record.
+> not: the claim-keyed, per-row-walk design first documented here has been
+> **replaced**, and it is no longer in the tree. Membership is a **table read**,
+> not a token claim, and the walk is **precomputed**. The old design is kept below,
+> labelled, because a decision record that deletes its own reversals is not a
+> record.
 
 **WITHDRAWN — the claim-keyed, per-row-walk design. It does not ship:**
 
@@ -982,7 +984,7 @@ CREATE POLICY row_scope ON projects USING (
 ```
 
 Its corrected descendant — admin branch on `current_user`, guarded `uuid` cast —
-is what `0001_rsl_foundation.sql` still contains, and is also superseded:
+is also superseded:
 
 ```sql
 CREATE FUNCTION claim_site_id() RETURNS uuid
@@ -1001,33 +1003,49 @@ CREATE POLICY row_scope ON projects USING (
 );
 ```
 
-> **Migration status, stated plainly.** `0001_rsl_foundation.sql` has **not** been
-> rewritten. It still carries the recursive `site_tree_ids()` walk keyed on a
-> `site_id` claim. Everything below is the design the testing actually proved, and
-> it is the design a migration rewrite must implement. Nothing in this ADR may be
-> read as a claim that the shipped SQL already does this.
-
-**What replaces it — membership in a table, joined against a closure:**
+**What replaces it — membership in a table, joined against a closure, in the `authz`
+schema:**
 
 ```sql
+-- Authorization internals live outside `db-schemas = "public"`, so PostgREST cannot
+-- address them. A relation the policies must read has to be granted to every serving
+-- role, and a relation in `db-schemas` with a grant is one GET away.
+CREATE SCHEMA authz;
+GRANT USAGE ON SCHEMA authz TO app_anon, app_member, app_admin;
+
 -- group hierarchy (admin-writable), membership (NOT member-writable), closure matview
 CREATE TABLE groups (id uuid PRIMARY KEY, parent_id uuid REFERENCES groups(id),
                      name text NOT NULL, is_system_group boolean NOT NULL DEFAULT false);
 CREATE TABLE user_groups (user_id uuid NOT NULL, group_id uuid NOT NULL REFERENCES groups(id),
                           PRIMARY KEY (user_id, group_id));
 
-CREATE FUNCTION actor() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid
-$$;
+-- The cast applies to the extracted text: parenthesise, because `::` binds tighter
+-- than `->>`. And it is CAUGHT: a malformed `sub` is a denial, not a 500.
+CREATE FUNCTION authz.actor() RETURNS uuid LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
+DECLARE raw text;
+BEGIN
+  raw := (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub');
+  IF raw IS NULL OR raw = '' THEN RETURN NULL; END IF;
+  RETURN raw::uuid;
+EXCEPTION WHEN others THEN RETURN NULL;
+END $$;
 
 CREATE POLICY row_scope ON projects USING (
-    group_id IN (
+    current_user = 'app_admin'
+    OR group_id IN (
         SELECT c.descendant FROM user_groups ug
-        JOIN org_closure c ON c.ancestor = ug.group_id
-        WHERE ug.user_id = actor()
+        JOIN authz.org_closure c ON c.ancestor = ug.group_id
+        WHERE ug.user_id = authz.actor()
     )
 );
 ```
+
+> **Migration status, stated plainly.** `0001_rls_foundation.sql` **has** been
+> rewritten to this design and the RLS suite has been rewritten against it: **68
+> tests**, green, run by `verify`. `grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b'
+> backend/database/` returns nothing. A green `test:rls` **is** evidence for this
+> ADR, with two stated exceptions: the **grant-subset trigger** is **not** enforced
+> (§Least privilege) and the whole scope axis rests on a caller-writable GUC (§F1).
 
 | Input | Result |
 |---|---|
@@ -1042,6 +1060,41 @@ That last row is the operational payoff and it is why scope is a table read:
 **membership changes take effect on the next request with the same token**, because
 membership is looked up per statement rather than carried in a claim the issuer
 controls.
+
+#### F1 — scope is keyed on a setting the caller can write
+
+**This is the sharpest edge in the design, it is not a bug today, and it is not
+fixed by anything in the schema.**
+
+`request.jwt.claims` is a **custom GUC**. PostgreSQL applies **no privilege control
+to custom dot-prefixed settings**: any role that can run `SET` can set it. Verified
+on the shipped schema — a member issued `SET request.jwt.claims = '{"sub":"…"}'`
+for another tenant and **read that tenant's rows**. No error, no warning.
+
+The same is true of the `role` GUC, and of any `app.*` GUC this design might
+introduce.
+
+| | |
+|---|---|
+| **What it would take to fix structurally** | something the database enforces rather than something the topology permits. There is no such mechanism for a custom GUC in PostgreSQL |
+| **What the control actually is** | **the absence of a request-reachable SQL path that can `SET` it.** The thin app has no SQL path at all (no ORM), and PostgREST sets the claims itself from the verified token, so today nothing a caller controls reaches the setting |
+| **Why that is fragile** | it is an *absence*, and absences do not survive the next feature. **`db-pre-request` is exactly such a path being planned** (revocation), and any `/rpc/` that takes SQL, any `pg` client, and any future `SET`-capable helper all re-open it |
+| **Severity if it opens** | **P0.** Cross-tenant read for any authenticated principal, with no error |
+
+Two rules follow, and they are not the same rule:
+
+1. **Any `pg` client, RPC, or `db-pre-request` hook that can reach `SET` on
+   `request.jwt.claims` is a P0**, and must be shown not to exist before that work
+   lands — not after. Assert the absence.
+2. **`has_permission(who, …)` taking `who` as a parameter is the same class of
+   hazard.** See §Capability: nothing in the tree supplies `who` from the verified
+   token. It arrives in the RPC body verbatim.
+
+**Do not "fix" this by moving scope into a different custom GUC.** That design was
+built and **rejected as a vulnerability, not a trade**: a member read 50 rows, called
+`set_config('app.scope', …)` on its own GUC, and read **500**. Custom GUCs have no
+privilege control and `SET LOCAL` gives no protection, because the caller is the one
+setting it.
 
 #### Why the subquery is evaluated once, and why that took a measurement
 
@@ -1111,10 +1164,16 @@ conflated and both are load-bearing:
 >
 > **One residual, stated because it is a real defect and it is fail-closed.** A
 > non-uuid or empty `sub` yields **`HTTP 500`**, not `403`. Nothing is disclosed and
-> nothing is admitted, but the status is an internal error rather than a
+> nothing is admitted, but the status is an internal error rather than an
 > authorization decision, and an operator reading logs will chase the wrong thing.
 > The fix is to catch the cast in `actor()` and return `NULL`; it is recorded here
 > because a 500 is not an acceptable long-term denial signal even when it is safe.
+>
+> **CLOSED in the shipped migration.** `authz.actor()` wraps the cast in
+> `EXCEPTION WHEN others THEN RETURN NULL`, and the suite asserts that `"sub":"garbage"`
+> and a token with **no** `sub` both return **zero rows** for a member and do not
+> break an admin. Recorded here because the shape of the fix — parenthesise the
+> extraction, then catch the cast — is the part that gets re-broken.
 
 ### The hierarchy
 
@@ -1128,11 +1187,15 @@ is tree-derived rather than equality.
 > failure mode rather than tolerating it. The earlier finding is kept and corrected
 > in place rather than deleted.
 
-**What the design is now — a closure materialized view, refreshed, not walked:**
+**What the design is now — a closure materialized view in `authz`, refreshed, not
+walked:**
 
 ```sql
+-- `authz`, not `public`: the closure needs a SELECT grant for every role whose
+-- requests evaluate the scope policy, and a relation in `db-schemas` with that
+-- grant is the whole org tree, one GET away.
 -- closure: NO accumulator column in the recursive row, UNION (not UNION ALL)
-CREATE MATERIALIZED VIEW org_closure AS
+CREATE MATERIALIZED VIEW authz.org_closure AS
 WITH RECURSIVE t AS (
     SELECT id AS ancestor, id AS descendant FROM groups
   UNION
@@ -1140,7 +1203,8 @@ WITH RECURSIVE t AS (
 )
 SELECT ancestor, descendant FROM t;
 
--- UNIQUE INDEX org_closure_uniq ON org_closure (ancestor, descendant)  -- required for CONCURRENTLY
+-- UNIQUE INDEX authz_org_closure_uniq ON authz.org_closure (ancestor, descendant)
+--   -- required for CONCURRENTLY
 -- statement-level trigger on groups issuing REFRESH MATERIALIZED VIEW CONCURRENTLY
 ```
 
@@ -1193,7 +1257,8 @@ CREATE POLICY row_scope ON projects USING (
 );
 ```
 
-**What `0001_rls_foundation.sql` still contains — SUPERSEDED, kept for the record:**
+**An earlier revision of `0001_rls_foundation.sql` contained this — SUPERSEDED, kept
+for the record, and gone from the tree:**
 
 ```sql
 CREATE INDEX IF NOT EXISTS sites_parent_id_idx ON sites (parent_id);
@@ -1346,13 +1411,13 @@ from a membership table rather than a token claim, and there is **no incremental
 repair** — the view is rebuilt from `groups` — so the failure mode that rejected the
 closure table below no longer exists.
 
-**SUPERSEDED: the recursive `STABLE` function.** It remains in
-`0001_rsl_foundation.sql` and it is the shape the RLS suite exercises, but it is one
-call per candidate row (400,001 calls over 400,000 rows) and it is keyed on a claim
-rather than on membership. It was kept at the time because every faster alternative
-introduced a way for the answer to be **wrong without saying so**. The closure view
-is the alternative that turned out not to have that property — because it is
-*rebuilt*, not *repaired*.
+**SUPERSEDED — and now gone from the tree: the recursive `STABLE` function.** It was
+in `0001_rls_foundation.sql` and it was the shape the RLS suite exercised; the W26/W27
+rewrite removed it. It was one call per candidate row (400,001 calls over 400,000
+rows) and it was keyed on a claim rather than on membership. It was kept at the time
+because every faster alternative introduced a way for the answer to be **wrong without
+saying so**. The closure view is the alternative that turned out not to have that
+property — because it is *rebuilt*, not *repaired*.
 
 **1. Per-session scope cache — REJECTED AS A VULNERABILITY, not a trade-off.**
 
@@ -1474,9 +1539,37 @@ user_roles(user_id, role_id)
   a child role holds everything its parent holds, so the resolution walks *up*
   from the caller's roles and collects the union. `groups.parent_id` means a
   group's rows include its descendants' rows, which is the closure join.
-- **`is_system_role` / `is_system_group` mark rows the application may not
-  delete.** They are the administrative floor, and they are what `app_admin` is
-  recognised by — not by its name.
+- **`is_system_role` / `is_system_group` mark rows the application may not remove,
+  and they are now ENFORCED.** They were declared and read by nothing — `app_admin`
+  holds `DELETE` on both tables and `DELETE FROM roles WHERE is_system_role = true`
+  returned `204` with the row gone. **A column documented as a control and enforced
+  by nothing is worse than no column**, because the comment tells a reader the
+  control is there. The shipped trigger:
+  - **The rule:** a row that *is* a floor row may not be `UPDATE`d or `DELETE`d
+    except from a superuser session. `INSERT` is deliberately **not** covered —
+    the floor has to be creatable, and adding one is not the risk; removing or
+    rewriting one is, since the floor is what capability resolution rests on.
+  - **`SECURITY INVOKER`, and it must stay that way.** The whole function is a
+    question about the caller, so a `DEFINER` body would answer about the **owner**
+    and every check would pass. It reads no table — the row's own JSON is the input —
+    so `INVOKER` costs it nothing. This is the same identity trap as the resolver,
+    pointing the other way: `DEFINER` here would be a floor that never fires.
+  - **The superuser path is `current_setting('is_superuser')`, NOT `current_user`.**
+    `is_superuser` derives from `SESSION_USER` and is not changed by `SET ROLE`,
+    which is precisely what is wanted: the check must survive the escalation
+    boundary, or the provisioning path (`pgrst_authenticator` `SET ROLE app_admin`)
+    would be indistinguishable from a request. Measured: `on` for a `postgres`
+    session, `off` for `app`, `pgrst_authenticator`, and every serving role after
+    `SET ROLE app_admin`.
+  - **A trigger, not a grant**, because the floor is **per-ROW** and grants are
+    **per-TABLE**. Withholding `DELETE` from `app_admin` would remove the capability
+    from every ordinary row to protect one, and would break "superset, not a bypass"
+    — which is asserted over every table in `pg_tables`.
+  - **What it does not cover, stated rather than discovered later:** `TRUNCATE` does
+    not fire a row trigger. It is closed by the grants instead — no serving role
+    holds `TRUNCATE` on either table — and that is asserted per role rather than left
+    in a comment, because a future table-level `TRUNCATE` grant is the change that
+    would reopen this.
 - **`UNIQUE (resource, action_id)` is what makes a capability addressable.** A
   capability is `('project', 'delete')`, resolved from two columns, not a string
   that has to be parsed at every call site.
@@ -1501,23 +1594,38 @@ CREATE TABLE role_permissions (role_id uuid REFERENCES roles(id),
 CREATE TABLE user_roles (user_id uuid NOT NULL, role_id uuid NOT NULL REFERENCES roles(id),
                          PRIMARY KEY (user_id, role_id));
 
--- Identity is the caller's, from the verified token. NEVER current_user, and NEVER
--- current_setting('role') -- see the correction below for why, measured.
+-- Identity is the caller's, passed IN. Never current_user, never
+-- current_setting('role'), and NOT wired to actor() -- see the corrections below.
+--
+-- THIS IS THE SHIPPED FORM. $1/$2/$3 rather than the parameter names, because in a
+-- SQL function an unqualified name that also names a column in scope resolves to the
+-- COLUMN: `p.resource = resource` parses as `p.resource = p.resource`, always true.
+-- Measured: project/read answered true for a member whose role held only
+-- customer/read.
+--
+-- The ancestor set is SEEDED in the CTE, and the join starts at role_permissions --
+-- not at the caller's own roles with a filter on top. Joining role_permissions to
+-- user_roles first and then filtering `rp.role_id IN (<ancestors>)` caps inheritance
+-- at the caller's own roles: the join has already discarded every ancestor's rows, so
+-- the filter is a no-op and resolution is silently ONE LEVEL DEEP. Measured: a
+-- manager two levels below a role holding project/read was denied it.
+--
+-- UNION, not UNION ALL -- same reason as the closure. On a cyclic role graph the
+-- UNION ALL form never reaches a fixed point. Verified: has_permission hung.
 CREATE FUNCTION has_permission(who uuid, resource text, action text)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM  user_roles ur
-    JOIN  role_permissions rp  ON rp.role_id = ur.role_id
-    JOIN  permissions p        ON p.id = rp.permission_id
-    JOIN  actions a            ON a.name = p.action_id
-    WHERE ur.user_id = who
-      AND p.resource = resource
-      AND a.name     = action
+    FROM  role_permissions rp
+    JOIN  permissions p  ON p.id = rp.permission_id
+    JOIN  actions a      ON a.name = p.action_id
+    WHERE p.resource = $2
+      AND a.name     = $3
       AND rp.role_id IN (          -- walk UP: a child holds what its ancestors hold
         WITH RECURSIVE up(id) AS (
-          SELECT ur.role_id
-          UNION ALL
+          SELECT ur.role_id FROM user_roles ur WHERE ur.user_id = $1
+          UNION
           SELECT r.parent_id FROM roles r JOIN up ON up.id = r.id
           WHERE r.parent_id IS NOT NULL
         )
@@ -1527,13 +1635,14 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
 $$;
 ```
 
-> **Precompute that ancestor set, exactly as `org_closure` is precomputed.** The
-> recursive term above is written out for clarity, and it is the **shape not to
-> ship**: a `STABLE` function in a qual is evaluated once per candidate row —
-> measured 400,001 calls over 400,000 rows — and is **not** hoisted. The shipped
-> form materialises the role ancestor set and joins it, so the plan shows a
-> `hashed SubPlan` with `loops = 1`. Same argument, same measurement, same fix as
-> §The hierarchy.
+> **Precomputing the role ancestor set into a second closure view is NOT done, and
+> is not yet justified.** It is the same argument that decided `org_closure` — a
+> `STABLE` function in a qual is evaluated once per candidate row (measured 400,001
+> calls over 400,000 rows), not once per statement, so a precomputed set would show a
+> hashed SubPlan with `loops = 1`. At a role count in the tens, a second denormalised
+> view is not worth it. **Measure before adding one**; this is advice, not a shipped
+> fact, and an earlier version of this ADR stated it as though the shipped function
+> had already done it.
 
 - **A new permission is one inserted row and no migration.** Verified in the
   executed design test: adding one permission to one role needed no DDL and no
@@ -1614,13 +1723,41 @@ $$;
 > correct denial. A capability system that silently denies everyone looks exactly
 > like a capability system that works.
 >
-> **Where the fix lives now.** `has_permission()` takes `who` as a parameter and
-> `actor()` supplies it from the verified claims, so there is no role-valued
-> setting inside the function to get wrong. The `role` GUC finding still stands for
-> any helper that does need it: **`current_setting('role', true)` tracks
-> impersonation; `current_user`, `current_role` and `session_user` do not.** The
-> admin branch in a *policy* is a different matter — a policy is not inside a
-> function, so `current_user` is correct there.
+> **Where the fix lives now — and the correction to it.** `has_permission()` takes
+> `who` as a parameter rather than reading a role-valued setting inside a `DEFINER`
+> body, so there is no `current_user` to get wrong. **The previous version of this
+> section claimed that "`actor()` supplies it from the verified claims". That
+> wiring does not exist in the tree, and nothing ever implemented it.** `has_permission`
+> is a `SECURITY DEFINER` function whose first argument is `who`; `actor()` is a
+> separate function used only by the scope policies and by
+> `authz.visible_group_ids()`. PostgREST publishes `has_permission` as an RPC in
+> `public`, so **`who` arrives in the request body verbatim** — caller-supplied,
+> unsigned by anything the database checks.
+>
+> Consequence, stated rather than smoothed over: `has_permission` is **advisory for
+> a caller checking itself** and must never be made the enforcement point for CRUD,
+> which is table grants.
+>
+> **And it is a disclosure oracle, which is why `app_anon` is excluded.** Because
+> `who` is an argument, a sweep of `(who, resource, action)` recovers any user's
+> entire capability set. Measured on the grant this replaced: **63 probes,
+> unauthenticated, recovered the administrator's complete permission set**, and the
+> function became an oracle for *"does this uuid hold any role at all"*. The shipped
+> grant is `TO app_member, app_admin` — **not** `app_anon`, and the file's own
+> general rule about granting helpers to `app_anon` does not apply here because **no
+> policy calls this function**.
+>
+> **What remains is a deliberate trade:** an authenticated member can still read
+> somebody else's capabilities. Capability is data, not a secret, and a self-only
+> wrapper cannot express *"may this user do X"* without the caller being that user.
+> Narrower still (`app_admin` alone) is possible, was considered, and would remove
+> the per-user capability surface the application needs.
+>
+> The `role` GUC finding still stands for any helper that does need it:
+> **`current_setting('role', true)` tracks impersonation; `current_user`,
+> `current_role` and `session_user` do not.** The admin branch in a *policy* is a
+> different matter — a policy is not inside a function, so `current_user` is correct
+> there.
 >
 > `SECURITY INVOKER` remains the rejected alternative, for the same reason: it
 > publishes the whole permission matrix.
@@ -1666,38 +1803,40 @@ bypass: the failure is partial and visible.
 
 #### Least privilege runs in both directions
 
-The requirement that drove this redesign was two-sided, and the two sides have
-different mechanisms:
+The requirement that drove this redesign was two-sided. **Only one side is enforced.**
 
-- **"An account manager cannot create a user outside their own RLS scope."**
-  **Free.** The `user_groups` insert is itself a scoped write, and the scope
-  policy's `WITH CHECK` rejects a `group_id` outside the actor's closure — in the
-  database, with no code path to forget. (Omitting `WITH CHECK` is safe: Postgres
-  reuses `USING` when none is written.)
-- **"They cannot grant a capability they themselves do not have."** This needs
-  enforcement, because a `role_permissions` write is **unscoped** — there is no
-  group dimension on it for RLS to filter. It is enforced by a trigger:
+| Side | Mechanism | Status |
+|---|---|---|
+| "An account manager cannot create a user outside their own RLS scope" | the `user_groups` insert is a scoped write and the policy's `WITH CHECK` rejects an out-of-closure `group_id` | **Enforced.** (Omitting `WITH CHECK` is safe: Postgres reuses `USING` when none is written.) |
+| "They cannot grant a capability they themselves do not have" | a `BEFORE INSERT OR UPDATE` trigger on `role_permissions` **and** `user_roles` | **NOT ENFORCED. Nothing implements it.** |
 
-  ```sql
-  -- SKETCH ONLY. Not implemented; the shipped migration is a superseded design.
+**The ADR's least-privilege invariant is therefore not met, and the migration records
+no gap.** `app_admin` holds full `INSERT`, `UPDATE` and `DELETE` on `role_permissions`
+and on `user_roles` with nothing filtering them, so today *any* account manager
+confers *any* capability on *any* role. The requirement is still the requirement; it
+is unenforced, not withdrawn. Tracked as `rebase.md` **W08b**.
+
+The sketch:
+
+```sql
+  -- SKETCH ONLY. NOT IMPLEMENTED, and unimplementable as drawn -- see below.
   --
   -- IDENTITY. The actor must come from something the caller cannot forge. A
-  -- caller-writable GUC is NOT acceptable: see the rejected per-session scope
-  -- cache in §The hierarchy decision, where exactly that was measured letting a
-  -- member widen its own scope tenfold. Read it from the verified claims, the same
-  -- way actor() does.
+  -- caller-writable GUC is NOT acceptable: request.jwt.claims is exactly that, and
+  -- it is what the scope policies read (see §F1). Reading the grantor from it
+  -- reproduces the very hole this trigger is meant to close.
   --
   -- SEPARATION OF DUTY. The grant-subset check must not be able to grant itself:
   -- if the caller holds `roles.admin`, then `roles.admin` confers everything the
   -- caller has, and the check is vacuous for them. Pin the rule to a row that is
-  -- not grantable.
+  -- not grantable. **The sketch below has this defect.**
   CREATE TRIGGER role_permissions_grant_subset
   BEFORE INSERT ON role_permissions
   FOR EACH ROW EXECUTE FUNCTION assert_grant_is_subset();
 
   CREATE FUNCTION assert_grant_is_subset() RETURNS trigger
   LANGUAGE plpgsql SECURITY DEFINER AS $$
-  DECLARE grantor uuid := app_actor();   -- the verified caller, from the claims
+  DECLARE grantor uuid := app_actor();   -- no such function exists either
   BEGIN
     IF NOT has_permission(grantor,
                           (SELECT resource FROM permissions WHERE id = NEW.permission_id),
@@ -1711,7 +1850,7 @@ different mechanisms:
   END $$;
   ```
 
-  **Three things this sketch must survive, and does not yet.**
+  **Three things this sketch must survive, and does not.**
   - **`BEFORE INSERT` only is not enough** — a `BEFORE UPDATE` that repoints a row to
     a different `permission_id` is the same escalation, and needs the same check.
     `OLD` is `NULL` on an insert, so the two cases must be branched rather than
@@ -1807,6 +1946,24 @@ the row already produced, and the recursion stops.
    non-terminating closure exhausts the filesystem, and the failure is not a slow
    query — it is a full disk.
 
+> **M9 — and the trigger is load-bearing for a reason nobody wrote down.** The
+> shipped `assert_group_acyclic()` is `BEFORE INSERT OR UPDATE … FOR EACH ROW`, and
+> its `SELECT` sees rows written **earlier in the same command**, because the
+> **command counter advances between trigger firings**. That is the only thing
+> preventing a single multi-row statement from building a cyclic closure.
+>
+> **Measured by shape, and the shape is the whole of it.** A **forward** chain —
+> `(a→b), (b→c), (c→a)` with every parent written later in the same statement — is
+> **refused**: the third row's walk finds the first two. A **backward** chain —
+> `(a, no parent), (b→a), (c→b)` — is **admitted, and correctly so**, because it is
+> genuinely acyclic at the moment each row is checked and no cycle exists afterwards.
+>
+> **It is fragile and it is invisible.** Change the trigger to `FOR EACH STATEMENT`,
+> to a `CONSTRAINT` trigger, or route the read through anything that does not see
+> the advanced command counter, and the forward form is admitted. Nothing in the DDL
+> says so. Any code that bulk-loads `groups` needs a test that loads it in **one
+> statement**, because that is the case the control is carrying.
+
 > **`parent_id REFERENCES groups(id)` does not enforce acyclicity.** It is not even
 > close: a self-referencing FK happily admits `A → B → A`. Nothing in the DDL
 > prevents a cycle, which is why item 1 above is a trigger and not a constraint.
@@ -1818,7 +1975,7 @@ the row already produced, and the recursion stops.
 > a data-integrity costume, and the 384-rows-in-12.7-ms result is the *correct*
 > behaviour of a system that was handed a cycle it should have refused.
 
-### The closure matview is a first-class PostgREST resource, and it has no RLS
+### The closure matview: keep it out of `db-schemas` — and note that "grant it to nobody" is unimplementable
 
 A matview is not a table and it is not protected like one. Four hazards, all
 measured:
@@ -1826,31 +1983,66 @@ measured:
 | Hazard | Consequence |
 |---|---|
 | **No RLS and no policy.** `CREATE POLICY` on a matview does not exist | there is nothing to scope it *with*; the grant is the only control |
-| PostgREST **auto-publishes** it as a resource | `org_closure` is reachable at `/org_closure` the moment the schema cache reloads |
+| PostgREST **auto-publishes** it as a resource | `org_closure` in `db-schemas` is reachable at `/org_closure` the moment the schema cache reloads |
 | It appears in the served spec under `openapi-mode = "ignore-privileges"` **regardless of grants** | the spec advertises a resource the spec mode deliberately refuses to hide |
 | **A single `GRANT SELECT` served the entire org tree to an anonymous caller** | the whole hierarchy, every group, to anyone |
 
-So: **grant it to nobody.** Not "grant it narrowly" — nobody. If a client needs the
-closure, expose it through an RPC or a policy-governed table, not by granting on the
-matview. And assert the grant state in a test, because `ignore-privileges` means the
-served spec will never tell you.
+> **REVERSAL — "grant it to nobody. Not 'grant it narrowly' — nobody" is withdrawn,
+> and it was not a judgement call: it is unimplementable.**
+>
+> The hazards above are real, and the conclusion drawn from them was still wrong.
+> **A policy expression's subquery runs with the QUERYING role's privileges**, not
+> the table owner's. So a relation the scope policy reads must carry a `SELECT`
+> grant for **every** role whose requests evaluate that policy. Measured on the
+> shipped schema, before the `authz` schema existed: an `INSERT` as `app_admin`
+> failed with `permission denied for materialized view org_closure` — and so did
+> every scoped select and update. **With the grant removed to nobody, row scoping is
+> 100% non-functional**, while the policy, the grants and every comment still look
+> correct. That is the same shape as the "a revoke is not a policy" finding below,
+> one level up.
+>
+> **The shipped answer is the schema, not the grant.** `org_closure` lives in
+> **`authz`**, which is **outside** `db-schemas`, so PostgREST cannot address it and
+> `ignore-privileges` cannot advertise it — and it carries
+> `GRANT SELECT ON authz.org_closure TO app_anon, app_member, app_admin`. Both halves
+> are required: the schema hides it, the grant lets the policy read it.
+> `app_anon` is in the grant list because a policy expression is evaluated for every
+> role that reaches the table; without it an unauthenticated read fails with
+> `permission denied for materialized view` — a `42501` on a request that should
+> have returned zero rows, which is a denial-of-service surface and an oracle.
+>
+> **Assert both halves in a test**: that the grant state is what it should be, *and*
+> that the relation is absent from the served spec. The spec alone will not tell you
+> about the grant, and the grant alone will not tell you it is hidden.
 
 **Refresh: `REFRESH MATERIALIZED VIEW CONCURRENTLY` from a statement-level trigger
-on `groups`.** `CONCURRENTLY` requires a `UNIQUE` index on the view —
-`org_closure_uniq (ancestor, descendant)` — and it cannot run inside a transaction
-block that has already written, which is why the trigger is **statement-level**, not
-row-level.
+on `groups`.**
 
-| Refresh strategy | Tenant reads during the refresh |
+| Requirement | What it actually is |
 |---|---|
-| **13.5 ms** | baseline, no refresh |
-| **6.7 ms** | during a `CONCURRENTLY` refresh — reads continue |
-| **7,606 ms** | during a plain refresh — tenant reads blocked |
-| **8,466 ms** | with a trigger-held lock — tenant reads blocked |
+| a `UNIQUE` index on the view | `authz_org_closure_uniq (ancestor, descendant)`. Without it the refresh is refused: `cannot refresh materialized view … concurrently` |
+| inside the writing transaction | so a reader sees the pre-write closure or the post-write closure and **never an intermediate state**. Strictly better than any refresh schedule |
+| `CONCURRENTLY` | **chosen for the lock it avoids.** A plain `REFRESH` holds an **`AccessExclusiveLock`** for the whole rebuild and blocks every tenant read behind it |
+| statement-level | because **N group changes cost one rebuild instead of N** |
 
-**There is no staleness window.** The refresh runs *inside the writing transaction*,
-so a reader either sees the pre-write closure or the post-write closure and never an
-intermediate state. That is strictly better than any refresh schedule.
+> **CORRECTED — the previously recorded justification for statement-level was
+> false.** It said `CONCURRENTLY` *"cannot run inside a transaction block that has
+> already written"*, therefore statement-level. **That does not reproduce on
+> PostgreSQL 15.19.** Verified: `CONCURRENTLY` succeeds from a row-level trigger
+> inside a transaction that has already written. The only two restrictions that do
+> bite are a **read-only transaction** and a **missing unique index**. Statement-level
+> is still the right choice — but for the rebuild-count reason above, not for
+> legality. An earlier draft of the migration repeated the false claim as well.
+
+> **WITHDRAWN — the refresh timing table is not reproducible.** This ADR, and two
+> other documents, carried `13.5 ms` baseline / `6.7 ms` concurrent / `7,606 ms`
+> plain / `8,466 ms` trigger-held. Re-measured on the **shipped** 12-row closure the
+> audit got **plain `REFRESH` 36.5 ms** and **`CONCURRENTLY` 27.5 ms**. The figures do
+> not describe the design; they described whatever fixture was loaded, and the
+> 7,606 ms in particular is three orders of magnitude off anything a 12-row closure
+> can cost. **The argument for `CONCURRENTLY` is the lock, and the lock is a
+> property of the access mode rather than of elapsed time.** Cite
+> `AccessExclusiveLock`; do not cite milliseconds without naming the fixture.
 
 > **REVERSAL — the blue/green matview swap is withdrawn as unnecessary, and it was
 > also impossible.** An earlier draft proposed building a second matview and swapping
@@ -1865,7 +2057,7 @@ intermediate state. That is strictly better than any refresh schedule.
 > Recorded as a reversal because the proposal was made here and is now wrong for a
 > reason that only executing it revealed.
 
-### Corrections to the record — four claims that were wrong in the small ways
+### Corrections to the record — six claims that were wrong in the small ways
 
 Recorded as corrections because each was written down as fact and each is the kind of
 detail that gets copied into a migration verbatim.
@@ -1899,10 +2091,32 @@ reuses `polqual` for the check. Previously recorded as a catalog reading; it is 
 insert into an out-of-scope group is refused. A catalog entry is evidence that
 something was set; a refused insert is evidence that something was *enforced*.
 
-**4. A non-uuid or empty `sub` yields `HTTP 500`, not `403`.** Fail-closed, but the
+**4. A non-uuid or empty `sub` yielded `HTTP 500`, not `403`.** Fail-closed, but the
 wrong signal: an operator reading logs investigates an internal error instead of an
 authorization decision. Recorded in §Row scope as well, because it belongs with the
-claim-accessor discussion rather than only here.
+claim-accessor discussion rather than only here. **Closed** — `authz.actor()` catches
+the cast, and the suite asserts both shapes deny.
+
+**5. `GRANT USAGE ON SCHEMA public TO PUBLIC` does NOT put schema usage back.** The
+`down` script recorded that it *"reports `WARNING: no privileges were granted for
+"public"` and leaves the ACL unchanged. Verified twice."* **That claim is false, and
+the "verified twice" is the load-bearing part of the error** — it is recorded as
+measured when it was inferred. Re-measured: the statement emits **no warning at
+all**, exits 0, and `has_schema_privilege(role, 'public', 'USAGE')` **flips to
+`true`**. The revert of that particular revoke does exist, and the down script
+omits it while asserting it does not.
+
+The residual is a **narrowing**, which is the safe direction, and leaving it in place
+rather than faking it was the right call. But the justification was invented, and a
+down script that documents a non-existent limitation teaches the next reader that
+the ACL is unrecoverable. Recorded because the pattern matters more than the
+instance: **"verified twice" on a negative result is a claim about an absence, and an
+absence needs a positive assertion, not a warning that did not appear.**
+
+**6. `CONCURRENTLY` CAN run inside a transaction block that has already written.**
+Recorded in §The closure matview above; listed here because it was written down as
+settled fact in three documents and the migration repeated it as a "correction to
+the record" while recording the same error.
 
 ### Function privileges are part of the boundary, and a revoke is not a policy
 
@@ -1955,7 +2169,8 @@ Two consequences, both mandatory:
    requests, and a request-serving role that owns no tables. Collapsing them —
    which is the obvious thing to do for a template — disables RLS entirely.
 2. **`ALTER TABLE … FORCE ROW LEVEL SECURITY`** on every protected table, so the
-   owner is subject to the policy too.
+   owner is subject to the policy too — **with two exceptions, and neither is a
+   shortcut.**
 
 Without both, every policy in this ADR is decorative. This is the same failure
 class as the deleted RLS proxy: an enforcement mechanism that reports success
@@ -1967,12 +2182,62 @@ while enforcing nothing.
 > Every role that can reach a protected table must therefore also be
 > `NOSUPERUSER NOBYPASSRLS`, and that is asserted in a test — not assumed.
 
+#### The two tables that must NOT be FORCEd, and what happens if they are
+
+| Table | `ENABLE` | `FORCE` | Why not |
+|---|---|---|---|
+| `projects`, `customers` | yes | **yes** | the owner is bound by the policy; the suite asserts it |
+| `groups` | yes | **no** | the closure refresh runs as the **view owner**, and RLS applies to the owner under `FORCE` |
+| `user_groups` | yes | **no** | the owner writes these rows (there is no serving-role write grant at all) and `FORCE` would refuse them |
+
+**`FORCE` on `groups` is silent total closure loss — the highest-consequence
+one-line edit available in this schema.** `REFRESH MATERIALIZED VIEW` evaluates the
+view's query with the privileges of the view owner, so under `FORCE` the refresh
+reads `groups` through a policy whose predicate `actor()` cannot satisfy. The
+closure is rewritten **empty**. Every tenant's scope becomes zero rows. No error, no
+warning, and a green `verify` is one test away.
+
+> **D2 — CORRECTED, and the correction is worse than the original claim.** The
+> migration recorded that a FORCE'd refresh *"wrote a closure containing 1 row
+> instead of 2 — the matview silently lost half the tree"*. Re-measured by audit:
+> the closure **empties entirely — 0 rows**. Half-loss was the lucky case, and it is
+> the figure most likely to be copied forward as a tolerable degradation. It is not
+> tolerable; it is total. **Do not describe it as partial.**
+
+The trade, stated rather than buried: an owner can read the group tree
+unrestricted. `groups` is the shape of the org chart and carries no tenant payload —
+no names, contacts or records — so the blast radius is the hierarchy, not the data.
+Every **request-serving** role is still bound by the policy. The owner never
+receives a request; it exists to apply migrations. This is the weakest link in the
+pattern; keep tenant payload out of `groups` and record the trade in a comment.
+
+**This is not the same decision as the `SECURITY DEFINER` helper on `groups`.** Two
+distinct mechanisms, two distinct measured reasons:
+
+- **`authz.visible_group_ids()` is `SECURITY DEFINER`** because `REFRESH
+  MATERIALIZED VIEW CONCURRENTLY` is refused *"because it is being used by active
+  queries in this session"*. A group write fires the refresh trigger from **inside**
+  the writing statement, and the `groups` policy's own join holds an active query on
+  the closure for that whole statement. Behind a `DEFINER` helper the internal scan
+  is closed when it returns. Inlining the join there fails the refresh on **every**
+  insert, update and delete — verified.
+- **`groups` is not `FORCE`d** because the refresh evaluates the view as the owner
+  (the table above).
+
+Neither reason implies the other. An earlier version of this ADR merged them into
+"one decision, not two" and attributed both to a `stack depth limit exceeded` under
+`SECURITY INVOKER` — which was the justification for a design that has since been
+replaced. **Assert the two halves separately; either alone passes.**
+
+It takes **no argument** and calls `actor()` itself, deliberately: a `who` parameter
+would let any caller enumerate another user's group ids.
+
 #### What `FORCE` costs: migrations and seeding
 
 `FORCE ROW LEVEL SECURITY` subjects the **owner** to the policy, and that
-includes the migration role. An owner running `INSERT` against a table whose
-policy filters on `site_id` will have its rows rejected — there is no claim, so
-the predicate is false.
+includes the migration role. An owner running `INSERT` against a FORCE'd table whose
+policy filters on `group_id` will have its rows rejected — there is no membership,
+so the predicate is false.
 
 This is not a reason to drop `FORCE`. It is a reason to decide where writes come
 from:
@@ -2201,25 +2466,38 @@ The claims that replaced it, each directly checkable:
 - **Every table is declared group-scoped, hierarchy, or unscoped**, and its primary
   key follows. Every FK on a group-scoped table carries `group_id`. Any FK leaving
   the scoped set terminates somewhere members cannot write.
-- **`org_closure` is granted to nobody.** No RLS protects it, PostgREST publishes it
-  automatically, and the served spec advertises it regardless of grants.
+- **`org_closure` lives in `authz`, outside `db-schemas`, and is granted to the
+  three serving roles.** It cannot be granted to nobody: a policy expression's
+  subquery runs with the querying role's privileges, so without the grant no scoped
+  read evaluates at all. The schema is what hides it from PostgREST; the grant is
+  what lets the policy read it. Both are asserted. §The closure matview.
 - Every table needs a policy and grants. That is deliberate: default deny is
   cheaper to achieve than default allow.
 - This ADR supersedes nothing, but it **does** retire the assumption that a
   permission system can express scoping. It cannot. Only a database policy can.
 
-### Migration status, and what must not be read as built
+### Migration status, and what is still not built
 
-**None of §Capability, the role hierarchy, `user_groups`, `user_roles`,
-`actions`, `permissions`, `role_permissions` or `app_admin`-as-superset is
-implemented.** The shipped artefacts implement a superseded design:
+**The design in this ADR is shipped.** `backend/database/migrations/0001_rls_foundation.sql`
+implements it and `backend/test/rls/rls.spec.ts` proves it with **68** tests run by
+`npm run verify`. `grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b' backend/database/`
+returns nothing. A green `test:rls` **is** evidence for this ADR — which it was not
+before the W26/W27 rewrite.
 
-| Artefact | What it actually contains |
+| Claim | Status |
 |---|---|
-| `backend/database/migrations/0001_rls_foundation.sql` | a `sites` table, a `site_id` **token claim** accessor, and a recursive per-row hierarchy walk |
-| `backend/test/rls/rls.spec.ts` | **33 passing tests** that exercise exactly that shape |
+| the grant-subset rule — a caller cannot grant a capability it does not hold | **NOT IMPLEMENTED.** `app_admin` holds full `INSERT` on `role_permissions` and `user_roles` with nothing filtering them. §Least privilege. **W08b** |
+| scope is keyed on something the caller cannot forge | **IT IS NOT, AND CANNOT BE.** `request.jwt.claims` is a caller-writable GUC; the control is the absence of a request-reachable `SET` path. §F1. **P0 if that surface appears** |
 
-Both are the targets of the rewrite work items in `rebase.md` (W26 the migration,
-W27 the suite). **A green `test:rls` is not evidence for anything above.** It says
-the superseded shape is internally consistent — which is why §6.6.1's tamper
-matrix must be re-measured against the rewritten file rather than carried across.
+One control that was decorative and is now enforced, and one trade that is not a
+defect but is easy to mistake for one:
+
+| | |
+|---|---|
+| **`is_system_role` / `is_system_group` were decorative and are now enforced** | a `BEFORE` row trigger on both tables: a floor row may not be `UPDATE`d or `DELETE`d except from a superuser session, and `INSERT` is uncovered so the floor is creatable. `SECURITY INVOKER`; superuser recognised by `current_setting('is_superuser')` rather than `current_user`. `TRUNCATE` does not fire a row trigger and is closed by the grants instead. §Capability |
+| **`has_permission` is not executable by `app_anon`** | its `who` argument makes it a disclosure oracle — measured, **63 unauthenticated probes recovered an administrator's complete permission set**. Granted to `app_member`/`app_admin`; no policy calls it, so the "grant every policy helper to `app_anon`" rule does not apply. §Capability |
+| **`app_admin` reads the complete `user_groups` table** | the scope policy reads `user_groups` with the **querying** role's privileges, so no serving role can be denied `SELECT` on it. `app_member` is restricted by its policy to its own membership rows; **`app_admin` reads every user in every group.** That is the price of the superset on this table, and the grants discussion used to omit it. **No serving role may `INSERT`/`UPDATE`/`DELETE` it, `app_admin` included** — that omission is the control that fails open if forgotten. |
+
+> **The tamper table in `rebase.md` §6.6.1 was measured against the superseded
+> suite and must be re-measured against the rewritten file.** A proof carried across
+> a schema change is a stale result wearing a current one's clothes.

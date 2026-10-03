@@ -169,23 +169,26 @@ closed vocabulary of tier labels. There are **no per-user grants and no denies**
 every member of a role holds identical capabilities.
 
 **The hierarchy is precomputed, not walked.** `org_closure` is a materialized
-view holding every ancestor/descendant pair, refreshed inside the writing
-transaction, so there is no staleness window and no per-row walk. It is **not a
-table**: it has no RLS and no policy, PostgREST auto-publishes it, and the served
-spec advertises it regardless of grants — so it is **granted to nobody**, and a
-test asserts that rather than trusting the spec.
+view in the **`authz`** schema holding every ancestor/descendant pair, refreshed
+inside the writing transaction, so there is no staleness window and no per-row walk.
+It is **not a table**: it has no RLS and no policy, and a relation in
+`db-schemas = "public"` is auto-published by PostgREST and advertised in the served
+spec regardless of grants. **So it must live outside `db-schemas`** — and it cannot
+be granted to nobody either, because a policy expression's subquery runs with the
+*querying* role's privileges, so without a `SELECT` grant no scoped read evaluates at
+all. The schema hides it; the grant to the three serving roles lets the policy read
+it. Both are asserted in a test.
 
-> **CORRECTED — none of the above is in the shipped database.** The shape in this
-> section is the design ADR-0023 settled on.
-> `backend/database/migrations/0001_rls_foundation.sql` still creates a `sites`
-> table and keys scope on a `site_id` **token claim**, walking the hierarchy per
-> candidate row. `groups`, `user_groups`, `org_closure`, `actions`, `permissions`,
-> `roles`, `role_permissions` and `user_roles` **do not exist in the tree today**,
-> and neither does any `has_permission()`. Nothing above is a description of the
-> shipped SQL until that migration is rewritten (`rebase.md` W26) and the RLS suite
-> alongside it (W27). Stated here rather than only in the ADR, because this is the
-> section a reader would otherwise take as a description of what is in the
-> database.
+> **SHIPPED.** `backend/database/migrations/0001_rls_foundation.sql` implements
+> everything in this section and `backend/test/rls/rls.spec.ts` proves it, run by
+> `verify`. `groups`, `user_groups`, `org_closure`, `actions`, `permissions`,
+> `roles`, `role_permissions`, `user_roles` and `has_permission()` are all in the
+> tree; the superseded `sites` / `site_id`-claim design is gone. Two things to keep
+> in view: the **grant-subset trigger** is **not implemented**
+> (`rebase.md` W08b), so least privilege is half-enforced; and — most importantly —
+> **the identity source is a caller-writable GUC**. `request.jwt.claims` can be
+> `SET` by any role; the only control is that no request-reachable SQL path can reach
+> the `SET`, and `db-pre-request` is a planned one. ADR-0023 §F1.
 
 **The referential-integrity constraint, in one line:** *a group-scoped table may
 only carry foreign keys that stay within the group-scoped set; any FK leaving that
@@ -233,10 +236,11 @@ rather than by a decorator someone can forget.
 **`app_admin` is a superset, not a bypass** — all rows, all tables, all pages, all
 endpoints, by four distinct mechanisms with four tests. **Every user has at least
 one role and at least one group**, so there is no "nobody" case on either axis.
-Least privilege runs both ways: scope is bounded for free by the policy's
-`WITH CHECK`, and the grant-subset rule — *a caller cannot grant a capability it
-does not hold* — is bounded by a trigger on `role_permissions` and `user_roles`
-raising `42501`.
+Least privilege runs both ways in the design, but **only the scope half is
+enforced**: it is bounded free by the policy's `WITH CHECK`, while the grant-subset
+rule — *a caller cannot grant a capability it does not hold* — has **no trigger and
+no policy to fall back on**, so `app_admin` may currently confer any capability.
+`rebase.md` W08b; ADR-0023 §Least privilege.
 
 > **WITHDRAWN — the invariant that used to be stated here.** This section read:
 > *"no query or guard filters by site and by feature at the same time. The two keys

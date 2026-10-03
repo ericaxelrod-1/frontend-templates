@@ -221,7 +221,9 @@ CREATE POLICY tenant_isolation ON projects USING (
 - **VERIFIED: a table's owner bypasses its policies, silently.** Four roles are
   mandatory — a migration/owner role that never serves requests, plus
   `app_anon` / `app_member` / `app_admin` — and `FORCE ROW LEVEL SECURITY` goes on
-  every protected table. Otherwise every policy here is decorative.
+  every protected table **except `groups` and `user_groups`**, where adding it is a
+  silent data-loss bug rather than hardening. Otherwise every policy here is
+  decorative.
 - **`FORCE` does not bind a superuser or `BYPASSRLS` role** — `postgres` read 5/5
   from a `FORCE`d table. Every role that can reach a protected table must be
   `NOSUPERUSER NOBYPASSRLS`.
@@ -336,18 +338,42 @@ policies are **OR**ed, so they always **widen** access.
 > - **Denial tests could never have caught this.** Assert the **positive** case: an
 >   actor that *holds* a permission *passes*.
 
-**Least privilege runs in both directions**, and the two sides need different
-mechanisms:
+**Least privilege runs in both directions — and only one of them is enforced.**
 
 - **"An account manager cannot create a user outside their own RLS scope"** is
-  **free** — the `user_groups` insert is a scoped write, and the policy's
+  enforced — the `user_groups` insert is a scoped write, and the policy's
   `WITH CHECK` rejects a `group_id` outside the actor's closure, in the database.
 - **"They cannot grant a capability they themselves do not have"** needs a trigger,
   because a `role_permissions` write is **unscoped** and RLS has no group dimension
   to filter it by. A `BEFORE INSERT OR UPDATE` trigger on `role_permissions` **and**
-  `user_roles` checks that the actor's effective permission set is a **superset** of
-  what is being conferred and raises `42501` otherwise. Sketch (not implemented):
-  ADR-0023 §Least privilege.
+  `user_roles` is supposed to check that the actor's effective permission set is a
+  **superset** of what is being conferred and raise `42501` otherwise.
+  **It does not exist.** `app_admin` holds full `INSERT`/`UPDATE`/`DELETE` on both
+  tables with nothing filtering them, so today any account manager confers any
+  capability. The invariant is **not met**, and the sketch is vacuous in any case for
+  a caller who already holds the permission being conferred — `roles.admin` confers
+  everything its holder has. Sketch: ADR-0023 §Least privilege. Tracked: `rebase.md`
+  **W08b**.
+
+**`is_system_role` / `is_system_group` are the administrative floor, and they are
+enforced.** A row that *is* a floor row may not be `UPDATE`d or `DELETE`d except
+from a superuser session; `INSERT` is uncovered so the floor stays creatable. The
+trigger is **`SECURITY INVOKER`** and must stay that way — the function is a question
+about the caller, so a `DEFINER` body would answer about the owner and the floor
+would never fire. The superuser path is `current_setting('is_superuser')`, **not**
+`current_user`, because it survives `SET ROLE` and therefore keeps provisioning
+distinguishable from a request. `TRUNCATE` does not fire a row trigger; it is closed
+by the grants, and that is asserted per role rather than left to a comment.
+
+**The sharpest edge: scope is keyed on a setting the caller can write.**
+`request.jwt.claims` is a custom GUC, and any role may `SET` it. Verified — a member
+set it directly and read another tenant's rows. **No grant, policy or constraint can
+prevent this**; the only control is that no request-reachable SQL path can reach the
+`SET`, and that is an absence rather than a defence. **Any `pg` client, RPC, or
+`db-pre-request` hook that can set it is a P0** — and `db-pre-request` is exactly
+such a path already planned. `has_permission(who, …)` is the same class of hazard:
+`who` arrives in the RPC body verbatim, nothing supplies it from the verified token.
+Assert the absence of such a surface before adding one. ADR-0023 §F1.
 
 **An admin is a superset, not a bypass.** No flag turns enforcement off.
 `app_admin` holds more of everything across **four distinct mechanisms** — all
@@ -372,17 +398,56 @@ planner hoists it: **`loops = 1`** at 305 rows and at 3305 rows, against
 change. (`SETOF uuid` remains **rejected** in a policy expression.) Full record:
 ADR-0023 §The hierarchy.
 
-**The closure matview is granted to nobody.** A matview has no RLS and no policy,
-PostgREST auto-publishes it as a first-class resource, and under
-`openapi-mode = "ignore-privileges"` it appears in the served spec regardless of
-grants. **A single `GRANT SELECT` served the entire org tree to an anonymous
-caller.** Refresh it with `REFRESH MATERIALIZED VIEW CONCURRENTLY` from a
-**statement-level** trigger on `groups`; reads continue at **6.7 ms** during the
-refresh (13.5 ms baseline) against **7,606 ms** for a plain refresh. The refresh
+**The closure matview lives in `authz`, outside `db-schemas` — and cannot be granted
+to nobody.** A matview has no RLS and no policy, PostgREST auto-publishes anything in
+`db-schemas` as a first-class resource, and under `openapi-mode = "ignore-privileges"`
+it appears in the served spec regardless of grants. **A single `GRANT SELECT` on a
+`public` closure served the entire org tree to an anonymous caller.**
+
+But "granted to nobody" is **unimplementable here**: a policy expression's subquery
+runs with the **querying** role's privileges, so without a `SELECT` grant for every
+role whose requests evaluate the scope policy, **no scoped read evaluates at all** —
+measured as `permission denied for materialized view org_closure` on every insert,
+select and update. The answer is the **schema**: `authz.org_closure` is outside
+`db-schemas`, so PostgREST cannot address it and `ignore-privileges` cannot advertise
+it, **and** it carries `GRANT SELECT … TO app_anon, app_member, app_admin`. Assert
+both halves — the grant state, and its absence from the served spec.
+
+**`groups` and `user_groups` are ENABLEd but deliberately NOT FORCEd.** `FORCE` on
+`groups` makes the closure refresh — which runs as the view owner — read the tree
+through a policy `actor()` cannot satisfy, and the closure is rewritten **empty**.
+Every tenant's scope becomes zero rows, silently. Measured: **0 rows**, not the
+half-tree an earlier note claimed. Every request-serving role is still bound.
+
+Refresh with `REFRESH MATERIALIZED VIEW CONCURRENTLY` from a **statement-level**
+trigger on `groups`. **`CONCURRENTLY` is chosen for the lock it avoids**: a plain
+`REFRESH` holds an `AccessExclusiveLock` for the whole rebuild. (The previously
+published timings — 13.5 ms / 6.7 ms / 7,606 ms — do **not** reproduce; on the
+shipped 12-row closure the audit measured plain `REFRESH` at 36.5 ms and
+`CONCURRENTLY` at 27.5 ms. Quote the lock, not the milliseconds.) The refresh
 happens inside the writing transaction, so there is **no staleness window** — which
 is also why the blue/green swap once proposed here is withdrawn as unnecessary, and
-was impossible besides (`DROP MATERIALIZED VIEW` is rejected because seven policies
-depend on it).
+was impossible besides (`DROP MATERIALIZED VIEW` is rejected because policies depend
+on it).
+
+**`app_admin` reads the complete `user_groups` table.** The scope policy reads
+`user_groups` with the querying role's privileges, so no serving role can be denied
+`SELECT` on it; `app_member`'s policy restricts it to its own rows, but `app_admin`
+reads **every user in every group**. That is the price of the superset on this table.
+**No serving role may write it, `app_admin` included** — that omission is the control
+that fails open if forgotten.
+
+**Cycle safety has a fragile edge nobody documents.** The `BEFORE … FOR EACH ROW`
+acyclicity trigger sees rows written earlier in the same command, because the command
+counter advances between rows. That is the *only* thing stopping a single multi-row
+`INSERT` into `groups` from building a cyclic closure. Change it to a statement-level
+or constraint trigger and the bulk form is admitted.
+
+**Never cache resolved scope in a GUC the caller can set.** A per-session scope
+cache was built and rejected as a vulnerability, not a trade-off: a member read 50
+rows, called `set_config('app.scope', …)` on its own custom GUC, and read **500**.
+Custom GUCs have no privilege control and `SET LOCAL` gives no protection — and
+neither does `request.jwt.claims`, which is what the real design reads. See above.
 
 **Referential-integrity checks bypass RLS and fail OPEN.** FK, unique and primary key
 checks are not policy-governed: a plain FK is an **existence oracle** (`23503`
@@ -394,11 +459,6 @@ see. The rule: *a group-scoped table may only carry foreign keys that stay withi
 the group-scoped set, and any FK leaving that set must terminate at a table members
 cannot write to.* Table categories and the matching primary keys are in ADR-0023
 §Referential-integrity checks bypass RLS.
-
-**Never cache resolved scope in a GUC the caller can set.** A per-session scope
-cache was built and rejected as a vulnerability, not a trade-off: a member read 50
-rows, called `set_config('app.scope', …)` on its own custom GUC, and read **500**.
-Custom GUCs have no privilege control and `SET LOCAL` gives no protection.
 
 The scope expansion is **self-inclusive**: a member scoped to a group sees its own row
 plus its descendants, and a member scoped to an unrelated group sees **its own single
