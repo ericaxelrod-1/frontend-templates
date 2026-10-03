@@ -185,6 +185,15 @@ CREATE POLICY tenant_isolation ON projects USING (
 );
 ```
 
+> **SUPERSEDED.** The policy above is what the migration still ships; it keys scope
+> on a `site_id` **token claim** and walks the hierarchy **per row**. The proven
+> design reads **membership from a table** joined to a refreshed **closure
+> matview**, so the subquery is hoisted (`loops = 1`) and a membership change takes
+> effect on the **next request with the same token**. See ADR-0023 §Row scope. The
+> totality lessons below — guarded accessor, no unguarded `uuid` cast, `OR` does not
+> short-circuit past a raising operand — all still stand, and they are why the
+> shipped shape never leaked.
+
 - Tables intended to be globally readable are listed explicitly. Default is deny.
 - **Key the admin branch on `current_user`, never on the `role` claim.** Verified
   over HTTP: a policy keyed on `request_claims()->>'role' = 'admin'` is **dead
@@ -192,7 +201,8 @@ CREATE POLICY tenant_isolation ON projects USING (
   so a valid admin token got `200 []` and saw nothing. `current_user` is set by
   Postgres from the `SET ROLE` the escalation boundary already constrained, so a
   member who forges `"role":"admin"` into their own validly-signed token gets zero
-  rows.
+  rows. **In a policy, `current_user` is right; inside a `SECURITY DEFINER`
+  function it is wrong** — it rebinds to the owner. See §Scope and capability.
 - **A policy is evaluated for EVERY role that reaches the table, `app_anon`
   included.** So `EXECUTE` on the policy's helpers must be granted to `app_anon`
   too — verified, omitting it made an unauthenticated read fail with
@@ -278,38 +288,84 @@ access.
 
 | Axis | Question | Mechanism | Keyed on |
 |---|---|---|---|
-| Scope | Which rows? | RLS policy | `site_id` claim |
+| Scope | Which rows? | RLS policy | a **membership table**, not a claim |
 | Operation | Which verbs? | table `GRANT` | DB `role` claim |
 | Capability / feature | Which features? | per-operation RLS policy | capability **table** |
 
+> **CORRECTED — `has_capability()` was dead, and it took the capability axis with
+> it.** The documented body read `rc.db_role = current_user` inside a **`SECURITY
+> DEFINER`** function. `SECURITY DEFINER` rebinds `current_user` to the **function
+> owner**, so the predicate compared the capability table against the owner's role
+> name and never against the serving role: **measured, it returned `false` for
+> `app_admin` *while holding* the capability row.** The whole capability axis was
+> silently absent — and absent in the shape that **denies**, so it produced an
+> ordinary zero-row result rather than an error.
+>
+> - The correct source is **`current_setting('role', true)`**, the GUC that tracks
+>   PostgREST's impersonation. Inside a `SECURITY DEFINER` function: `current_user`
+>   = `app`, `current_role` = `app`, `session_user` = `pgrst_authenticator`,
+>   `role` = `app_admin` — three plausible answers and only one correct.
+> - **`SECURITY INVOKER` is not the fix.** It would require `SELECT` on
+>   `role_capability` for every serving role, publishing the **entire capability
+>   matrix** — the thing capability exists to keep private.
+> - **Denial tests could never have caught this.** Assert the **positive** case: a
+>   role that *holds* a capability *passes*.
+
 **An IC and a site manager are the same DB role — `app_member`.** They reach the same
-features and are scoped to their own site by the *identical* policy. Their only
+features and are scoped to their own group by the *identical* policy. Their only
 difference is capability, enforced in the database by a row in a capability table.
-An admin is recognised by `current_user = 'app_admin'`, **not** by an absent
-`site_id` and not by a claim — so the admin branch matches every row for a reason
-that cannot be forged.
+An admin is recognised by `current_user = 'app_admin'` **in a policy**, **not** by
+an absent claim and not by an absent `group_id` — so the admin branch matches every
+row for a reason that cannot be forged.
 
 Never create DB roles named after capabilities (`ic`, `site_manager`). Modelling a
 capability as a role needs **one role per distinct capability set** — five
 capabilities means **31** additional roles — and role inheritance cannot help
 because it only adds and never subtracts.
 
-For a hierarchy, scope derives from position in a tree via one recursive function —
-`RETURNS uuid[]` with `array_agg` (`SETOF uuid` is **rejected** in a policy
-expression), indexed on `sites(parent_id)`. The walk **is** evaluated per row —
-confirmed at 400,001 calls over 400,000 rows — so do not denormalise the scope to
-"fix" it; the cost is per-row repetition, not per-call cost, and a single call
-costs ~3 ms. Adding a level is a data change.
+For a hierarchy, scope is a **closure materialized view refreshed from `groups`**,
+not a walk. A `STABLE` function in a policy qual is evaluated **once per candidate
+row** — measured 400,001 calls over 400,000 rows — because `STABLE` means *"same
+answer within this statement"*, not *"called once"*. The replacement joins
+membership to the closure, and because that subquery is **uncorrelated** the
+planner hoists it: **`loops = 1`** at 305 rows and at 3305 rows, against
+`loops = 305` for a deliberately correlated variant. Adding a level is a data
+change. (`SETOF uuid` remains **rejected** in a policy expression.) Full record:
+ADR-0023 §The hierarchy.
+
+**The closure matview is granted to nobody.** A matview has no RLS and no policy,
+PostgREST auto-publishes it as a first-class resource, and under
+`openapi-mode = "ignore-privileges"` it appears in the served spec regardless of
+grants. **A single `GRANT SELECT` served the entire org tree to an anonymous
+caller.** Refresh it with `REFRESH MATERIALIZED VIEW CONCURRENTLY` from a
+**statement-level** trigger on `groups`; reads continue at **6.7 ms** during the
+refresh (13.5 ms baseline) against **7,606 ms** for a plain refresh. The refresh
+happens inside the writing transaction, so there is **no staleness window** — which
+is also why the blue/green swap once proposed here is withdrawn as unnecessary, and
+was impossible besides (`DROP MATERIALIZED VIEW` is rejected because seven policies
+depend on it).
+
+**Referential-integrity checks bypass RLS and fail OPEN.** FK, unique and primary key
+checks are not policy-governed: a plain FK is an **existence oracle** (`23503`
+versus success reveals any group id, including out-of-scope ones); an FK to an
+unreadable table is a **content oracle**; `UNIQUE` + `ON CONFLICT DO NOTHING` gives
+the same oracle with **no error at all**; and `ON DELETE CASCADE` **crosses RLS** —
+a member deleted a group they held and destroyed a row in a group they could never
+see. The rule: *a group-scoped table may only carry foreign keys that stay within
+the group-scoped set, and any FK leaving that set must terminate at a table members
+cannot write to.* Table categories and the matching primary keys are in ADR-0023
+§Referential-integrity checks bypass RLS.
 
 **Never cache resolved scope in a GUC the caller can set.** A per-session scope
 cache was built and rejected as a vulnerability, not a trade-off: a member read 50
 rows, called `set_config('app.scope', …)` on its own custom GUC, and read **500**.
 Custom GUCs have no privilege control and `SET LOCAL` gives no protection.
 
-The walk is **self-inclusive**: a member scoped to a site sees its own row plus its
-descendants, and a member scoped to an unrelated site sees **its own single row and
+The walk is **self-inclusive**: a member scoped to a group sees its own row plus its
+descendants, and a member scoped to an unrelated group sees **its own single row and
 none of the subtree**. Verified counts over the five-row proof fixture:
-root→3, mid→2, unrelated→**1**, unknown→0, admin→all 5.
+root→3, mid→2, unrelated→**1**, unknown→0, admin→all 5. Multiple groups **union** —
+`IN`/`ANY`, never `AND`.
 
 ### Never create a view
 

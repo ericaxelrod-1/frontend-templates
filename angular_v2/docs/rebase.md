@@ -682,10 +682,13 @@ named `pgrst_smoke`. None of it is template material.
 Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicated
 `hypothesis_test` database. Three of my documented claims were **wrong**.
 
-> **A fourth batch followed — §6.6.2.** These ten are about RLS mechanics. A later
-> round found that a *rule* in ADR-0023 and `AGENTS.md` B2 caused a real privilege
-> escalation, and that two performance claims written down here were false. The
-> section below is correct as far as it goes and incomplete about authorization.
+> **A fourth batch followed — §6.6.2. A fifth — §6.6.4.** These ten are about RLS
+> mechanics. §6.6.2 found that a *rule* in ADR-0023 and `AGENTS.md` B2 caused a
+> real privilege escalation and that two performance claims written down here were
+> false. §6.6.4 then **replaced the row-scope design outright** and reversed four
+> decisions recorded in this section, including the rejection of the closure table.
+> The section below is correct as far as it goes and is now **superseded on scope,
+> hierarchy and capability**.
 
 | # | Verdict |
 |---|---|
@@ -906,17 +909,26 @@ Enforced in the database by per-operation RLS policies, capability in a **table*
 
 #### Hierarchy: kept, and three alternatives built and rejected
 
-- **KEPT: the recursive `STABLE` function.**
+> **REVERSED — see §6.6.4.** The "closure table — rejected" verdict below was a
+> rejection of *incremental repair*, and it has been allowed to stand as a rejection
+> of closure. Closure refreshed wholesale is now the design, and the recursive
+> function it replaces is **superseded**, not kept.
+
+- **SUPERSEDED: the recursive `STABLE` function.** Still in
+  `0001_rls_foundation.sql` and still what the RLS suite exercises, but keyed on a
+  token claim and called once per candidate row.
 - **Per-session scope cache — REJECTED AS A VULNERABILITY, not a trade-off.** A
   member honestly scoped to one unit read **50** rows, then called
   `set_config('app.scope', '{150,…,159}', true)` on **its own** custom GUC and read
   **500**. Custom GUCs have no privilege control; `SET LOCAL` gives no protection
   because the caller is the one setting it. Strictly worse than the alternative
   and no faster.
-- **Closure table — rejected.** Its incremental repair **silently disagreed with
-  the tree**: 5 ancestor/descendant pairs missing one way and 5 the other, across
-  **9 roots, with zero errors raised**. Root 1 had the *same count* both sides
-  (241) and different membership, so count-based checks pass.
+- **Closure table with incremental repair — rejected, then reversed.** Its
+  incremental repair **silently disagreed with the tree**: 5 ancestor/descendant
+  pairs missing one way and 5 the other, across **9 roots, with zero errors
+  raised**. Root 1 had the *same count* both sides (241) and different membership,
+  so count-based checks pass. What survives the reversal: **compare membership, not
+  counts**, when validating any denormalised scope.
 - **`ltree` — rejected.** Its `UNIQUE` constraint on `path` makes the obvious
   repair fail outright: `duplicate key value violates unique constraint
   "org_ltree_path_key"`. Verified.
@@ -933,12 +945,12 @@ declaration changed:
 
 | Previously documented | Verdict | Measured |
 |---|---|---|
-| "400,000 rows cost 400,001 calls" | **TRUE — kept** | 400,001 calls, via `pg_stat_user_functions` |
+| "400,000 rows cost 400,001 calls" | **TRUE — kept**, and the reason the design changed | 400,001 calls, via `pg_stat_user_functions` |
 | "`PARALLEL SAFE` cost ~170×" | **FALSE — withdrawn** | `PARALLEL SAFE` **5.8 s** vs `PARALLEL UNSAFE` **12.5 s** — **faster** |
 | "`PARALLEL SAFE` forces single-threaded evaluation" | **FALSE — withdrawn** | it permits `Gather` + `Parallel Seq Scan`, 4 workers launched |
 | per-row evaluation is caused by `VOLATILE` | **FALSE — withdrawn** | `STABLE` **12.5 s** vs `VOLATILE` **21.9 s**; neither is hoisted |
 | a `STABLE` function is "hoisted into a one-time InitPlan — 2 invocations for 20,040 rows" | **FALSE — withdrawn** | same function on 20,410 rows: **20,411 calls** |
-| "denormalise the scope instead of recursing per row" | **WITHDRAWN as advice** | invites optimising a ~3 ms call; the cost is repetition, not per-call cost |
+| "denormalise the scope instead of recursing per row" | **WITHDRAWN as advice, then superseded by the design** | the scope *is* now denormalised, into `org_closure`. What was wrong was the *reason* — optimising a ~3 ms call. The reason that justified it is once-per-statement evaluation (`loops = 1`). See §6.6.4 |
 
 `STABLE` means *"the same answer within this statement"* — **not** "called once".
 In a qual that also references a column it is evaluated per candidate row.
@@ -953,15 +965,123 @@ In a qual that also references a column it is evaluated per candidate row.
 ### 6.6.3 Open: revocation while a session is live
 
 **Nobody has tested what happens when a permission or a membership is revoked while
-a session is live.** It is the seam between the capability mechanism and the
-hierarchy mechanism, and the two have different revocation latency *by
-construction*: capability resolves per statement from a table read at that moment,
-while hierarchy scope resolves from a **signed JWT claim** verified once at the
-start of the transaction. A claim can carry a scope that no longer exists.
+a session is live.**
+
+> **PARTIALLY RESOLVED by §6.6.4 — and the premise has changed.** This item was
+> written against a design where hierarchy scope rides in a **signed JWT claim**
+> while capability resolves from a table, and that asymmetry — *different revocation
+> latency by construction* — was the whole concern. It is gone: scope is now a
+> **membership table read per statement**, exactly like capability. A membership
+> change takes effect on the **next request with the same token**.
+>
+> **What remains open** is therefore smaller and should be re-stated before it is
+> written as a test: the capability side, the token-lifetime question, and the
+> refresh-rotation cases. The seam described above no longer exists, so a test
+> written from the old text would be testing a design that is superseded.
 
 Recorded as an explicit unknown, with the required cases listed as a specification
 in `docs/testing.md` under *Required, and not yet written*. Until they are written
 and executed, treat live-session revocation as **not implemented**.
+
+### 6.6.4 Executed design testing — the closure-join row scope, and four reversals
+
+A further round, executed against PostgreSQL 15.19. Four of its findings **reverse
+decisions recorded earlier in this document**, which is why it is called out here
+rather than folded into §6.6.2. Full narrative and SQL: ADR-0023.
+
+**1. Row scope is a membership table, not a token claim.** `user_groups` joined to a
+closure matview, with identity from the token's `sub`. Consequence that matters
+operationally: **membership changes take effect on the next request with the same
+token.** Scope behaviour, all measured: a member of `EU` sees `EU`, `UK`, `FR` and
+**not** `HQ`, **not** `US`; a member of `HQ` sees everything beneath; a member of two
+disjoint groups sees the **union** — `IN`/`ANY`, never `AND`. This retires §6.6.3's
+premise.
+
+**2. The scoping subquery is hoisted; it is a `hashed SubPlan`.** `loops = 1` at 305
+rows and `loops = 1` at 3305 rows; a deliberately correlated variant gives
+`loops = 305`. It appears as a **`hashed SubPlan`, not an `InitPlan`** — `x IN
+(SELECT …)` yields the hashed form, `InitPlan` being for uncorrelated *scalar*
+subqueries. **Uncorrelatedness is what buys once-per-statement**; the node name does
+not, and the once-per-statement conclusion is unaffected by the naming correction.
+> **For anyone benchmarking:** an `EXISTS`-shaped "correlated" variant is
+> **simplified back into a hashed SubPlan**. Only `loops` in the plan reveals the
+> truth, never the policy text.
+
+**3. `has_capability()` was dead — the capability axis was silently absent.** The
+documented body read `rc.db_role = current_user` inside a **`SECURITY DEFINER`**
+function; `SECURITY DEFINER` rebinds `current_user` to the **function owner**, so
+the predicate never matched a serving role. **Measured: `false` for `app_admin`
+*while holding* the capability row.** The correct source is
+`current_setting('role', true)`. Inside a `SECURITY DEFINER` function
+`current_user` = `app`, `current_role` = `app`, `session_user` =
+`pgrst_authenticator`, `role` = `app_admin` — only the last tracks impersonation.
+`SECURITY INVOKER` is **not** the alternative: it needs `SELECT` on
+`role_capability` for every serving role, publishing the whole capability matrix.
+
+**4. Referential-integrity checks bypass RLS and fail OPEN.** Not previously on the
+list. Measured: a plain FK is an **existence oracle** (success vs `23503` reveals
+any group id, including out-of-scope ones); an FK to a table the caller cannot read
+escalates to a **content oracle** (a token value in an unreadable table was
+confirmed); `UNIQUE` + `ON CONFLICT DO NOTHING` gives the same oracle with **no
+error at all**, which is the most dangerous form; and `ON DELETE CASCADE` crosses
+RLS — a member deleted a group they held and destroyed a row in a group they could
+never see. Hence a design constraint, not a lint rule: *a group-scoped table may only
+carry foreign keys that stay within the group-scoped set, and any FK leaving that
+set must terminate at a table members cannot write to.* Scoping categories —
+group-scoped (`projects`, `customers`, `PRIMARY KEY (group_id, id)`, `group_id` on
+every FK), the hierarchy (`groups`, simple PK, admin-only self-FK), and unscoped
+(`users`, `roles`, `role_permissions`, `user_groups`, simple PKs) — are in ADR-0023.
+
+**5. Cycle safety is a property of `UNION` with no accumulator, and nothing else.**
+Same graph, same session: `UNION ALL` + `depth` on a cyclic tree is
+**non-terminating** and exceeds `temp_file_limit` in **91 ms**; `UNION` with no
+accumulator returns **384 rows in 12.7 ms**. On an *acyclic* tree both return **361
+rows** — indistinguishable, which is how this gets got wrong. Defence in depth: a
+write-time trigger rejects the cycle; `UNION` bounds it if the trigger is bypassed;
+and **`temp_file_limit` must be set on the refreshing session**, or a
+non-terminating closure exhausts the filesystem. `parent_id REFERENCES groups(id)`
+does **not** enforce acyclicity, and a tolerated cycle makes each member inherit the
+whole cycle's scope.
+
+**6. The closure matview has no RLS and PostgREST publishes it automatically.** A
+matview has no policy, it is auto-exposed as a first-class resource, and under
+`openapi-mode = "ignore-privileges"` it appears in the served spec **regardless of
+grants**. **A single `GRANT SELECT` served the entire org tree to an anonymous
+caller.** Grant it to nobody. Refresh with
+`REFRESH MATERIALIZED VIEW CONCURRENTLY` (needs `UNIQUE (ancestor, descendant)`)
+from a **statement-level** trigger on `groups`: reads continue at **6.7 ms** against
+a 13.5 ms baseline, versus **7,606 ms** for a plain refresh and **8,466 ms** with a
+trigger-held lock. The refresh runs inside the writing transaction, so there is **no
+staleness window**.
+
+> **REVERSAL — the blue/green matview swap is withdrawn, and it was also
+> impossible.** There is no window to close, and `DROP MATERIALIZED VIEW
+> org_closure` is **rejected** because **seven RLS policies depend on it**. Both
+> halves of the earlier proposal fail; only the first was visible without executing.
+
+**7. Four small claims were wrong, in ways that get copied verbatim into SQL.**
+`CREATE MATERIALIZED VIEW … AS WITH RECURSIVE …` is a **syntax error** on PG 15 when
+the CTE is the whole query — the design parses only because of the trailing `SELECT
+ancestor, descendant FROM t`. `actor()` as originally written does not compile:
+`->> 'sub'` returns `text` against `RETURNS uuid`, and `->>'sub'::uuid` is *also*
+wrong because `::` binds tighter than `->>` — the correct form is
+`(… ->> 'sub')::uuid`. `USING` alone **does** govern `INSERT` when no `WITH CHECK`
+is written (`polqual` is reused), now confirmed by **denial** rather than by reading
+`pg_policy`. And a non-uuid or empty `sub` yields **`HTTP 500`, not `403`** —
+fail-closed, but the wrong signal.
+
+**8. Two inverted research citations.** `InitPlan` was used for "an uncorrelated
+subquery"; it is the node for an uncorrelated **scalar** subquery, and `x IN (SELECT
+…)` gives a **`hashed SubPlan`**. The once-per-statement conclusion is unaffected.
+And the claim that the **two-argument** `current_setting` is the safe form is
+**inverted for this case**: measured, two-argument **raises** (`HTTP 500`) and the
+**three-argument** form with `nullif` gives a **clean denial**. Keep the
+three-argument form.
+
+> **Migration status.** `backend/database/migrations/0001_rls_foundation.sql` has
+> **not** been rewritten. It still carries the recursive `site_tree_ids()` walk keyed
+> on a `site_id` claim. Everything in items 1–8 is the design a migration rewrite
+> must implement; none of it may be read as a claim about the shipped SQL.
 
 ---
 

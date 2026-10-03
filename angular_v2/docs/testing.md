@@ -77,6 +77,19 @@ one that was found **after** the docs claimed it was handled:
    `DELETE` are refused by grants, not by application code.
 4. **Vocabulary** — capability lives in a table, not in roles; no DB role is named
    after a capability; no policy or grant mentions `ic` or `site_manager`.
+   - **Capability is not merely denied — it is granted.** Assert that a role
+     **holding** `user.delete` **succeeds** at deleting a row in its own scope. This
+     positive case is the one that catches the defect that actually occurred: a
+     `SECURITY DEFINER` body reading `current_user` compares against the *function
+     owner*, so `has_capability()` returned `false` for `app_admin` **while holding
+     the capability row**. Every denial test on this page passed against it. A
+     capability axis that denies everyone is indistinguishable from a working one.
+   - **Identity inside the check comes from the `role` GUC.** Inside a
+     `SECURITY DEFINER` function, `current_user`/`current_role` = `app` and
+     `session_user` = `pgrst_authenticator`; only `current_setting('role', true)`
+     tracks PostgREST's impersonation. `SECURITY INVOKER` is not the fix — it would
+     require `SELECT` on `role_capability` for every serving role, publishing the
+     whole capability matrix.
 5. **Composition, not separation** — scope and capability appear **together**, in
    one policy per operation. The previous version of this line said "no policy or
    guard filters by scope *and* capability together". **That rule caused a silent
@@ -94,41 +107,61 @@ one that was found **after** the docs claimed it was handled:
 7. **Not superuser** — every serving role is `NOSUPERUSER NOBYPASSRLS`, asserted
    against the catalogue. `FORCE ROW LEVEL SECURITY` does not bind either.
 8. **No public function execution** — every function's `proacl` excludes `PUBLIC`.
-9. **Hierarchy** — the walk returns the right set for a known root (root→3, mid→2,
-   unrelated→**1**, unknown→0), and **the caller cannot widen its own scope**:
-   `set_config('app.scope', …)` on a caller-writable GUC must not change what the
-   policy returns. The per-session scope cache was rejected as a vulnerability
-   precisely because it fails this test.
+9. **Hierarchy** — a member of a group sees that group and its descendants and
+   **nothing above it**: member of `EU` sees `EU`, `UK`, `FR` and **not** `HQ` and
+   **not** `US`; a member of `HQ` sees everything beneath. A member of two disjoint
+   groups sees the **union** — `IN`/`ANY`, never `AND`. **The caller cannot widen
+   its own scope**: `set_config('app.scope', …)` on a caller-writable GUC must not
+   change what the policy returns. The per-session scope cache was rejected as a
+   vulnerability precisely because it fails this test.
+10. **Membership revocation** — remove a `user_groups` row and re-issue the **same**
+    token. The next request must not see the old scope. Scope is a table read, so
+    this is the whole of live-session scope revocation; there is no claim to wait
+    out. (The claim-keyed design could not pass this.)
+11. **The scoping subquery is evaluated once** — `EXPLAIN (ANALYZE)` reports
+    **`loops = 1`** for the scoping SubPlan, at both a small and a large row count.
+    Do **not** assert this from the policy text: an `EXISTS`-shaped correlated
+    variant is simplified back into a hashed SubPlan. Only `loops` is evidence.
+12. **The closure matview is granted to nobody** — assert against `pg_acl` that no
+    role, `PUBLIC` included, holds `SELECT` on `org_closure`. A matview has no RLS,
+    PostgREST publishes it automatically, and `openapi-mode = "ignore-privileges"`
+    lists it in the spec regardless — so neither the spec nor a denial test can see
+    a grant that should not be there. **One `GRANT SELECT` served the entire org
+    tree to an anonymous caller.**
+13. **Referential integrity does not leak** — for each FK on a group-scoped table,
+    assert that a caller in group A cannot distinguish "group B exists" from
+    "group B does not exist" by writing a row. `23503` is an existence oracle; a
+    `UNIQUE` + `ON CONFLICT DO NOTHING` path is the same oracle **with no error at
+    all**; `ON DELETE CASCADE` is a write across RLS. Also assert no group-scoped
+    FK leaves the group-scoped set.
 
 ### Required, and not yet written: revocation while a session is live
 
 **This is an explicit unknown, recorded here because nobody has tested it.**
 
-- **What is unknown:** what happens when a **permission or a membership is revoked
-  while a session is live**. Nothing in the executed design testing covers it.
-- **Why it matters precisely:** it is the seam between the two mechanisms this
-  template rests on, and the two have **different revocation latency by
-  construction**. The capability mechanism resolves per *statement*, from
-  `current_user` and a table read at that moment, so a revoked capability row
-  should bite on the very next request. The hierarchy mechanism resolves scope
-  from a **signed JWT claim** (`request.jwt.claims.site_id`), which PostgREST
-  verifies once at the start of the transaction. A claim carries a scope that may
-  no longer exist in the database, and nothing reconciles the two. Which one wins
-  has not been measured.
-- **The cases that must be covered:**
+> **The premise has changed — re-read this before writing the tests.** When this was
+> written, hierarchy scope rode in a **signed JWT claim** verified once per
+> transaction while capability resolved per statement from a table. The two
+> therefore had *different revocation latency by construction*, and that seam was
+> the worry. **The seam no longer exists:** scope is a **membership table read**,
+> exactly like capability, so a membership change takes effect on the **next
+> request with the same token**. Item 10 above is that test. A test written from the
+> old text would be testing a superseded design.
+
+- **What remains unknown:**
   1. A **capability** revoked mid-session → the next request is denied. Expected
-     to work, because `has_capability()` reads the table live. **Unverified.**
-  2. A **site membership** revoked mid-session → the next request must not see the
-     old scope. Expected **not** to hold if the scope rides in the token, because
-     the token was already signed. **Unverified, and this is the one that
-     matters.**
-  3. Access token still valid, **refresh token** revoked → refresh refused, session
+     to work, because `has_capability()` reads the table live. **Unverified** — and
+     note that "expected to work" was wrong once already: the same function
+     returned `false` for *everyone*.
+  2. Access token still valid, **refresh token** revoked → refresh refused, session
      cannot be extended.
-  4. A user **removed from a unit** whose descendants they were reaching → no rows
-     from that subtree on the next request.
-  5. The claim references a **deleted** site → a denial, never an error.
+  3. A user **removed from a group** whose descendants they were reaching → no rows
+     from that subtree on the next request. Same mechanism as item 10; **unverified**.
+  4. The claim references a **deleted** user → a denial, never an error.
 - **Assertion discipline as everywhere else:** bodies and row counts, never the
-  status code alone, and prove each test can go red.
+  status code alone, and prove each test can go red. Note case 4: a non-uuid or
+  empty `sub` currently yields **`HTTP 500`**, not `403` — fail-closed, but assert
+  the current behaviour explicitly so a change to either is visible.
 - Until these exist and are executed, treat live-session revocation as **not
   implemented**, and do not present the access token's TTL as if it bounds the
   exposure.

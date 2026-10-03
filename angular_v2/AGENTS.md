@@ -229,28 +229,28 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
 ## B2. Authorization — three axes, three mechanisms, composing per operation
 
 **Scope and capability are orthogonal.** A role-based check can be satisfied by a
-valid role no matter which site the caller is standing in, so it can never express
-"your site's rows." Forcing one mechanism to carry both is why the previous
+valid role no matter which group the caller is standing in, so it can never express
+"your group's rows." Forcing one mechanism to carry both is why the previous
 permissions module could not do row-level security at all (ADR-0023).
 
 **Orthogonal inputs, one composed expression.** The axes are separate *sources of
 truth*; they are not separate *expressions*. Every policy that needs both carries
-both, in one statement, per operation. See the correction below — the previous
-version of this section forbade that, and the ban shipped a privilege escalation.
-
-> **CORRECTED after executed design testing.** This heading used to read "never
-> mixed", and the invariant under it said scope and capability must "never appear
-> in the same expression". **That was wrong and it caused a real, silent security
-> bug** — a `FOR ALL` scope policy OR-ed a capability gate away entirely, so a
-> user with zero capabilities could `DELETE` and `INSERT` with no error. The rule,
-> the failure it produced, and the corrected rule are recorded in full under
-> §Scope below. Read that before writing any policy.
+both, in one statement, per operation. Two corrections below, both from executed
+testing: the older rule — "never in the same expression" — shipped a privilege
+escalation, and the axis table's Scope and Feature cells were both wrong. Full
+evidence and measurements in **ADR-0023**.
 
 | Axis | Question | Mechanism | Keyed on |
 |---|---|---|---|
-| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `site_id` claim |
+| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | a **membership table**, not a claim |
 | **Operation** | Which *verbs*? | table + column `GRANT` | DB `role` claim |
-| **Feature / capability** | Which *features*? | per-operation RLS policies | capability table |
+| **Feature / capability** | Which *features*? | per-operation RLS policies | `role_capability` table |
+
+> **CORRECTED.** The Scope and Feature rows were both wrong. Scope was documented as
+> keyed on a `site_id` **JWT claim**; it is keyed on **membership in a table**, so a
+> revoked membership bites on the next request rather than at token expiry. Feature
+> was documented as thin-app guards on a capability role; capability is a row in
+> `role_capability`, checked in the database. Full evidence in ADR-0023.
 
 **The two role vocabularies are different things.**
 
@@ -281,76 +281,44 @@ version of this section forbade that, and the ban shipped a privilege escalation
   mechanism.
 - **CORRECTED — the separation rule was WRONG and it shipped a security bug.**
   This section used to say, as a greppable invariant: *"you must be unable to
-  write one query or guard that filters by site **and** by feature."* That rule
-  **caused a silent privilege escalation**, and it is withdrawn. Enforcement was
-  correct and the shape the rule forced was wrong.
-
-  **The failure it produced.** Splitting the two axes across two policies is the
-  natural reading of "never in the same expression". So scope was written as one
-  `FOR ALL` policy and each capability gate as its own per-operation policy:
+  write one query or guard that filters by site **and** by feature."* **That rule
+  caused a silent privilege escalation** and is withdrawn. Enforcement was correct;
+  the shape the rule forced was wrong. Full narrative, both SQL shapes and the
+  measurement: ADR-0023 §the withdrawal at the top.
 
   ```sql
-  -- the WRONG shape, and it is wrong in a way no test of each half would catch
+  -- WRONG: two PERMISSIVE policies on one operation are OR-ed, so scope_only
+  -- admits every in-scope DELETE on its own and cap_delete can only widen.
   CREATE POLICY scope_only ON t FOR ALL          USING (<scope>);
   CREATE POLICY cap_delete ON t FOR DELETE USING (<capability>);
-  ```
 
-  **Multiple PERMISSIVE policies on one operation are OR-ed.** `scope_only`
-  covers `DELETE`, so it admits every in-scope `DELETE` on its own, and
-  `cap_delete` can only ever widen. Verified end to end: a member holding **zero**
-  capabilities ran `DELETE` — **1 row deleted** — and `INSERT` — **1 row
-  inserted** — with **no error and no warning**. The capability gate was not
-  weak; it was absent, and every component of it was individually correct.
-
-  - The same holds for `FOR INSERT`: a `FOR ALL` policy's `USING` expression
-    falls back to govern `WITH CHECK`, so it admits inserts outright.
-  - Two policies on one operation therefore **widen** access. Never split one
-    operation's requirements across two permissive policies.
-
-  **The corrected rule. Scope and capability COMPOSE, in ONE policy per
-  operation.** They remain separate *inputs* — never derived from one another,
-  never inferred from each other, and never a source for the other — but they are
-  combined deliberately in the same expression:
-
-  ```sql
-  -- scope AND capability, one policy per operation
+  -- RIGHT: one composed policy per operation.
   CREATE POLICY user_delete ON users FOR DELETE USING (
-      has_capability('user.delete')
-      AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
+      has_capability('user.delete') AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
   );
-  CREATE POLICY user_insert ON users FOR INSERT
-      WITH CHECK (
-      has_capability('user.create')
-      AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
-  );
-  ```
 
-  **The only correct way to get two policies on one operation is
-  `AS RESTRICTIVE`, which ANDs with the permissive set.** A permissive scope
-  policy plus a restrictive capability policy is equivalent to the single composed
-  policy above, and is the right structure when the scope half is shared by many
-  tables:
-
-  ```sql
-  CREATE POLICY scope_only ON t FOR ALL USING (<scope>);           -- permissive
+  -- Also right: permissive scope + RESTRICTIVE capability (ANDs with the
+  -- permissive set). Use this when the scope half is shared by many tables.
   CREATE POLICY cap_delete ON t AS RESTRICTIVE FOR DELETE
-      USING (has_capability('user.delete'));                       -- ANDs
+      USING (has_capability('user.delete'));
   ```
 
-  Verified both shapes. Two permissive `SELECT` policies (`unit_id = 2` and
-  `unit_id = 9`) returned **2** rows to a member scoped to unit 2; adding a
-  `RESTRICTIVE` policy on `unit_id = 2` dropped it to **1**.
+  Verified: a member holding **zero** capabilities ran the two-permissive shape and
+  `DELETE`d **1 row** and `INSERT`ed **1 row**, **no error and no warning**. The
+  gate was not weak — it was absent, and every half passed its own test. A `FOR ALL`
+  policy's `USING` also governs `WITH CHECK`, which is why `INSERT` fails the same
+  way.
 
   - **What survives of the old rule, and is still greppable:** no capability is
-    *derived from* scope and none from the DB role. `has_capability()` reads
-    `current_user` and a capability table; `unit_tree_ids()` reads the site
-    claim. Neither is computed from the other, and a policy never infers "you
-    are an IC" from "you are scoped to a site".
+    *derived from* scope and none from the DB role. `has_capability()` reads the
+    `role` GUC and a capability table; `actor()` reads identity from the token.
+    Neither is computed from the other, and a policy never infers "you are an IC"
+    from "you are scoped to a group".
   - **What is gone:** the claim that the two can never meet in one expression.
     They must meet. Keeping them apart is what removed the gate.
   - Name tests after the attack: *"a member with no `user.delete` capability
-    cannot delete a row in its own site"* — that is the case both wrong shapes
-    fail, and neither per-half test ever ran.
+    cannot delete a row in its own group"* — the case both wrong shapes fail and
+    neither per-half test ever ran.
 
 ### Scope — Postgres RLS only
 
@@ -390,7 +358,9 @@ code.**
   a bare `current_setting(...,true)::json`; it **raises** on an empty string
   rather than denying. Use a defensive accessor, and **never cast a caller-supplied
   value to `uuid` inside a policy** — a malformed claim raises
-  `invalid input syntax for type uuid` and takes the whole query down with it:
+  `invalid input syntax for type uuid` and takes the whole query down with it.
+  `USING` alone **does** govern `INSERT` when no `WITH CHECK` is written (`polqual`
+  is reused) — confirmed by denial, not only by reading `pg_policy`:
 
 ```sql
 CREATE FUNCTION request_claims() RETURNS jsonb
@@ -416,6 +386,13 @@ CREATE POLICY row_scope ON projects USING (
 );
 ```
 
+> **SUPERSEDED — the shape above is what `0001_rls_foundation.sql` still ships, and
+> it is not the design.** It keys scope on a `site_id` **token claim** and walks the
+> hierarchy **per row**. Both are replaced: scope is read from a **membership
+> table** joined to a refreshed **closure matview**, whose subquery is hoisted
+> (`loops = 1`). A token claim cannot express membership that changes mid-session.
+> Proven design, evidence and the migration-status note: **ADR-0023 §Row scope**.
+
 - **Key the admin branch on `current_user`, never on the `role` claim.** The
   claim is caller-supplied and signed by whoever holds the secret; `current_user`
   is set by Postgres from the `SET ROLE` the escalation boundary already
@@ -423,6 +400,8 @@ CREATE POLICY row_scope ON projects USING (
   this policy exists to close. Verified in the shipped policy: a member who forged
   `"role":"admin"` into their own validly-signed token got **zero rows**, because
   no branch reads that field.
+  - **In a policy, `current_user` is right. Inside a `SECURITY DEFINER` function it
+    is wrong** — it rebinds to the function owner. See §Capability.
 - **The DB role vocabulary is `app_anon` / `app_member` / `app_admin`.** A
   capability role (`ic`, `site_manager`, `admin`) is a *different* vocabulary and
   is not a database role. Writing `request_claims()->>'role' = 'admin'` produces
@@ -446,35 +425,69 @@ CREATE POLICY row_scope ON projects USING (
   names; `app.user_id` is invisible to a policy built on `request.jwt.claims`.
 - **Hierarchy functions must return a scalar array, not `SETOF`.** Postgres rejects
   set-returning functions in policy expressions. Use `RETURNS uuid[]` with
-  `array_agg`.
-- **The hierarchy walk IS evaluated per row — confirmed, keep expecting this.**
-  Measured with `pg_stat_user_functions` against the shipped shape
-  (`STABLE SECURITY DEFINER`): **400,001 calls over 400,000 rows**, and 20,411
-  over 20,410. `EXPLAIN` shows the call inside the Seq Scan's `Filter`.
-  - **CORRECTED — the cause was wrong, twice over.** An earlier version of this
-    file blamed `VOLATILE`, and then claimed `PARALLEL SAFE` cost "~170×". Both
-    are withdrawn, measured on PostgreSQL 15.19 with identical function bodies:
-    - `STABLE` **12.5 s** vs `VOLATILE` **21.9 s** on the same 400k scan.
-      `VOLATILE` is ~1.7× slower and **neither is hoisted**. `STABLE` means
-      "same answer within this statement", **not** "called once". A `STABLE`
-      function in a qual that also references a column is called per candidate
-      row. A separate claim that `STABLE` is "hoisted into a one-time InitPlan —
-      2 invocations for 20,040 rows" **did not reproduce**; the same function on
-      a 20,410-row table was called 20,411 times.
-    - `PARALLEL SAFE` **5.8 s** vs `PARALLEL UNSAFE` **12.5 s** — `PARALLEL SAFE`
-      was **faster**, not 170× slower. It permits a `Gather` over a `Parallel Seq
-      Scan`; it does not force single-threaded evaluation. Keep `PARALLEL UNSAFE`
-      for a `SECURITY DEFINER` helper, but because it is the default and a
-      privileged helper should not be relaxed on the strength of one benchmark —
-      not for the performance reason that was written down.
-  - **Do not denormalise the scope to "fix" this.** That advice is withdrawn. It
-    invited optimising a function whose *single-call* cost is sub-millisecond, and
-    it would not have bought anything: the cost is per-row **repetition**, not
-    per-call cost. Rewriting the hierarchy storage to reduce a repetition count is
-    a data-model change made for a benchmark number.
-  - The honest statement of the trade: the cost is linear in rows scanned. If that
-    ever matters, the fix is a narrower predicate or an index, measured — not a
-    speculative rewrite of the hierarchy.
+  `array_agg`, or read the closure view directly.
+- **A `STABLE` function in a policy qual is evaluated once per candidate row.**
+  Measured: **400,001 calls over 400,000 rows**. `STABLE` means *"same answer within
+  this statement"*, **not** "called once" — so a `STABLE` helper whose argument
+  includes a column cannot be hoisted. The two claims that explained it away
+  (`VOLATILE` caused it; `PARALLEL SAFE` cost ~170×) are both withdrawn and both
+  measured false. **Full record: ADR-0023 §The hierarchy.** Keep this bullet; it is
+  the reason the scope was later denormalised into a closure view.
+- **Scope is a closure materialized view, refreshed — not a walk.** The scoping
+  subquery is uncorrelated, so the planner hoists it: **`loops = 1` at 305 rows and
+  at 3305 rows**, where a deliberately correlated variant gives `loops = 305`. It
+  appears as a **`hashed SubPlan`** — `x IN (SELECT …)` yields the hashed form;
+  `InitPlan` is for uncorrelated *scalar* subqueries. Uncorrelatedness is what buys
+  once-per-statement; the node name does not.
+  - **Scope comes from a membership table (`user_groups`), not a token claim**, so a
+    membership change takes effect on the **next request with the same token**.
+    Multiple groups union — `IN`/`ANY`, never `AND`.
+- **The closure matview is granted to NOBODY.** A matview has no RLS and no policy,
+  PostgREST auto-publishes it as a first-class resource, and under
+  `openapi-mode = "ignore-privileges"` it appears in the served spec regardless of
+  grants. **A single `GRANT SELECT` served the entire org tree to an anonymous
+  caller.** Assert the grant state in a test — the spec will not tell you.
+- **Refresh it with `REFRESH MATERIALIZED VIEW CONCURRENTLY` from a statement-level
+  trigger on the hierarchy table.** `CONCURRENTLY` needs a `UNIQUE` index on the
+  view. Reads continue at **6.7 ms** during a concurrent refresh (13.5 ms
+  baseline); a plain refresh blocked tenant reads for **7,606 ms** and a
+  trigger-held lock for **8,466 ms**. Because the refresh runs inside the writing
+  transaction there is **no staleness window**.
+  - **REVERSED: the blue/green matview swap is withdrawn — unnecessary *and*
+    impossible.** There is no window to close, and `DROP MATERIALIZED VIEW` on the
+    closure is rejected because seven RLS policies depend on it.
+- **Cycle safety: the closure query uses `UNION` and carries NO accumulator
+  column.** `UNION` terminates on a cycle *only* when the recursive row has no
+  accumulator — add a `depth` column and every pass is a new row, so `UNION`
+  degrades to `UNION ALL`. Measured on a cyclic graph: `UNION ALL` + `depth` is
+  **non-terminating** and exceeds `temp_file_limit` in **91 ms**; `UNION` with no
+  accumulator returns **384 rows in 12.7 ms**. On an *acyclic* tree both return
+  **361 rows** — the property is invisible until the data is broken.
+  - **`parent_id REFERENCES groups(id)` does not enforce acyclicity.**
+  - Defence in depth, in order: a write-time trigger rejects the cycle; `UNION`
+    bounds it if the trigger is bypassed; **`temp_file_limit` must be set on the
+    refreshing session** or a non-terminating closure exhausts the filesystem.
+  - A tolerated cycle is fail-closed on the query and fail-**open** on the data:
+    each cycle member inherits the whole cycle's scope.
+- **Referential-integrity checks bypass RLS and fail OPEN.** FK, unique and primary
+  key checks are not policy-governed. Measured: a plain FK is an **existence
+  oracle** (success vs `23503` reveals any group id, including out-of-scope ones);
+  an FK to an unreadable table is a **content oracle** (a token value in an
+  unreadable table was confirmed); `UNIQUE` + `ON CONFLICT DO NOTHING` gives the
+  same oracle with **no error at all** — the most dangerous form; and
+  `ON DELETE CASCADE` **crosses RLS** (a member deleted a group they held and
+  destroyed a row in a group they could never see).
+  - **The rule — a design constraint, not a mechanical transform:** *A group-scoped
+    table may only carry foreign keys that stay within the group-scoped set. Any FK
+    leaving that set must terminate at a table members cannot write to.*
+  - **Declare every table in one of three categories**, and the primary key follows:
+
+    | Category | Tables | Primary key | FK discipline |
+    |---|---|---|---|
+    | **Group-scoped** | `projects`, `customers` | `PRIMARY KEY (group_id, id)` | carries `group_id`, and **every** FK carries `group_id` |
+    | **The hierarchy** | `groups` | simple `PRIMARY KEY (id)` | not scoped by `group_id` — it *is* the group; self-FK is admin-only-reachable |
+    | **Unscoped** | `users`, `roles`, `role_permissions`, `user_groups` | simple primary keys | global reference data |
+
 - **A hierarchy function that walks the tree its own policy protects must be
   `SECURITY DEFINER`, and the tree table must NOT be `FORCE`d.** These are one
   decision, not two. With `SECURITY INVOKER` the walk reads a table whose policy
@@ -490,8 +503,8 @@ CREATE POLICY row_scope ON projects USING (
   unrestricted. Keep tenant payload out of it, and record the trade in a comment
   where the next maintainer will hit it.
 - **The hierarchy walk is self-inclusive.** It anchors on the `root` row itself, so
-  a member scoped to a site sees its own row plus its descendants, and a member
-  scoped to an unrelated site sees **its own single row and none of the subtree**.
+  a member scoped to a group sees its own row plus its descendants, and a member
+  scoped to an unrelated group sees **its own single row and none of the subtree**.
   Verified counts over the five-row proof fixture: root→3, mid→2, unrelated→**1**,
   unknown→0, admin→all 5. Anyone documenting "unrelated→0" is describing a bug.
 - **`EXECUTE` is granted to `PUBLIC` on new functions by default.** `REVOKE
@@ -503,31 +516,25 @@ CREATE POLICY row_scope ON projects USING (
 - **Hierarchy is a function, not a policy.** Scope derives from position in a tree
   via one recursive helper — `LANGUAGE sql STABLE`. Adding a level is a data
   change, not a code change.
-- **The hierarchy decision, and the three designs rejected in its place.** All
-  three were built and executed, not argued about.
-  - **KEPT: the shipped recursive `STABLE` function.** Its cost is linear in rows
-    scanned (above) and its single-call cost is sub-millisecond.
-  - **REJECTED AS A VULNERABILITY, not a trade-off: a per-session scope cache.**
-    Cache the resolved scope in a GUC for the session and read it from the policy.
-    A member **widened its own scope**: a policy reading
-    `current_setting('app.scope', true)` returned **50 rows**; the same member
-    then called `set_config('app.scope', '{150,…,159}', true)` on **its own
-    custom GUC** and read **500 rows** across ten units. No error, no warning.
-    Custom (dot-prefixed) GUCs have **no privilege control at all**, and `SET
-    LOCAL` gives **no** protection — the caller sets it. Strictly worse than the
-    alternative *and* no faster. **Never cache authorization scope in a GUC the
-    caller can set.**
-  - **REJECTED: a closure table.** Faster than the recursive walk, and its
-    incremental repair **silently disagreed with the tree**: comparing every
-    unit's closure against the recursive walk found **5 differing ancestor/
-    descendant pairs across 9 roots, with no error raised**. Root 1 had the
-    *same count* on both sides (241) and different membership, so any
-    count-based sanity check passes. Repair logic that can be wrong without
-    complaining is a worse trade than a slower walk.
+- **Rejected designs, all built and executed.** Full evidence in ADR-0023 and
+  `docs/rebase.md` §6.6.2.
+  - **REJECTED AS A VULNERABILITY: a per-session scope cache.** A member read 50
+    rows, then called `set_config('app.scope', …)` on **its own** custom GUC and
+    read **500**. Custom GUCs have no privilege control and `SET LOCAL` gives no
+    protection — the caller is the one setting it. **Never cache authorization
+    scope in a GUC the caller can set.**
   - **REJECTED: `ltree`.** Its `UNIQUE` constraint on `path` makes the obvious
-    repair **fail outright** — re-parenting a node onto an occupied path raises
+    repair fail outright — re-parenting onto an occupied path raises
     `duplicate key value violates unique constraint "org_ltree_path_key"`.
-    Verified. See `docs/rebase.md` §6.6.2 for the full record.
+    Verified.
+  - **CORRECTED: a closure table was rejected here and is now the design.** The
+    original rejection was of **incremental repair**, which silently disagreed with
+    the tree in 5 places across 9 roots with no error raised — and root 1 had the
+    *same count* (241) on both sides with different membership, so count-based
+    checks pass. A closure refreshed **wholesale** has no repair step to get
+    wrong. **What survives:** any incremental update of a denormalised scope must be
+    proved to agree with the source, and comparing *counts* does not prove it —
+    compare membership.
 - **Default deny.** `REVOKE ALL ... FROM PUBLIC` before any grant. Tables intended
   to be globally readable are listed explicitly.
 - **The claims setting only reaches the database if PostgREST is configured to
@@ -537,8 +544,18 @@ CREATE POLICY row_scope ON projects USING (
   "."`. Only the **JSPath** `".role"` works; `$.role` panics on 16.4 too. A policy
   suite can be perfect and every request still fails, because nothing reaches the
   policy. See B5 and `docs/development.md` troubleshooting.
-- PostgREST exposes JWT claims as a transaction-scoped setting; policies read
-  them with `current_setting('request.jwt.claims', true)::json->>'sub'`.
+- PostgREST exposes JWT claims as a transaction-scoped setting. Read them with the
+  **three-argument** `current_setting`, `nullif`-guarded, inside a function that
+  catches the cast — never inline as `current_setting(…, true)::json->>'sub'`, which
+  raises on `''`. See the guarded accessor above.
+  - **CORRECTED — an earlier version of this file said the two-argument
+    `current_setting` was the safe form. That is inverted for this case.** Measured:
+    two-argument **raises** (`HTTP 500`); three-argument with `nullif` and a guarded
+    cast gives a **clean denial**. Keep the three-argument form.
+  - **One residual, recorded because it is fail-closed but wrong:** a non-uuid or
+    empty `sub` yields **`HTTP 500`**, not `403`. Nothing is disclosed and nothing
+    is admitted, but an operator reading logs chases an internal error instead of an
+    authorization decision. Catch the cast in the accessor and return `NULL`.
 - The thin Nest app has no SQL path at all (no ORM), so it passes no identity to
   a policy: PostgREST does that from the verified token. `SET LOCAL app.user_id`
   appears nowhere and would be ignored if it did.
@@ -576,11 +593,19 @@ GRANT  SELECT (id, site_id, name)  TO app_member;       -- `secret` unreadable
 
 ### Capability — per-operation RLS policies over a capability table
 
-**Decided and executed: capability is enforced in the database, by per-operation
-RLS policies, with capability living in a TABLE — not in roles.** This replaced
-the previous answer in this section ("feature guards in the thin app", keyed on a
-capability role), because the thin-app answer could not be composed with scope,
-and composing them is mandatory (§Scope).
+**Decided: capability is enforced in the database, by per-operation RLS policies,
+with capability living in a TABLE — not in roles.** This replaced the previous
+answer in this section ("feature guards in the thin app", keyed on a capability
+role), because the thin-app answer could not be composed with scope, and composing
+them is mandatory (§Scope).
+
+> **CORRECTED after execution.** The shape below is right and the function body was
+> **dead**. `has_capability()` read `current_user` inside a `SECURITY DEFINER`
+> function, so it compared the capability table against the *owner's* role and
+> returned `false` for everyone — including `app_admin` **while holding the
+> capability row**. The capability axis was silently absent, and it was absent in
+> the shape that *denies*, which is why nothing looked wrong. Full evidence:
+> ADR-0023 §Capability.
 
 ```sql
 CREATE TABLE role_capability (
@@ -589,12 +614,41 @@ CREATE TABLE role_capability (
   PRIMARY KEY (db_role, capability)
 );
 
+-- current_setting('role', true), NEVER current_user -- see the correction below.
 CREATE FUNCTION has_capability(cap text) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT EXISTS (SELECT 1 FROM role_capability rc
-                 WHERE rc.db_role = current_user AND rc.capability = cap)
+                 WHERE rc.db_role = current_setting('role', true)
+                   AND rc.capability = cap)
 $$;
 ```
+
+- **CORRECTED — the documented body was dead, and it took the whole capability axis
+  with it.** It read `WHERE rc.db_role = current_user` inside a **`SECURITY
+  DEFINER`** function. `SECURITY DEFINER` rebinds `current_user` to the **function
+  owner**, so the predicate compared the capability table against the owner's role
+  name and never against the serving role. **Measured: `has_capability()` returned
+  `false` for `app_admin` *while holding* the capability row.** Every component was
+  individually correct and the capability axis was silently absent.
+  - **Why that shape is the worst one available:** it denies **everyone**, including
+    the roles that should have it, and it denies them with an ordinary zero-row
+    result. No error, no warning — a capability system that refuses every caller
+    looks exactly like a capability system that works.
+  - **The correct source is `current_setting('role', true)`**, the GUC Postgres
+    tracks for the `SET ROLE` that PostgREST's impersonation performs.
+  - Measured inside a `SECURITY DEFINER` function: `current_user` = `app`,
+    `current_role` = `app`, `session_user` = `pgrst_authenticator`,
+    `role` = `app_admin`. Three of the four look plausible; only one is right.
+  - **Inside a `SECURITY DEFINER` function, identity comes from the `role` GUC,
+    never `current_user`.** In a *policy* — which is not inside a function —
+    `current_user` is still correct for the admin branch.
+  - **`SECURITY INVOKER` is not the alternative.** Under `INVOKER` every serving role
+    needs `SELECT` on `role_capability`, which publishes the **entire capability
+    matrix** — exactly what capability exists to keep private. Keep `DEFINER`; fix
+    the GUC.
+  - **The test that would have caught it is the positive one.** Denials already had
+    tests; the defect is invisible to them. Assert that a role **holding** a
+    capability **passes**.
 
 - **Confirmed expressible: `FOR INSERT WITH CHECK` and `FOR DELETE USING`
   discriminate by operation.** Postgres evaluates a different policy per verb,

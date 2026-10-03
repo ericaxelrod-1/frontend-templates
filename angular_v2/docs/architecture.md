@@ -127,9 +127,14 @@ why the previous permissions module could not express row-level security at all
 
 | Axis | Question | Mechanism | Keyed on |
 |---|---|---|---|
-| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `site_id` claim |
+| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | a **membership table** joined to a closure view |
 | **Operation** | Which *verbs* and *columns*? | table + column `GRANT` | DB `role` claim |
-| **Feature** | Which *features*? | thin-app guards | capability role |
+| **Feature** | Which *features*? | per-operation RLS policies | `role_capability` table |
+
+> **CORRECTED.** Scope was documented as keyed on a `site_id` **claim** — it is
+> keyed on **membership in a table**, so revocation bites on the next request.
+> Feature was documented as thin-app guards on a capability **role** — capability is
+> a **row in a table**, checked in the database. Evidence in ADR-0023.
 
 RLS sits below both runtimes, so it is a filter on **every** query rather than a
 layer the application calls. Neither runtime needs to remember it — the
@@ -140,12 +145,22 @@ projects TO app_member` means members cannot UPDATE or DELETE, enforced by grant
 rather than by a decorator someone can forget.
 
 **An `ic` and a `site_manager` are the same DB role — `app_member`.** They reach
-the same features and are scoped to their own site by the identical policy; their
-only difference is capability, enforced above RLS. An `admin` token carries no
-`site_id`, so its policy branch matches every row.
+the same features and are scoped to their own group by the identical policy; their
+only difference is capability, enforced in the database beside RLS.
 
-The invariant, and it is greppable: **no query or guard filters by site and by
-feature at the same time.** The two keys never meet.
+> **WITHDRAWN — the invariant that used to be stated here.** This section read:
+> *"no query or guard filters by site and by feature at the same time. The two keys
+> never meet."* **That rule caused a silent privilege escalation.** Splitting the
+> axes across two policies puts scope in a `FOR ALL` policy and each capability
+> gate in its own per-operation policy; multiple permissive policies on one
+> operation are **OR**ed, so the `FOR ALL` scope policy admits every in-scope
+> `DELETE` on its own. Measured: a member holding **zero** capabilities deleted a
+> row and inserted a row, **no error and no warning**.
+>
+> **The corrected rule: separate inputs, one composed expression.** Scope and
+> capability must never be *derived from* one another — but they must **meet** in a
+> single policy per operation. Two policies on one operation are only correct with
+> `AS RESTRICTIVE`, which ANDs with the permissive set. Full record: ADR-0023.
 
 The previous design attempted this in application code via a 2,411-line
 `Proxy`-wrapped `EntityManager`. It enforced nothing, and it failed silently.
