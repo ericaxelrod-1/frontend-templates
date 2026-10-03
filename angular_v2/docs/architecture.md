@@ -139,7 +139,7 @@ discipline (ADR-0023).
 |---|---|---|
 | **Group-scoped** | `projects`, `customers`, and every future tenant table | `PRIMARY KEY (group_id, id)` |
 | **The hierarchy** | `groups` | simple `PRIMARY KEY (id)` |
-| **Unscoped** | `users`, `roles`, `role_capability`, `user_groups` | simple primary keys |
+| **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups` | simple primary keys |
 
 ```
 groups (parent_id → groups)              admin-writable; the hierarchy itself
@@ -152,13 +152,21 @@ groups (parent_id → groups)              admin-writable; the hierarchy itself
    └──◄ group_id on every group-scoped table
 
 users ──► user_groups                     membership, not a token claim
-roles ──► role_capability                 capability is a row, not a role
+roles (parent_id → roles) ──► user_roles  capability axis — a role is a ROW
+   └──► role_permissions ──► permissions ──► actions   (resource, action)
 ```
 
 **Scope is a table read, not a claim.** `user_groups` holds who belongs where and
 is not writable by the members in it; `groups` is admin-writable. Neither is
 carried in the token, so a membership change takes effect on the **next request
 with the same token** rather than at token expiry.
+
+**Capability is a table read too, keyed on a role row.** `role_permissions.role_id`
+is a real foreign key to `roles.id`, so *"what can this role do?"* is answerable by
+a query — the previous design kept a PostgreSQL role name in the capability table
+and left `roles` referenced by nothing. Capability is `resource` + `action`, not a
+closed vocabulary of tier labels. There are **no per-user grants and no denies**, so
+every member of a role holds identical capabilities.
 
 **The hierarchy is precomputed, not walked.** `org_closure` is a materialized
 view holding every ancestor/descendant pair, refreshed inside the writing
@@ -167,13 +175,17 @@ table**: it has no RLS and no policy, PostgREST auto-publishes it, and the serve
 spec advertises it regardless of grants — so it is **granted to nobody**, and a
 test asserts that rather than trusting the spec.
 
-> **CORRECTED — the shipped migration does not match this.** The shape above is
-> the design ADR-0023 settled on. `backend/database/migrations/0001_rls_foundation.sql`
-> still creates a `sites` table and keys scope on a `site_id` **token claim**,
-> walking the hierarchy per candidate row. Nothing above is a description of the
-> shipped SQL until that migration is rewritten. Stated here rather than only in
-> the ADR, because this is the section a reader would otherwise take as a
-> description of what is in the database.
+> **CORRECTED — none of the above is in the shipped database.** The shape in this
+> section is the design ADR-0023 settled on.
+> `backend/database/migrations/0001_rls_foundation.sql` still creates a `sites`
+> table and keys scope on a `site_id` **token claim**, walking the hierarchy per
+> candidate row. `groups`, `user_groups`, `org_closure`, `actions`, `permissions`,
+> `roles`, `role_permissions` and `user_roles` **do not exist in the tree today**,
+> and neither does any `has_permission()`. Nothing above is a description of the
+> shipped SQL until that migration is rewritten (`rebase.md` W26) and the RLS suite
+> alongside it (W27). Stated here rather than only in the ADR, because this is the
+> section a reader would otherwise take as a description of what is in the
+> database.
 
 **The referential-integrity constraint, in one line:** *a group-scoped table may
 only carry foreign keys that stay within the group-scoped set; any FK leaving that
@@ -182,20 +194,19 @@ not something a policy can fix — FK, unique and primary-key checks are not
 policy-governed, so every shape outside that line is an oracle or a write across
 RLS. Measured evidence in ADR-0023.
 
-### Authorization is three axes, not two
+### Authorization is two axes, not one
 
 Scope and capability are orthogonal, and forcing one mechanism to carry both is
 why the previous permissions module could not express row-level security at all
 (ADR-0023). The organising frame is one sentence: **groups = RLS (which rows),
-roles = OLS (which actions).**
+roles = OLS (which objects).**
 
-| Axis | Question | Mechanism | Keyed on |
+| Axis | Question | Mechanism | Key material |
 |---|---|---|---|
 | **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | the token's `sub` → `user_groups` → `org_closure` |
-| **Operation** | Which *verbs* and *columns*? | table + column `GRANT` | DB `role` claim |
-| **Capability** | Which *features*? | per-operation RLS policies | `current_setting('role', true)` + `role_capability` |
+| **Capability** | Which *objects*? — tables, verbs, columns, pages, endpoints | OLS: table + column `GRANT`, and `has_permission()` | the token's `sub` → `user_roles` → `roles` → `role_permissions` |
 
-Each axis has a **different key**, and no one key derives another.
+Each axis has its **own** key material, and neither is derived from the other.
 
 - **Scope** resolves `sub` through `actor()` to a set of group ids. The
   subquery is **uncorrelated**, so the planner hoists it: measured `loops = 1` at
@@ -203,43 +214,42 @@ Each axis has a **different key**, and no one key derives another.
   correlated variant. It appears as a `hashed SubPlan` — `x IN (SELECT …)` yields
   that form. **Uncorrelatedness is what buys once-per-statement; the node name
   does not.** Assert on `loops`, not on the apparent shape of the SQL.
-- **Operation** is grants, so PostgREST cannot offer a verb the grants withhold,
-  even by accident.
-- **Capability** reads `current_setting('role', true)` — the GUC Postgres tracks
-  for the `SET ROLE` that PostgREST's impersonation performs — and **never
-  `current_user`.** Inside a `SECURITY DEFINER` function `current_user` rebinds to
-  the *function owner*: measured inside one, `current_user`, `current_role` and
-  `session_user` all read plausibly and none of them is right, while `role` read
-  `app_admin`. A body using `current_user` returned `false` for a role **while
-  holding** the capability row — the whole capability axis silently absent, in the
-  shape that denies, so nothing reported it. The fix is the GUC, not
-  `SECURITY INVOKER`, which would publish the entire capability matrix.
-
-RLS sits below both runtimes, so it is a filter on **every** query rather than a
-layer the application calls. Neither runtime needs to remember it — the
-application supplies identity and the policy decides.
+- **Capability** resolves the same `sub` through `user_roles`, walking
+  `roles.parent_id` **upward**, then `role_permissions` → `permissions` →
+  `actions`. Inside its `SECURITY DEFINER` function identity is the **actor
+  argument**, never `current_user` — which rebinds to the *function owner*.
+  Measured: a body using `current_user` returned `false` for a caller **while
+  holding** the permission row — the whole capability axis silently absent, in the
+  shape that denies, so nothing reported it. The fix is the argument, not
+  `SECURITY INVOKER`, which would publish the entire permission matrix.
+- **Nothing intersects the two.** There is no `permission_rules` table, no AND/OR
+  combiner, and no row carrying both a group and a permission. Scope is one policy
+  per table; capability is a grant. Neither can widen the other.
 
 Object-level security is likewise in the database: `GRANT SELECT, INSERT ON
 projects TO app_member` means members cannot UPDATE or DELETE, enforced by grants
 rather than by a decorator someone can forget.
 
-**An `ic` and a `site_manager` are the same DB role — `app_member`.** They reach
-the same features and are scoped to their own group by the identical policy; their
-only difference is capability, enforced in the database beside RLS.
+**`app_admin` is a superset, not a bypass** — all rows, all tables, all pages, all
+endpoints, by four distinct mechanisms with four tests. **Every user has at least
+one role and at least one group**, so there is no "nobody" case on either axis.
+Least privilege runs both ways: scope is bounded for free by the policy's
+`WITH CHECK`, and the grant-subset rule — *a caller cannot grant a capability it
+does not hold* — is bounded by a trigger on `role_permissions` and `user_roles`
+raising `42501`.
 
 > **WITHDRAWN — the invariant that used to be stated here.** This section read:
 > *"no query or guard filters by site and by feature at the same time. The two keys
 > never meet."* **That rule caused a silent privilege escalation.** Splitting the
-> axes across two policies puts scope in a `FOR ALL` policy and each capability
-> gate in its own per-operation policy; multiple permissive policies on one
-> operation are **OR**ed, so the `FOR ALL` scope policy admits every in-scope
+> axes across two policies on one operation puts scope in a `FOR ALL` policy and a
+> capability gate in its own per-operation policy; multiple permissive policies on
+> one operation are **OR**ed, so the `FOR ALL` scope policy admits every in-scope
 > `DELETE` on its own. Measured: a member holding **zero** capabilities deleted a
 > row and inserted a row, **no error and no warning**.
 >
-> **The corrected rule: separate inputs, one composed expression.** Scope and
-> capability must never be *derived from* one another — but they must **meet** in a
-> single policy per operation. Two policies on one operation are only correct with
-> `AS RESTRICTIVE`, which ANDs with the permissive set. Full record: ADR-0023.
+> **What replaced it:** the axes are separate *inputs* — neither derived from the
+> other — and they are **not** expressed as two competing policies on one
+> operation. Full record: ADR-0023.
 
 The previous design attempted this in application code via a 2,411-line
 `Proxy`-wrapped `EntityManager`. It enforced nothing, and it failed silently.
@@ -346,10 +356,12 @@ Full model in [`security.md`](./security.md). The structural summary:
 
 | Layer | Mechanism | Property |
 |---|---|---|
-| Coarse authorization | Global guard + permission decorator | Default deny |
+| Coarse authorization | Global `JwtAuthGuard` + the boundary `GRANT` | Default deny |
 | Fine scoping | Postgres RLS over `user_groups` → `org_closure` | Cannot be bypassed; resolved once per statement |
 | Verbs and columns | Postgres `GRANT` | Cannot be bypassed; default deny |
-| Capability | `role_capability` rows read by per-operation policies | Enforced in the database, beside RLS |
+| Capability | `role_permissions` → `permissions`, resolved by `has_permission()` | Enforced in the database; `role_id` is a real FK to `roles.id` |
+| Grant subset | `BEFORE INSERT OR UPDATE` trigger on `role_permissions` / `user_roles` | A caller cannot grant what it does not hold (`42501`) |
+| Admin | A superset across all four of the above | Not a bypass: no flag disables enforcement |
 | Brute force | Per-account counter → progressive delay + risk challenge | Cannot be weaponised into a DoS |
 | IP | Normalized, subnet-aggregated reputation | Secondary corroboration |
 | Challenge | Server-side CAPTCHA, single-use, expiring | Validated server-side |
@@ -373,8 +385,13 @@ produce audit rows and still count toward throttling. See ADR-0011.
 | Scope in a token claim | Membership is a **table read**, so a revoked membership bites on the next request instead of at token expiry. A claim is also caller-supplied (ADR-0023) |
 | Recursive per-row hierarchy walk | It was one call per candidate row — 400,001 calls over 400,000 rows. The closure matview is hoisted to `loops = 1` |
 | `GRANT`s on the closure matview | No RLS protects a matview and PostgREST publishes it; a single grant served the whole org tree anonymously |
+| **The ORM-driven scope engine** — `rls_rules`, `rls_join_paths`, `rls_join_conditions`, `rls_scope_templates`, `rls_condition_groups`, `rls_rule_conditions`, and the `sql` / `parameters` / `scope_sql` raw-SQL columns | It existed to make RLS work on SQLite through an ORM. On PostgreSQL the policy *is* the join, written as SQL; a data-driven engine that assembles it adds a second source of truth for the one thing that must not have one. Scope is `user_groups` ⨝ `org_closure` (ADR-0023) |
+| **`permission_rules`** and its AND/OR combiner | It put both axes on one row and made them compete. They answer different questions and never do (ADR-0023) |
+| **`group_permissions`, `user_permissions`, `is_granted`**, and deny-precedence resolution | Per-user grants and denies make a capability answer order-dependent, and two readers of the same rows can disagree. **Every member of a role holds identical capabilities** (ADR-0023) |
+| **The permission cache database** — `cache/permissions.sqlite`, `cache_permission_maps`, `cache_sync_status`, sync endpoints | A second copy of the authorization data. `has_permission()` reads the live rows; nothing caches an authorization answer (ADR-0023) |
+| **Object-scanning tables** — `api_endpoints`, `frontend_routes`, `ui_components` and their `*_permissions` joins | PostgREST derives the API surface from the schema, so there is nothing to scan. The permission surface is *which tables and which verbs*, expressed directly as `permissions(resource, action_id)` (ADR-0023) |
 | Runtime key transform | `angular/` deleted one after a 35-task refactor. Naming is a build-time concern |
-| Application-level permission guards on CRUD | PostgREST maps claims to a DB role; policies read them. Guards only remain on the thin app's own routes (ADR-0004) |
+| Application-level permission guards on CRUD | PostgREST maps claims to a DB role; policies read them. Guards only remain on the thin app's own non-CRUD routes (ADR-0004) |
 | Docker / compose | Too heavy for local dev (ADR-0018) |
 | CI pipeline | Never a live app; `verify` is inherited by forks instead (ADR-0020) |
 | Third-party services | No accounts, no API keys — the portability constraint. PostgREST is a local binary, not a service |

@@ -64,76 +64,97 @@ six fail against the old implementation:
 
 Plus one per RLS policy, permitted and denied.
 
-And these for the three-axis authorization model (ADR-0023) — the first is the
+And these for the two-axis authorization model (ADR-0023) — the first is the
 one that was found **after** the docs claimed it was handled:
 
 1. **Escalation.** A validly-signed token whose `role` claim names a table-owning
    role must be refused. Then assert the row count is unchanged. This is the
    highest-severity control in the project: untested, that token read every row
    and its `DELETE` removed one.
-2. **Scope** — an `app_member` token for site A returns only site A rows; a token
-   for site B returns only site B.
-3. **Operation** — `app_member` may `SELECT` and `INSERT` but `UPDATE` and
-   `DELETE` are refused by grants, not by application code.
-4. **Vocabulary** — capability lives in a table, not in roles; no DB role is named
-   after a capability; no policy or grant mentions `ic` or `site_manager`.
-   - **Capability is not merely denied — it is granted.** Assert that a role
-     **holding** `user.delete` **succeeds** at deleting a row in its own scope. This
-     positive case is the one that catches the defect that actually occurred: a
-     `SECURITY DEFINER` body reading `current_user` compares against the *function
-     owner*, so `has_capability()` returned `false` for `app_admin` **while holding
-     the capability row**. Every denial test on this page passed against it. A
-     capability axis that denies everyone is indistinguishable from a working one.
-   - **Identity inside the check comes from the `role` GUC.** Inside a
-     `SECURITY DEFINER` function, `current_user`/`current_role` = `app` and
-     `session_user` = `pgrst_authenticator`; only `current_setting('role', true)`
-     tracks PostgREST's impersonation. `SECURITY INVOKER` is not the fix — it would
-     require `SELECT` on `role_capability` for every serving role, publishing the
-     whole capability matrix.
-5. **Composition, not separation** — scope and capability appear **together**, in
-   one policy per operation. The previous version of this line said "no policy or
-   guard filters by scope *and* capability together". **That rule caused a silent
-   privilege escalation** (`adr.md` ADR-0023), and these replace it:
-   - **A member with no capability is denied, in its own scope** — must fail to
-     `DELETE` and to `INSERT` rows belonging to *its own* unit. This is the only
-     assertion that separates the correct shape from the broken one: when scope
-     and capability sit in two permissive policies, every other test on this page
-     still passes while the capability check has been OR-ed away entirely.
+2. **Scope** — an `app_member` token for group A returns only group A's rows; a
+   token for group B returns only group B's.
+3. **Object-level security** — `app_member` may `SELECT` and `INSERT` but `UPDATE`
+   and `DELETE` are refused by grants, not by application code.
+4. **Capability** — `has_permission()` returns `true` for an actor who **holds** a
+   permission. Two halves:
+   - **Capability is granted, not merely denied.** A caller **holding**
+     `project.delete` **succeeds** at deleting a row in its own scope. This
+     positive case is the one that catches the defect that actually occurred: the
+     previous resolver read `current_user` inside a **`SECURITY DEFINER`** body,
+     which rebinds to the *function owner*, so it returned `false` for `app_admin`
+     **while holding** the row. Every denial test on this page passed against it.
+     A capability axis that denies everyone is indistinguishable from a working one.
+   - **Identity inside the check is the actor argument.** Never `current_user`,
+     `current_role` or `session_user` — all three read plausibly inside a
+     `SECURITY DEFINER` function and none of them tracks the caller.
+     `SECURITY INVOKER` is not the fix: it would require `SELECT` on
+     `role_permissions` and `permissions` for every serving role, publishing the
+     whole permission matrix.
+5. **Separation, not separation-by-policy** — the axes are separate **inputs** and
+   neither is derived from the other. The previous version of this line said "no
+   policy or guard filters by scope *and* capability together". **That rule caused
+   a silent privilege escalation** (`adr.md` ADR-0023), and these replace it:
+   - **No member with no membership rows sees rows.** Must fail to `SELECT` rows
+     belonging to its own group. Both withdrawn shapes pass every other test on
+     this page while the capability check has been OR-ed away entirely.
    - **No operation carries two permissive policies.** Assert against `pg_policy`
      that no `(relid, cmd)` pair has more than one `polpermissive` row. Where two
      policies are wanted, one must be `AS RESTRICTIVE`.
-6. **Policy totality** — empty, absent and malformed claims all yield zero rows and
-   no error; an admin token with a garbage `site_id` still sees everything.
-7. **Not superuser** — every serving role is `NOSUPERUSER NOBYPASSRLS`, asserted
+   - **No per-user grant, no deny, no combiner.** `user_roles` is the only
+     user↔capability link. Assert a `user_permissions` table, an `is_granted`
+     column and a `permission_rules` table are all **absent**, and that every user
+     has at least one row in both `user_roles` and `user_groups`.
+6. **Grant subset** — a caller **cannot grant a capability it does not hold**.
+   Insert a `role_permissions` row conferring a permission the caller lacks and
+   assert `42501`; do the same for `user_roles` against the *role's* effective
+   permission set. The scope half of least privilege is free via `WITH CHECK`;
+   this half has no policy to fall back on, so it is the one a test must name.
+7. **`app_admin` is a superset, not a bypass** — **four** assertions, one per
+   mechanism: every row, every table, every page, every endpoint. Removing any one
+   mechanism must fail exactly one of them, and must not remove the other three.
+8. **Policy totality** — empty, absent and malformed claims all yield zero rows and
+   no error; an admin token with a garbage claim still sees everything.
+9. **Not superuser** — every serving role is `NOSUPERUSER NOBYPASSRLS`, asserted
    against the catalogue. `FORCE ROW LEVEL SECURITY` does not bind either.
-8. **No public function execution** — every function's `proacl` excludes `PUBLIC`.
-9. **Hierarchy** — a member of a group sees that group and its descendants and
-   **nothing above it**: member of `EU` sees `EU`, `UK`, `FR` and **not** `HQ` and
-   **not** `US`; a member of `HQ` sees everything beneath. A member of two disjoint
-   groups sees the **union** — `IN`/`ANY`, never `AND`. **The caller cannot widen
-   its own scope**: `set_config('app.scope', …)` on a caller-writable GUC must not
-   change what the policy returns. The per-session scope cache was rejected as a
-   vulnerability precisely because it fails this test.
-10. **Membership revocation** — remove a `user_groups` row and re-issue the **same**
-    token. The next request must not see the old scope. Scope is a table read, so
-    this is the whole of live-session scope revocation; there is no claim to wait
-    out. (The claim-keyed design could not pass this.)
-11. **The scoping subquery is evaluated once** — `EXPLAIN (ANALYZE)` reports
-    **`loops = 1`** for the scoping SubPlan, at both a small and a large row count.
-    Do **not** assert this from the policy text: an `EXISTS`-shaped correlated
-    variant is simplified back into a hashed SubPlan. Only `loops` is evidence.
-12. **The closure matview is granted to nobody** — assert against `pg_acl` that no
-    role, `PUBLIC` included, holds `SELECT` on `org_closure`. A matview has no RLS,
-    PostgREST publishes it automatically, and `openapi-mode = "ignore-privileges"`
-    lists it in the spec regardless — so neither the spec nor a denial test can see
-    a grant that should not be there. **One `GRANT SELECT` served the entire org
-    tree to an anonymous caller.**
-13. **Referential integrity does not leak** — for each FK on a group-scoped table,
-    assert that a caller in group A cannot distinguish "group B exists" from
-    "group B does not exist" by writing a row. `23503` is an existence oracle; a
-    `UNIQUE` + `ON CONFLICT DO NOTHING` path is the same oracle **with no error at
-    all**; `ON DELETE CASCADE` is a write across RLS. Also assert no group-scoped
-    FK leaves the group-scoped set.
+10. **No public function execution** — every function's `proacl` excludes `PUBLIC`.
+11. **Hierarchy** — a member of a group sees that group and its descendants and
+    **nothing above it**: member of `EU` sees `EU`, `UK`, `FR` and **not** `HQ` and
+    **not** `US`; a member of `HQ` sees everything beneath. A member of two disjoint
+    groups sees the **union** — `IN`/`ANY`, never `AND`. A member of an unrelated
+    group sees **its own single row and none of the subtree**, not zero: the walk
+    and the closure join are both self-inclusive, and *"unrelated → 0"* describes a
+    bug. **The caller cannot widen its own scope**: `set_config('app.scope', …)` on
+    a caller-writable GUC must not change what the policy returns. The per-session
+    scope cache was rejected as a vulnerability precisely because it fails this
+    test.
+12. **Membership revocation** — remove a `user_groups` row and re-issue the **same**
+     token. The next request must not see the old scope. Scope is a table read, so
+     this is the whole of live-session scope revocation; there is no claim to wait
+     out. (The claim-keyed design could not pass this.)
+13. **The scoping subquery is evaluated once** — `EXPLAIN (ANALYZE)` reports
+     **`loops = 1`** for the scoping SubPlan, at both a small and a large row count.
+     Do **not** assert this from the policy text: an `EXISTS`-shaped correlated
+     variant is simplified back into a hashed SubPlan. Only `loops` is evidence.
+     The same assertion applies to the role-ancestor set `has_permission()` reads.
+14. **The closure matview is granted to nobody** — assert against `pg_acl` that no
+     role, `PUBLIC` included, holds `SELECT` on `org_closure`. A matview has no RLS,
+     PostgREST publishes it automatically, and `openapi-mode = "ignore-privileges"`
+     lists it in the spec regardless — so neither the spec nor a denial test can see
+     a grant that should not be there. **One `GRANT SELECT` served the entire org
+     tree to an anonymous caller.**
+15. **Referential integrity does not leak** — for each FK on a group-scoped table,
+     assert that a caller in group A cannot distinguish "group B exists" from
+     "group B does not exist" by writing a row. `23503` is an existence oracle; a
+     `UNIQUE` + `ON CONFLICT DO NOTHING` path is the same oracle **with no error at
+     all**; `ON DELETE CASCADE` is a write across RLS. Also assert no group-scoped
+     FK leaves the group-scoped set.
+
+### Nothing above exists yet
+
+**The 33 tests that currently pass exercise the superseded `sites` / `site_id` /
+`site_tree_ids()` design** in `0001_rls_foundation.sql`, and are evidence for none
+of the above. Rewriting the suite against the closed-join schema is tracked as
+`rebase.md` W27.
 
 ### Required, and not yet written: revocation while a session is live
 
@@ -145,18 +166,18 @@ one that was found **after** the docs claimed it was handled:
 > therefore had *different revocation latency by construction*, and that seam was
 > the worry. **The seam no longer exists:** scope is a **membership table read**,
 > exactly like capability, so a membership change takes effect on the **next
-> request with the same token**. Item 10 above is that test. A test written from the
+> request with the same token**. Item 12 above is that test. A test written from the
 > old text would be testing a superseded design.
 
 - **What remains unknown:**
-  1. A **capability** revoked mid-session → the next request is denied. Expected
-     to work, because `has_capability()` reads the table live. **Unverified** — and
-     note that "expected to work" was wrong once already: the same function
-     returned `false` for *everyone*.
+  1. A **permission** revoked from a role mid-session → the next request is denied.
+     Expected to work, because `has_permission()` reads the tables live.
+     **Unverified** — and note that "expected to work" was wrong once already: the
+     same function returned `false` for *everyone*.
   2. Access token still valid, **refresh token** revoked → refresh refused, session
      cannot be extended.
   3. A user **removed from a group** whose descendants they were reaching → no rows
-     from that subtree on the next request. Same mechanism as item 10; **unverified**.
+     from that subtree on the next request. Same mechanism as item 12; **unverified**.
   4. The claim references a **deleted** user → a denial, never an error.
 - **Assertion discipline as everywhere else:** bodies and row counts, never the
   status code alone, and prove each test can go red. Note case 4: a non-uuid or

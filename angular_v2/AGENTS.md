@@ -210,63 +210,47 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
 - Timestamps are `timestamptz`. Booleans are `boolean`. UUIDs are `uuid`.
 - Index anything you filter or sort on, including `jsonb` paths (GIN).
 
-## B2. Authorization — three axes, three mechanisms, composing per operation
+## B2. Authorization — two axes, two mechanisms, two key materials
 
-**Organising frame: `groups = RLS`, `roles = OLS`.** *Groups* decide **rows** (RLS,
-below the application); *roles* decide **verbs** and capabilities (grants and
-per-operation policies). Both are needed: a role-based check is satisfied by a valid
-role no matter which group the caller stands in, so it can never express "your
-group's rows."
+**`groups` = scope (RLS). `roles` = capability (OLS). Nothing else.** Both are read
+in the database and both resolve from the token's `sub`, but **neither is computed
+from the other** and **no table puts them on one row**. ADR-0023; `docs/security.md`.
 
-**The axes are separate inputs, composed in one policy per operation** — separate
-*sources of truth*, not separate *expressions*. Evidence: **ADR-0023**,
-`docs/security.md` §Scope and capability.
-
-| Axis | Question | Mechanism | Keyed on |
+| Axis | Question | Mechanism | Key material |
 |---|---|---|---|
-| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `user_groups` **membership table** — never a claim |
-| **Operation** | Which *verbs*? | table + column `GRANT` | DB `role` claim |
-| **Feature / capability** | Which *features*? | per-operation RLS policies | `role_capability` **table** |
+| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `user_groups` membership ⨝ `org_closure` — **never a claim** |
+| **Capability** | Which *objects*? tables, verbs, columns, pages, endpoints | object-level security: `GRANT` + `has_permission()` | `user_roles` → `roles` → `role_permissions` → `permissions` |
 
-**Two role vocabularies, and collapsing them fails silently.** **DB role** =
-`app_anon` / `app_member` / `app_admin` (impersonation, RLS, grants). **Capability** =
-`ic` / `site_manager` / `admin` — a *label*, never a DB role, held as a row in
-`role_capability`, and also the vocabulary the thin app's guards *speak*.
+**Two namespaces, and collapsing them fails silently.** **DB role** =
+`app_anon` / `app_member` / `app_admin` — impersonation and grants, nothing else.
+**Role** = a row in `roles`, where capability lives. Never create a DB role named
+after a capability, and **never store a PostgreSQL role name in `roles`**: that
+leaves the table referenced by nothing, so nothing can answer *"what can this role
+do?"*. The `roles` → `role_permissions` foreign key is the fix (ADR-0023).
 
-- **An `ic` and a `site_manager` are the *same* DB role — `app_member`.** Same
-  features, same scope policy; capability is their only difference.
-- **Never create DB roles named after capabilities.** Capability lives in a **table**.
-- **Never both *mechanisms* on one operation.** A table verb belongs to the database;
-  application logic to a thin-app guard. Scope and capability compose precisely
-  because both are **RLS** — one mechanism.
+- **Every user has at least one role and at least one group.** So there is no
+  `permission_rules` table, no combiner and no "nobody" case: the axes answer
+  different questions and never compete.
+- **No per-user grant, no deny, no precedence rules.** No `user_permissions`, no
+  `is_granted`. Every member of a role holds identical capabilities.
 - **Never split one operation's requirements across two PERMISSIVE policies.** They
-  are **OR**-ed, so a scope policy covering `DELETE` admits it alone and a capability
-  policy can only widen. Compose them in one policy, or mark the capability policy
-  `AS RESTRICTIVE` (which ANDs with the permissive set).
+  are **OR**-ed, so a scope policy covering `DELETE` admits it alone and a second
+  policy can only widen the set.
 
   ```sql
   -- WRONG: OR-ed, so scope_only admits every in-scope DELETE on its own.
-  CREATE POLICY scope_only ON t FOR ALL   USING (<scope>);
-  CREATE POLICY cap_delete ON t FOR DELETE USING (<capability>);
-
-  -- RIGHT: one composed policy per operation. A FOR ALL policy's USING also
-  -- governs WITH CHECK, which is why the WRONG shape fails INSERT identically.
-  CREATE POLICY user_delete ON users FOR DELETE USING (
-      has_capability('user.delete') AND <scope>
-  );
-
-  -- Also right when the scope half is shared by many tables.
-  CREATE POLICY cap_delete ON t AS RESTRICTIVE FOR DELETE
-      USING (has_capability('user.delete'));
+  CREATE POLICY scope_only ON t FOR ALL          USING (<scope>);
+  CREATE POLICY cap_delete ON t FOR DELETE      USING (<capability>);
   ```
 
-- **No capability is *derived from* scope or from the DB role** — that is the whole
-  of the surviving separation rule. **The claim that the two can never meet in one
-  expression is gone**: keeping them apart is what removed the gate. *(Withdrawn
-  invariant, measured escalation, both SQL shapes: ADR-0023, top.)*
-- **Name tests after the attack:** *"a member with no `user.delete` capability cannot
-  delete a row in its own group"* — the case both wrong shapes fail and neither
-  per-half test ever ran.
+  Measured: a member holding **zero** capabilities ran `DELETE` — 1 row removed — and
+  `INSERT`, no error and no warning. **One policy per table** for scope, and
+  **grants, not a competing `USING`**, for capability. *(Withdrawn invariant, the
+  measured escalation, both SQL shapes and the `AS RESTRICTIVE` alternative:
+  ADR-0023, top.)*
+- **Name tests after the attack:** *"a member with no `user.delete` permission
+  cannot delete a row in its own group"* — the case both wrong shapes fail and
+  neither per-half test ever ran.
 
 ### Scope — Postgres RLS only
 
@@ -347,6 +331,15 @@ CREATE POLICY row_scope ON projects USING (
 > must remove it. It is deliberately not reproduced here as an example;
 > ADR-0023 §Row scope holds it, labelled, with the measurements that retired it.
 
+> **NOTHING in B2 is implemented.** The shipped migration carries the superseded
+> scope shape above, and **all of the capability axis is absent from the tree**:
+> there is no `groups`, `user_groups`, `org_closure`, `actions`, `permissions`,
+> `roles`, `role_permissions` or `user_roles` table anywhere today. The 33 RLS
+> tests that pass exercise the superseded migration, so **a green `verify` is not
+> evidence for any rule in this section.** Rewrite target and its verification:
+> `rebase.md` W26 (schema) and W27 (suite). Full statement: ADR-0023 §Migration
+> status.
+
 - **Key the admin branch on `current_user`, never on the `role` claim.**
   `request_claims()->>'role' = 'admin'` is a **dead branch** that can never match —
   the claim is caller-supplied, `current_user` is not. *(In a policy `current_user`
@@ -356,10 +349,10 @@ CREATE POLICY row_scope ON projects USING (
   variant gives `loops = 305`. **Uncorrelatedness buys it, not the node name** —
   `x IN (SELECT …)` yields the hashed form, `InitPlan` is for uncorrelated *scalar*
   subqueries, and an `EXISTS`-shaped variant is simplified back to a hashed SubPlan.
-  **Assert on `loops`, not on the SQL's apparent shape.**
-- **Never repeat the claim that a `STABLE` helper is hoisted into an `InitPlan`.**
-  `STABLE` means *"same answer within this statement"*, **not** *"called once"*; the
-  withdrawn walk was called 400,001 times over 400,000 rows. (ADR-0023 §The hierarchy.)
+  **Assert on `loops`, not on the SQL's apparent shape.** Nor is a `STABLE` helper
+  hoisted into an `InitPlan` — `STABLE` means *"same answer within this
+  statement"*, **not** *"called once"*; the withdrawn walk was called 400,001 times
+  over 400,000 rows. (ADR-0023 §The hierarchy.)
 - **Multiple groups `UNION` — `IN`/`ANY`, never `AND`.** A membership change takes
   effect on the **next request with the same token**. No membership rows, or
   absent/empty/`{}` claims → **zero rows**, no error.
@@ -409,7 +402,7 @@ CREATE POLICY row_scope ON projects USING (
     |---|---|---|---|
     | **Group-scoped** | `projects`, `customers` | `PRIMARY KEY (group_id, id)` | carries `group_id`, and **every** FK carries `group_id` |
     | **The hierarchy** | `groups` | simple `PRIMARY KEY (id)` | not scoped by `group_id` — it *is* the group; self-FK is admin-only-reachable |
-    | **Unscoped** | `users`, `roles`, `role_permissions`, `user_groups` | simple primary keys | global reference data |
+    | **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups` | simple primary keys | global reference data |
 
 - **A hierarchy function that walks the tree its own policy protects must be
   `SECURITY DEFINER`, and the tree table must NOT be `FORCE`d — one decision, not
@@ -486,67 +479,73 @@ GRANT  SELECT (id, group_id, name) TO app_member;       -- `secret` unreadable
 - Prefer keeping sensitive columns out of the readable set from the outset.
 - **A test asserts `SELECT` is denied** — not merely omitted from a response.
 
-### Capability — per-operation RLS policies over a capability table
+### Capability — object-level security over a permission table
 
-**Capability is enforced in the database, by per-operation RLS policies, with
-capability living in a TABLE — not in roles.** The earlier answer ("feature guards in
-the thin app", keyed on a capability role) is withdrawn: a guard above the database
-cannot be composed with the policy below it. Thin-app guards remain correct for what
-RLS cannot express — a workflow action that is not a table verb.
+**Capability is `resource` + `action` over a TABLE, resolved from the caller's role
+rows.** It governs *objects* — tables, verbs, columns, pages, endpoints. It is never
+keyed on a database role name and never keyed on a group.
 
 ```sql
-CREATE TABLE role_capability (
-  db_role    text NOT NULL,
-  capability text NOT NULL,
-  PRIMARY KEY (db_role, capability)
-);
+actions(name)
+permissions(id, resource, action_id)      UNIQUE (resource, action_id)
+roles(id, name, parent_id, is_system_role)
+role_permissions(role_id, permission_id)  -- role_id is a real FK to roles.id
+user_roles(user_id, role_id)
 
--- current_setting('role', true), NEVER current_user -- see the rule below.
-CREATE FUNCTION has_capability(cap text) RETURNS boolean
+-- The actor is passed in. Never current_user; never a role name.
+CREATE FUNCTION has_permission(who uuid, resource text, action text) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT EXISTS (SELECT 1 FROM role_capability rc
-                 WHERE rc.db_role = current_setting('role', true)
-                   AND rc.capability = cap)
+  SELECT EXISTS (
+    SELECT 1 FROM user_roles ur
+    JOIN role_permissions rp ON rp.role_id = ur.role_id
+    JOIN permissions p       ON p.id = rp.permission_id
+    JOIN actions a           ON a.name = p.action_id
+    WHERE ur.user_id = who AND p.resource = resource AND a.name = action
+      AND rp.role_id IN (WITH RECURSIVE up(id) AS (      -- inherits UP the roles
+            SELECT ur.role_id UNION ALL
+            SELECT r.parent_id FROM roles r JOIN up ON up.id = r.id
+            WHERE r.parent_id IS NOT NULL) SELECT id FROM up)
+  )
 $$;
 ```
 
-- **Inside a `SECURITY DEFINER` function, identity comes from the `role` GUC, never
-  `current_user`** — which rebinds to the **function owner**. A body reading
-  `rc.db_role = current_user` returns `false` for everyone, which is the worst
-  available shape: it denies **everyone** with an ordinary zero-row result, so the
-  whole capability axis is absent, silently. In a *policy* — not inside a function —
-  `current_user` is still correct for the admin branch.
-- **`SECURITY INVOKER` is not the alternative.** It would need `SELECT` on
-  `role_capability` for every serving role, publishing the **entire capability
-  matrix**. Keep `DEFINER`; fix the GUC.
-- **The test that catches this is the positive one.** Denials already had tests; the
-  defect is invisible to them. Assert that a role **holding** a capability
-  **passes**.
+- **Precompute the role ancestor set above the way `org_closure` is precomputed.**
+  A `STABLE` function in a qual is once per candidate row (measured 400,001 calls
+  over 400,000 rows), not once per statement. Assert on `loops`.
+- **Identity inside a `SECURITY DEFINER` function is the actor argument, never
+  `current_user`** — which rebinds to the **function owner**. A body reading it
+  answers identically for everyone, which **denies everyone** with an ordinary
+  zero-row result, so the whole capability axis is absent, silently. Measured on
+  the previous resolver: it returned `false` for `app_admin` *while holding* the
+  row. *(ADR-0023 §Capability.)*
+- **Assert the positive case.** A caller that **holds** a permission **passes**.
+  Denial tests cannot see this defect — every one of them passed against it.
+- **`SECURITY INVOKER` is not the alternative** — it needs `SELECT` on
+  `role_permissions` and `permissions` for every serving role, publishing the
+  **entire permission matrix**. Keep `DEFINER`; fix the identity.
 - **`FOR INSERT WITH CHECK` and `FOR DELETE USING` discriminate by operation**, so
-  the `INSERT` capability requirement cannot be satisfied by the `DELETE` one.
-- **Grants-as-capability is a dead end.** A capability modelled as a role needs one
-  role per distinct capability set: five capabilities means **31 additional database
-  roles**, each needing a policy per table plus a cluster-scoped `ADMIN OPTION` grant.
-- **Role inheritance cannot help — it only ever adds, never subtracts.** `REVOKE` a
-  privilege *from the child* and inheritance puts it straight back. Every serving role
-  here is `NOINHERIT`, which makes membership inert anyway.
-- **A new capability inside an existing tier is one inserted row, no migration** —
-  and the policies name capabilities, so a new name is not a code change either.
-- **A new tier that is not a superset of an existing one is a new database role** —
-  and therefore a bootstrap change, an `ADMIN OPTION` grant, and a decision about what
-  that role may reach. Say so before designing one.
+  an `INSERT` requirement is not satisfied by the `DELETE` one.
+- **A new permission is one inserted row, no migration.** A new *tier* that is not a
+  superset is a new database role — a bootstrap change plus an `ADMIN OPTION`
+  grant. Say so before designing one.
+- **`app_admin` is a superset, not a bypass:** all **rows** (RLS), all **tables**
+  (grants), all **pages** (the resolver), all **endpoints** (the boundary `GRANT`).
+  Four mechanisms, four tests. No flag turns enforcement off.
+- **The grant-subset rule is enforced in the database.** A `BEFORE INSERT OR UPDATE`
+  trigger on `role_permissions` **and** `user_roles` verifies the actor's effective
+  permission set is a **superset** of what is being conferred, and raises `42501`
+  otherwise — otherwise an account manager grants a capability they do not hold.
+  Sketch: ADR-0023 §Least privilege. **Not implemented.**
+- **Never cache an authorization answer** — not in a GUC the caller can set, and not
+  in a second database. `has_permission()` reads the live rows.
 - Do not build query-builder proxies, `Proxy` wrappers, or CLS-based scope
   propagation. The previous implementation of this was ~2,400 lines that
   silently enforced nothing.
-- **Every policy has a test**: permitted case returns rows, denied case returns
-  none, and the denied case is proven for each access path. An LLM writing
-  `USING (true)` is otherwise invisible.
-  - **Add the cross-axis test, which is the one that actually catches the bug
-    above:** a member with **no** capability must be denied, *in its own scope*.
-    Per-half tests pass against both the correct and the broken shape.
-  - **Assert on bodies and row counts, never on status codes alone.** No grant at
-    all is `401`, not `200 []`; a correct denial, a full `USING (true)` leak and a
-    partial leak were **all HTTP 200**. A status-only test passes on a real leak.
+- **Every policy has a test — permitted returns rows, denied returns none, per
+  access path — and assertions are on bodies and row counts, never on the status
+  code alone.** No grant at all is `401`, not `200 []`; a correct denial, a full
+  `USING (true)` leak and a partial leak were **all HTTP 200**, so a status-only
+  test passes on a real leak. B8.
 
 ## B3. API contract — the spec is generated from the live schema
 
@@ -613,8 +612,9 @@ $$;
     `pg_auth_members` and raising — otherwise its absence surfaces far away as an
     unrelated-looking `permission denied to set role` from inside a fixture.
   - **The `role` claim is a DB role name, not a capability.** Tokens carry
-    `app_member` / `app_admin`, never `ic` / `site_manager` / `admin`; a policy or
-    test written against the bare capability name produces a branch that can never match.
+    `app_member` / `app_admin`; capability is resolved from `user_roles`, so a
+    policy or test keyed on the claim's value produces a branch that can never
+    match the caller's permissions.
   - **`REVOKE SET ON PARAMETER role` is inert on PostgreSQL 15.** Never rely on it.
   - **Never use `REVOKE <owner> FROM <authenticator>` as the boundary** — it is a
     per-role denylist, bypassed by any role not yet revoked.

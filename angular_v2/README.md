@@ -35,43 +35,55 @@ third-party accounts or API keys**. Every feature works on a fresh clone.
 
 ## Row scoping and roles
 
-**Groups determine which rows you can see. Roles determine what you can do.**
-Both are enforced in the database — `CREATE POLICY`, `GRANT`, and a capability
+**Groups determine which rows you can see. Roles determine which objects you can
+reach.** The two axes are separate inputs, resolved separately, and never compete.
+Both are enforced in the database — `CREATE POLICY` and `GRANT`, plus a permission
 table — not by guards in application code. A new endpoint, a forgotten decorator,
 or a second runtime cannot bypass any of it, because none of it lives in the
 application.
 
 ```
 groups ──► user_groups ──► org_closure ──► which group_ids the policy admits
-roles ──► role_capability ──► which actions a role may take
+roles  ──► role_permissions ──► permissions ──► which resource:action a role holds
+                ▲
+             user_roles
 ```
 
 Scope is read from a **membership table**, not from a claim inside the token, so
 a membership change takes effect on the **next request with the same token**
 rather than at token expiry. The policy's subquery is **uncorrelated**, so it is
 evaluated **once per statement, not once per candidate row** — measured `loops =
-1` at 305 rows and at 3305 rows. Full design and evidence:
-[`docs/adr.md`](docs/adr.md) ADR-0023, and
+1` at 305 rows and at 3305 rows.
+
+Capability is `resource` + `action` over a table, and `role_permissions.role_id`
+is a real foreign key to `roles.id` — so *"what can this role do?"* is a query,
+not an application-code convention. There are no per-user grants and no denies:
+**every member of a role holds identical capabilities.** `app_admin` is a
+**superset, not a bypass** — all rows, all tables, all pages, all endpoints, by
+four mechanisms with four tests.
+
+Full design and evidence: [`docs/adr.md`](docs/adr.md) ADR-0023, and
 [`docs/architecture.md`](docs/architecture.md) §The data model.
 
 ### What is and is not built
 
 Read this before you read the ADR as a description of working code.
 
-**The shipped migration does not implement the design above.**
+**None of the design above is implemented.**
 `backend/database/migrations/0001_rls_foundation.sql` still carries the
 **superseded** shape: a `sites` table, a `site_id` token claim, and a recursive
 `site_tree_ids()` walk evaluated per candidate row. There is no `groups` table,
-no `user_groups`, no `org_closure` and no `role_capability` anywhere in the tree
-today. That migration is the target to be rewritten, not a record of what is
-running.
+no `user_groups`, no `org_closure`, no `actions`, no `permissions`, no `roles`,
+no `role_permissions` and no `user_roles` anywhere in the tree today — and
+therefore **no capability axis at all**. That migration is the target to be
+rewritten, not a record of what is running.
 
 **The 33 passing RLS tests are not evidence for it.** `npm run verify` gates on
 `backend/test/rls/rls.spec.ts`, and those 33 tests pass — **against the
 superseded design**, because they exercise that migration. They are evidence that
 the enforcement machinery is real and that the gate can go red when a control is
 removed. They are not evidence for group scoping, for the closure, or for
-capability, because none of those three exist in the shipped SQL yet.
+capability, because none of those exist in the shipped SQL yet.
 
 So: the ADR is the design, the migration is the older thing, and the test suite
 proves the older thing. If you fork this, do not read one as describing the

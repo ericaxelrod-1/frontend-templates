@@ -259,69 +259,108 @@ CREATE POLICY tenant_isolation ON projects USING (
 - Application code must not build query-builder proxies, `Proxy` wrappers, or
   CLS-based scope propagation. Enforcement below the application is the point.
 
-### Scope and capability are separate inputs that COMPOSE
+### Scope and capability are separate inputs, resolved separately
 
 ADR-0023 defines the whole model. ~~**Row scope and capability never appear in the
 same expression.**~~ **That rule is withdrawn — it caused a silent privilege
-escalation.** Two axes written into two policies is the one arrangement in which
-a capability check is silently OR-ed out of existence, and it was verified: a
-member with **zero** capabilities deleted a row and inserted a row, no error.
+escalation.** Two axes written as two policies on one operation is precisely the
+arrangement in which a capability check is silently OR-ed out of existence, and it
+was verified: a member with **zero** capabilities deleted a row and inserted a row,
+no error.
 
-**The corrected rule: they compose, in one policy per operation.**
+**What replaced it is not "compose them" but "stop making them compete."** Scope
+is *one policy per table*. Capability is *object-level security* — a grant, or a
+`has_permission()` answer. Neither axis can widen the other and there is no
+`AND`/`OR` combiner to reconcile.
 
 ```sql
-CREATE POLICY user_delete ON users FOR DELETE USING (
-    has_capability('user.delete')
-    AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
+-- one policy per table: which rows
+CREATE POLICY row_scope ON projects USING (
+    group_id IN (SELECT c.descendant FROM user_groups ug
+                 JOIN org_closure c ON c.ancestor = ug.group_id
+                 WHERE ug.user_id = actor())
 );
-CREATE POLICY user_insert ON users FOR INSERT WITH CHECK (
-    has_capability('user.create')
-    AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
-);
+
+-- capability: which objects, resolved from the caller's roles
+CREATE FUNCTION has_permission(who uuid, resource text, action text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$ ... $$;
+-- resolved as user_roles -> roles (walking parent_id upward)
+--                 -> role_permissions -> permissions -> actions
 ```
 
-They remain **separate inputs** — capability is never derived from scope, nor from
-the DB role — but they meet in one expression on purpose. Two policies on one
-operation are only correct with **`AS RESTRICTIVE`**, which ANDs with the
-permissive set: two *permissive* policies are **OR**ed, so they always **widen**
-access.
+They remain **separate inputs** — neither derived from the other — but there is no
+statement that has to combine them. Two policies on one operation are only correct
+with **`AS RESTRICTIVE`**, which ANDs with the permissive set: two *permissive*
+policies are **OR**ed, so they always **widen** access.
 
-| Axis | Question | Mechanism | Keyed on |
+| Axis | Question | Mechanism | Key material |
 |---|---|---|---|
 | Scope | Which rows? | RLS policy | a **membership table**, not a claim |
-| Operation | Which verbs? | table `GRANT` | DB `role` claim |
-| Capability / feature | Which features? | per-operation RLS policy | capability **table** |
+| Capability | Which objects? — tables, verbs, columns, pages, endpoints | OLS: `GRANT` + `has_permission()` | `user_roles` → `roles` → `role_permissions` → `permissions` |
 
-> **CORRECTED — `has_capability()` was dead, and it took the capability axis with
-> it.** The documented body read `rc.db_role = current_user` inside a **`SECURITY
-> DEFINER`** function. `SECURITY DEFINER` rebinds `current_user` to the **function
-> owner**, so the predicate compared the capability table against the owner's role
-> name and never against the serving role: **measured, it returned `false` for
-> `app_admin` *while holding* the capability row.** The whole capability axis was
-> silently absent — and absent in the shape that **denies**, so it produced an
-> ordinary zero-row result rather than an error.
+> **CORRECTED twice — the previous capability model left `roles` unconnected.** It
+> was `role_capability(db_role, capability)`, keyed on a **PostgreSQL role name**,
+> with capability as a fixed label vocabulary (`ic` / `site_manager` / `admin`).
+> Nothing in the schema joined `roles` to it, so no constraint could answer *"what
+> can this role do?"* — only application code could, and that is where it enforced
+> nothing. Capability is now `resource` + `action` over a table, and
+> `role_permissions.role_id` is a real FK to `roles.id`.
 >
-> - The correct source is **`current_setting('role', true)`**, the GUC that tracks
->   PostgREST's impersonation. Inside a `SECURITY DEFINER` function: `current_user`
->   = `app`, `current_role` = `app`, `session_user` = `pgrst_authenticator`,
->   `role` = `app_admin` — three plausible answers and only one correct.
+> **Withdrawn with it, deliberately:** `user_permissions` and `is_granted` (per-user
+> grants and denies, and the precedence rules that made them order-dependent — every
+> member of a role now holds identical capabilities); `permission_rules` (an AND/OR
+> combiner that put both axes on one row); the permission **cache database**
+> (`cache/permissions.sqlite`, `cache_permission_maps`, `cache_sync_status`, sync
+> endpoints — a second source of truth); and the **object-scanning tables**
+> (`api_endpoints`, `frontend_routes`, `ui_components` and their `*_permissions`
+> joins — PostgREST derives the API surface from the schema, so the permission
+> surface is *which tables and which verbs*, and there is nothing to scan). Each
+> existed to make RLS work on SQLite through an ORM. Named once, with the reason,
+> so nobody restores one. ADR-0023 §Capability.
+>
+> **And a measured defect that survives in a new shape.** The previous resolver read
+> `rc.db_role = current_user` inside a **`SECURITY DEFINER`** function.
+> `SECURITY DEFINER` rebinds `current_user` to the **function owner**, so the
+> predicate compared the capability table against the *owner's* role name and never
+> against the serving role: **measured, it returned `false` for `app_admin` *while
+> holding* the capability row.** The whole capability axis was silently absent — and
+> absent in the shape that **denies**, so it produced an ordinary zero-row result
+> rather than an error.
+> - **The rule, generalised:** inside a `SECURITY DEFINER` function, identity comes
+>   from the caller — the actor argument, or `current_setting('role', true)`, which
+>   tracks impersonation. **Never `current_user`, `current_role` or
+>   `session_user`**; all three read plausibly and none of them is right.
 > - **`SECURITY INVOKER` is not the fix.** It would require `SELECT` on
->   `role_capability` for every serving role, publishing the **entire capability
->   matrix** — the thing capability exists to keep private.
-> - **Denial tests could never have caught this.** Assert the **positive** case: a
->   role that *holds* a capability *passes*.
+>   `role_permissions` and `permissions` for every serving role, publishing the
+>   **entire permission matrix**.
+> - **Denial tests could never have caught this.** Assert the **positive** case: an
+>   actor that *holds* a permission *passes*.
 
-**An IC and a site manager are the same DB role — `app_member`.** They reach the same
-features and are scoped to their own group by the *identical* policy. Their only
-difference is capability, enforced in the database by a row in a capability table.
-An admin is recognised by `current_user = 'app_admin'` **in a policy**, **not** by
-an absent claim and not by an absent `group_id` — so the admin branch matches every
-row for a reason that cannot be forged.
+**Least privilege runs in both directions**, and the two sides need different
+mechanisms:
 
-Never create DB roles named after capabilities (`ic`, `site_manager`). Modelling a
-capability as a role needs **one role per distinct capability set** — five
-capabilities means **31** additional roles — and role inheritance cannot help
-because it only adds and never subtracts.
+- **"An account manager cannot create a user outside their own RLS scope"** is
+  **free** — the `user_groups` insert is a scoped write, and the policy's
+  `WITH CHECK` rejects a `group_id` outside the actor's closure, in the database.
+- **"They cannot grant a capability they themselves do not have"** needs a trigger,
+  because a `role_permissions` write is **unscoped** and RLS has no group dimension
+  to filter it by. A `BEFORE INSERT OR UPDATE` trigger on `role_permissions` **and**
+  `user_roles` checks that the actor's effective permission set is a **superset** of
+  what is being conferred and raises `42501` otherwise. Sketch (not implemented):
+  ADR-0023 §Least privilege.
+
+**An admin is a superset, not a bypass.** No flag turns enforcement off.
+`app_admin` holds more of everything across **four distinct mechanisms** — all
+**rows** (the RLS admin branch), all **tables** (grants), all **pages** (the
+resolver), all **endpoints** (the boundary `GRANT`) — and **four separate tests**,
+because a bypass is one mechanism that fails silently while a superset is four that
+have to be removed one at a time.
+
+Never create DB roles named after capabilities, and never store a PostgreSQL role
+name in `roles`. Both collapse the two axes into one. Modelling a capability set as
+database roles needs one role per distinct set — five capabilities means **31**
+additional roles — and role inheritance cannot help, because it only adds and never
+subtracts.
 
 For a hierarchy, scope is a **closure materialized view refreshed from `groups`**,
 not a walk. A `STABLE` function in a policy qual is evaluated **once per candidate
@@ -361,11 +400,11 @@ cache was built and rejected as a vulnerability, not a trade-off: a member read 
 rows, called `set_config('app.scope', …)` on its own custom GUC, and read **500**.
 Custom GUCs have no privilege control and `SET LOCAL` gives no protection.
 
-The walk is **self-inclusive**: a member scoped to a group sees its own row plus its
-descendants, and a member scoped to an unrelated group sees **its own single row and
-none of the subtree**. Verified counts over the five-row proof fixture:
-root→3, mid→2, unrelated→**1**, unknown→0, admin→all 5. Multiple groups **union** —
-`IN`/`ANY`, never `AND`.
+The scope expansion is **self-inclusive**: a member scoped to a group sees its own row
+plus its descendants, and a member scoped to an unrelated group sees **its own single
+row and none of the subtree**. Multiple groups **union** — `IN`/`ANY`, never `AND`.
+*"Unrelated → 0" describes a bug, not a design; anyone writing that assertion is
+testing the wrong thing.*
 
 ### Never create a view
 
@@ -392,7 +431,7 @@ Use **column-level privileges**, not a projection:
 REVOKE ALL ON customers FROM app_member;     -- table level, ALL verbs
 GRANT  SELECT, INSERT   ON customers TO app_member;
 REVOKE SELECT ON customers FROM app_member;   -- table level, FIRST
-GRANT  SELECT (id, site_id, name) TO app_member;
+GRANT  SELECT (id, group_id, name) TO app_member;
 ```
 
 Order matters, and the wrong order **fails open silently**: revoking a column while

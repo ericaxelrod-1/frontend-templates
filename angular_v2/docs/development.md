@@ -171,10 +171,15 @@ touches the other PostgREST instance on 3002.
 > `org_closure` + `actor()`, where the scoping subquery is **uncorrelated** and
 > evaluated **once per statement** (`loops = 1` at 305 and at 3305 rows).
 >
+> **There is also no capability axis at all.** No `actions`, `permissions`,
+> `roles`, `role_permissions` or `user_roles` table exists in the tree today, and
+> there is no `has_permission()` — so `security.md` §Scope and capability and
+> `testing.md` §Two-axis describe a design, not the shipped SQL.
+>
 > **So the 33 passing tests below are not evidence for the new design.** They
 > prove the superseded design is internally consistent — and they are the reason
 > the rewrite has to rewrite the *tests*, not just the SQL. `backend/database/
-> migrations/0001_rsl_foundation.sql` still ships the old shape.
+> migrations/0001_rls_foundation.sql` still ships the old shape.
 >
 > The tamper table in this section was measured against that old file, so read it
 > as a **method** (remove a control, confirm the gate goes red at step 7 of 8)
