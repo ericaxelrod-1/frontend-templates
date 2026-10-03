@@ -90,11 +90,12 @@ angular_v2/
                     │  schema; RLS enforces row scoping     │
                     └──────────────┬───────────────────────┘
                                    │
-                    ┌──────────────▼───────────────────────┐
-                    │ PostgreSQL                          │
-                    │  tables + RLS policies (no views)     │
-                    │  ← migrations are the schema source  │
-                    └──────────────▲───────────────────────┘
+                     ┌──────────────▼───────────────────────┐
+                     │ PostgreSQL                          │
+                     │  tables + RLS policies (no views)     │
+                     │  scope: user_groups × org_closure     │
+                     │  ← migrations are the schema source  │
+                     └──────────────▲───────────────────────┘
                                    │
    ┌───────────────────────────────┴──────────────────────────┐
    │  Thin NestJS app — the ten things PostgREST cannot do   │
@@ -110,6 +111,45 @@ not beneath it** (ADR-0004).
 The boundary is deliberate: anything expressible as CRUD over a table or view is
 PostgREST's; anything requiring an algorithm, a secret, a socket, or a schedule is
 Nest's. Nothing is served by both.
+
+> **CORRECTED — "a table or view" is a table.** Views are rejected by ADR-0022 and
+> forbidden by `AGENTS.md` B1, so the sentence above describes a boundary that no
+> resource can land on. A superuser-created view bypasses every RLS policy on its
+> base table **silently**, and the migrations here run as a superuser, so a view
+> would be an object that turns the whole authorization model off. The boundary
+> rule is *CRUD over a base table → PostgREST*, full stop.
+
+### 3.0 Where row scope comes from
+
+Row scope is **not** in the token and **not** in application code. The design
+that ADR-0023 §Row scope settles on, and that W26 must implement:
+
+```
+PostgREST  SET ROLE app_member          ← the role claim selects the DB role
+                 │
+Postgres    actor()                      ← identity: the token's `sub`, via request.jwt.claims
+                 │
+           user_groups(user_id, group_id) ← MEMBERSHIP, read per statement
+                 │
+           org_closure(ancestor, descendant)  ← precomputed, refreshed, UNIQUE index
+                 │
+                 └─→ policy scope: group_id IN (SELECT …)  →  hashed SubPlan, loops = 1
+```
+
+Three properties follow, and each is a different mechanism's job:
+
+| Property | Mechanism | Measured / executed by |
+|---|---|---|
+| A membership change bites on the **next request, same token** | scope is a **table read**, not a `site_id` claim | W27 |
+| The subquery is evaluated **once per statement** | it is **uncorrelated**, over a **closure** rather than a per-row walk | `loops = 1` at 305 and 3305 rows — W30 |
+| A member with **no** capability is still denied, in its own scope | scope and capability **compose in one policy per operation** | W27 |
+
+The earlier shape — a `sites` table, a `site_id` claim, and a recursive
+`site_tree_ids()` walk evaluated per candidate row — is **superseded**. It is not
+what the tree above shows. §6 still describes it, W06 and W07 were proved against
+it, and the shipped migration still implements it; that mismatch is the whole
+point of W26 and W27, and it is why a green `test:rls` is not evidence for the
+model above.
 
 ```
 nest/                        thin app — ~3–5k LOC, not the API
@@ -152,8 +192,12 @@ TypeORM is **removed**. This is not only a LOC change:
 - **The schema is the single declarative artifact.** An LLM reads one file
   instead of 63 files under `modules/permissions/`.
 
-Adding a resource becomes **two** artifacts — a table (or view) and an RLS
-policy — instead of five: DTO, entity, controller, service, module registration.
+Adding a resource becomes **two** artifacts — a base table and an RLS policy —
+instead of five: DTO, entity, controller, service, module registration.
+
+> **CORRECTED.** This said "a table (or view)". Views are not an option: ADR-0022
+> rejects them because a superuser-created view bypasses RLS silently, and every
+> migration here runs as a superuser. See §3.
 
 ---
 
@@ -224,7 +268,7 @@ new implementation) · **MOVE** (relocated) · **SPLIT** (becomes N files) ·
 | `src/config/email.config.ts` | **REWRITE** | keep the abstraction; add `assets` handling |
 | `src/config/environment.config.ts` | **REWRITE** | add `jwt`, `alerts`, `security`, `captcha` namespaces; assert required keys at boot. The JWT secret must be shared with PostgREST |
 | `src/database/data-source.ts` | **DELETE** | TypeORM removed. Replaced by a plain-SQL migration runner (`node-pg-migrate` or `psql`-driven) plus `seed.ts` |
-| `postgrest.conf` | **NEW** | DB role, `db-schemas`, `db-anon-role`, and the JWT role-claim mapping and `jwt-role-claim-key`. This is where JWT → identity reaches the policies |
+| `postgrest.conf` | **NEW** | DB role, `db-schemas`, `db-anon-role`, and the JWT role-claim mapping and `jwt-role-claim-key`. This is where JWT → identity reaches the policies — and identity is only ever the token's `sub` via `actor()`; the *scope* key is `user_groups` membership read per statement, never a claim |
 | `src/database/database.sqlite` | **DELETE** | tracked binary; must never ship |
 | `src/database/README.md` | **REWRITE** | describes the deleted tree |
 | `src/database/schema-sync.ts` | **DELETE** | 194-line parallel hand-written DDL system |
@@ -241,9 +285,12 @@ new implementation) · **MOVE** (relocated) · **SPLIT** (becomes N files) ·
 ### 5.2 Backend — `src/modules/`
 
 **Read this first.** With PostgREST serving the API layer, every controller and
-DTO below is **DELETE, not REWRITE** — PostgREST serves those routes from tables
-and views. What survives in Nest is only the logic PostgREST cannot express:
+DTO below is **DELETE, not REWRITE** — PostgREST serves those routes from base
+tables. What survives in Nest is only the logic PostgREST cannot express:
 algorithms, secrets, sockets, schedules.
+
+> **CORRECTED.** This originally read "from tables and views". Views are
+> forbidden (ADR-0022, `AGENTS.md` B1) — see §3.
 
 | Module | Files | Disposition |
 |---|---|---|
@@ -270,37 +317,50 @@ algorithms, secrets, sockets, schedules.
 
 Under ADR-0023 this module has not one disposition but three, because it
 conflated the three authorization axes. Splitting it is the largest single win in
-the rebase:
+the rebase.
+
+> **CORRECTED — the two rows marked Feature below were keyed on the pre-closure
+> design.** They said the Feature axis is *the only axis that reads a capability
+> role* and that it lives in **thin-app guards**. Both halves are wrong, and
+> corrected: a guard above the database **cannot be composed** with the scope
+> policy below it, and keeping them apart is what caused the privilege escalation
+> ADR-0023 §the withdrawal records — a member with **zero** capabilities `DELETE`d
+> a row and `INSERT`ed a row, no error and no warning. Capability is now a row in
+> `role_capability`, read by `has_capability()` from a **per-operation RLS policy
+> composed with the scope policy in one expression**. Thin-app guards remain
+> correct for the one thing RLS cannot express — a workflow action that is not a
+> table verb. `ic` and `site_manager` remain a **label vocabulary**, not database
+> roles, and both map to `app_member`.
 
 | What it did | Axis | Where it goes | Disposition |
 |---|---|---|---|
-| Injected row filters from group membership | Scope | `CREATE POLICY` migrations | **DELETE** — no application code writes scoping SQL |
+| Injected row filters from group membership | Scope | `CREATE POLICY` migrations, keyed on **`user_groups` membership joined to `org_closure`** — not on a `site_id` claim, and not on a per-row recursive walk | **DELETE** — no application code writes scoping SQL |
 | Gated endpoints by role | Operation | table + column `GRANT`s | **DELETE** — grants withhold the verb in the database |
-| Gated endpoints by capability role | Feature | thin-app guards | **KEEP, rewritten** — the only axis that reads a capability role |
+| Gated endpoints by capability role | Feature | **`role_capability` table, enforced by per-operation RLS policies composed with the scope policy**; thin-app guards only for non-CRUD workflow actions | **KEEP, rewritten** — the only axis that reads a capability *label*, and it is checked **in the database** |
 | Managed RLS rule/scope templates | Feature (admin) | thin app | **KEEP** — it *writes* policies, so it cannot go with them |
-| Compiled join paths for policies | Scope | thin app + migrations | **KEEP** — genuine logic, with a spec |
+| Compiled join paths for policies | Scope | thin app + migrations | **KEEP** — genuine logic, with a spec. Note the compiled path is now a **closure join**, so the compiler's output is a constant subquery, not a per-row walk |
 | CRUD over actions, permissions, grants | — | tables | **DELETE** — PostgREST serves them |
 | `actions.controller.ts` (top level) | | **DELETE** — duplicate of `controllers/actions.controller.ts` |
 | `controllers/actions.controller.ts` | | **DELETE** — becomes an `actions` table; PostgREST serves it. Resolves the `/permissions/actions` collision by deleting both |
 | `controllers/permissions.controller.ts` | | **DELETE** — becomes `permissions` + `role_permissions` tables. Resolves the 6 frontend 404s because the spec regenerates |
 | `controllers/resources.controller.ts` | | **DELETE** — becomes a `resources` table |
-| `controllers/permission-inspector.controller.ts` | | **DELETE** — becomes a view or a PostgREST embedding (`?select=*,roles(*)`). Kills the `/user/{id}` vs `/users/{id}` mismatch |
+| `controllers/permission-inspector.controller.ts` | | **DELETE** — becomes a PostgREST embedding (`?select=*,roles(*)`). Kills the `/user/{id}` vs `/users/{id}` mismatch. **Not a view** — see the correction below |
 | `controllers/rls-rules.controller.ts` | | **DELETE** |
 | `controllers/rls-*.controller.ts` (3) | | **REWRITE** — admin CRUD over RLS templates; RLS enforcement itself moves to SQL |
 | `controllers/cache-sync.controller.ts` | | **DELETE** with the cache subsystem |
 | `cache-entities/*` (4 + index) | | **DELETE** — cache-on-database is the wrong mechanism; use a computed/invalidation strategy |
-| `guards/permission.guard.ts` (×2) | | **DELETE both** — two classes, and neither was ever applied. Verb-level access becomes table `GRANT`s (`GRANT SELECT, INSERT ... TO app_member` withholds UPDATE/DELETE at the database), which PostgREST cannot bypass. A *new* capability guard, keyed on capability role and applied only to thin-app routes, replaces them — see `Feature` in ADR-0023 |
-| `decorators/require-permission*.ts` (2) | | **DELETE both as written** — they guard CRUD routes, which grants now govern, and they were never applied. Kills the 3-decorator / 2-`PERMISSIONS_KEY` drift. **Write exactly one replacement**, keyed on capability role, registered on the thin app only |
+| `guards/permission.guard.ts` (×2) | | **DELETE both** — two classes, and neither was ever applied. Verb-level access becomes table `GRANT`s (`GRANT SELECT, INSERT ... TO app_member` withholds UPDATE/DELETE at the database), which PostgREST cannot bypass. A *new* capability guard replaces them, applied only to thin-app routes that are **not** table verbs, keyed on capability *label* — never on CRUD routes, which the database governs |
+| `decorators/require-permission*.ts` (2) | | **DELETE both as written** — they guard CRUD routes, which grants now govern, and they were never applied. Kills the 3-decorator / 2-`PERMISSIONS_KEY` drift. **Write exactly one replacement**, keyed on capability label, registered on the thin app only — a second one on a CRUD route is a second authorization axis stacked on RLS |
 | `dtos/*.ts` (7) | | **DELETE** — replaced by PostgREST's generated types |
 | `entities/*.ts` | | **REWRITE** — become table definitions in migrations |
 | `scope-compiler.service.ts` | | **KEEP** — genuine logic; compiles join paths for the RLS policy generator; add spec |
 | `rls-rule.service.ts`, `rls-scope-template.service.ts` | | **KEEP + REWRITE** — the admin surface that *writes policies* stays in Nest; the policy *evaluation* moves to SQL |
-| `permissions.service.ts` (2,353 lines) | | **DELETE** — the single biggest deletion in the rebase. Row-injection logic moves to RLS policies; the raw query at `:729` disappears with TypeORM. **Note the split:** the row-scoping half becomes SQL, the capability half becomes guards on the thin app. Neither survives as application code writing filters |
-| `permissions.module.ts` | | **REWRITE** — remove `RlsContextGuard` (never applied). Register the single capability guard, scoped to the thin app's own routes and keyed on capability role — never on CRUD routes |
+| `permissions.service.ts` (2,353 lines) | | **DELETE** — the single biggest deletion in the rebase. Row-injection logic moves to RLS policies; the raw query at `:729` disappears with TypeORM. **Note the split:** the row-scoping half becomes SQL (a composed per-operation policy), and the capability half becomes `has_capability()` reading `role_capability` — **also SQL, in the same expression**. Neither survives as application code writing filters |
+| `permissions.module.ts` | | **REWRITE** — remove `RlsContextGuard` (never applied). Register the single capability guard, scoped to the thin app's own non-CRUD routes and keyed on capability *label* — never on CRUD routes |
 | `cache-entities/*` (5) | | **DELETE** — cache-on-database is the wrong mechanism |
 | **`users/`** | 19 | **MOSTLY DELETE** |
 | `entities/*.entity.re-export.ts` (4) | | **DELETE** — alternate import paths make `Role`/`Group` ownership ambiguous |
-| `services/groups.service.ts` vs `groups.service.ts` | | **DELETE both** — two `GroupsService` classes (490-line repo-based vs 68-line permission-based) with divergent authorization models, selected by import path. Membership becomes a `group_members` table; authorization becomes a policy |
+| `services/groups.service.ts` vs `groups.service.ts` | | **DELETE both** — two `GroupsService` classes (490-line repo-based vs 68-line permission-based) with divergent authorization models, selected by import path. The hierarchy becomes a **`groups`** table with `parent_id` self-FK; membership becomes **`user_groups`**; authorization becomes a policy over `user_groups` ⨝ `org_closure` |
 | `users.service.ts` | | **REWRITE (thin)** — bcrypt cost 10 → configurable ≥12; password hashing only. All CRUD → PostgREST |
 | `users.controller.ts`, `groups.controller.ts` | | **DELETE** — tables + policies |
 | `dto/*.ts` (5) | | **DELETE** — generated types |
@@ -325,8 +385,24 @@ the rebase:
 | `schema/` | 4 of 4 | ~380 |
 | `auth/` CRUD + Passport | ~12 of 45 | ~2,100 |
 
-Every removed controller becomes a table or a view. Every removed DTO becomes a
+Every removed controller becomes a base table. Every removed DTO becomes a
 generated type. Every removed authorization check becomes a `CREATE POLICY`.
+
+> **CORRECTED.** This line read "a table or a view". Views are rejected by
+> ADR-0022 and forbidden by `AGENTS.md` B1; a superuser-created view bypasses
+> every RLS policy on its base table with no error, and the migrations run as a
+> superuser.
+
+#### Where the row-scope key lives after the split
+
+Three things that used to be one mechanism are now separate artifacts, and the
+inventory above has to say which survives:
+
+| Replaced by | Name | Drawn in |
+|---|---|---|
+| The `sites` hierarchy table and its per-row walk | `groups` + `org_closure` | the **migration** (W26) |
+| The `site_id` token claim as the scope key | `user_groups` membership, read per statement | the **migration** (W26) |
+| A capability label read only by thin-app guards | `role_capability` read by `has_capability()` **inside the policy** | the **migration** (W26/W07) |
 
 ### 5.3 Backend — migrations (50 files, both trees)
 
@@ -348,6 +424,36 @@ entities is smaller, has a working `down()`, and is honest.
 Result: a baseline schema migration + a small set of `CREATE POLICY`
 migrations. Every policy gets a test (per `AGENTS.md` B8).
 
+> **The baseline that exists today implements the SUPERSEDED design, so this row
+> is not finished.** `backend/database/migrations/0001_rls_foundation.sql` is
+> already generated and shipped, and it contains a **`sites`** table, a
+> `site_id`-claim accessor (`claim_site_id()`), and a **recursive per-row walk**
+> (`site_tree_ids()`). ADR-0023 §Row scope replaces all three with
+> `groups` + `user_groups` + `role_capability` + an `org_closure` matview, and
+> §6.6.4 records the measurements that decided it (`loops = 1` at 305 and at 3305
+> rows, against 400,001 function calls over 400,000 rows for the walk).
+>
+> **Rewriting that file is W26.** Until it lands, the shipped SQL is a *record of
+> a design that has been replaced*, and the RLS suite in W27 is what must be
+> rewritten alongside it — the 33 passing tests exercise the old design and prove
+> nothing about the new one. Do not read a green `test:rls` as evidence for the
+> closure-join model.
+>
+> The rewritten baseline must also declare **every table in one of three
+> scoping categories**, because the primary key follows from the category and
+> the FK discipline does not follow from either alone (ADR-0023 §Referential
+> integrity):
+
+| Category | Tables | Primary key | FK discipline |
+|---|---|---|---|
+| **Group-scoped** | `projects`, `customers` | `PRIMARY KEY (group_id, id)` | carries `group_id`; **every** FK carries `group_id` too |
+| **The hierarchy** | `groups` | simple `PRIMARY KEY (id)` | not scoped — it *is* the group; self-FK `parent_id` is admin-only-reachable |
+| **Unscoped** | `users`, `roles`, `role_permissions`, `user_groups` | simple primary keys | global reference data, not tenant rows |
+
+Declaring them late is not available: an FK that leaves the group-scoped set is
+an **existence oracle** even when every policy is correct, because FK checks are
+constraint triggers that run outside RLS (§6.6.4 item 4, tests in W28).
+
 ### 5.3.1 Schema cache reload — a mandatory migration step
 
 PostgREST caches the schema. **A newly migrated table 404s until the cache is
@@ -367,6 +473,12 @@ NOTIFY pgrst, 'reload schema';
   a stale cache fails the build instead of confusing a developer.
 - Tradeoff to verify in the spike: under high migration frequency the NOTIFY can be
   skipped in favour of a PostgREST restart. Either is acceptable; doing nothing is not.
+- `NOTIFY` also covers the `org_closure` matview, and that is the problem rather
+  than the solution: a matview has no RLS and no policy, PostgREST **auto-publishes**
+  it as a first-class resource, and under `openapi-mode = "ignore-privileges"` it
+  appears in the served spec **regardless of grants**. A single `GRANT SELECT`
+  served the entire org tree to an anonymous caller. Grant it to **nobody**, and
+  assert the grant state in a test — the spec will not tell you (W30).
 
 ### 5.4 Backend — `src/scripts/` (30 files)
 
@@ -530,21 +642,24 @@ than no doc.
 
 ## 6. Cross-cutting work items
 
+Each item carries a **status** in its `Work` cell. The vocabulary is small and
+it is deliberately narrower than it looks — see §6.0.1.
+
 | ID | Phase | Work | Verified by |
 |---|---|---|---|
 | W01 | N1 | ESLint baseline: `prefer-on-push`, `prefer-standalone`, `prefer-control-flow`, `conditional-complexity`, `no-empty-lifecycle-method`, `prefer-takeuntil-destroyed` | `npm run lint` reports zero errors with no `eslint-disable` added |
 | W02 | N1 | `npm run verify`: build → typecheck → lint → test → smoke against live Postgres | Stop Postgres; assert **non-zero** exit rather than a skip |
 | W03 | N1 | Document-level link checker: every relative link in `docs/` and `AGENTS.md` resolves | The checker runs in CI-equivalent `verify` |
 | W04 | N1 | Doc-claims checker: every command in `development.md` exists in a `package.json` script | The checker runs in `verify` |
-| W05 | N7 | **PostgREST/RLS spike** — table → policy → PostgREST → JWT → curl → `openapi.json` → types | Five curl checks: per-claim RLS, anon not a leak, spec served |
-| W06 | N2 | `postgrest.conf`: `db-anon-role`, `jwt-role-claim-key`, shared secret. **Four** roles: a migration/owner role plus `app_anon`/`app_member`/`app_admin` | `curl /` returns the spec; a wrong secret is refused; **no request-serving role owns a table** |
-| W07 | N2 | Native RLS policies per ADR-0023: **one composed policy per operation**, `request.jwt.claims`, fail-closed, plus `FORCE ROW LEVEL SECURITY` — **except on the tree table, which must not be `FORCE`d** (§6.6 item 8). **Scope and capability compose; never split one operation across two permissive policies** (§6.6.2) | Permitted returns rows; denied returns none; per access path; **and the policy still applies when run as the owner role**. Plus: a member with **no** capability is denied **in its own scope**, and no `(relid, cmd)` pair carries two `polpermissive` rows |
+| W05 | N7 | **PostgREST/RLS spike** — table → policy → PostgREST → JWT → curl → `openapi.json` → types. **CORRECTED:** the spike's scoping check was per-claim (`site_id`), which is the design ADR-0023 §Row scope withdrew | Five curl checks: **membership-scoped** RLS (two members of different groups see disjoint rows), anon not a leak, spec served |
+| W06 | N2 | **SUPERSEDED (not done).** `postgrest.conf`: `db-anon-role`, `jwt-role-claim-key`, shared secret. **Four** roles: a migration/owner role plus `app_anon`/`app_member`/`app_admin`. The **role and claims machinery is unaffected** by the scope redesign and still stands — what no longer holds is everything it was verified *against*: the claim it fed was a `site_id`, and the policy that read it is the recursive walk | `curl /` returns the spec; a wrong secret is refused; **no request-serving role owns a table**. Re-run unchanged, then re-run **again** after W26/W27 against the closure-join schema — a pass on the old schema is not a pass on this one |
+| W07 | N2 | **SUPERSEDED (not done).** Native RLS policies per ADR-0023. It was implemented and proved, and the proof is real: **one composed policy per operation**, scope and capability composed (never split across two permissive policies — §6.6.2), fail-closed, `FORCE ROW LEVEL SECURITY`, and the identity read from `request.jwt.claims`. **The scope key and the hierarchy mechanism are both withdrawn**: it keys scope on a `site_id` claim and evaluates a recursive `site_tree_ids()` walk **per candidate row**. See W26/W27 — neither is a rewrite of this item, they are this item re-specified | Permitted returns rows; denied returns none; per access path; **and the policy still applies when run as the owner role**. Plus: a member with **no** capability is denied **in its own scope**, and no `(relid, cmd)` pair carries two `polpermissive` rows. **All of it must be re-executed against the closure-join schema**: the 33 green tests are the superseded design's |
 | W08 | N2 | Column + table grants; `REVOKE ALL FROM PUBLIC` first, then `REVOKE SELECT` **at table level** before the column list | Assert `SELECT` is **denied**, not merely omitted. The column-revoke-only order fails **open** — verified |
-| W08a | N2 | **Capability as a table, enforced by per-operation policies.** Recorded by executed design testing, not by argument | Five capabilities need **31** roles as grants; a new capability in an existing tier is **one inserted row**; hierarchy alternatives (scope cache, closure table, `ltree`) each rejected with evidence — §6.6.2 |
+| W08a | N2 | **Capability as a table, enforced by per-operation policies.** Recorded by executed design testing, not by argument. **CORRECTED:** the closure table was listed here among the rejected hierarchy alternatives — that rejection was of *incremental repair*, and closure refreshed wholesale is now the design (§6.6.4). `ltree` and the per-session scope cache remain rejected, each with evidence | Five capabilities need **31** roles as grants; a new capability in an existing tier is **one inserted row**; the hierarchy alternatives (scope cache, `ltree`) each rejected with evidence and the **closure table reversed**, with the surviving rule being *compare membership, not counts* — §6.6.2, §6.6.4 |
 | W09 | N2 | Plain-SQL migrations, one directory, one table; `NOTIFY pgrst, 'reload schema'` after commit | Every migrated table is reachable at its endpoint |
-| W10 | N2 | `seed.ts` using PostgREST or `psql`, never TypeORM; seeds the three DB roles and an admin user | A fresh `setup` reaches a logged-in state |
+| W10 | N2 | `seed.ts` using PostgREST or `psql`, never TypeORM; seeds the three DB roles and an admin user. Must seed **through** the boundary: connect as `pgrst_authenticator`, `SET LOCAL ROLE app_admin` | A fresh `setup` reaches a logged-in state |
 | W11 | N2 | Thin Nest app: JWT issuance, login orchestration, password reset, email, CAPTCHA, cron | Each route has a test; the six security tests in W13 |
-| W12 | N2 | Rate limiting for PostgREST routes via `db-pre-request` or a reverse proxy | Sustained requests are throttled; PostgREST does not throttle alone |
+| W12 | N2 | Rate limiting for PostgREST routes. **CORRECTED:** this said "via `db-pre-request` or a reverse proxy" — `db-pre-request` **cannot** do it; it runs in a read-only transaction, so a write there fails `25006` and a working request returns `405`. Reverse proxy only | Sustained requests are throttled; PostgREST does not throttle alone, and `db-pre-request` is asserted **not** to be the throttle |
 | W13 | N2 | Six security tests: audit row · 5-failure block · blocked-before-credentials · IP normalization · per-account · allowlist | Each **fails** against the old code, passes after |
 | W14 | N2 | Delete `packages/nestjs-typeorm-rls/`, TypeORM, Passport, Swagger, and both migration trees | `grep` gates are empty; `npm ls` shows none installed |
 | W15 | N3 | `openapi.json` committed — PostgREST Swagger 2.0 → `swagger2openapi` → OpenAPI 3.0 → `openapi-typescript` | Regeneration is a no-op on a clean tree; generated fields are spec-verbatim |
@@ -558,6 +673,14 @@ than no doc.
 | W23 | N5 | Zoneless opt-in; remove `NgZone` | `NgZone.isStable`-dependent code absent; SSR still renders |
 | W24 | ALL | Remove every mock service and stub; real tests replace the 14 assertion-free scripts | `grep` for mock factories in `src/` is empty; `no-restricted-imports` active |
 | W25 | N6 | Rewrite all docs against the built system | Every command runs; every claim is true; W03/W04 pass |
+| W26 | N2 | **Rewrite the baseline migration to the closure-join schema.** `backend/database/migrations/0001_rls_foundation.sql` is shipped and still implements the superseded design. It must become `groups` (hierarchical, `parent_id` self-FK) + `user_groups` (membership, **not** member-writable) + `role_capability` + `org_closure`, with `actor()` replacing `claim_site_id()` and `site_tree_ids()` **deleted**. Every table declares its scoping category (group-scoped / hierarchy / unscoped) and takes the primary key that follows from it; **every FK on a group-scoped table carries `group_id`**, so no FK leaves the scoped set (W28). `down()` must reverse all of it | A `migration:run` against an **empty** database creates `groups`, `user_groups`, `role_capability`, `org_closure` and creates **no** `sites` table; `grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b' backend/database/` returns **nothing**; each group-scoped table reports `PRIMARY KEY (group_id, id)` in `\d`; `migration:revert` leaves an empty schema |
+| W27 | N2 | **Rewrite the RLS suite against the new shape.** `backend/test/rls/` currently passes **33** tests that exercise `site_tree_ids()` + a `site_id` claim. They prove the old design and are **not evidence for the new one** — a green suite here must not be read as validation of closure scope. The rewritten suite must assert, by name, the measured closure behaviours: a member of `EU` sees `EU`/`UK`/`FR` and **not** `HQ`, **not** `US`; a member of `HQ` sees everything beneath; a member of two disjoint groups sees the **union** (`IN`/`ANY`, never `AND`); **no** membership rows → **zero** rows and no error; and a membership revoked since the token was minted changes scope on the **next request with the same token**. Keep the cross-axis test: a member with **no** capability is denied **in its own scope** | Every test above exists and passes; the suite contains **zero** references to `site_id` / `site_tree_ids`; and the §6.6.1 tamper table is **re-measured against the rewritten file** — disabling `ENABLE ROW LEVEL SECURITY`, deleting the `REVOKE SELECT` lines and widening the boundary `GRANT` each turn `verify` red at step 7 of 8. A tamper table carried over from the superseded suite is not a verification |
+| W28 | N2 | **Referential-integrity oracle tests — none of the four shapes exists today.** FK, `UNIQUE` and primary-key checks are **not policy-governed**, so they bypass RLS and **fail open**. Add one test per shape, each named after the leak: (a) **plain FK existence oracle** — success vs `23503` reveals any group id, including out-of-scope ones; (b) **content oracle via an FK to an unreadable table** — a token value in a table the caller cannot `SELECT` is confirmed present; (c) the **silent `UNIQUE` + `ON CONFLICT DO NOTHING`** form — the same oracle with **no error at all**, the most dangerous of the four; (d) **`ON DELETE CASCADE` crossing RLS** — a member deleted a group they held and destroyed a row in a group they could never see. Plus a structural test for the design constraint itself | Each of the four tests **fails** when its shape is present and passes when the FK is re-pointed at a table members cannot write to; the `ON CONFLICT DO NOTHING` test asserts the **row is absent afterwards**, because there is no error to assert on; the structural test asserts that no FK on a group-scoped table leaves the group-scoped set, by reading `pg_constraint` |
+| W29 | N2 | **Assert no `SECURITY INVOKER` function is reachable by a serving role.** A helper under `INVOKER` reads its tables *as the caller*, so every serving role needs `SELECT` on them — on `role_capability` that publishes the **entire capability matrix**, which is exactly what capability exists to keep private. `SECURITY DEFINER` is kept and the `role` GUC is the fix; this item exists so that trade is **asserted**, not remembered | Query `pg_proc` for every function in the schema: assert **no** function with `prosecdef = false` is executable by `app_anon`, `app_member` or `app_admin`; assert every `SECURITY DEFINER` helper is safe by inspection (reads no caller-supplied table, returns no caller-supplied data); and dropping `SECURITY DEFINER` from the capability helper turns the suite **red** |
+| W30 | N2 | **`org_closure` refresh and the index `CONCURRENTLY` requires.** Create the matview with `UNION` and **no accumulator column**, add `UNIQUE (ancestor, descendant)` — `REFRESH MATERIALIZED VIEW CONCURRENTLY` is refused without it — and refresh from a **statement-level** trigger on `groups`, inside the writing transaction, so there is no staleness window. Grant the matview to **nobody** | `EXPLAIN` shows the policy subplan as a **`hashed SubPlan` with `loops = 1`** at 305 rows and at 3305 rows (a correlated variant gives `loops = 305` — assert on `loops`, never on the policy's apparent shape, because an `EXISTS`-shaped variant is simplified back to a hashed SubPlan); `has_table_privilege` is **false** for every serving role on `org_closure`, and `/org_closure` is not reachable anonymously; a write to `groups` is visible to the next read in the **same** transaction; tenant reads during a concurrent refresh stay in the **6.7 ms** class, not the 7,606 ms a plain refresh costs |
+| W31 | N2 | **Cycle safety — three controls, in order.** A write-time trigger rejects a cycle at insert; the closure query uses `UNION` with **no accumulator** so a cycle that gets past the trigger costs 384 rows rather than a hung session; and **`temp_file_limit` is set on the refreshing session**. `parent_id REFERENCES groups(id)` does **not** enforce acyclicity, and on an acyclic tree the unsafe and safe variants are indistinguishable — both return 361 rows — so the property is invisible until the data is broken | Inserting `A → B → A` is **refused** by the trigger; with the trigger disabled a forced cyclic graph returns **384 rows in under 1 s** instead of hanging, and the test has a timeout that would fail on the non-terminating form; `temp_file_limit` is asserted **present** on the role that runs the refresh, because its absence turns a slow query into a full disk |
+| W32 | N2 | **`actor()` must catch the `uuid` cast.** Identity is the token's `sub`, and the naive spelling `->>'sub'::uuid` is **wrong** — `::` binds tighter than `->>`, so it casts the literal `'sub'`. The correct form is `(… ->> 'sub')::uuid`, and it must be **wrapped** so a non-uuid or empty `sub` returns `NULL` rather than raising | Over HTTP, a token with `"sub":"garbage"` and one with **no** `sub` return **zero rows**, not `HTTP 500`. Today they return 500 — fail-closed, but the wrong signal: an operator reading logs investigates an internal error instead of an authorization decision. The test fails against the current unguarded `::uuid` |
+
 
 ### 6.0.1 Audit protocol
 
@@ -567,6 +690,27 @@ not inferred. An item with no runnable verification is treated as not started.
 
 `grep` gates are expected to return nothing; a non-empty result is a failure, not
 a warning.
+
+**Superseded is not a fifth status, and it is not "done".** An item can be
+*implemented* and *proved* and still be **superseded**, because the design it was
+proved against has since been replaced. Concretely:
+
+- A **superseded** item keeps its verification record, because the proof was real
+  and deleting it would lose the eight defects that executing the file found
+  (§6.6) — the whole reason the ADR records them.
+- It is **not done**, because the verification was executed against a schema that
+  is no longer the design. Re-running it against the old schema proves nothing
+  about the new one.
+- It is therefore **not started** as work, until the replacement's own
+  verification passes.
+
+This is the exact failure class the governing risk in §1.2 describes, and it
+does not announce itself: `npm run test:rls` is green, `verify` passes, and the
+green says only that the superseded shape is internally consistent. **W06 and W07
+are superseded** — the role and claims machinery they built still stands, but
+everything they were proved against was keyed on a `site_id` claim and a
+per-candidate-row walk. Their replacements are W26 (the schema) and W27 (the
+suite).
 
 ### 6.1 Where the boundary sits
 
@@ -621,7 +765,7 @@ Checked against PostgREST documentation and upstream issues rather than assumed:
 |---|---|
 | RLS works with PostgREST | **Confirmed.** Policies read claims via `current_setting('request.jwt.claims', true)::json` |
 | PostgREST verifies the JWT itself | **Confirmed.** Role impersonation via the `role` claim, configurable with `jwt-role-claim-key` |
-| PostgREST does **not** rate-limit | **Confirmed.** Upstream states you must put a reverse proxy in front; docs ship an Nginx `limit_req` example. W8 stands |
+| PostgREST does **not** rate-limit | **Confirmed.** Upstream states you must put a reverse proxy in front; docs ship an Nginx `limit_req` example. W12 stands — and it is **not** `db-pre-request`, which runs in a read-only transaction |
 | PostgREST emits column names verbatim, no auto-transform | **Confirmed.** The feature was explicitly declined upstream |
 | Column renaming works on reads | **Confirmed, but read-only** — `?select=alias:column`. Writes still require real column names, so aliases cannot solve naming end-to-end |
 | Column privileges replace views for hiding columns | **Confirmed with a caveat we under-weighted** — `select=*` breaks, and grant order matters |
@@ -642,7 +786,7 @@ change the design.
 |---|---|
 | PostgreSQL | **15.19** via `apt-get install postgresql` |
 | PostgREST | **16.4**, static binary. The only OpenAPI settings are `openapi-mode`, `openapi-security-active`, `openapi-server-proxy-uri` — **no version switch** |
-| RLS per-claim | **Works.** Site A token → only site A rows; site B token → only site B |
+| RLS per-claim | **Works — and this is the shape that was later withdrawn.** A `site_id` token → only that site's rows; another `site_id` token → only that one's. **Superseded:** scope is now read from `user_groups` membership joined to `org_closure`, not from a claim (§6.6.4, W26). The spike result stands as evidence that PostgREST applies RLS at all; it is not evidence for how scope is keyed |
 | Spec generation | **Works.** `GET /` serves the spec |
 | Schema reload | `NOTIFY pgrst, 'reload schema'` is **mandatory and sufficient** — no restart (§5.3.1) |
 | Contract chain | **Works.** Swagger 2.0 → OpenAPI 3.0 → types, spec-verbatim, zero camelCase leakage |
@@ -689,6 +833,20 @@ Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicate
 > decisions recorded in this section, including the rejection of the closure table.
 > The section below is correct as far as it goes and is now **superseded on scope,
 > hierarchy and capability**.
+>
+> **Two things in it are load-bearing for the sections that follow it, so it is
+> kept rather than replaced.** The findings below were what executing a policy
+> file finds — a `SETOF` return type that does not compile, a claim accessor that
+> raises instead of denying, `EXECUTE` granted to `PUBLIC`, an admin branch that
+> matches nothing — and **every one of them still applies to the closure-join
+> schema**, which is why they are re-verified in W27 rather than inherited.
+>
+> **What is superseded here is the scope *key* and the hierarchy *mechanism*, not
+> the mechanics.** The row counts at the end of this section — root→3, mid→2,
+> unrelated→1 — describe `site_tree_ids()` + `claim_site_id()`. They are **not**
+> the numbers the closure design produces, and the closure numbers are in §6.6.4.
+> The shipped migration still contains the old shape (W26) and the suite still
+> asserts the old numbers (W27).
 
 | # | Verdict |
 |---|---|
@@ -738,7 +896,9 @@ Ten hypotheses executed against PostgreSQL 15.19 + PostgREST 16.4, in a dedicate
 **Corrected in W07**, which is where each of these was proven rather than
 reasoned about. Beyond the list above, five further defects were found by
 executing the corrected file — recorded here because the pattern, not the
-instance, is the lesson:
+instance, is the lesson. **The proof stands; the file it proved is superseded**
+(W06/W07 in §6), so each of these must be re-earned against the closure-join
+schema in W27 rather than assumed to carry over.
 
 9. **Revoking `EXECUTE` from `PUBLIC` and granting it to nobody** is worse than
    doing nothing: every scoped request became
@@ -772,7 +932,11 @@ a leak look like a feature. "Unrelated→0" would be wrong too: the row is the
 caller's own site, and the suite asserts 1 explicitly so the number cannot drift in
 either direction.
 
-The one number every document must now agree on:
+The one number every document must now agree on — **for the SUPERSEDED design**.
+These are `site_tree_ids()` + `claim_site_id()` figures, and they are retained
+because they are what the shipped suite still asserts. **They are not the numbers
+the closure-join design produces**; when W27 lands these rows are replaced by the
+§6.6.4 numbers, and until then a green `test:rls` confirms only this table:
 
 | Claim | Rows visible | Why |
 |---|---|---|
@@ -788,6 +952,20 @@ The one number every document must now agree on:
 "the tests pass": **the tests can go red when the control is removed.** A suite
 that stays green whether or not the protection exists is worse than no suite,
 because it converts an absent control into a documented one.
+
+> **This table was measured against the SUPERSEDED schema, and that limits what it
+> proves.** The `12 / 2 / 3 of 33` figures describe a suite exercising
+> `site_tree_ids()` + a `site_id` claim. Two consequences, both required reading:
+>
+> 1. **The *method* is what transfers.** Removing a control and confirming the
+>    gate goes red at step 7 is a procedure, not a number. It applies unchanged to
+>    the closure-join schema.
+> 2. **The *numbers* do not transfer, and neither does the green.** 33 green tests
+>    prove the recursive-walk design is internally consistent. They are **not
+>    evidence for the design ADR-0023 §Row scope settles on.** W27 re-measures
+>    this table against the rewritten file; carrying it forward unmeasured would
+>    make a stale result look like a live one, which is the failure mode §1.2
+>    exists to prevent.
 
 Each row below was executed by removing one control from the shipped SQL, running
 the full gate, and restoring the file byte-for-byte. In every case the run ended at
@@ -1078,10 +1256,23 @@ And the claim that the **two-argument** `current_setting` is the safe form is
 **three-argument** form with `nullif` gives a **clean denial**. Keep the
 three-argument form.
 
-> **Migration status.** `backend/database/migrations/0001_rls_foundation.sql` has
-> **not** been rewritten. It still carries the recursive `site_tree_ids()` walk keyed
-> on a `site_id` claim. Everything in items 1–8 is the design a migration rewrite
-> must implement; none of it may be read as a claim about the shipped SQL.
+> **Migration status — read this before citing anything above.** Neither artefact
+> has moved:
+>
+> - `backend/database/migrations/0001_rsl_foundation.sql` has **not** been
+>   rewritten. It still carries the recursive `site_tree_ids()` walk keyed on a
+>   `site_id` claim. **The rewrite is W26.**
+> - `backend/test/rls/` has **not** been rewritten either. Its **33 passing tests
+>   exercise the old design** and are **not evidence for any of items 1–8**.
+>   **The rewrite is W27**, and W27 must re-measure the §6.6.1 tamper table,
+>   because a proof carried across a schema change is a stale result wearing a
+>   current one's clothes.
+> - W06 and W07 are **superseded, not done** (§6.0.1). They were implemented and
+>   proved, and the proof found the eight defects it found — but against a design
+>   that has since been replaced.
+>
+> Everything in items 1–8 is the design a migration rewrite **must** implement.
+> None of it may be read as a claim about the shipped SQL or the shipped suite.
 
 ---
 
@@ -1096,9 +1287,21 @@ npm run verify            # build + typecheck + lint + test + smoke
 # P1 — API layer
 npm run test:rls          # gating step 7 of 8: every policy permitted returns rows, denied returns none
                            # and the gate is proven able to fail — see §6.6.1 before trusting it
+                           # CURRENTLY VALIDATES THE SUPERSEDED DESIGN (W27): a green run is
+                           # not evidence for the closure-join model
 npm run generate:client   # PostgREST spec → client regenerates cleanly
 curl $PGRST_URL/ | jq .   # PostgREST is serving; OpenAPI is present
 grep -rn "typeorm" package.json   # must be absent
+
+# P1 — closure-join scope (W26–W32). Written before implementation so the rebase is
+# auditable; none of these has been executed. Each is the verification its item
+# claims, not an additional aspiration.
+grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b' backend/database/   # must be empty
+# EXPLAIN the scoped SELECT: the policy subplan must be a hashed SubPlan with
+#   loops = 1 at 305 rows AND at 3305 rows — assert on loops, never on the SQL's
+#   apparent shape, because an EXISTS-shaped variant is simplified back to hashed.
+# psql: has_table_privilege(<serving role>, 'org_closure', 'SELECT') must be false
+#       for every serving role; the matview has no RLS and PostgREST auto-publishes it.
 
 # P2
 npm run test -- --watch=false
@@ -1122,8 +1325,9 @@ npm run build && npm run verify
 | **Two runtimes to run and understand** | High | The setup command starts both. Boundary rule in §6.1 keeps it unambiguous. PostgREST is a single binary — no new service to operate |
 | **Two JWT secrets must stay in sync** (`PGRST_JWT_SECRET` and `JWT_SECRET`) | High | Fail loudly at boot if they differ. Documented in `.env.example` |
 | API shape couples to schema shape — a column rename breaks the public API | Accepted as a breaking change, not mitigated (ADR-0022). Caught as a compile error by `verify` |
-| An LLM writes an over-permissive `USING (true)` policy | High | RLS policy tests (W12) are the only defence — permitted case *and* denied case per policy, per access path. This is the same risk as with Nest; PostgREST does not add it |
-| PostgREST does not rate-limit | High | W8 — edge limiter in front of it. Never rely on Postgres query volume as a throttle |
+| An LLM writes an over-permissive `USING (true)` policy | High | RLS policy tests (W27) are the only defence — permitted case *and* denied case per policy, per access path, plus the cross-axis case a member with no capability is denied in its own scope. This is the same risk as with Nest; PostgREST does not add it |
+| PostgREST does not rate-limit | High | W12 — edge limiter in front of it. Never rely on Postgres query volume as a throttle, and never on `db-pre-request`, which is read-only |
+| **The shipped RLS suite is green against a design that has been replaced** | High | `test:rls` and `verify` both pass while the schema is the superseded one, and nothing in either output says so. Mitigation is W26 + W27 landing as one change: rewrite the migration and the suite together, re-measure the §6.6.1 tamper table against the rewritten file, and treat the interim green as **not evidence** (§6.0.1) |
 | `angular/` is the only working reference — deleting it strands the work | High | Build in `angular_v2/` alongside; never edit `angular/` until v2 passes every gate |
 | RLS rewrite is the highest-risk single item | High | Policies are testable in isolation; ship them before anything depends on them |
 | Angular 22's `OnPush` default is a silent breaking change | Medium | Migrate on v18 where it is opt-in; upgrade last (P4) |

@@ -10,17 +10,14 @@ duplicate these rules elsewhere; update them here.
 
 ## 0. What this repository is
 
-An **Angular 22 (SSR) frontend + NestJS 12 (Fastify) backend** template intended
-to be forked and built upon.
+An **Angular 22 (SSR) frontend + NestJS 12 (Fastify) backend** template intended to
+be forked and built upon. Two consequences drive most rules below:
 
-Two consequences follow, and they drive most rules below:
-
-1. **This repo is never a live app.** There is no production deployment, no
-   accounts, no third-party API keys. Every feature must work with zero external
-   credentials — self-hosted or purely local.
-2. **Most changes here will be made by AI agents.** That makes *mechanical
-   enforcement* far more important than documentation. An agent pattern-matches
-   the nearest example and replicates it. The code is the instruction.
+1. **This repo is never a live app.** No production deployment, no accounts, no
+   third-party API keys. Every feature must work with zero external credentials.
+2. **Most changes here will be made by AI agents**, so *mechanical enforcement*
+   matters more than documentation. An agent pattern-matches the nearest example
+   and replicates it. **The code is the instruction.**
 
 ---
 
@@ -28,9 +25,7 @@ Two consequences follow, and they drive most rules below:
 
 ```bash
 # Backend — backend/
-npm run build
-npm run lint
-npm test
+npm run build && npm run lint && npm test
 npm run migration:run        # apply migrations
 npm run db:seed              # seed roles/permissions/admin user
 
@@ -45,19 +40,15 @@ npm start                    # dev server on :4200 (no SSR)
 psql -h localhost -U postgres -c 'select version();'
 ```
 
-Postgres is expected to be running locally. Connection settings come from
-`DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` in `.env`.
-Docker is not used and is not a supported path.
+Postgres is expected to be running locally, from `DB_HOST` / `DB_PORT` / `DB_USER` /
+`DB_PASSWORD` / `DB_NAME` in `.env`. **Docker is not used and is not a supported
+path.**
 
 ### The verification gate
 
-```bash
-npm run verify
-```
-
-**This is the most important command in the repository.** It runs typecheck,
-lint, tests, and a smoke check against a live database. A change is not complete
-until `verify` passes.
+**`npm run verify` is the most important command in the repository.** It runs
+typecheck, lint, tests, and a smoke check against a live database. A change is not
+complete until `verify` passes.
 
 - Never report work as done on the basis of "it looks right."
 - Never weaken a lint rule or delete a test to make `verify` pass. Fix the code.
@@ -83,9 +74,9 @@ build on it.
 
 ### 2.2 No mock services. Ever.
 
-**Mocks are the most common way an agent fakes progress.** Creating
+**Mocks are the most common way an agent fakes progress**, and creating
 `MockAuthService` to unblock a compile, then reporting the task complete, is the
-single most frequent failure mode in this codebase's history. It is forbidden.
+single most frequent failure mode in this codebase's history.
 
 - **A mock service must never exist in application code.** Not in `src/` outside
   `*.spec.ts`, not in `*.service.ts`, not "temporarily". If a real service
@@ -99,16 +90,12 @@ single most frequent failure mode in this codebase's history. It is forbidden.
   exists.** If `AuthService` exists, build on it. A second `MockAuthService`
   shadows the real contract and both get maintained.
 - **Masks, stubs, and fixtures are for `*.spec.ts` and `*.stories.ts` only.**
-  Fake data in application code is forbidden for the same reason.
 - **Never bypass a real integration to "save time."** If Postgres is
   unavailable, the test fails or is skipped explicitly. It is never replaced
   with an in-memory fake.
 - **Never declare a task complete while a mock is in the tree.** Report it as
-  blocked instead. A truthful "this needs X" is a valid outcome; a mock plus a
-  success message is a lie.
-
-A mock is not a placeholder for work — it is a claim that the work is done. When
-reviewing a diff, treat any new mock as a blocking finding.
+  blocked instead. When reviewing a diff, treat any new mock as a blocking
+  finding.
 
 ### 2.3 Fail loudly, never silently
 
@@ -173,9 +160,9 @@ Required baseline. One flat config only (`eslint.config.js`) — a second legacy
 
 **`rxjs-angular/prefer-takeuntil-destroyed` does not exist and must not be
 listed.** The `rxjs-angular` plugin ships only `prefer-async-pipe`,
-`prefer-composition` and `prefer-takeuntil`. Its teardown rule reads
-`context.parserServices`, which ESLint 9 removed, while `angular-eslint@22`
-requires ESLint ^9||^10 — so enabling it aborts the entire lint run.
+`prefer-composition` and `prefer-takeuntil`, and its teardown rule reads
+`context.parserServices`, which ESLint 9 removed while `angular-eslint@22` requires
+ESLint ^9||^10 — enabling it aborts the entire lint run.
 `@angular-eslint/no-implicit-take-until-destroyed` is the substitute. The plugin
 may stay installed, but **no rule is enabled from it.**
 
@@ -199,284 +186,220 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
   evaded its own security layer through `entityManager.query()`.
 - **PostgREST serves base tables.** It is the API layer. Do not add a Nest
   controller for anything expressible as CRUD over a table.
-- **No views.** No `CREATE VIEW` in any migration (ADR-0022). PostgREST serves
-  base tables. A superuser-created view **bypasses all RLS silently**, and writes
-  through views are unreliable (no primary key).
+- **No views.** No `CREATE VIEW` in any migration (ADR-0022). A superuser-created
+  view **bypasses all RLS silently**, and writes through views are unreliable (no
+  primary key).
 - **One naming convention, end to end.** Columns, the wire, and generated types
   are all `snake_case`. No client key transform, ever — it rewrites keys inside
-  `jsonb` and breaks passthrough payloads.
+  `jsonb` and breaks passthrough payloads. Never quote a camelCase identifier:
+  Postgres folds `userId` to `userid`, and the mismatch only surfaces when
+  something else references it.
 - Derived field → `GENERATED ALWAYS AS (...) STORED` or a `STABLE` function via
   `/rpc/fn_name`.
 - **Migrations are the only schema authority.** Plain SQL, one directory, one
-  migrations table name. Never edit columns without a migration.
-- **Role creation is not a migration.** `CREATE ROLE` needs `CREATEROLE` and roles
-  are cluster-scoped while migrations are database-scoped, so roles live in
-  `database/bootstrap/001_roles.sql`, run once **as a superuser**. The
-  escalation-boundary `GRANT` lives there for the same reason: `GRANT <role> TO
-  <role>` needs `ADMIN OPTION`, so it *cannot* run in a migration — verified:
-  `must have admin option on role "app_anon"`. **The one statement that is the
-  security boundary is necessarily a superuser statement.** Do not move it into a
-  migration to make the file self-contained.
-- Every migration needs a working `down()`.
+  migrations table name. Never edit columns without a migration. Every migration
+  needs a working `down()`.
+- **Role creation is not a migration.** `CREATE ROLE` needs `CREATEROLE`, and roles are
+  cluster-scoped while migrations are database-scoped, so roles — and the
+  escalation-boundary `GRANT`, which needs `ADMIN OPTION` and therefore *cannot* run
+  in a migration — live in `database/bootstrap/001_roles.sql`, run once **as a
+  superuser**. **The one statement that is the security boundary is necessarily a
+  superuser statement.** Do not move it to make a file self-contained.
 - Store arrays and objects as `jsonb` (or a real Postgres array type). JSON blobs
   must be queryable.
 - Timestamps are `timestamptz`. Booleans are `boolean`. UUIDs are `uuid`.
-- Columns are `snake_case`. Never quote a camelCase identifier: Postgres folds
-  `userId` to `userid`, and the mismatch only surfaces when something else
-  references it.
 - Index anything you filter or sort on, including `jsonb` paths (GIN).
 
 ## B2. Authorization — three axes, three mechanisms, composing per operation
 
-**Scope and capability are orthogonal.** A role-based check can be satisfied by a
-valid role no matter which group the caller is standing in, so it can never express
-"your group's rows." Forcing one mechanism to carry both is why the previous
-permissions module could not do row-level security at all (ADR-0023).
+**Organising frame: `groups = RLS`, `roles = OLS`.** *Groups* decide **rows** (RLS,
+below the application); *roles* decide **verbs** and capabilities (grants and
+per-operation policies). Both are needed: a role-based check is satisfied by a valid
+role no matter which group the caller stands in, so it can never express "your
+group's rows."
 
-**Orthogonal inputs, one composed expression.** The axes are separate *sources of
-truth*; they are not separate *expressions*. Every policy that needs both carries
-both, in one statement, per operation. Two corrections below, both from executed
-testing: the older rule — "never in the same expression" — shipped a privilege
-escalation, and the axis table's Scope and Feature cells were both wrong. Full
-evidence and measurements in **ADR-0023**.
+**The axes are separate inputs, composed in one policy per operation** — separate
+*sources of truth*, not separate *expressions*. Evidence: **ADR-0023**,
+`docs/security.md` §Scope and capability.
 
 | Axis | Question | Mechanism | Keyed on |
 |---|---|---|---|
-| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | a **membership table**, not a claim |
+| **Scope** | Which *rows*? | `CREATE POLICY` (RLS) | `user_groups` **membership table** — never a claim |
 | **Operation** | Which *verbs*? | table + column `GRANT` | DB `role` claim |
-| **Feature / capability** | Which *features*? | per-operation RLS policies | `role_capability` table |
+| **Feature / capability** | Which *features*? | per-operation RLS policies | `role_capability` **table** |
 
-> **CORRECTED.** The Scope and Feature rows were both wrong. Scope was documented as
-> keyed on a `site_id` **JWT claim**; it is keyed on **membership in a table**, so a
-> revoked membership bites on the next request rather than at token expiry. Feature
-> was documented as thin-app guards on a capability role; capability is a row in
-> `role_capability`, checked in the database. Full evidence in ADR-0023.
+**Two role vocabularies, and collapsing them fails silently.** **DB role** =
+`app_anon` / `app_member` / `app_admin` (impersonation, RLS, grants). **Capability** =
+`ic` / `site_manager` / `admin` — a *label*, never a DB role, held as a row in
+`role_capability`, and also the vocabulary the thin app's guards *speak*.
 
-**The two role vocabularies are different things.**
-
-| Vocabulary | Values | Used by |
-|---|---|---|
-| DB role (scope tier) | `app_anon`, `app_member`, `app_admin` | PostgREST impersonation, RLS, grants |
-| Capability role (a **label**, not a DB role) | `ic`, `site_manager`, `admin` | thin-app guards, feature checks |
-
-> **CORRECTED.** The second row previously read "Used by: thin-app guards". It now
-> also reads them, but capability is **enforced in the database** — a capability is
-> a row in `role_capability`, checked by `has_capability()` from a per-operation
-> RLS policy composed with the scope policy. `ic` / `site_manager` / `admin` remain
-> the vocabulary the thin app's guards *speak*, and remain **not** database
-> roles. See §Capability.
-
-- **An `ic` and a `site_manager` are the *same* DB role — `app_member`.** They
-  reach the same features and are scoped to their own site by the *identical*
-  policy. Their only difference is capability.
-- **Never create DB roles named after capabilities** (`ic`, `site_manager`).
-  Capability lives in a **table**, not in roles — see §Capability below. Modelling
-  a capability as a role is not merely inelegant, it is arithmetically dead: five
-  capabilities need **31** additional roles (§Capability).
-- **Never both mechanisms on one operation.** If an operation is a table verb,
-  the database grants it. If it is application logic, a thin-app guard checks it.
-  Applying both means two places to update and two ways to disagree. This is a
-  statement about *mechanisms for one operation*, and it is unaffected by the
-  correction below — scope and capability compose because both are **RLS**, one
-  mechanism.
-- **CORRECTED — the separation rule was WRONG and it shipped a security bug.**
-  This section used to say, as a greppable invariant: *"you must be unable to
-  write one query or guard that filters by site **and** by feature."* **That rule
-  caused a silent privilege escalation** and is withdrawn. Enforcement was correct;
-  the shape the rule forced was wrong. Full narrative, both SQL shapes and the
-  measurement: ADR-0023 §the withdrawal at the top.
+- **An `ic` and a `site_manager` are the *same* DB role — `app_member`.** Same
+  features, same scope policy; capability is their only difference.
+- **Never create DB roles named after capabilities.** Capability lives in a **table**.
+- **Never both *mechanisms* on one operation.** A table verb belongs to the database;
+  application logic to a thin-app guard. Scope and capability compose precisely
+  because both are **RLS** — one mechanism.
+- **Never split one operation's requirements across two PERMISSIVE policies.** They
+  are **OR**-ed, so a scope policy covering `DELETE` admits it alone and a capability
+  policy can only widen. Compose them in one policy, or mark the capability policy
+  `AS RESTRICTIVE` (which ANDs with the permissive set).
 
   ```sql
-  -- WRONG: two PERMISSIVE policies on one operation are OR-ed, so scope_only
-  -- admits every in-scope DELETE on its own and cap_delete can only widen.
-  CREATE POLICY scope_only ON t FOR ALL          USING (<scope>);
+  -- WRONG: OR-ed, so scope_only admits every in-scope DELETE on its own.
+  CREATE POLICY scope_only ON t FOR ALL   USING (<scope>);
   CREATE POLICY cap_delete ON t FOR DELETE USING (<capability>);
 
-  -- RIGHT: one composed policy per operation.
+  -- RIGHT: one composed policy per operation. A FOR ALL policy's USING also
+  -- governs WITH CHECK, which is why the WRONG shape fails INSERT identically.
   CREATE POLICY user_delete ON users FOR DELETE USING (
-      has_capability('user.delete') AND unit_id = ANY (unit_tree_ids(claim_unit_id()))
+      has_capability('user.delete') AND <scope>
   );
 
-  -- Also right: permissive scope + RESTRICTIVE capability (ANDs with the
-  -- permissive set). Use this when the scope half is shared by many tables.
+  -- Also right when the scope half is shared by many tables.
   CREATE POLICY cap_delete ON t AS RESTRICTIVE FOR DELETE
       USING (has_capability('user.delete'));
   ```
 
-  Verified: a member holding **zero** capabilities ran the two-permissive shape and
-  `DELETE`d **1 row** and `INSERT`ed **1 row**, **no error and no warning**. The
-  gate was not weak — it was absent, and every half passed its own test. A `FOR ALL`
-  policy's `USING` also governs `WITH CHECK`, which is why `INSERT` fails the same
-  way.
-
-  - **What survives of the old rule, and is still greppable:** no capability is
-    *derived from* scope and none from the DB role. `has_capability()` reads the
-    `role` GUC and a capability table; `actor()` reads identity from the token.
-    Neither is computed from the other, and a policy never infers "you are an IC"
-    from "you are scoped to a group".
-  - **What is gone:** the claim that the two can never meet in one expression.
-    They must meet. Keeping them apart is what removed the gate.
-  - Name tests after the attack: *"a member with no `user.delete` capability
-    cannot delete a row in its own group"* — the case both wrong shapes fail and
-    neither per-half test ever ran.
+- **No capability is *derived from* scope or from the DB role** — that is the whole
+  of the surviving separation rule. **The claim that the two can never meet in one
+  expression is gone**: keeping them apart is what removed the gate. *(Withdrawn
+  invariant, measured escalation, both SQL shapes: ADR-0023, top.)*
+- **Name tests after the attack:** *"a member with no `user.delete` capability cannot
+  delete a row in its own group"* — the case both wrong shapes fail and neither
+  per-half test ever ran.
 
 ### Scope — Postgres RLS only
 
-**Row-level security is enforced by Postgres policies. Never in application
-code.**
+**Row-level security is enforced by Postgres policies. Never in application code.**
 
-- **VERIFIED ON A LIVE INSTALL: a table's owner bypasses its RLS policies.**
-  Postgres exempts owners from RLS. If the migration role also serves requests,
-  every policy is a no-op and **nothing errors** — verified: the same JWT claim
-  returned 5 of 5 rows as owner and 2 of 5 as a non-owner.
+- **A table's owner bypasses its RLS policies**, and **nothing errors** when it does.
   - **Two distinct roles, always.** A migration/owner role that never receives
     requests, and a request-serving role that owns nothing.
-  - **`ALTER TABLE … FORCE ROW LEVEL SECURITY`** on every protected table, so
-    even the owner is subject to the policy.
-    - **`FORCE` does not bind a superuser or `BYPASSRLS` role** — verified: `postgres`
-      read 5/5 from a `FORCE`d table. Every role that can reach a protected table
-      must be `NOSUPERUSER NOBYPASSRLS`, asserted in a test.
-  - **That includes the migration role for `DML`.** DDL is unaffected, but seeding
-    is `INSERT`, so the owner is rejected by the policy (`new row violates
-    row-level security policy` — verified). **Seed through the boundary:** connect
-    as `pgrst_authenticator` and `SET LOCAL ROLE app_admin` in one transaction.
-    **Never disable `row_security` to seed** — that reopens the bypass.
-    - **CORRECTED after the W07 proof.** This used to say "seed from a role that
-      sets `request.jwt.claims` to a value the policy admits." **That route stopped
-      working** when the admin branch was fixed to key on `current_user` rather
-      than on a claim — claims alone can only ever *narrow* scope now. A correction
-      to a policy can silently invalidate a procedure documented elsewhere; check
-      the policy before trusting any seeding instruction.
-  - Omitting `WITH CHECK` is safe: Postgres falls back to the `USING` expression
-    for inserts, so one expression governs both visibility and insertability.
-  - A test asserts the policy applies when run as the migration role, not only as
-    the request role.
+  - **`ALTER TABLE … FORCE ROW LEVEL SECURITY`** on every protected table.
+    - **`FORCE` does not bind a superuser or `BYPASSRLS` role.** Every role that can
+      reach a protected table must be `NOSUPERUSER NOBYPASSRLS`, asserted in a test.
+  - **That includes the migration role for `DML`.** Seed **through the boundary**:
+    connect as `pgrst_authenticator`, `SET LOCAL ROLE app_admin`, one transaction.
+    **Never disable `row_security` to seed.** Claims alone cannot buy write access,
+    because the admin branch discriminates on `current_user`.
+  - Omitting `WITH CHECK` is safe — Postgres reuses `USING` for inserts, so one
+    expression governs both visibility and insertability.
+  - A test asserts the policy applies as the migration role, not only the request role.
 - Write `CREATE POLICY` in a migration. RLS sits below the application, so no
-  forgotten guard, new endpoint, or future runtime can bypass it.
-- One policy per table, and it must be **total** — every `OR` branch is
-  evaluated, so a cast in any branch can take the whole query down. Never write
-  a bare `current_setting(...,true)::json`; it **raises** on an empty string
-  rather than denying. Use a defensive accessor, and **never cast a caller-supplied
-  value to `uuid` inside a policy** — a malformed claim raises
-  `invalid input syntax for type uuid` and takes the whole query down with it.
-  `USING` alone **does** govern `INSERT` when no `WITH CHECK` is written (`polqual`
-  is reused) — confirmed by denial, not only by reading `pg_policy`:
+  forgotten guard, endpoint, or future runtime can bypass it.
+- **One policy per table, and it must be `total`** — every `OR` branch is evaluated,
+  so a cast in any branch can take the whole query down.
+  - **Never a bare `current_setting(...,true)::json`** — it *raises* on an empty
+    string rather than denying, and `OR` does not short-circuit past a raising operand.
+  - **Never cast a caller-supplied value to `uuid` inside a policy** — a malformed
+    claim raises `invalid input syntax for type uuid` and takes the query down, admin
+    branch included.
+  - **Read identity with the three-argument, `nullif`-guarded `current_setting`, in a
+    function that catches the cast** — never inline as `current_setting(…, true)::json->>'sub'`.
+    The two-argument form is *not* the safe one: `HTTP 500` where the guarded form denies.
+- **The policy subquery must be uncorrelated.** That is what buys once-per-statement
+  evaluation, and it is why scope is denormalised into the closure view, not walked.
+
+This is the scope policy. **Scope comes from `user_groups`, not from the token —
+there is no `site_id` claim:**
 
 ```sql
-CREATE FUNCTION request_claims() RETURNS jsonb
-LANGUAGE sql STABLE PARALLEL SAFE AS $$
-  SELECT coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+-- group hierarchy (admin-writable), membership (NOT member-writable), closure matview
+CREATE TABLE groups (id uuid PRIMARY KEY, parent_id uuid REFERENCES groups(id), name text NOT NULL);
+CREATE TABLE user_groups (user_id uuid NOT NULL, group_id uuid NOT NULL REFERENCES groups(id),
+                          PRIMARY KEY (user_id, group_id));
+
+-- The cast applies to the extracted text: parenthesise. `->>'sub'::uuid` casts the
+-- LITERAL 'sub' instead, because `::` binds tighter than `->>`.
+CREATE FUNCTION actor() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid
 $$;
 
--- The uuid cast is guarded. A malformed site_id yields NULL, which flows into
--- site_tree_ids(NULL), which walks no rows — a denial, not an error.
-CREATE FUNCTION claim_site_id() RETURNS uuid
-LANGUAGE plpgsql STABLE PARALLEL SAFE AS $$
-DECLARE raw text;
-BEGIN
-  raw := request_claims()->>'site_id';
-  IF raw IS NULL OR raw = '' THEN RETURN NULL; END IF;
-  RETURN raw::uuid;
-EXCEPTION WHEN others THEN RETURN NULL;   -- never raise on attacker input
-END $$;
+-- Closure: UNION (not UNION ALL) and NO accumulator column in the recursive row.
+-- The trailing SELECT is required -- without it the statement is a syntax error.
+CREATE MATERIALIZED VIEW org_closure AS
+WITH RECURSIVE t AS (
+    SELECT id AS ancestor, id AS descendant FROM groups
+  UNION
+    SELECT t.ancestor, g.id FROM t JOIN groups g ON g.parent_id = t.descendant
+)
+SELECT ancestor, descendant FROM t;
+
+-- UNIQUE index, required for REFRESH ... CONCURRENTLY.
+CREATE UNIQUE INDEX org_closure_uniq ON org_closure (ancestor, descendant);
 
 CREATE POLICY row_scope ON projects USING (
-    current_user = 'app_admin'
-    OR site_id = ANY (site_tree_ids(claim_site_id()))
+    group_id IN (
+        SELECT c.descendant FROM user_groups ug
+        JOIN org_closure c ON c.ancestor = ug.group_id
+        WHERE ug.user_id = actor()
+    )
 );
+
+-- An admin branch ORs on current_user, which is set by Postgres from the SET ROLE
+-- the escalation boundary already constrained -- never from a token field.
 ```
 
-> **SUPERSEDED — the shape above is what `0001_rls_foundation.sql` still ships, and
-> it is not the design.** It keys scope on a `site_id` **token claim** and walks the
-> hierarchy **per row**. Both are replaced: scope is read from a **membership
-> table** joined to a refreshed **closure matview**, whose subquery is hoisted
-> (`loops = 1`). A token claim cannot express membership that changes mid-session.
-> Proven design, evidence and the migration-status note: **ADR-0023 §Row scope**.
+> **SUPERSEDED, and it must not be copied: the per-row recursive walk keyed on a
+> `site_id` claim.** `0001_rsl_foundation.sql` still ships it. That design is
+> **measured wrong** on both halves — a claim cannot express membership that
+> changes mid-session, and a walk cannot be hoisted — and the migration rewrite
+> must remove it. It is deliberately not reproduced here as an example;
+> ADR-0023 §Row scope holds it, labelled, with the measurements that retired it.
 
-- **Key the admin branch on `current_user`, never on the `role` claim.** The
-  claim is caller-supplied and signed by whoever holds the secret; `current_user`
-  is set by Postgres from the `SET ROLE` the escalation boundary already
-  constrained. Reading the admin tier out of the token re-opens the very hole
-  this policy exists to close. Verified in the shipped policy: a member who forged
-  `"role":"admin"` into their own validly-signed token got **zero rows**, because
-  no branch reads that field.
-  - **In a policy, `current_user` is right. Inside a `SECURITY DEFINER` function it
-    is wrong** — it rebinds to the function owner. See §Capability.
-- **The DB role vocabulary is `app_anon` / `app_member` / `app_admin`.** A
-  capability role (`ic`, `site_manager`, `admin`) is a *different* vocabulary and
-  is not a database role. Writing `request_claims()->>'role' = 'admin'` produces
-  a **dead branch** that never matches, because no token ever carries the bare
-  string `admin`. Verified over HTTP: a valid `app_admin` token got `200 []` and
-  saw nothing at all.
-- **A malformed `site_id` must not break an admin either.** It is tempting to
-  reason that `TRUE OR NULL` is `TRUE` and "the failing cast never completes" —
-  that reasoning is **wrong**. `OR` does not short-circuit past an expression
-  that raises; both operands are evaluated and the error wins. Verified: an
-  admin token with `"site_id":"garbage"` returned
-  `invalid input syntax for type uuid`. Only the guarded accessor above makes the
-  policy total for every input, admin included.
-- Absent, empty, or `{}` claims → both branches false → **zero rows**, no error.
+- **Key the admin branch on `current_user`, never on the `role` claim.**
+  `request_claims()->>'role' = 'admin'` is a **dead branch** that can never match —
+  the claim is caller-supplied, `current_user` is not. *(In a policy `current_user`
+  is right; inside a `SECURITY DEFINER` function it is wrong. See §Capability.)*
+- **The scoping subquery is hoisted once per statement — a `hashed SubPlan`, not an
+  `InitPlan`.** Measured `loops = 1` at 305 rows and at 3305 rows; a correlated
+  variant gives `loops = 305`. **Uncorrelatedness buys it, not the node name** —
+  `x IN (SELECT …)` yields the hashed form, `InitPlan` is for uncorrelated *scalar*
+  subqueries, and an `EXISTS`-shaped variant is simplified back to a hashed SubPlan.
+  **Assert on `loops`, not on the SQL's apparent shape.**
+- **Never repeat the claim that a `STABLE` helper is hoisted into an `InitPlan`.**
+  `STABLE` means *"same answer within this statement"*, **not** *"called once"*; the
+  withdrawn walk was called 400,001 times over 400,000 rows. (ADR-0023 §The hierarchy.)
+- **Multiple groups `UNION` — `IN`/`ANY`, never `AND`.** A membership change takes
+  effect on the **next request with the same token**. No membership rows, or
+  absent/empty/`{}` claims → **zero rows**, no error.
+- **`parent_id REFERENCES groups(id)` does not enforce acyclicity** — a
+  self-referencing FK admits `A → B → A`.
 - **A policy is evaluated for EVERY role that reaches the table, including
-  `app_anon`.** So `EXECUTE` on the policy's helper functions must be granted to
-  `app_anon` too — verified, omitting it made unauthenticated reads fail with
-  `permission denied for function site_tree_ids` instead of returning zero rows.
-  A policy that errors is a denial-of-service surface and an oracle.
+  `app_anon`.** Grant `EXECUTE` on the policy's helpers to `app_anon` too. A policy
+  that *errors* instead of denying is a DoS surface and an oracle.
 - **`SET LOCAL app.user_id` is not an alternative.** A policy reads the setting it
   names; `app.user_id` is invisible to a policy built on `request.jwt.claims`.
-- **Hierarchy functions must return a scalar array, not `SETOF`.** Postgres rejects
+- **Hierarchy functions must return a scalar array, not `SETOF`** — Postgres rejects
   set-returning functions in policy expressions. Use `RETURNS uuid[]` with
   `array_agg`, or read the closure view directly.
-- **A `STABLE` function in a policy qual is evaluated once per candidate row.**
-  Measured: **400,001 calls over 400,000 rows**. `STABLE` means *"same answer within
-  this statement"*, **not** "called once" — so a `STABLE` helper whose argument
-  includes a column cannot be hoisted. The two claims that explained it away
-  (`VOLATILE` caused it; `PARALLEL SAFE` cost ~170×) are both withdrawn and both
-  measured false. **Full record: ADR-0023 §The hierarchy.** Keep this bullet; it is
-  the reason the scope was later denormalised into a closure view.
-- **Scope is a closure materialized view, refreshed — not a walk.** The scoping
-  subquery is uncorrelated, so the planner hoists it: **`loops = 1` at 305 rows and
-  at 3305 rows**, where a deliberately correlated variant gives `loops = 305`. It
-  appears as a **`hashed SubPlan`** — `x IN (SELECT …)` yields the hashed form;
-  `InitPlan` is for uncorrelated *scalar* subqueries. Uncorrelatedness is what buys
-  once-per-statement; the node name does not.
-  - **Scope comes from a membership table (`user_groups`), not a token claim**, so a
-    membership change takes effect on the **next request with the same token**.
-    Multiple groups union — `IN`/`ANY`, never `AND`.
-- **The closure matview is granted to NOBODY.** A matview has no RLS and no policy,
-  PostgREST auto-publishes it as a first-class resource, and under
-  `openapi-mode = "ignore-privileges"` it appears in the served spec regardless of
-  grants. **A single `GRANT SELECT` served the entire org tree to an anonymous
-  caller.** Assert the grant state in a test — the spec will not tell you.
+- **`org_closure` is a matview, granted to NOBODY.** No RLS, no policy, PostgREST
+  **auto-publishes** it, and under `openapi-mode = "ignore-privileges"` it appears in
+  the served spec **regardless of grants**. A single `GRANT SELECT` served the whole
+  org tree to an anonymous caller. Assert the grant state in a test — the spec will
+  not tell you.
 - **Refresh it with `REFRESH MATERIALIZED VIEW CONCURRENTLY` from a statement-level
-  trigger on the hierarchy table.** `CONCURRENTLY` needs a `UNIQUE` index on the
-  view. Reads continue at **6.7 ms** during a concurrent refresh (13.5 ms
-  baseline); a plain refresh blocked tenant reads for **7,606 ms** and a
-  trigger-held lock for **8,466 ms**. Because the refresh runs inside the writing
-  transaction there is **no staleness window**.
-  - **REVERSED: the blue/green matview swap is withdrawn — unnecessary *and*
-    impossible.** There is no window to close, and `DROP MATERIALIZED VIEW` on the
-    closure is rejected because seven RLS policies depend on it.
-- **Cycle safety: the closure query uses `UNION` and carries NO accumulator
-  column.** `UNION` terminates on a cycle *only* when the recursive row has no
-  accumulator — add a `depth` column and every pass is a new row, so `UNION`
-  degrades to `UNION ALL`. Measured on a cyclic graph: `UNION ALL` + `depth` is
-  **non-terminating** and exceeds `temp_file_limit` in **91 ms**; `UNION` with no
-  accumulator returns **384 rows in 12.7 ms**. On an *acyclic* tree both return
-  **361 rows** — the property is invisible until the data is broken.
-  - **`parent_id REFERENCES groups(id)` does not enforce acyclicity.**
-  - Defence in depth, in order: a write-time trigger rejects the cycle; `UNION`
-    bounds it if the trigger is bypassed; **`temp_file_limit` must be set on the
-    refreshing session** or a non-terminating closure exhausts the filesystem.
-  - A tolerated cycle is fail-closed on the query and fail-**open** on the data:
-    each cycle member inherits the whole cycle's scope.
-- **Referential-integrity checks bypass RLS and fail OPEN.** FK, unique and primary
-  key checks are not policy-governed. Measured: a plain FK is an **existence
-  oracle** (success vs `23503` reveals any group id, including out-of-scope ones);
-  an FK to an unreadable table is a **content oracle** (a token value in an
-  unreadable table was confirmed); `UNIQUE` + `ON CONFLICT DO NOTHING` gives the
-  same oracle with **no error at all** — the most dangerous form; and
-  `ON DELETE CASCADE` **crosses RLS** (a member deleted a group they held and
-  destroyed a row in a group they could never see).
+  trigger on `groups`.** `CONCURRENTLY` needs a `UNIQUE` index on the view and cannot
+  run in a transaction block that has already written — hence statement-level, not
+  row-level. Because the refresh runs *inside* the writing transaction there is **no
+  staleness window**. **The blue/green matview swap is withdrawn** — unnecessary (no
+  window to close) *and* impossible (`DROP MATERIALIZED VIEW` is rejected because
+  seven RLS policies depend on it).
+- **Cycle safety: the closure query uses `UNION` and carries NO accumulator column.**
+  `UNION` terminates on a cycle *only* without one; add `depth` and every pass is a
+  new row, so `UNION` degenerates to `UNION ALL`. On an *acyclic* tree the two are
+  indistinguishable — invisible until broken.
+  - Defence in depth, in order: a write-time trigger rejects the cycle; `UNION` bounds
+    it if the trigger is bypassed; **`temp_file_limit` must be set on the refreshing
+    session** or a non-terminating closure exhausts the filesystem.
+  - A tolerated cycle is fail-closed on the query and fail-**open** on the data — each
+    cycle member inherits the whole cycle's scope.
+- **Referential-integrity checks bypass RLS and fail OPEN.** FK, unique and primary key
+  checks are not policy-governed — the policy is not evaluated at all. A plain FK is an
+  **existence oracle** (`23503` vs success reveals any group id, including out-of-scope
+  ones); an FK to an unreadable table is a **content oracle**; `UNIQUE` +
+  `ON CONFLICT DO NOTHING` gives the same oracle with **no error at all**; and
+  `ON DELETE CASCADE` **crosses RLS**.
   - **The rule — a design constraint, not a mechanical transform:** *A group-scoped
     table may only carry foreign keys that stay within the group-scoped set. Any FK
     leaving that set must terminate at a table members cannot write to.*
@@ -489,85 +412,55 @@ CREATE POLICY row_scope ON projects USING (
     | **Unscoped** | `users`, `roles`, `role_permissions`, `user_groups` | simple primary keys | global reference data |
 
 - **A hierarchy function that walks the tree its own policy protects must be
-  `SECURITY DEFINER`, and the tree table must NOT be `FORCE`d.** These are one
-  decision, not two. With `SECURITY INVOKER` the walk reads a table whose policy
-  calls the walk, and every request as a non-superuser role dies with
-  `stack depth limit exceeded` — verified, after ~100 frames, with no policy error
-  and no partial result. `FORCE` on that table does not fix it — it makes it
-  worse, because then the owner inside the function is itself subject to the
-  policy. Only DEFINER plus leaving that table un-`FORCE`d terminates.
-  `SECURITY DEFINER` is safe here **only** because the function reads no
-  caller-supplied table and returns no caller-supplied data; it is not a general
-  licence to make helpers privileged.
-  **This is the weakest link in the pattern:** an owner can read the tree table
-  unrestricted. Keep tenant payload out of it, and record the trade in a comment
-  where the next maintainer will hit it.
-- **The hierarchy walk is self-inclusive.** It anchors on the `root` row itself, so
-  a member scoped to a group sees its own row plus its descendants, and a member
-  scoped to an unrelated group sees **its own single row and none of the subtree**.
-  Verified counts over the five-row proof fixture: root→3, mid→2, unrelated→**1**,
-  unknown→0, admin→all 5. Anyone documenting "unrelated→0" is describing a bug.
-- **`EXECUTE` is granted to `PUBLIC` on new functions by default.** `REVOKE
-  EXECUTE … FROM PUBLIC` on every function, or any `SECURITY DEFINER` helper is
-  anonymously reachable. Verified: 7 of 9 test functions had `NULL proacl`.
-  **A revoke is not a policy** — revoking from `PUBLIC` while granting to nobody
-  is strictly worse than doing nothing, because it turns every scoped request into
-  a 42501. Revoke and grant, always together.
-- **Hierarchy is a function, not a policy.** Scope derives from position in a tree
-  via one recursive helper — `LANGUAGE sql STABLE`. Adding a level is a data
-  change, not a code change.
-- **Rejected designs, all built and executed.** Full evidence in ADR-0023 and
-  `docs/rebase.md` §6.6.2.
-  - **REJECTED AS A VULNERABILITY: a per-session scope cache.** A member read 50
-    rows, then called `set_config('app.scope', …)` on **its own** custom GUC and
-    read **500**. Custom GUCs have no privilege control and `SET LOCAL` gives no
-    protection — the caller is the one setting it. **Never cache authorization
-    scope in a GUC the caller can set.**
-  - **REJECTED: `ltree`.** Its `UNIQUE` constraint on `path` makes the obvious
-    repair fail outright — re-parenting onto an occupied path raises
-    `duplicate key value violates unique constraint "org_ltree_path_key"`.
-    Verified.
-  - **CORRECTED: a closure table was rejected here and is now the design.** The
-    original rejection was of **incremental repair**, which silently disagreed with
-    the tree in 5 places across 9 roots with no error raised — and root 1 had the
-    *same count* (241) on both sides with different membership, so count-based
-    checks pass. A closure refreshed **wholesale** has no repair step to get
-    wrong. **What survives:** any incremental update of a denormalised scope must be
-    proved to agree with the source, and comparing *counts* does not prove it —
-    compare membership.
-- **Default deny.** `REVOKE ALL ... FROM PUBLIC` before any grant. Tables intended
-  to be globally readable are listed explicitly.
-- **The claims setting only reaches the database if PostgREST is configured to
-  produce it, and the one setting that decides it will `PANIC` a server rather
-  than fall back.** `jwt-role-claim-key = "role"` (bare) aborts PostgREST 16.4 on
-  boot: `failed to parse role-claim-key value (role) … unexpected "r" / expecting
-  "."`. Only the **JSPath** `".role"` works; `$.role` panics on 16.4 too. A policy
-  suite can be perfect and every request still fails, because nothing reaches the
-  policy. See B5 and `docs/development.md` troubleshooting.
-- PostgREST exposes JWT claims as a transaction-scoped setting. Read them with the
-  **three-argument** `current_setting`, `nullif`-guarded, inside a function that
-  catches the cast — never inline as `current_setting(…, true)::json->>'sub'`, which
-  raises on `''`. See the guarded accessor above.
-  - **CORRECTED — an earlier version of this file said the two-argument
-    `current_setting` was the safe form. That is inverted for this case.** Measured:
-    two-argument **raises** (`HTTP 500`); three-argument with `nullif` and a guarded
-    cast gives a **clean denial**. Keep the three-argument form.
-  - **One residual, recorded because it is fail-closed but wrong:** a non-uuid or
-    empty `sub` yields **`HTTP 500`**, not `403`. Nothing is disclosed and nothing
-    is admitted, but an operator reading logs chases an internal error instead of an
-    authorization decision. Catch the cast in the accessor and return `NULL`.
-- The thin Nest app has no SQL path at all (no ORM), so it passes no identity to
-  a policy: PostgREST does that from the verified token. `SET LOCAL app.user_id`
-  appears nowhere and would be ignored if it did.
-- `db-pre-request` is the hook for **revocation** — verified: a revoked token gets
-  a clean `401`/`PT401`, no 500 loop. It is **not** a throttle (read-only
-  transaction, above). An unreadable revocation table makes revocation **silently
-  return `200` with data**, so the table must be `GRANT`ed to the authenticator.
-- **No views.** A superuser-created view bypasses every RLS policy on its base
-  table, silently. Never create one (ADR-0022).
-- **Every policy has a test**: permitted case returns rows, denied case returns
-  none, and the denied case is proven for each access path. An LLM writing
-  `USING (true)` is otherwise invisible.
+  `SECURITY DEFINER`, and the tree table must NOT be `FORCE`d — one decision, not
+  two.** Under `INVOKER` the walk reads a table whose policy calls the walk and every
+  non-superuser request dies with `stack depth limit exceeded`; `FORCE` on that table
+  *causes* it. Assert both halves, because either alone passes. `SECURITY DEFINER` is
+  safe here **only** because the function reads no caller-supplied table and returns
+  no caller-supplied data. **This is the weakest link in the pattern** — an owner can
+  read the tree table unrestricted, so keep tenant payload out of it and record the
+  trade in a comment.
+- **The hierarchy walk is self-inclusive.** It anchors on the `root` row itself, so a
+  member scoped to a group sees its own row plus its descendants, and a member scoped
+  to an unrelated group sees **its own single row and none of the subtree**. Anyone
+  documenting "unrelated → 0" is describing a bug.
+- **`EXECUTE` is granted to `PUBLIC` on new functions by default.** `REVOKE EXECUTE …
+  FROM PUBLIC` on every function, or any `SECURITY DEFINER` helper is anonymously
+  reachable. **A revoke is not a policy** — revoking from `PUBLIC` while granting to
+  nobody is strictly worse than doing nothing, because it turns every scoped request
+  into a `42501`. Revoke and grant, always together.
+- **Never cache authorization scope in a GUC the caller can set.** Custom
+  dot-prefixed GUCs have no privilege control and `SET LOCAL` gives no protection,
+  because the caller is the one setting it. Rejected as a vulnerability, not a trade.
+- **Rejected designs, all built and executed** (ADR-0023 §The hierarchy decision,
+  `docs/rebase.md` §6.6.2):
+  - **`ltree`** — its `UNIQUE` constraint on `path` makes the obvious repair fail
+    outright on re-parenting onto an occupied path.
+  - **A closure table with *incremental* repair** — the repair silently disagreed with
+    the tree in 5 places with no error, and one root had the *same count* on both sides
+    with different membership. The wholesale refresh is the design; the rejection was
+    of repair, not of closure.
+  - **What survives of that finding:** any incremental update of a denormalised scope
+    must be proved to agree with the source, and **comparing counts does not prove it
+    — compare membership.**
+- **Default deny.** `REVOKE ALL ... FROM PUBLIC` before any grant. Tables intended to be
+  globally readable are listed explicitly.
+- **The claims setting only reaches the database if PostgREST is configured to produce
+  it, and the one setting that decides it will `PANIC` a server rather than fall
+  back.** Only the **JSPath** `".role"` works. A policy suite can be perfect and every
+  request still fail, because nothing reaches the policy. See B5.
+- **One residual, fail-closed but wrong:** a non-uuid or empty `sub` yields **`HTTP
+  500`**, not `403`. Catch the cast in `actor()` and return `NULL`.
+- The thin Nest app has no SQL path at all (no ORM), so it passes no identity to a
+  policy: PostgREST does that from the verified token.
+- `db-pre-request` is the hook for **revocation**, and is **not** a throttle (see B6).
+  An unreadable revocation table makes revocation **silently return `200` with data**,
+  so the table must be `GRANT`ed to the authenticator.
+- **No views.** A superuser-created view bypasses every RLS policy on its base table,
+  silently. Never create one (ADR-0022).
+- **Every policy has a test**: permitted case returns rows, denied case returns none,
+  and the denied case is proven for each access path. An LLM writing `USING (true)` is
+  otherwise invisible.
 
 ### Operation — Postgres grants, not app guards
 
@@ -579,33 +472,27 @@ REVOKE ALL ON projects FROM PUBLIC;                    -- default deny FIRST
 GRANT SELECT, INSERT                ON projects TO app_member;  -- no UPDATE/DELETE
 GRANT SELECT, INSERT, UPDATE, DELETE ON projects TO app_admin;
 
-REVOKE SELECT ON projects FROM app_member;             -- then columns
-GRANT  SELECT (id, site_id, name)  TO app_member;       -- `secret` unreadable
+REVOKE SELECT ON projects FROM app_member;             -- table level, FIRST
+GRANT  SELECT (id, group_id, name) TO app_member;       -- `secret` unreadable
 ```
 
-- Order matters: revoke the table-level grant **before** applying column grants,
-  or the column revoke silently does nothing.
-- A column-restricted role **cannot use `select=*`**, so requests against that
-  table must name columns explicitly.
-- Prefer keeping sensitive columns out of the readable set from the outset over
-  revoking after the fact.
+- **A column privilege can only narrow a table grant that has already been taken
+  away — it cannot subtract from one.** `REVOKE SELECT (col)` on top of a standing
+  table-level `SELECT` is accepted, exits 0, and changes nothing. The `REVOKE ALL` →
+  verb grants → **table-level** `REVOKE SELECT` → column list order is the one that
+  works; assert both orders so they cannot both be "right".
+- A column-restricted role **cannot use `select=*`**, so requests against that table
+  must name columns explicitly.
+- Prefer keeping sensitive columns out of the readable set from the outset.
 - **A test asserts `SELECT` is denied** — not merely omitted from a response.
 
 ### Capability — per-operation RLS policies over a capability table
 
-**Decided: capability is enforced in the database, by per-operation RLS policies,
-with capability living in a TABLE — not in roles.** This replaced the previous
-answer in this section ("feature guards in the thin app", keyed on a capability
-role), because the thin-app answer could not be composed with scope, and composing
-them is mandatory (§Scope).
-
-> **CORRECTED after execution.** The shape below is right and the function body was
-> **dead**. `has_capability()` read `current_user` inside a `SECURITY DEFINER`
-> function, so it compared the capability table against the *owner's* role and
-> returned `false` for everyone — including `app_admin` **while holding the
-> capability row**. The capability axis was silently absent, and it was absent in
-> the shape that *denies*, which is why nothing looked wrong. Full evidence:
-> ADR-0023 §Capability.
+**Capability is enforced in the database, by per-operation RLS policies, with
+capability living in a TABLE — not in roles.** The earlier answer ("feature guards in
+the thin app", keyed on a capability role) is withdrawn: a guard above the database
+cannot be composed with the policy below it. Thin-app guards remain correct for what
+RLS cannot express — a workflow action that is not a table verb.
 
 ```sql
 CREATE TABLE role_capability (
@@ -614,7 +501,7 @@ CREATE TABLE role_capability (
   PRIMARY KEY (db_role, capability)
 );
 
--- current_setting('role', true), NEVER current_user -- see the correction below.
+-- current_setting('role', true), NEVER current_user -- see the rule below.
 CREATE FUNCTION has_capability(cap text) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT EXISTS (SELECT 1 FROM role_capability rc
@@ -623,64 +510,31 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
 $$;
 ```
 
-- **CORRECTED — the documented body was dead, and it took the whole capability axis
-  with it.** It read `WHERE rc.db_role = current_user` inside a **`SECURITY
-  DEFINER`** function. `SECURITY DEFINER` rebinds `current_user` to the **function
-  owner**, so the predicate compared the capability table against the owner's role
-  name and never against the serving role. **Measured: `has_capability()` returned
-  `false` for `app_admin` *while holding* the capability row.** Every component was
-  individually correct and the capability axis was silently absent.
-  - **Why that shape is the worst one available:** it denies **everyone**, including
-    the roles that should have it, and it denies them with an ordinary zero-row
-    result. No error, no warning — a capability system that refuses every caller
-    looks exactly like a capability system that works.
-  - **The correct source is `current_setting('role', true)`**, the GUC Postgres
-    tracks for the `SET ROLE` that PostgREST's impersonation performs.
-  - Measured inside a `SECURITY DEFINER` function: `current_user` = `app`,
-    `current_role` = `app`, `session_user` = `pgrst_authenticator`,
-    `role` = `app_admin`. Three of the four look plausible; only one is right.
-  - **Inside a `SECURITY DEFINER` function, identity comes from the `role` GUC,
-    never `current_user`.** In a *policy* — which is not inside a function —
-    `current_user` is still correct for the admin branch.
-  - **`SECURITY INVOKER` is not the alternative.** Under `INVOKER` every serving role
-    needs `SELECT` on `role_capability`, which publishes the **entire capability
-    matrix** — exactly what capability exists to keep private. Keep `DEFINER`; fix
-    the GUC.
-  - **The test that would have caught it is the positive one.** Denials already had
-    tests; the defect is invisible to them. Assert that a role **holding** a
-    capability **passes**.
-
-- **Confirmed expressible: `FOR INSERT WITH CHECK` and `FOR DELETE USING`
-  discriminate by operation.** Postgres evaluates a different policy per verb,
-  so the capability requirement for `INSERT` cannot be satisfied by the one for
-  `DELETE`. Verified against the four policies on the `users` fixture: `SELECT`,
-  `UPDATE` (with `USING` *and* `WITH CHECK`), `INSERT` (`WITH CHECK` only) and
-  `DELETE` (`USING` only) each carried their own scope expression, and
-  `INSERT`/`DELETE` carried the capability term as well.
-- **Grants-as-capability is a dead end — enumerated, not asserted.** A policy can
-  only test `current_user`, so a capability modelled as a role needs one role per
-  distinct capability set. With the **five** capabilities in the executed fixture
-  (`financial.read`, `user.create`, `user.deactivate`, `user.delete`,
-  `user.read`) that is 2⁵ = **32** distinct sets; the empty set is already served
-  by the base role, so **31 additional database roles**, each needing a policy per
-  table, plus `GRANT role TO authenticator` entries that are cluster-scoped and
-  need `ADMIN OPTION` — a superuser statement per role.
-- **Role inheritance cannot help. It only ever adds, never subtracts.** Verified:
-  grant a privilege to the parent role and the child inherits it; then
-  `REVOKE` that privilege **from the child** and it is still `t` — inheritance
-  puts it straight back. There is no way to express "this role has that
-  capability *except* this one". And every serving role here is `NOINHERIT`
-  (verified: `app_anon`, `app_member`, `app_admin`, `app_auditor`, `cap_auth`,
-  `cap_owner` all `rolinherit = f`), which makes membership **inert** for
-  privilege resolution in the first place.
-- **A new capability inside an existing tier is one inserted row, no migration.**
-  Verified: `INSERT INTO role_capability VALUES ('app_auditor',
-  'financial.export')` and the tier has it, with no DDL and no policy change. The
-  operation policies reference capabilities **by name**, so a new name is not a
-  code change either.
+- **Inside a `SECURITY DEFINER` function, identity comes from the `role` GUC, never
+  `current_user`** — which rebinds to the **function owner**. A body reading
+  `rc.db_role = current_user` returns `false` for everyone, which is the worst
+  available shape: it denies **everyone** with an ordinary zero-row result, so the
+  whole capability axis is absent, silently. In a *policy* — not inside a function —
+  `current_user` is still correct for the admin branch.
+- **`SECURITY INVOKER` is not the alternative.** It would need `SELECT` on
+  `role_capability` for every serving role, publishing the **entire capability
+  matrix**. Keep `DEFINER`; fix the GUC.
+- **The test that catches this is the positive one.** Denials already had tests; the
+  defect is invisible to them. Assert that a role **holding** a capability
+  **passes**.
+- **`FOR INSERT WITH CHECK` and `FOR DELETE USING` discriminate by operation**, so
+  the `INSERT` capability requirement cannot be satisfied by the `DELETE` one.
+- **Grants-as-capability is a dead end.** A capability modelled as a role needs one
+  role per distinct capability set: five capabilities means **31 additional database
+  roles**, each needing a policy per table plus a cluster-scoped `ADMIN OPTION` grant.
+- **Role inheritance cannot help — it only ever adds, never subtracts.** `REVOKE` a
+  privilege *from the child* and inheritance puts it straight back. Every serving role
+  here is `NOINHERIT`, which makes membership inert anyway.
+- **A new capability inside an existing tier is one inserted row, no migration** —
+  and the policies name capabilities, so a new name is not a code change either.
 - **A new tier that is not a superset of an existing one is a new database role** —
-  and therefore a bootstrap change, an `ADMIN OPTION` grant, and a decision about
-  what that role may reach. Say so before designing one.
+  and therefore a bootstrap change, an `ADMIN OPTION` grant, and a decision about what
+  that role may reach. Say so before designing one.
 - Do not build query-builder proxies, `Proxy` wrappers, or CLS-based scope
   propagation. The previous implementation of this was ~2,400 lines that
   silently enforced nothing.
@@ -690,120 +544,98 @@ $$;
   - **Add the cross-axis test, which is the one that actually catches the bug
     above:** a member with **no** capability must be denied, *in its own scope*.
     Per-half tests pass against both the correct and the broken shape.
+  - **Assert on bodies and row counts, never on status codes alone.** No grant at
+    all is `401`, not `200 []`; a correct denial, a full `USING (true)` leak and a
+    partial leak were **all HTTP 200**. A status-only test passes on a real leak.
 
 ## B3. API contract — the spec is generated from the live schema
 
 - `openapi.json` is generated by PostgREST from the database and committed, with
-  `openapi-mode = "ignore-privileges"` so the served spec does not vary by the
-  requesting role.
+  `openapi-mode = "ignore-privileges"` so the served spec does not vary by role.
 - The frontend client is generated from it. **Never hand-write a URL, a response
   interface, or an HTTP call.** If the spec doesn't produce it, fix the schema.
-- Regenerate after any schema or route change:
-  ```bash
-  npm run generate:client
-  ```
-- A change that alters the wire format without regenerating the client is
-  incomplete.
+- Regenerate after any schema or route change — `npm run generate:client`. A change
+  that alters the wire format without regenerating the client is incomplete.
 - `@ApiProperty()` and explicit DTO classes apply **only** to the thin Nest app's
   own routes. There is no decorator-based contract for the CRUD surface.
-- A column rename is a **breaking change**: migration and client regeneration in
-  the same change. `verify` rejects the mismatch at compile time.
+- A column rename is a **breaking change**: migration and client regeneration in the
+  same change. `verify` rejects the mismatch at compile time.
 - Validation on the thin app's routes is global and strict:
   `new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })`.
 - Pagination is a shared helper. Never hand-roll `{ items, total, page }`.
 
 ## B4. Frontend client generation
 
-- The Angular types are **generated** by `openapi-typescript` from
-  `openapi.json`, which PostgREST emits from the live schema. Both are committed.
-- **Not Orval.** Its `namingConvention` covers file names and enum keys, not
-  schema property keys; converting snake_case properties needs a custom mutator.
+- The Angular types are **generated** by `openapi-typescript` from `openapi.json`,
+  which PostgREST emits from the live schema. Both are committed, and generated
+  types are never hand-edited — `verify` fails if they are.
+- **Not Orval.** Its `namingConvention` covers file names and enum keys, not schema
+  property keys; converting snake_case properties needs a custom mutator.
   `openapi-typescript` emits the spec verbatim with zero runtime dependencies.
 - Never hand-write an API URL, a response interface, or an HTTP call in the
   frontend. If the spec doesn't produce it, fix the schema.
-- **No runtime key transform.** Naming is resolved at build time. A runtime
-  transform would rewrite keys inside `jsonb` and corrupt passthrough payloads —
-  the `angular/` codebase deleted one for exactly this reason.
-- Generated types are never hand-edited. `verify` fails if they are.
-- Regenerate after any schema or route change:
-  ```bash
-  npm run generate:client     # openapi.json -> Angular types
-  ```
-- A change that alters the wire format without regenerating the client is
-  incomplete.
+- **No runtime key transform.** Naming is resolved at build time; a runtime transform
+  would rewrite keys inside `jsonb` and corrupt passthrough payloads.
+- Regenerate after any schema or route change — `npm run generate:client`. A change
+  that alters the wire format without regenerating the client is incomplete.
 - A column rename is a **breaking change**: migration and regeneration in the same
   change. `verify` rejects the mismatch at compile time.
 
 ## B5. Authentication
 
 - **PostgREST verifies the JWT** from the shared secret and performs role
-  impersonation via the `role` claim. Set `jwt-role-claim-key` explicitly.
-- **`jwt-role-claim-key` must be a JSPath: `.role`, not `role`.** The bare claim
-  name makes PostgREST 16.4 **PANIC on boot** rather than fall back — verified,
-  `failed to parse role-claim-key value (role) ... unexpected "r" / expecting "."`.
-  The leading dot is the entire fix. `$.role` is a later JSONPath spelling and
-  **also** panics on 16.4 — do not "modernise" the value.
+  impersonation via the `role` claim.
+- **`jwt-role-claim-key` must be a JSPath: `.role`, not `role`.** The bare claim name
+  makes PostgREST 16.4 **PANIC on boot** rather than fall back. The leading dot is
+  the entire fix; `$.role` **also** panics on 16.4 — do not "modernise" the value.
 - **PostgREST gives environment variables precedence over its config file.** A
-  `PGRST_JWT_SECRET` inherited from `backend/.env` silently overrides the value
-  in `postgrest.conf`, and a server started that way verifies tokens with the
-  wrong secret. Every request then fails `PGRST301 "None of the keys was able to
-  decode the JWT"` while the config file looks correct. Verified — and it cost
-  more time to find than any SQL bug here, because nothing in the file is wrong.
-  When spawning PostgREST, strip inherited `PGRST_*` keys rather than overriding
-  them: `spawn` stringifies env values, so `undefined` reaches PostgREST as the
-  literal text `"undefined"`.
+  `PGRST_JWT_SECRET` inherited from `backend/.env` silently overrides
+  `postgrest.conf`, and every request then fails `PGRST301 "None of the keys was able
+  to decode the JWT"` while the config file looks correct. Strip inherited `PGRST_*`
+  keys when spawning PostgREST rather than overriding them: `spawn` stringifies env
+  values, so `undefined` arrives as the literal `"undefined"`.
 - **The thin app registers `JwtAuthGuard` via `APP_GUARD`. Default deny.** Public
   routes opt out with `@Public()`. Per-controller `@UseGuards` is not an
-  authorization model — a new controller that forgets the decorator is fully
-  public.
+  authorization model — a new controller that forgets the decorator is fully public.
 - Both runtimes read the **same** secret. If `PGRST_JWT_SECRET` and `JWT_SECRET`
   diverge, fail loudly at boot rather than issuing tokens nothing accepts.
 - **The `role` claim selects the database role — and it is an escalation vector.**
-  PostgREST issues `SET ROLE` to whatever the token names. Verified: a
-  validly-signed token naming a **table-owning** role got `200` with full read,
-  and its `DELETE` returned `204` and **removed the row**.
+  PostgREST issues `SET ROLE` to whatever the token names, so a validly-signed token
+  naming a **table-owning** role gets full read and a working `DELETE`.
   - **Validating the claim at mint is necessary but nowhere near sufficient.** The
     mitigation must hold even if another code path ever issues a token.
   - **The control is the grant, and nothing else:**
     `GRANT app_anon, app_member, app_admin TO authenticator;` — with that alone a
-    token claiming an owner role gets `403` with
-    `permission denied to set role "app"` (verified).
-  - **The GRANT needs `ADMIN OPTION`, so it cannot be run by a migration role.**
-    Verified: applying it as the owner fails with
-    `must have admin option on role "app_anon"`. The one statement that *is* the
-    boundary is therefore a superuser statement, and it belongs in the role
-    bootstrap rather than the migration. Assert it there by reading
+    token claiming an owner role gets `403`.
+  - **The GRANT needs `ADMIN OPTION`, so it cannot run in a migration.** The one
+    statement that *is* the security boundary is necessarily a superuser statement,
+    and it lives in `database/bootstrap/001_roles.sql`. Assert it there by reading
     `pg_auth_members` and raising — otherwise its absence surfaces far away as an
-    unrelated-looking `permission denied to set role` from deep inside a fixture.
+    unrelated-looking `permission denied to set role` from inside a fixture.
   - **The `role` claim is a DB role name, not a capability.** Tokens carry
-    `app_member` / `app_admin`, never `ic` / `site_manager` / `admin`. Writing a
-    policy or a test against the bare capability name produces a branch that can
-    never match.
+    `app_member` / `app_admin`, never `ic` / `site_manager` / `admin`; a policy or
+    test written against the bare capability name produces a branch that can never match.
   - **`REVOKE SET ON PARAMETER role` is inert on PostgreSQL 15.** Never rely on it.
-  - **Never use `REVOKE <owner> FROM <authenticator>` as the boundary.** It is a
+  - **Never use `REVOKE <owner> FROM <authenticator>` as the boundary** — it is a
     per-role denylist, bypassed by any role not yet revoked.
   - Every serving role is `NOSUPERUSER NOBYPASSRLS NOINHERIT`.
-  - **The authenticator must be `LOGIN`.** It is the one role PostgREST
-    connects *as*, and a `NOLOGIN` role cannot be connected to — verified, and
-    the failure is "the server cannot serve at all", not a subtle one. The other
-    four stay `NOLOGIN`, because nothing ever connects as them; PostgREST reaches
-    them with `SET ROLE`.
+  - **The authenticator must be `LOGIN`** — the one role PostgREST connects *as*. The
+    other four stay `NOLOGIN`; PostgREST reaches them with `SET ROLE`.
   - **The issuer must always set `exp`** — a token with no `exp` is accepted.
-  - A test asserts a token naming each non-granted role is refused, and checks the
-    row count afterwards.
-  - **Assert the row count through an UNFILTERED read.** A count taken through a
-    filtered path cannot distinguish "nothing was deleted" from "I can see
-    nothing", which makes every denial assertion in the suite vacuous. Concretely:
-    under `FORCE`, a claimless owner read returns **0 rows**, not the true count —
-    verified — so an owner-connection count helper silently reads zero forever.
-- **No default JWT secret.** Assert `JWT_SECRET` is present and sufficiently
-  long at bootstrap; throw if not.
-- Access tokens short-lived (~15–30 min). Permissions are read from the
-  database on each token refresh, **not baked into the token**, so revocation
-  takes effect promptly.
-- Refresh tokens are persisted in the database, rotated on every use, and
-  genuinely revocable. In-memory session state is forbidden — it breaks on
-  restart and on more than one instance.
+  - A test asserts a token naming each non-granted role is refused, then checks the
+    row count.
+  - **Assert the row count through an UNFILTERED read.** A filtered count cannot
+    distinguish "nothing was deleted" from "I can see nothing", which makes every
+    denial assertion vacuous — under `FORCE`, a claimless owner read returns **0 rows**,
+    so an owner-connection count helper silently reads zero forever.
+- **No default JWT secret.** Assert `JWT_SECRET` is present and sufficiently long at
+  bootstrap; throw if not.
+- Access tokens short-lived (~15–30 min). Permissions are read from the database on
+  each token refresh, **not baked into the token**, so revocation takes effect
+  promptly.
+- Refresh tokens are persisted in the database, rotated on every use, and genuinely
+  revocable. In-memory session state is forbidden — it breaks on restart and on more
+  than one instance.
 - Password hashing: bcrypt or argon2, cost ≥ 12, configurable.
 - Logout must actually invalidate the refresh token.
 
@@ -811,13 +643,12 @@ $$;
 
 Every app forked from this needs these. They must actually work.
 
-- **Rate limiting is registered globally** and tightened per-route on
-  `login`, `register`, and `forgot-password`. Use `@Throttle` / the exported
-  `ThrottleSkip`, not a hand-rolled metadata key.
-- **PostgREST does not rate-limit.** Upstream states you must put a reverse proxy
-  in front of it. **`db-pre-request` cannot do it either** — it runs in a
-  read-only transaction, so a write there fails `25006` and a working request
-  returns `405`. Verified. Use the reverse proxy.
+- **Rate limiting is registered globally** and tightened per-route on `login`,
+  `register`, and `forgot-password`. Use `@Throttle` / the exported `ThrottleSkip`,
+  not a hand-rolled metadata key.
+- **PostgREST does not rate-limit, and `db-pre-request` cannot either** — it runs in
+  a read-only transaction, so a write there fails `25006` and a working request
+  returns `405`. Use a reverse proxy.
 - **Failed logins are recorded before the credential check**, not from a route
   handler that only runs on success. There is no Passport strategy to hook — the
   check lives inside `POST /auth/login` itself.
@@ -863,48 +694,33 @@ Every app forked from this needs these. They must actually work.
   throwaway schema per suite; never point tests at a developer's working data.
 - **Every RLS policy has a test**: permitted case returns rows, denied case returns
   none, and the denied case is proven for each access path.
-- **Name a test after the attack it prevents, not after what it calls.**
-  "a validly-signed token naming the table-owning role is refused, and the row
-  survives" tells a reader in six months which claim is load-bearing; "rls works"
-  tells them nothing. `rls.spec.ts` is a fine *filename* — the `it()` titles are
-  what a human reads when a step goes red.
-- **Assert on bodies and row counts, never on status codes alone.** The specific
-  way this bites: with a table-level `SELECT` grant in place, a column that was
-  meant to be hidden comes back at **HTTP 200 with its value intact**, and a
-  status-only assertion passes on the leak. Verified.
-- **Prove a security test can fail.** Remove the control and confirm the matching
-  test goes red — a suite whose tests all pass whether or not the protection
-  exists is the exact failure this file exists to prevent. `npm run test:rls` is a
-  **gating step of `verify`** (step 7 of 8), and the claim is verified rather than
-  asserted: each of these was executed by removing one control from the shipped
-  SQL, running the whole gate, and restoring the file —
-
-  | Control removed | Result |
-  |---|---|
-  | *(nothing — baseline)* | `verify passed`, 33 RLS tests green |
-  | `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | red at step 7/8, **12 of 33** |
-  | the `REVOKE SELECT ON … FROM app_member/app_admin` lines | red at step 7/8, **2 of 33** |
-  | the boundary `GRANT` widened to reach the table-owning role | red at step 7/8, **3 of 33** |
-
-  The other steps cannot see any of it: typecheck, lint and both unit suites stay
-  green with every policy in the database disabled. `verify` stops at the first
-  failing step, so a tampered run ends at 7 and never reaches 8. Re-run this
-  table whenever a control moves — a gate whose load-bearing status was proved
-  once, three defects ago, is a claim again (`rebase.md` §6.6.1).
-  - **A tampered run can leave the cluster worse than it found it.** Role
-    membership is cluster-scoped and the bootstrap only ever `GRANT`s, so
-    restoring the SQL file does **not** undo a widened boundary `GRANT` — the next
-    run is red with a clean tree, and the live escalation is back. Undo it with
+- **Name a test after the attack it prevents, not after what it calls.** "a
+  validly-signed token naming the table-owning role is refused, and the row survives"
+  tells a reader in six months which claim is load-bearing; "rls works" tells them
+  nothing. `rls.spec.ts` is a fine *filename* — the `it()` titles are what a human
+  reads when a step goes red.
+- **Assert on bodies and row counts, never on status codes alone.** With a
+  table-level `SELECT` grant in place, a column meant to be hidden comes back at
+  **HTTP 200 with its value intact**, and a status-only assertion passes on the leak.
+- **Prove a security test can fail.** Remove the control and confirm the matching test
+  goes red — a suite that passes whether or not the protection exists is the exact
+  failure this file exists to prevent. `npm run test:rls` is a **gating step of
+  `verify`** (step 7 of 8); the tamper matrix that proved it is `docs/rebase.md`
+  §6.6.1, and **it must be re-run whenever a control moves.** Every other step of
+  `verify` stays green with all RLS disabled.
+  - **A tampered run can leave the cluster worse than it found it.** Role membership
+    is cluster-scoped and the bootstrap only ever `GRANT`s, so restoring the SQL file
+    does **not** undo a widened boundary `GRANT`. Undo it with
     `REVOKE <role> FROM pgrst_authenticator` as a superuser and re-read
     `pg_auth_members`. Check the cluster, not the diff.
 - **Never start a test server on a port something else may already hold.** The
   readiness probe succeeds against the *other* server, and the suite then quietly
-  tests a database it did not create. Refuse to start if the port answers, and
-  report the conflict. Same reasoning for `DROP DATABASE`: terminate existing
-  backends first, or the drop fails naming a connection the operator cannot see.
-- No test targets a non-existent API. If a spec and an implementation
-  disagree, the spec is wrong or the implementation is unfinished — resolve it,
-  do not leave a false green.
+  tests a database it did not create. Refuse to start if the port answers, and report
+  the conflict. Same reasoning for `DROP DATABASE`: terminate existing backends
+  first, or the drop fails naming a connection the operator cannot see.
+- No test targets a non-existent API. If a spec and an implementation disagree, the
+  spec is wrong or the implementation is unfinished — resolve it, do not leave a
+  false green.
 
 ---
 
@@ -914,9 +730,9 @@ Location: `frontend/`. Angular 22, standalone components, zoneless, SSR.
 
 ## F1. Components
 
-- **Always `standalone: true`.** Do not create or use NgModules. A component
-  flag is redundant on Angular 19+, where standalone is the default — write it
-  anyway so the intent is explicit and version-independent.
+- **Always `standalone: true`.** Do not create or use NgModules. The flag is
+  redundant on Angular 19+ — write it anyway so the intent is explicit and
+  version-independent.
 - Imports are per-component in the `imports` array.
 - `templateUrl` for anything over ~15 lines. Inline templates only for trivial
   markup. Never both, never neither.
@@ -928,14 +744,14 @@ Location: `frontend/`. Angular 22, standalone components, zoneless, SSR.
 - **OnPush on every component.** It is the Angular 22 default, so you should never
   write the strategy at all. Never write `ChangeDetectionStrategy.Eager` —
   Angular's former `Default`, renamed so its cost is obvious.
-- **Zero manual change detection.** No `ChangeDetectorRef.detectChanges()`,
-  no `markForCheck()`, no `NgZone` injection. These exist only to compensate for
-  mutable state the framework cannot see. If you need one, the state is wrong.
+- **Zero manual change detection.** No `ChangeDetectorRef.detectChanges()`, no
+  `markForCheck()`, no `NgZone` injection. They exist only to compensate for mutable
+  state the framework cannot see; if you need one, the state is wrong.
 - The application is **zoneless**. `NgZone.onStable` and `NgZone.onMicrotaskEmpty`
-  never emit and `NgZone.isStable` is always `true`; anything depending on them
-  is broken.
-- If a view fails to update, the cause is a mutated object identity or a plain
-  field where a signal is required — fix that, don't force a detection pass.
+  never emit and `NgZone.isStable` is always `true`; anything depending on them is
+  broken.
+- If a view fails to update, the cause is a mutated object identity or a plain field
+  where a signal is required — fix that, don't force a detection pass.
 
 ## F3. State
 
@@ -971,8 +787,8 @@ Location: `frontend/`. Angular 22, standalone components, zoneless, SSR.
   not optional.
 - Narrow types with `@if (x; as y)` — never `*ngIf` + `$any()`. `$any()` disables
   `strictTemplates` and removes the compiler as a safety net.
-- **No method calls in template bindings.** They re-evaluate every change
-  detection pass.
+- **No method calls in template bindings** — they re-evaluate every change detection
+  pass. Use a pure, memoized pipe instead:
   ```html
   {{ getPatternIcon(type) }}     ✗
   {{ iconFor(type) }}            ✓ pure pipe, memoized
@@ -983,9 +799,8 @@ Location: `frontend/`. Angular 22, standalone components, zoneless, SSR.
 - Getters are fine in templates only if trivially cheap; never getters that
   build arrays or call third-party libraries.
 - Modals: never nest depth > 2. Extract the inner blocks into child components.
-- Extract repeated markup into a component. **Do not copy a block.** If you
-  find yourself pasting a 50-line table into a new page, the answer is a child
-  component.
+- **Extract repeated markup into a component. Do not copy a block.** If you find
+  yourself pasting a 50-line table into a new page, the answer is a child component.
 - Interactive elements are `<button>`. Never `(click)` on a `div`/`span`.
   Icon-only buttons carry `aria-label` or `matTooltip`.
 - Every `<img>` has `alt`. Use `ngSrc` + `NgOptimizedImage` for static images.

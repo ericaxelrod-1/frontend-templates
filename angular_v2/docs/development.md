@@ -9,7 +9,7 @@ PostgreSQL instance — no container runtime.
 
 | Tool | Version | Notes |
 |---|---|---|
-| Node.js | `^22.22.3 \|\| ^24.15.0 \|\| >=26` | Angular 22's floor. `frontend/.npmrc` sets `engine-strict=true`, so a forker hits this at install rather than at build. Nest 12 also requires ≥ 20.19 — the 21.x line is unsupported |
+| Node.js | `^22.22.3 \|\| ^24.15.0 \|\| >=26` | Angular 22's floor, and the floor `verify` fails on. `frontend/.npmrc` sets `engine-strict=true`, so a forker hits this at install rather than at build. Nest 12 also requires ≥ 20.19 — the 21.x line is unsupported. **Verify the version from a login shell** — see [Troubleshooting](#troubleshooting) |
 | TypeScript | 6.0.x | pinned by Angular 22. See the codegen note below |
 | PostgreSQL | **15 or later** | verified on 15.19; 16/17 also fine. `security_invoker` views need 15+, though this template creates none |
 
@@ -17,6 +17,15 @@ PostgreSQL instance — no container runtime.
 node --version
 psql -h localhost -U postgres -c 'select version();'
 ```
+
+> **Check `node --version` before anything else, and run it from a login shell.**
+> On a machine where Node is managed by **nvm**, nvm is sourced from `.bashrc`,
+> which a **non-login** shell does not read. Such a shell resolves to whatever
+> older Node is on `PATH` — so the reported version is below the floor, and
+> `npm run verify` fails at the frontend step with a confusing **Angular CLI
+> version error** rather than a clear "unsupported Node" message. The failure
+> looks like an Angular problem and is an environment one; `bash -lc 'node
+> --version'` is the honest check.
 
 ### Known constraint: `openapi-typescript` and TypeScript 6
 
@@ -149,9 +158,29 @@ that passes without exercising its subject is a false green, which is the exact
 failure mode this suite exists to prevent.
 
 It rebuilds its own `rls_proof` database from nothing on every run, applies both
-SQL files, seeds a three-level site tree, starts a PostgREST on port **3005** and
-tears it down afterwards. It refuses to run if something else already answers on
-that port, and it never touches the other PostgREST instance on 3002.
+SQL files, seeds a **three-level `sites` tree** and a `site_id` token per
+principal, starts a PostgREST on port **3005** and tears it down afterwards. It
+refuses to run if something else already answers on that port, and it never
+touches the other PostgREST instance on 3002.
+
+> ### ⚠ This suite currently validates the SUPERSEDED design
+>
+> The schema it seeds is the **old** one: a `sites` table, a `site_id` claim,
+> and a recursive `site_tree_ids()` walk evaluated **once per candidate row**.
+> ADR-0023 §Row scope replaces all three with `groups` + `user_groups` +
+> `org_closure` + `actor()`, where the scoping subquery is **uncorrelated** and
+> evaluated **once per statement** (`loops = 1` at 305 and at 3305 rows).
+>
+> **So the 33 passing tests below are not evidence for the new design.** They
+> prove the superseded design is internally consistent — and they are the reason
+> the rewrite has to rewrite the *tests*, not just the SQL. `backend/database/
+> migrations/0001_rsl_foundation.sql` still ships the old shape.
+>
+> The tamper table in this section was measured against that old file, so read it
+> as a **method** (remove a control, confirm the gate goes red at step 7 of 8)
+> rather than as current numbers. Both the migration rewrite and the suite rewrite
+> are tracked as work items; `rebase.md` §6.0.1, W06/W07 and W26/W27 have the
+> detail.
 
 The test names are the documentation. Each one names the attack it prevents —
 "a validly-signed token naming the table-owning role is refused, and the row
@@ -214,14 +243,15 @@ add CI on top; the template does not need any.
 | Symptom | Cause |
 |---|---|
 | Boot fails on missing `JWT_SECRET` | Working as designed. Set it in `.env`. |
+| **`verify` fails at a frontend step with an Angular CLI version error, not a Node error** | **An unsupported Node, reported confusingly.** The frontend requires `^22.22.3 \|\| ^24.15.0 \|\| >=26` and `frontend/.npmrc` sets `engine-strict=true`. **Run `verify` from a login shell** — `bash -lc 'npm run verify'` — so nvm is sourced by `.bashrc`. A **non-login** shell does not read `.bashrc`, resolves to an older Node below the floor, and the failure surfaces as an Angular CLI version mismatch rather than "unsupported Node". Check with `bash -lc 'node --version'` before debugging anything else. |
 | `verify` fails at the smoke step | Postgres unreachable or migrations not applied. |
 | Prerender throws `ReferenceError: localStorage` | A browser global on a server-executed path. Guard it or remove it. |
 | Frontend types out of sync | Run `npm run generate:client`. |
-| RLS test returns zero rows unexpectedly | Check the `SET LOCAL` identity is set and the policy's `USING` clause. |
+| RLS test returns zero rows unexpectedly | Check identity and the policy's `USING` clause. Identity is the token's `sub` read through the claims setting — **not** `SET LOCAL app.user_id`, which no policy here reads, and not a `site_id` claim. Scope is `user_groups` membership joined to `org_closure`, so zero rows usually means no membership rows rather than a missing identity setting. |
 | **PostgREST panics on boot:** `failed to parse role-claim-key value (role) … unexpected "r" / expecting "."` | `jwt-role-claim-key` must be a **JSPath**. Use `".role"`. The bare `"role"` does not fall back — it aborts startup. `$.role` panics too on 16.4, so do not "modernise" it. |
 | `PGRST301 "None of the keys was able to decode the JWT"` while `postgrest.conf` looks correct | **Environment beats config.** An inherited `PGRST_JWT_SECRET` from `backend/.env` silently overrides the file. Strip inherited `PGRST_*` keys when spawning PostgREST — `spawn` stringifies `undefined` into the literal text `"undefined"`. |
 | `403 permission denied for function request_claims` on every scoped request | `EXECUTE` was revoked from `PUBLIC` and granted to nobody. **A revoke is not a policy** — revoke *and* grant to `app_anon`, `app_member`, `app_admin`. Scoping is 100% non-functional until you do. |
-| `permission denied for function site_tree_ids` on an *unauthenticated* read | `EXECUTE` was not granted to `app_anon`. A policy is evaluated for every role that reaches the table, including the anonymous one; the denial must arrive as zero rows, not as a `42501`. |
+| `permission denied for function site_tree_ids` on an *unauthenticated* read | `EXECUTE` was not granted to `app_anon`. A policy is evaluated for every role that reaches the table, including the anonymous one; the denial must arrive as zero rows, not as a `42501`. **This names the superseded design** — the walk is what `0001_rsl_foundation.sql` still ships; the closure-join replacement reads a matview and has no walk to grant, so this symptom goes away with the migration rewrite. |
 | `stack depth limit exceeded` on any query as a non-superuser role | The hierarchy function reads the table its own policy protects. It must be `SECURITY DEFINER` **and** that table must not be `FORCE`d — one decision, not two. |
 | `must have admin option on role "app_anon"` | The escalation-boundary `GRANT` cannot run as the migration role. Run `database/bootstrap/001_roles.sql` **as a superuser** — the one statement that *is* the boundary is necessarily a superuser statement. |
 | `new row violates row-level security policy` when seeding | `FORCE` binds the owner for `DML`. Seed through the boundary: connect as `pgrst_authenticator`, `SET ROLE app_admin`. **Never** `SET row_security = off` — it reopens the owner bypass. |
