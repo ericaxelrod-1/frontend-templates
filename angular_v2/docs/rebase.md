@@ -1657,3 +1657,483 @@ no SQL path at all.
 ADR-0004 is rewritten accordingly. The correction is recorded here rather than
 quietly swapped, because a decision record that hides its reversals is not a
 record.
+
+---
+
+## 9. The privacy module — assessment and port plan
+
+Appended as a new top-level section rather than folded into §2 or §6, because it
+is a **feature assessment**, not a finding in the general audit: §2 counts
+defects across the whole tree, and this module's problem is not that it has many
+defects but that **its centre of gravity does not exist**. It was built for an
+application with a user population, a marketing programme and a jurisdictional
+obligation, and then filed in a template that has none of those. Porting it as
+written would import the obligation without the application.
+
+Read against the tree on 2026-10-11. Nothing was executed; every claim below is
+`file:line` in `angular/`.
+
+### 9.0 What was claimed, and by whom
+
+Three commits describe this work. Their subjects are worth quoting in full,
+because the plan below rejects most of what they claim:
+
+| Commit | Subject |
+|---|---|
+| `eb5aebc` | `feat(privacy): complete verified implementation with 100% pass rate (Epics 2-6)` |
+| `f28bfe5` | `feat(privacy): complete implementation of privacy system and sentinel (Epics 2-6)` |
+| `e8172f9` | `feat(privacy): implement foundational registry and worker (Epic 1)` |
+
+"100% pass rate" is measurable and the measurement is reproducible: **7 spec
+files, 693 lines, 26 `it()` blocks, of which 7 are `should be defined`.** That is
+a real suite against zero behaviour, and §2 finding 8 records 1,761 lines of
+assertion-free tests elsewhere in the same tree for exactly this reason. The
+frontend is thinner still: **3 spec files, 3 `it()` blocks, all three
+`expect(component).toBeTruthy()`** (`privacy-dashboard.component.spec.ts:35`,
+`privacy-settings.component.spec.ts:41`, `public-request.component.spec.ts:30`).
+
+None of this means the code is bad. Some of it is careful work. It means the
+commit subject is not evidence, and the rest of §9 is written against the code.
+
+### 9.1 Inventory
+
+**Backend** — `angular/backend/src/modules/privacy/`, 25 files, **2,500 lines**
+(1,807 production, 693 spec):
+
+| Piece | LOC | What it is |
+|---|---|---|
+| `privacy.service.ts` | 346 | Consent flags, export, `deleteAccount` |
+| `privacy-housekeeping.service.ts` | 282 | 2 `@Cron` jobs, the provider fan-out worker |
+| `privacy.controller.ts` | 198 | 11 routes, JWT-guarded, self-service |
+| `privacy-ticket.service.ts` | 195 | Ticket lifecycle, public tickets, magic link |
+| `privacy-cleanup.service.ts` | 74 | 2 more `@Cron` jobs |
+| `privacy-jurisdiction.service.ts` | 79 | GeoIP → GDPR/CCPA, SLA arithmetic |
+| `privacy-registry.service.ts` | 78 | `DiscoveryService` plugin registry |
+| `privacy.module.ts` | 78 | Wiring |
+| `privacy-public.controller.ts` | 80 | 3 **unauthenticated** routes |
+| `privacy-ticket.controller.ts` | 66 | 4 routes, one `@RequirePermission('privacy:read')` |
+| `privacy-audit.service.ts` | 46 | HMAC audit writer |
+| `privacy-magic-link.service.ts` | 46 | JWT sign/verify |
+| `entities/` | 158 | 3 TypeORM entities |
+| `scripts/` | 81 | `generate-policy.ts`, `rotate-pepper.ts` |
+
+**Frontend** — `angular/frontend/src/app/`, **1,978 lines**: dashboard (221),
+settings (150 + template 173), public request (246), three dialogs (471), admin
+table (149), NGXS `PrivacyState` (166) + actions (48), `PrivacyService` (131).
+
+**Supporting**: 3 entities, 4 migrations
+(`1777327198305`, `1777327198306`, `1777327370749`, `1777327370750`), a
+`@PrivacyProvider()` decorator + `IPrivacyProvider`, `PRIVACY_POLICY.md` (451
+bytes), `docs/PRIVACY_COMPLIANCE.md` (17.5 KB), `docs/implementation-plans/PRIVACY_COMPLIANCE_EPICS/`
+(6 epics, ~20 stories).
+
+**One provider exists.** `@PrivacyProvider()` is applied exactly once, to
+`UsersService` (`users.service.ts:24`, `providerName = 'users'` at `:27`). The
+registry discovers it; the registry's own test registers a *second* mock provider
+to get a count of 2. **The polymorphic multi-source deletion machinery has one
+member, and that member deletes the row that already exists.**
+
+### 9.2 Built vs. not built
+
+**The toast question, answered — the suspicion is correct, and narrower than
+stated.**
+
+Toasts were built, for the four **leaf dialogs**, and never for the two **page
+components**. `MatSnackBar` is injected and `open()` is called in
+`delete-account-dialog.component.ts:136,147`, `export-data-dialog.component.ts:111,147`,
+`support-ticket-dialog.component.ts:132,144`, `public-request.component.ts:183,230`
+and `privacy-settings.component.ts:62,92,104`. A shared
+`core/services/notification.service.ts` exists and is used widely elsewhere
+(`groups.component.ts` alone has 14 call sites). **Neither `privacy-dashboard.component.ts`
+nor `privacy-admin.component.ts` imports it, or anything else that surfaces a
+message.**
+
+The two components that never got one are exactly the two where a privacy
+request's *outcome* is reported, and both compensate by inventing a worse channel:
+
+- `privacy-admin.component.ts:138` — `error: (err) => console.error('Failed to load tickets:', err)`. The operator
+  sees an empty table and a server log.
+- `privacy-dashboard.component.ts` routes everything through NGXS.
+  `privacy.state.ts` catches every error and writes it to
+  `state.error` (`fetchPreferences`, `updateMarketingConsent`, `updateDoNotSell`,
+  `fetchActiveTickets`, `createTicket`, `exportData`, `deleteAccount` — six
+  `catchError` blocks). `PrivacyState.getError` (`:48-51`) is a selector that
+  **zero components select**. Verified: the only `PrivacyState` consumers are
+  `header.component.ts:57,86`, `privacy-dashboard.component.ts:189-191` and
+  `privacy-settings.component.ts:37-38`, and none reads `getError`.
+
+So the precise statement is not "toasts never happened" — it is **"toasts
+happened at the leaves and the page-level error channel is a store field that
+nothing renders."** The NGXS error field is worse than no channel, because it is
+a failure handler that provably executes and provably reaches no user, and it is
+the reason the module can look complete in a code review: the `catchError` is
+right there.
+
+Two more page-level surfaces are inert:
+
+- `privacy-dashboard.component.ts:85` — `VIEW ALL REQUESTS` is a `<button>` with
+  **no `(click)` handler**.
+- `privacy-admin.component.ts:81-83` — `View Details` is a `<button>` with **no
+  `(click)` handler**. Every row has a button that does nothing.
+- `privacy-dashboard.component.ts:48` — the "Privacy Score" widget renders a
+  **hardcoded `85`/100** with the comment `<!-- Privacy Score Widget (Placeholder for now) -->`.
+  Nothing anywhere computes a privacy score.
+
+**What is genuinely built and working:** jurisdiction resolution
+(`privacy-jurisdiction.service.ts` — declaration > profile > IP, with the priority
+order asserted); the HMAC audit writer's *format*; the file-path sanitisation in
+the export worker (`:142-145`); the atomic job claim (`privacy-housekeeping.service.ts:76-84`
+— conditional `UPDATE`, `affected === 1`, genuinely race-safe); the `Promise.allSettled`
+fan-out with per-provider error collection; the `HeavyRoute` → disk-usage
+interceptor, which *is* wired end to end
+(`system-resource.interceptor.ts:21-38`).
+
+**What is not built, with evidence:**
+
+| Claim implied by the commits | Evidence |
+|---|---|
+| "Data subject deletion" | `privacy.service.ts:235-244` is a **soft delete**: `isDeleted: true`, and the row is *retained* with `email`/`username` overwritten to `deleted_<id>_<ts>@deleted.local`. Nothing erases. `users.service.ts:862-877` (`onDelete`, the provider path) does the same and additionally sets `password: 'ANONYMIZED'` — a **literal string in the password column**, not a hash. |
+| "Deletion timeout" | `privacy.service.ts:209-213` constructs an `AbortController` and arms `controller.abort()` — **`controller.signal` is never passed to `provider.onDelete`**. The `Promise.race` at `:216-224` is the only real timeout; the controller is dead code. Contrast `privacy-housekeeping.service.ts:161`, where the same pattern *is* wired (`{ signal: controller.signal }`). The delete path was written by copying the export path and dropping the wiring. |
+| "Failures are handled" | `privacy.service.ts:207` `Promise.allSettled` + `:226-228` `console.error` per provider. Every provider can fail and `deleteAccount` still returns `success: true` with the message *"All personal data has been removed."* This is §2.3's "silently returning a success-shaped value is a bug", and it is what makes the erasure untestable — see below. |
+| "Audit trail" | `PrivacyAuditService.logAction` is called from **exactly two places**, both `scripts/` (`generate-policy.ts:43`, `rotate-pepper.ts:18`). **No request path, ever, writes an audit row.** Worse: **`privacy_audit_logs` is created by no migration** — `1777327198305` creates `privacy_tickets` and `privacy_jobs` only, and `1777327370749` creates the same two. The entity exists and is registered in `privacy.module.ts:38`, so under `synchronize: true` (`config/database.config.ts:20`) the table appears, and under a migration-only provision **it does not exist**. |
+| "Tamper-evident audit" | `privacy-audit.service.ts:31` computes an HMAC and stores it. **Nothing ever verifies it** — `grep -rn 'hmacHash\|verifyHmac'` over `backend/src/` returns only the entity, the writer, and the spec. A hash nobody checks is not tamper evidence. The pepper also defaults to `'default-pepper'` (`:25`) and the keyring reads `PRIVACY_PEPPER_${KID}` with no startup assertion, so a missing pepper silently produces HMACs under a known key. |
+| "`partial_success` erasure policy" | The entity declares it (`privacy-job.entity.ts:13`), the worker writes it (`privacy-housekeeping.service.ts:208-210`), and **both migrations' CHECK constraints omit it**: `1777327198305:34` and `1777327370749:139` are both `CHECK ("status" IN ('pending','processing','completed','failed'))`. Under a migration-provisioned database, writing it raises a constraint violation. The one test that covers this path (`privacy-housekeeping.service.spec.ts:106`) mocks the repository, so it cannot see the constraint. |
+| "Admin can review requests" | `privacy-ticket.service.ts:165-170` returns **every ticket, unscoped**. The only control is `@RequirePermission('privacy:read')` (`privacy-ticket.controller.ts:45`), and the grant is **order-dependent**: `1777327198306` inserts the permission rows at `:31-38`, *then* looks up the roles at `:41-48`, and at `:51-54` — if neither `'Administrator'` nor `'Super Administrator'` exists it `console.warn`s and **`return`s**, having already inserted the permissions. Roles are seeded (`database/seeds/`, `db/seeds/role-seed.service.ts`) and `data-source.ts:79` sets `migrationsRun: true` at startup, so on a database where migrations win the race **the permission exists and nobody holds it**, permanently. |
+| "Sentinel monitors privacy health" | `system-health.controller.ts:18` — `getUserTickets(0) // Mock for global tickets`. User id `0` is a hardcoded magic value standing in for "all tickets"; `activeJobs` is derived from it. `:41` — `POST clear-temp` returns `{ message: 'Cleanup job triggered' }` and **triggers nothing**. `:23-25` — `disk.total/used/free` are hardcoded `0` beside a real `percentage`. |
+| "Compliance documentation" | `backend/PRIVACY_POLICY.md` is 451 bytes and its §1 reads *"We collect data through the following services:"* followed immediately by §2 — an empty list under a heading that promises one. |
+
+**Fields that exist and are written by nothing:** `verified_at` and
+`accrued_paused_time` (`privacy-ticket.entity.ts:74-78`) are in the entity and in
+both migrations and are never assigned — `verifyTicket` (`privacy-ticket.service.ts:130-155`)
+sets `slaDeadline` and `status` and stops. `provider_results` is `simple-json`
+(`privacy-job.entity.ts:38`), which `AGENTS.md` §B1 forbids outright.
+`privacy.service.ts:58` computes `windowHours` and never uses it;
+`createPublicTicket` recomputes it at `:106`.
+
+**Security defects that would not survive a review, recorded because they change
+what ports:**
+
+- `privacy-magic-link.service.ts:22,29` — the magic-link JWT secret defaults to
+  the literal `'privacy-magic-secret'`. `AGENTS.md` §2.3: *"No default fallbacks
+  for security-critical config."* Forging a token for **any** `ticketId`+`email`
+  pair passes `verifyToken`, and `GET privacy/tickets/public/verify` then advances
+  the ticket and **starts the SLA clock and the erasure job**.
+- `privacy.module.ts:44` — `JwtModule` defaults `JWT_SECRET` to `'your-secret-key'`.
+- `privacy-ticket.service.ts:110-113` — `createPublicTicket` **`console.log`s the
+  magic link** and returns it in the HTTP response body. §2.5 forbids logging
+  tokens; returning it makes the emailed secret unnecessary.
+- `privacy-public.controller.ts:30` — `@Body() body: any, // Use 'any' temporarily
+  to debug the payload structure`. A debug marker left in reachable code, with
+  the reason stated in the comment and never removed.
+- `privacy-jurisdiction.service.ts:38` — `console.warn` in a catch.
+- `privacy-housekeeping.service.ts:30-32` — `fs.mkdirSync` in a **constructor**,
+  under `process.cwd()/data/privacy/exports`. Two services (`privacy-housekeeping`
+  `:17`, `privacy-cleanup` `:12`) both write to the same undeclared path.
+- The self-service admin listing is `@Get('all')` under `@Get()` — declared
+  **before** `:id`, which is correct, and worth recording as the one place the
+  route ordering was got right.
+
+### 9.3 What does not port
+
+| Legacy concern | Why not |
+|---|---|
+| **All three TypeORM entities** | No ORM (§B1). They become plain SQL in `backend/database/migrations/`. The entity files carry no logic — `privacy-job.entity.ts` is a column list. |
+| **Both SQLite migrations + the third/fourth privacy migrations** | Postgres 18, `uuidv7()` keys, `timestamptz`, `jsonb` not `simple-json`. The `CHECK` constraints are also wrong (§9.2) and would be copied forward as a latent bug. |
+| **The provider registry** (`IPrivacyProvider`, `@PrivacyProvider()`, `privacy-registry.service.ts`) | One member, and that member deletes a row that already exists. `DiscoveryService` + `Reflector` + metadata to discover a single hardcoded provider is the exact "looks finished and isn't" shape §2.1 forbids. **The extension point a forker actually needs is a foreign key**, not a DI plugin: to delete from a table you add, you add `ON DELETE CASCADE` from `users`, and §9.4's scope helper picks the row up for free. |
+| **`privacy-jurisdiction.service.ts` in full** | It imports `geoip-lite` (§0: zero external credentials), maintains a **hand-rolled 27-country EU list** (`:53-60`) that will silently rot, and `GB` is in it with the comment *"technically UK but often follows similar GDPR"* — a legal determination made by a hardcoded array literal. It also resolves to `OTHER` in the overwhelmingly common case of no GeoIP hit. A jurisdiction column whose only reliable output is `"other"` is a column. |
+| **SLA deadlines** | They are a function of the jurisdiction, so they inherit everything above, and they add `accrued_paused_time` — a column that exists for a pause/resume feature nobody implemented. |
+| **`privacy-public.controller.ts` — all 3 routes** | The entire verification apparatus exists for one reason: to let an **unauthenticated** caller open an erasure request about an account they cannot authenticate as. In a template whose users authenticate, the correct design is that **there is no anonymous erasure path**. Dropping it removes the CAPTCHA integration, the magic link, the `UNVERIFIED` state, the 24-hour expiry cron, and the `verified_at` column in one move. |
+| **`privacy-magic-link.service.ts`** | Same reason. A verification token is an authentication mechanism, and §2.4 says one mechanism per concern — `refresh_tokens` already is one. |
+| **The job queue** — `privacy_jobs`, `privacy-housekeeping.service.ts`'s `processJobs`, `privacy-cleanup.service.ts`'s `staleJobMonitor`, the `PENDING→PROCESSING→lockedAt` claim, and the 4-counter reconciliation at `:238-280` | All of it exists to make a 30-second fan-out across N providers **resumable and idempotent**. The target operation is a single `DELETE` in a single transaction, which cannot half-finish. **Every `@Cron` in this module disappears**; `angular_v2` keeps none. |
+| **`cleanupUnverifiedTickets`, `tempFileCleaner`** | Both delete things that no longer exist: unverified public tickets, and export files written to the local filesystem. The export path itself does not port (§9.4). |
+| **`exportUserData`** (`privacy.service.ts:98-172`) and both export routes | It assembles profile + login history + **behaviour profile** + security alerts. Shipping a "your data" feature whose payload includes `typicalLoginHours`, `knownIps` and `knownUserAgents` (`privacy.service.ts:150-158`) teaches a forker to build a behavioural fingerprint and then hand it to the subject. That is a worse default than having no export. Deferred — §9.7 Q3. |
+| **`updatePrivacyRestrictions`, `submitProcessingObjection`, `removeProcessingObjection`, `updateMarketingConsent`, `updateDoNotSell`** and their 4 routes | These are four CRUD endpoints over four `users` columns modelling obligations against processing this template **does not perform**. There is no marketing programme to consent to and nothing to sell. §9.7 Q2. |
+| **All 3 controllers as controllers** | `privacy.controller.ts`'s 11 routes and `privacy-ticket.controller.ts`'s 4 are CRUD over tables. §6.1: a resource that is pure CRUD does not appear in the Nest application at all. |
+| **`privacy-audit.service.ts` as written** | The HMAC keyring, `rotate-pepper.ts`, and `generate-policy.ts` go. The *audit trail* itself ports, in a different shape — §9.5. |
+| **`scripts/`** | Both bootstrap a Nest context and write an audit row as a side effect. Neither has anything to do once the audit trail is written by the erasure itself. |
+| **`PRIVACY_POLICY.md`, `docs/PRIVACY_COMPLIANCE*.md`, `PRIVACY_COMPLIANCE_EPICS/`** | 17.5 KB of prose describing an obligation structure the template does not adopt. `docs/` in `angular_v2` is rewritten against the built system (W25). |
+
+### 9.4 What ports, and as what
+
+Two tables. Names are proposals; the **category, policy and permission column is
+the part that is load-bearing.**
+
+#### `privacy_requests` — the request itself
+
+- **Category: DERIVED.** No `group_id`, for the same two reasons
+  `email_messages` has none (ADR-0025), and both apply here verbatim: a user may
+  hold several groups (one column would mean duplicating a request per group, and
+  "which groups is this request in?" becomes ambiguous), and an operator reading
+  requests should not see them partitioned by a group they did not choose. Simple
+  `PRIMARY KEY (id uuid DEFAULT uuidv7())`.
+- **FK discipline:** `user_id uuid REFERENCES public.users (id)`. This leaves the
+  DERIVED set, which is permitted **only at a table members cannot write to** —
+  and no serving role holds `INSERT` on it except `app_admin` (W40). This is the
+  one FK in the design and it is the one that makes `ON DELETE CASCADE` (§9.5)
+  legal.
+- **Scope policy — one predicate, both axes, uncorrelated, helper INSIDE the
+  subquery**, copied from `email_read_scope`
+  (`0005_email_messages.sql:277-299`) rather than invented:
+
+  ```sql
+  CREATE POLICY privacy_request_read ON public.privacy_requests FOR SELECT USING (
+    privacy_requests.user_id IN (
+      SELECT u.user_id FROM authz.visible_user_ids() AS u (user_id)
+       WHERE authz.can_read_privacy_request()
+    )
+  );
+  ```
+
+  `authz.visible_user_ids()` is the existing helper
+  (`0005_email_messages.sql:237-251`) and it already carries the measurement
+  that makes it mandatory rather than tidy: the inline `EXISTS` form **is
+  correctness-broken**, because a policy subquery reads `user_groups` with the
+  querying role's privileges and that table self-scopes to `user_id =
+  authz.actor()`. `authz.can_read_privacy_request()` is a new
+  `SECURITY DEFINER` wrapper over
+  `has_permission(authz.actor(), 'privacy_request', 'read')`, cloned from
+  `can_read_email()` (`0005_email_messages.sql:178-203`).
+- **Capability: a NEW permission row, `privacy_request:read`.** Not `user:read`
+  and not `privacy:read` — §B2's rule is that reusing a permission makes the
+  grant invisible, and the legacy tree already demonstrates why: it shipped four
+  permissions (`privacy:read/edit/delete/admin`) under one `privacy` resource and
+  then gated one endpoint on one of them. Written by **both** the migration and
+  `database/seed.ts`, both `ON CONFLICT DO NOTHING`, asserted from the live
+  catalog.
+- **Grants:** `SELECT, INSERT` to `app_member, app_admin`; **`DELETE` to nobody.**
+  A member may open and read their own request; they may not delete it in
+  isolation, because the deletion is atomic with the user row (§9.5) and a
+  half-done erasure is exactly the state §2.1 is about.
+- **Served by PostgREST.** Read via `GET /privacy_requests?select=*`; create via
+  `POST /privacy_requests`. No Nest controller, no DTO, no hand-written URL
+  (§B3/B4 — the Angular types come from the regenerated spec).
+
+#### `privacy_request_events` — the audit trail
+
+- **Category: unscoped**, and it is the first unscoped table that is *not*
+  global reference data — it is global *record-keeping*. Simple `PRIMARY KEY (id)`.
+- **Append-only, and therefore NOT PostgREST-writable.** `REVOKE INSERT, UPDATE,
+  DELETE … FROM PUBLIC, app_anon, app_member, app_admin`, then
+  `GRANT SELECT TO app_admin` only. Writes happen inside the `SECURITY DEFINER`
+  erasure function only. This is the task's explicit check, and the answer is
+  emphatic: **the legacy audit trail needs this and considerably more** — its
+  table does not exist in any migration, nothing writes to it, and its integrity
+  check is never performed. A table that can be mutated is an append-only table
+  that isn't (§B2).
+- **No FK to `privacy_requests` and no FK to `users`.** Both would defeat the
+  purpose: the audit must survive the request's deletion, and an FK is checked
+  outside RLS and fails open. The row carries `actor_id`, an
+  `action`, and a **`subject_ref`** — a keyed digest of the user id, not the id
+  itself, so the trail remains meaningful after the subject's row is gone
+  without retaining a link to a person who has asked to be forgotten. The digest
+  key is asserted present at boot (§2.3, no default), unlike the legacy's
+  `'default-pepper'`.
+- **Capability:** a second new row, `privacy_request_event:read`, admin-only.
+  One permission per capability, never one row serving both.
+- **Served by PostgREST** for read; **never** for write.
+
+#### The deletion — thin Nest app, and why it cannot be PostgREST
+
+`POST /privacy/erase` in the thin app. §3 already lists *"privacy workflows"*
+among the ten things PostgREST cannot do, so this is not a new boundary — and
+the reason it must be Nest is specific, not convenience:
+
+1. `users` is `FORCE`d with `USING (current_user = 'app_admin')` and granted only
+   to `app_admin` (`0002_refresh_tokens.sql:51-54`). A member **cannot** delete
+   their own user row through PostgREST.
+2. Escalating to the owner inside PostgREST would mean a `/rpc/` function, which
+   means `current_user` is still `app_member` — so the delete is still
+   policy-governed, and the policy reads `request.jwt.claims`. That is fine
+   *if* the GUC is set by PostgREST from a verified JWT, which is exactly the
+   mechanism §B2 F1 says is caller-writable by design and W37 is a P0 gate on.
+   Putting a **destructive** function behind it raises the stakes without
+   changing the guarantee.
+3. The operation is not one statement. It revokes sessions, deletes the user row
+   (which cascades to `email_messages`, `refresh_tokens`, `user_roles`,
+   `user_groups` — §9.5), deletes the request, and appends the audit row. A
+   partial erasure is the worst possible outcome, so it is one transaction in one
+   place.
+
+**The actor parameter is safe here and unsafe over PostgREST, and the difference
+is worth stating precisely.** The function takes `p_actor uuid` explicitly rather
+than reading `authz.actor()`, because the Nest connection cannot set the claims
+GUC without becoming a W37 violation. That is safe *only because* `p_actor`
+originates in a `JwtAuthGuard`-verified token inside Nest and never crosses an
+HTTP body into SQL. The same signature exposed as `/rpc/erase_subject` would let
+any caller name any `p_actor` and delete that user's account — the identical
+hazard §B2 records for `has_permission(who, …)` (63 unauthenticated probes
+recovered an administrator's full permission set). **One rule, stated once:
+a `SECURITY DEFINER` function that mutates takes its actor from the verified
+token, or takes no actor at all.**
+
+The function itself must re-check what the guard decided, because a guard is
+application code and §B2's governing claim is that RLS is not:
+`has_permission(p_actor, 'privacy_request', 'erase')` **AND**
+(`p_actor = p_subject` **OR** `p_subject` ∈ `authz.visible_user_ids()`). The
+second disjunct is what makes an operator-initiated erasure possible without
+widening the self-service path.
+
+### 9.5 The deletion-request semantics
+
+> *Delete the user record and the GDPR request itself. Nothing else.*
+
+**What it plainly implies.** A template has no second data source, so the entire
+jurisdiction/verification/SLA apparatus is solving a problem that does not exist
+here — and every piece of it (GeoIP, a hand-maintained EU list, magic links, an
+`UNVERIFIED` state, an expiry cron, a `PARTIAL_SUCCESS` ladder) is machinery whose
+failure mode is silent. **Delete, retain, and make extensible** is the honest
+split:
+
+| | |
+|---|---|
+| **DELETE** | The `users` row. The `privacy_requests` row. Everything that cascades from `users`. |
+| **RETAIN** | `privacy_request_events` — a keyed digest, never the id. `login_attempts` (`email_address`/`ip_address` are the subject's, but they are the security audit trail and `email_messages` is the mail history; both need a **decision**, §9.7 Q1, not a default). |
+| **EXTENSIBLE** | A forker adds a table, adds `REFERENCES public.users (id) ON DELETE CASCADE`, and it is erased. No plugin, no provider registration, no code change. |
+
+**What blocks the stated semantics today — this is the finding that matters most
+for W40.** The deletion *cannot be implemented on the current schema*:
+
+- `refresh_tokens.user_id uuid NOT NULL REFERENCES public.users (id)`
+  (`0002_refresh_tokens.sql:73`) — **no `ON DELETE` clause**, so `NO ACTION`.
+- `email_messages.user_id uuid NOT NULL REFERENCES public.users (id)`
+  (`0005_email_messages.sql:56`) — same.
+- `user_roles` and `user_groups` carry **no FK to `users` at all.**
+  `0001_rls_foundation.sql:137-146` says so in a comment — *"No foreign key to
+  `users`: the authentication tables are a later work item… When `users` lands this
+  becomes `REFERENCES users (id)`"* — and **it was never done.** `0002` created
+  `users` and did not revisit it.
+
+So `DELETE FROM users WHERE id = $1` raises **`23503`** the moment the user has a
+single refresh token — which is every authenticated user. And were the FKs merely
+absent rather than restrictive, the result would be worse and quieter: a deleted
+user keeps a live `user_roles` row and live `user_groups` rows, and
+`authz.visible_user_ids()` would keep resolving that id as a visible subject,
+because it reads `user_groups` without ever joining `users`. **An erasure that
+leaves the erased person's identity in the scope index has not erased it.**
+
+**RLS: who may see a `privacy_requests` row, and how a request about user X is
+scoped.**
+
+- **The subject sees their own.** `authz.visible_user_ids()` is self-inclusive —
+  it anchors on `mine.group_id` and the hierarchy walk includes the anchor's own
+  group — so `authz.actor()`'s own id is in the returned set. **This must be
+  asserted, not assumed** (§9.6, W43); "unrelated group → 0 rows" is a bug
+  statement and "self → 1 row" is the property that makes self-service possible.
+- **A colleague in the same group sees the request** if they hold
+  `privacy_request:read`. A member **holding zero capabilities sees nothing**,
+  including requests about themselves — scope AND capability in one predicate,
+  never two `PERMISSIVE` policies (§B2, and the measured escalation that rule
+  exists to prevent).
+- **`app_admin` sees every request.** Note the shipped precedent is that
+  `email_read_scope` carries **no** `current_user = 'app_admin'` branch; admin
+  breadth comes from the admin's group placement in the closure. That is
+  consistent, but it is an assumption about the seed, and W43 asserts it
+  explicitly rather than letting it be true by accident.
+- **A request about user X is scoped by X's membership**, not by the group's.
+  The policy never reads `privacy_requests.group_id`, because there isn't one.
+  That is the DERIVED category's whole point and it is what stops a request being
+  visible in a group its subject never chose.
+- **The FK is the residual.** `23503` vs. success reveals whether a given uuid is
+  a live `users` row — the existence oracle §B2 names. For a table members hold
+  `INSERT` on, that is reachable. It is bounded (the id is a 122-bit
+  database-generated uuid) and should be **written down as an accepted trade**,
+  in the shape W28 already uses for `projects_id_uniq`.
+
+**Proving it.** Six assertions, each named after what it prevents, each with a
+denied case **on row counts, not status codes** (§B8):
+
+1. *A member with `privacy_request:read` sees their own request and a colleague's
+   in the same group, and sees zero from an unrelated group.*
+2. *A member holding no `privacy_request:read` sees zero requests about
+   themselves, inside their own group.* (The cross-axis case; a status-only
+   assertion passes on a leak.)
+3. *Erasure deletes the user row, the request row and the cascaded children in
+   one transaction, and leaves `privacy_request_events` intact* — asserted by an
+   **unfiltered owner count**, because a filtered count cannot distinguish "not
+   deleted" from "cannot see" (§B5).
+4. *No serving role holds INSERT, UPDATE or DELETE on `privacy_request_events`.*
+   Assert **per role**, and assert `TRUNCATE` too — it does not fire a row
+   trigger (§B2).
+5. *Erasing a user who has a refresh token and an email message succeeds* —
+   this is the `23503` test, and it is the one that would have caught W40's
+   absence.
+6. *After erasure, `authz.visible_user_ids()` no longer returns the erased id* —
+   the orphan-membership test. **This is the assertion that distinguishes
+   "the user row is gone" from "the user is gone",** and it is the one to write
+   first.
+
+**Tamper proof.** Per §6.6.1 and B8, each control is removed in turn and the
+suite must go red: drop the `can_read_privacy_request()` conjunct (a member with
+no capability reads their own group's requests); `GRANT DELETE` to `app_member`
+(the erasure becomes deletable in isolation); drop `ON DELETE CASCADE` from
+`users → email_messages` (assertion 5 goes red with `23503`). A control that
+cannot fail is not a control.
+
+### 9.6 Work items
+
+Same shape as §6; these extend that table and use its `W…` series.
+
+| ID | Phase | Work | Verified by |
+|---|---|---|---|
+| W38 | N2 | **`ON DELETE CASCADE` on every FK to `users`, and add the two missing FKs.** `refresh_tokens.user_id` and `email_messages.user_id` are `NO ACTION` today, so `DELETE FROM users` raises `23503` for any authenticated user. `user_roles.user_id` and `user_groups.user_id` have **no FK at all** — the deferred one named in `0001_rls_foundation.sql:138-142` was never added, so an erasure orphans the subject's roles and groups. **The stated semantics are unimplementable until this lands.** Recorded as accepted: a cascade is not policy-governed (§B2), which is why `privacy_request_events` carries no FK (§9.4) | *Erasing a user holding a refresh token and an email message succeeds; the cascaded child rows are gone by an unfiltered owner count; `user_roles`/`user_groups` hold no row for the erased id; and `authz.visible_user_ids()` no longer returns it* |
+| W39 | N2 | `privacy_requests`, **DERIVED**, no `group_id`, `uuidv7()` PK, `user_id → users(id)`. One policy, `USING (user_id IN (SELECT … FROM authz.visible_user_ids() WHERE authz.can_read_privacy_request()))` — capability **inside** the subquery | `EXPLAIN` shows a **hashed SubPlan with `loops = 1`**, *and* `pg_stat_user_functions` shows **1** `can_read_privacy_request()` call at N rows. `loops = 1` alone is **necessary and not sufficient** — measured 3,300 calls beside the `IN` against 1 inside it (§6.7). A missing row in `pg_stat_user_functions` reads as **zero**, not as a broken measurement |
+| W40 | N2 | Capability: **new** rows `privacy_request:read` and `privacy_request_event:read` — never `user:read`, never a reuse of `email:read`. Grants: `SELECT, INSERT` on `privacy_requests` to `app_member`/`app_admin`; `SELECT` on `privacy_request_events` to `app_admin` **only**; **`DELETE` on `privacy_requests` to no serving role** | A member holding `user:read` but **not** `privacy_request:read` reads **zero** request rows *inside their own group*. Both permission rows and their grants are present after `db:seed` **and** after `migration:run` alone, read from the live catalog — the legacy's ordering bug (`1777327198306:31-54`) is the failure this prevents |
+| W41 | N2 | `privacy_request_events`, append-only. `REVOKE INSERT, UPDATE, DELETE FROM PUBLIC, app_anon, app_member, app_admin`, then `GRANT SELECT TO app_admin`. No FK to `users` or `privacy_requests`. `subject_ref` is a keyed digest; the key is asserted present at boot | `has_table_privilege` for all four verbs **per role**, `TRUNCATE` included — asserted, not commented. Removing the `REVOKE` makes a direct `INSERT` succeed, so the test proves it can fail |
+| W42 | N2 | The erasure: `SECURITY DEFINER` function in **`authz`** (outside `db-schemas`, so it is not published in `openapi.json`), taking `p_actor` from Nest's verified token and **re-checking** `has_permission(p_actor, 'privacy_request', 'erase') AND (p_actor = p_subject OR p_subject ∈ authz.visible_user_ids())`. One transaction: revoke sessions → delete user (cascades) → delete request → append event | A member naming **another** user's id gets a denial and **both rows survive**; a member naming themselves succeeds; an operator in scope succeeds; an operator **out of** scope is denied. The function is absent from `openapi.json` **and** absent from the served `/` spec |
+| W43 | N2 | RLS suite for both tables: six assertions from §9.5, named after the attack, on **row counts and bodies** | `npm run test:rls` (gate 7 of 8). Explicitly assert the three properties that are **assumptions today**: self-visibility (`visible_user_ids()` includes `authz.actor()`), admin breadth without an admin policy branch, and the `23503` existence-oracle trade recorded in writing |
+| W44 | N2 | Thin Nest route `POST /privacy/erase` + service + DTO with `@ApiProperty` on every field. **No `pg` client in this path may `SET request.jwt.claims`** — that is the W37 P0 and this is a new request-reachable SQL path | The W37 structural check stays green. `grep` for `set_config` / `SET request.jwt.claims` in `src/privacy/` returns nothing. The route is covered by `JwtAuthGuard` via `APP_GUARD` (default deny), not by a per-controller `@UseGuards` |
+| W45 | N3 | Frontend: regenerate `openapi.json` + types; a `features/privacy/` folder — request list (own), request submit, and the erase confirmation. **Signals, no NGXS**, and a single notification path per §F4. **Every action surfaces a result** — the legacy's `getError` selector with no consumer is the defect to not reproduce | No hand-written URL or interface (`grep` for a literal API path in `src/` is empty); a component spec that renders the template and **asserts the error case surfaces**, not just `toBeTruthy()` |
+| W46 | ALL | §6.6.1 tamper matrix re-measured for the two new tables, recorded in this file | Each control removed in turn, each with its real red count against the current suite. A carried-over number from a superseded schema is a fabricated result |
+
+### 9.7 Open questions
+
+Each of these is a decision a human should make. None has been chosen silently.
+
+**Q1 — Does erasure cascade into `login_attempts` and `email_messages`, or do
+they survive?** `login_attempts` carries the subject's IP and user agent;
+`email_messages` is the mail history, including `password_reset` and
+`email_verification` rows whose *recipients* are the subject. §9.5 currently
+assumes both cascade with `users`. **Against that:** the security audit trail and
+the mail log are exactly the records a regulator wants to see survive. **For it:**
+`email_messages` is a `DERIVED` table whose whole point is a user's mail history
+— retaining it after the user asks to be forgotten is the retention a GDPR
+erasure complaint is about. **This is a legal call, not an engineering one**, and
+it changes W38's `ON DELETE` clauses, so it should be answered before W38 lands
+rather than after.
+
+**Q2 — Do the four consent columns port at all?** `marketing_consent`,
+`do_not_sell`, `privacy_restrictions`, `processing_objections` are four columns on
+`users` in the legacy, fronted by four endpoints. This plan proposes **not**
+porting them: they model obligations against marketing and sale that this
+template performs neither of. **The cost of saying no:** a forker who sends
+marketing mail adds four nullable columns and four `PATCH` routes — cheap, and
+they can copy `email_messages`'s pattern. **The cost of saying yes:** four
+columns and four endpoints ship in a template where every one is permanently
+`false`, which is how `marketing_consent: false` becomes a default nobody
+questions. Needs a human call on what the template is *for*.
+
+**Q3 — Is a data-subject export in scope at all?** §9.3 defers it, on the grounds
+that the legacy's version exports a behaviour profile and there is no second data
+source here. **If it is wanted**, it is **not** a PostgREST resource (it is a
+multi-table join, so it needs an algorithm → thin app; and it must not be a view,
+§B1/ADR-0022), and it should assemble from `users`, `email_messages` and
+`login_attempts` explicitly — with the behaviour profile left behind, along with
+the `user_behavior_profile` table as a whole, which this plan does not port at all.
+
+**Q4 — Is there a public, unauthenticated request path?** §9.4 drops it
+completely, because an unauthenticated erasure is an account-takeover primitive and
+the verification machinery is how the legacy tried to make that safe. **If a forker
+needs public intake**, the honest shape is: a public request that **opens a
+record and nothing else** — no `UNVERIFIED`-then-promote state machine, no SLA
+clock that a token can start, no erasure until the subject authenticates through
+the ordinary `refresh_tokens` path. That is much smaller than the legacy and is
+the reason the legacy's version needs a magic-link service at all.
+
+**Q5 — Should `users` gain a self-read policy?** Today `users` is
+`FORCE`d with `USING (current_user = 'app_admin')` and granted only to
+`app_admin`, so **a member cannot read their own user row through PostgREST.**
+That is what forces erasure into Nest (§9.4). The alternative is a self-scoped
+branch on `users` — `OR id = authz.actor()` — which would let `DELETE /users` be
+pure CRUD in PostgREST and remove the Nest dependency entirely. **This is the
+single decision with the largest effect on the design**, it was not chosen here,
+and it belongs to whoever owns the authorization model.
