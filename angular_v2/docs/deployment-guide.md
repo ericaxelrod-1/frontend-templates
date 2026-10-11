@@ -212,6 +212,15 @@ checkout uses is a legitimate reason to set one. In production set
 unset; the two must agree, because the application and PostgREST both connect
 with `AUTHENTICATOR_PASSWORD`.
 
+**In development, that configured value has to be the same in `.env` and
+`.env.test`.** The seed reads it from the file belonging to the current
+`NODE_ENV`, and because the statement is cluster-scoped it does not matter which
+one supplied it — the password is now the cluster's, for `app_dev` as much as for
+the database being seeded. `verify` and every test suite run in test mode, so they
+leave the cluster on `.env.test`'s value, and `npm run dev` authenticates with
+`.env`'s. Diverge them and the development stack cannot mint a token; see §Step 8
+exists because step 7 is cluster-scoped for the symptom and the repair.
+
 ---
 
 ## Running the stack in development
@@ -290,6 +299,38 @@ security suite that passes without exercising its subject is a false green.
 
 A green `verify` is therefore the deployment gate. Never weaken a lint rule or
 delete a test to get one.
+
+### Step 8 exists because step 7 is cluster-scoped
+
+`ALTER ROLE pgrst_authenticator … PASSWORD` is **cluster-scoped**: it rewrites the
+login password for every database on the cluster, not just the throwaway one the
+proof rebuilt. The RLS proof sets its own password and restores it in `afterAll`,
+and the seed writes the **configured** `AUTHENTICATOR_PASSWORD` — no literal,
+because a literal would be written cluster-wide and outlive the run. Both restore
+paths read the value through the same loader the application uses, so which file
+supplied it depends on the `NODE_ENV` the run was launched under.
+
+The operational consequence is that **`AUTHENTICATOR_PASSWORD` must be identical
+in `backend/.env` and `backend/.env.test`**. `verify` runs in test mode, so a green
+run leaves the cluster holding `.env.test`'s value; `npm run dev` reads `.env`. When
+they disagree the development stack cannot mint a token — `POST /auth/login`
+answers **HTTP 500** with `password authentication failed for user
+"pgrst_authenticator"`, and PostgREST fails the same way because both connect as
+that role. Nothing in the failure names a `.env`: the application reads its own
+file without complaint and the database rejects the password it is handed.
+
+Step 8 is the gate for exactly this, and it runs **last** so it reads the cluster
+as the preceding steps left it. It proves the property from the outside — a real
+login with the configured password, because a SCRAM verifier cannot be read back —
+and its failure message names the divergence and the fix: re-run
+`npm run db:seed` under the development environment, which re-syncs the cluster
+from `.env`. Setting the two files to the same value is the durable fix; the
+re-seed only repairs the cluster, it does not stop them drifting again.
+
+In production there is no second file and so no such ambiguity: one
+`AUTHENTICATOR_PASSWORD` in `backend/.env.production`, which both the seed and the
+running stack read. The divergence is a development-only hazard, created by the
+test mode the gate runs in.
 
 ---
 

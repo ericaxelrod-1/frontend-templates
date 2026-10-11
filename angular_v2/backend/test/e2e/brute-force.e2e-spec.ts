@@ -6,6 +6,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Client } from 'pg';
 import type * as BcryptModule from 'bcrypt';
+import type * as ThrottleModule from '../../src/auth/throttle.js';
 import { restoreAuthenticatorPassword } from '../support/cluster.js';
 import { databaseConfig, loadTestEnvironment } from '../support/database.js';
 import { BACKEND_ROOT } from '../support/paths.js';
@@ -22,6 +23,10 @@ import { BACKEND_ROOT } from '../support/paths.js';
  * counts compare calls — the deterministic "did the handler reach the
  * credential check" signal — and delegates to the real bcrypt, so hashing
  * itself is never faked. Fixtures live only in this spec, never in src/.
+ *
+ * `src/auth/throttle.ts` is wrapped the same way, for the same reason and under
+ * the same discipline — see `loginExpectingGateDelay` below for why the delay
+ * is observed rather than timed.
  */
 
 const TEST_DB = 'brute_force_e2e';
@@ -31,6 +36,21 @@ const PROOF_TIMEOUT = 600_000;
 
 const DELAY_SCHEDULE_SECONDS = '0,1,2,4';
 const WINDOW = '600';
+
+/**
+ * The configured schedule in milliseconds, parsed once. Every delay expectation
+ * in this file is indexed out of it rather than restated, so the schedule and
+ * the assertions cannot drift apart (AGENTS.md §2.4).
+ *
+ * Index 1 is 1000ms — the smallest delay this suite can apply at all — and that
+ * number is the whole reason three of these cases could not be asserted against
+ * a clock: 1000ms of sleep plus a `bcrypt.compare` at cost 12 (~324ms idle,
+ * measured over 4.6s under load) is indistinguishable from "no delay, slow
+ * box".
+ */
+const SCHEDULED_DELAYS_MS: readonly number[] = DELAY_SCHEDULE_SECONDS.split(',').map(
+  (seconds) => Number(seconds) * 1000,
+);
 
 /**
  * The password this suite authenticates `pgrst_authenticator` with.
@@ -61,6 +81,32 @@ vi.mock('bcrypt', async (importOriginal) => {
     default: { ...actual, compare: countingCompare },
     compare: countingCompare,
   };
+});
+
+/**
+ * Delay-decision recorder.
+ *
+ * `delayForFailures` is wrapped exactly as bcrypt's `compare` is: it records
+ * what it decided and delegates to the real function, so the number
+ * `auth.service.ts` receives — and the `setTimeout` it waits on — is the same
+ * number it would have been without this file existing. Nothing about a
+ * request's latency changes; only the *reading* of the decision does.
+ */
+const delayStats = vi.hoisted(() => ({ decided: [] as number[] }));
+
+vi.mock('../../src/auth/throttle.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof ThrottleModule>();
+  const realDelayForFailures = actual.delayForFailures;
+  const recordingDelayForFailures = (
+    failures: number,
+    schedule: readonly number[],
+    capSeconds: number,
+  ): number => {
+    const decided = realDelayForFailures(failures, schedule, capSeconds);
+    delayStats.decided.push(decided);
+    return decided;
+  };
+  return { ...actual, delayForFailures: recordingDelayForFailures };
 });
 
 function psqlAsSuperuser(database: string, sql: string): string {
@@ -168,6 +214,46 @@ async function loginFrom(body: unknown, remoteAddress: string) {
   });
 }
 
+/**
+ * Drives one login and asserts the delay the gate decided, then the sleep that
+ * decision produced. Two assertions, because neither alone is the property.
+ *
+ * `gate.delayMs` is the largest per-axis `delayForFailures` decision on the
+ * request (the service maxes the account and IP ones), read from the recorder
+ * rather than from the clock — so it is a pure function of the counted failures
+ * and holds identically on a loaded box. That is what replaces the three
+ * `toBeLessThan(1000)` wall-clock assertions: they conflated "no delay bucket
+ * fired" with "the box was idle", and failed at 1171ms and 1622ms under load.
+ *
+ * The sleep is what the decision alone cannot show: it is the only thing that
+ * catches `auth.service.ts` computing `gate.delayMs` and then not waiting on
+ * it. It is asserted as a LOWER bound because `setTimeout` never fires early —
+ * load can only make it larger — which is the opposite of the ceiling the
+ * undelayed cases could never be given safely.
+ *
+ * An empty record means the gate chose no bucket without asking, because the
+ * allowlist branch short-circuits to 0. It is not a dead recorder: the delayed
+ * cases in this same suite read the same array and assert the scheduled delays
+ * from it.
+ */
+async function loginExpectingGateDelay(body: unknown, remoteAddress: string, expectedDelayMs: number) {
+  delayStats.decided.length = 0;
+  const startedAt = Date.now();
+  const response = await loginFrom(body, remoteAddress);
+  const elapsedMs = Date.now() - startedAt;
+  const decisions = [...delayStats.decided];
+  const gateDelayMs: number = decisions.length === 0 ? 0 : Math.max(...decisions);
+
+  expect(gateDelayMs).toBe(expectedDelayMs);
+  // A zero delay has no floor to prove: there is nothing to wait out, and any
+  // ceiling would measure this machine rather than the gate.
+  if (expectedDelayMs > 0) {
+    expect(elapsedMs).toBeGreaterThanOrEqual(expectedDelayMs);
+  }
+
+  return response;
+}
+
 function lastAttempt(username: string) {
   return withAdminClient(async (client) => {
     const result = await client.query<{
@@ -237,20 +323,14 @@ describe('brute-force login gate', () => {
     const username = 'throttle-victim';
     await resetFailedPenalty(username);
 
-    const clear = await loginFrom({ username, password: 'wrong' }, '10.9.0.1');
+    const clear = await loginExpectingGateDelay({ username, password: 'wrong' }, '10.9.0.1', 0);
     expect(clear.statusCode).toBe(401);
-    // k=0 on this request (no counted failures yet): it is not delayed.
-    const t0 = Date.now();
-    await loginFrom({ username, password: 'wrong' }, '10.9.0.2'); // k=1 → schedule[1] = 1s
-    expect(Date.now() - t0).toBeGreaterThanOrEqual(1000);
-
-    const t1 = Date.now();
-    await loginFrom({ username, password: 'wrong' }, '10.9.0.3'); // k=2 → schedule[2] = 2s
-    expect(Date.now() - t1).toBeGreaterThanOrEqual(2000);
-
-    const t2 = Date.now();
-    await loginFrom({ username, password: 'wrong' }, '10.9.0.4'); // k=3 → schedule[3] = 4s
-    expect(Date.now() - t2).toBeGreaterThanOrEqual(4000);
+    // k=0 on this request (no counted failures yet): the gate decides 0, and
+    // the request is not delayed.
+    // k=1, k=2, k=3 walk the schedule: each decision AND the wait it produced.
+    await loginExpectingGateDelay({ username, password: 'wrong' }, '10.9.0.2', SCHEDULED_DELAYS_MS[1]);
+    await loginExpectingGateDelay({ username, password: 'wrong' }, '10.9.0.3', SCHEDULED_DELAYS_MS[2]);
+    await loginExpectingGateDelay({ username, password: 'wrong' }, '10.9.0.4', SCHEDULED_DELAYS_MS[3]);
   });
 
   it('the same host written as different IP string forms accumulates one counter and after threshold both are delayed', async () => {
@@ -274,13 +354,10 @@ describe('brute-force login gate', () => {
       expect(row.ip_subnet).toBe('1.2.3.4');
     }
 
-    const t0 = Date.now();
-    await loginFrom({ username: 'rotation-other', password: 'wrong' }, '::ffff:1.2.3.4');
-    expect(Date.now() - t0).toBeGreaterThanOrEqual(4000);
-
-    const t1 = Date.now();
-    await loginFrom({ username: 'rotation-other-2', password: 'wrong' }, '1.2.3.4');
-    expect(Date.now() - t1).toBeGreaterThanOrEqual(4000);
+    // Same host, three spellings: one normalized key, one counter, and a
+    // request from outside it still lands on the capped bucket.
+    await loginExpectingGateDelay({ username: 'rotation-other', password: 'wrong' }, '::ffff:1.2.3.4', SCHEDULED_DELAYS_MS[3]);
+    await loginExpectingGateDelay({ username: 'rotation-other-2', password: 'wrong' }, '1.2.3.4', SCHEDULED_DELAYS_MS[3]);
   });
 
   it('IPv6 failures from the same /64 aggregate one subnet counter; addresses outside the /64 do not', async () => {
@@ -298,13 +375,14 @@ describe('brute-force login gate', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.ip_subnet).toBe('2001:db8:aa:bb::/64');
 
-    const t0 = Date.now();
-    await loginFrom({ username: 'subnet-insider', password: 'wrong' }, '2001:db8:aa:bb::9');
-    expect(Date.now() - t0).toBeGreaterThanOrEqual(2000);
+    // Inside the /64: the subnet counter keys the delay for a different account.
+    await loginExpectingGateDelay({ username: 'subnet-insider', password: 'wrong' }, '2001:db8:aa:bb::9', SCHEDULED_DELAYS_MS[2]);
 
-    const t1 = Date.now();
-    await loginFrom({ username: 'subnet-outsider', password: 'wrong' }, '2001:db8:cc:dd::1');
-    expect(Date.now() - t1).toBeLessThan(1000);
+    // Outside the /64: a different subnet and an account with no failures, so
+    // neither axis reaches a counted failure and the gate decides 0. This is
+    // one of the three cases that used to assert `toBeLessThan(1000)` on the
+    // wall clock, which a busy box fails on a correctly undelayed request.
+    await loginExpectingGateDelay({ username: 'subnet-outsider', password: 'wrong' }, '2001:db8:cc:dd::1', 0);
   });
 
   it('an allowlisted source address is never delayed, never blocked, and contributes no counter rows', async () => {
@@ -323,10 +401,8 @@ describe('brute-force login gate', () => {
 
     // From the allowlisted address the gate skips: no delay, compare runs, generic 401.
     compareStats.calls = 0;
-    const t0 = Date.now();
-    const allowlisted = await loginFrom({ username, password: 'wrong' }, '203.0.113.7');
+    const allowlisted = await loginExpectingGateDelay({ username, password: 'wrong' }, '203.0.113.7', 0);
     expect(allowlisted.statusCode).toBe(401);
-    expect(Date.now() - t0).toBeLessThan(1000);
     expect(compareStats.calls).toBe(1);
 
     // The allowlisted request wrote no counter row: ip_normalized stays NULL.
@@ -350,19 +426,15 @@ describe('brute-force login gate', () => {
     await loginFrom({ username, password: 'wrong' }, '7.7.7.7');
 
     // k=2 → the next attempt (even with the right password) waits schedule[2].
-    const t0 = Date.now();
-    const success = await loginFrom({ username, password: SEED_PASSWORD }, '7.7.7.7');
+    const success = await loginExpectingGateDelay({ username, password: SEED_PASSWORD }, '7.7.7.7', SCHEDULED_DELAYS_MS[2]);
     expect(success.statusCode).toBe(200);
-    expect(Date.now() - t0).toBeGreaterThanOrEqual(2000);
 
     const body = success.json<{ accessToken: string }>();
     expect(body.accessToken).toBeTruthy();
 
     // The success row reset the counters: the next attempt is unthrottled.
-    const t1 = Date.now();
-    const after = await loginFrom({ username, password: 'wrong' }, '7.7.7.7');
+    const after = await loginExpectingGateDelay({ username, password: 'wrong' }, '7.7.7.7', 0);
     expect(after.statusCode).toBe(401);
-    expect(Date.now() - t1).toBeLessThan(1000);
   });
 
 });

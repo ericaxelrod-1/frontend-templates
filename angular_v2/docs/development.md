@@ -196,6 +196,38 @@ against a live database.
 - Never weaken a lint rule or delete a test to make `verify` pass. Fix the code.
 - If a database is unreachable, `verify` **fails**. It never skips silently.
 
+### `AUTHENTICATOR_PASSWORD` must agree between `.env` and `.env.test`
+
+`ALTER ROLE pgrst_authenticator … PASSWORD` is **cluster-scoped**: one statement
+rewrites the login password for every database on the cluster, `app_dev`
+included. Both the seed and the RLS proof's teardown therefore write the
+**configured** value rather than a literal, and both read it through the same
+loader the application uses — so which file that value comes from depends entirely
+on the `NODE_ENV` the run was launched with.
+
+`npm run verify` runs in test mode, so it leaves the cluster holding the password
+from **`backend/.env.test`**. `npm run dev` reads **`backend/.env`**. If the two
+files disagree, the development stack cannot mint a token: `POST /auth/login`
+answers **HTTP 500** with `password authentication failed for user
+"pgrst_authenticator"` in the NestJS log, and PostgREST fails identically because
+both connect as that role. The symptom is opaque precisely because nothing about
+it names a `.env` — the stack reads `.env` happily and the database simply
+rejects the password it is given.
+
+Keep the two values identical. If they have diverged, re-sync under the
+development environment rather than editing the role by hand:
+
+```bash
+cd backend && npm run db:seed
+```
+
+`test/smoke/database.smoke-spec.ts` is the gate for this, and it is the last step
+of `verify` **because** a suite that only ever ran in isolation could not see the
+damage a preceding step did to the shared cluster. It asserts the property from
+the outside — a real login with the configured password — since a SCRAM verifier
+cannot be read back, and its failure message names the divergence and the
+`db:seed` fix. That message is the diagnostic; this section explains why it fires.
+
 ### Other scripts
 
 | Command | Purpose |
@@ -354,6 +386,7 @@ add CI on top; the template does not need any.
 | Boot fails on missing `JWT_SECRET` | Working as designed. Set it in `.env`. |
 | **`verify` fails at a frontend step with an Angular CLI version error, not a Node error** | **An unsupported Node, reported confusingly.** The frontend requires `^22.22.3 \|\| ^24.15.0 \|\| >=26` and `frontend/.npmrc` sets `engine-strict=true`. **Run `verify` from a login shell** — `bash -lc 'npm run verify'` — so nvm is sourced by `.bashrc`. A **non-login** shell does not read `.bashrc`, resolves to an older Node below the floor, and the failure surfaces as an Angular CLI version mismatch rather than "unsupported Node". Check with `bash -lc 'node --version'` before debugging anything else. |
 | `verify` fails at the smoke step | Postgres unreachable or migrations not applied. |
+| **`POST /auth/login` → HTTP 500**, `password authentication failed for user "pgrst_authenticator"`, after a green `verify` | **`AUTHENTICATOR_PASSWORD` diverged between `.env` and `.env.test`.** `ALTER ROLE … PASSWORD` is cluster-scoped, so the test-mode run left the cluster on `.env.test`'s value while `npm run dev` authenticates with `.env`'s. Re-sync with `cd backend && npm run db:seed`. See §`AUTHENTICATOR_PASSWORD` must agree. |
 | Prerender throws `ReferenceError: localStorage` | A browser global on a server-executed path. Guard it or remove it. |
 | Frontend types out of sync | Run `npm run generate:client`. |
 | RLS test returns zero rows unexpectedly | Check identity and the policy's `USING` clause. Identity is the token's `sub` read through the claims setting — **not** `SET LOCAL app.user_id`, which no policy here reads, and not a `site_id` claim. Scope is `user_groups` membership joined to `org_closure`, so zero rows usually means no membership rows rather than a missing identity setting. |
