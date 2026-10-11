@@ -15,6 +15,8 @@ import {
   CreateTicketDto,
 } from './privacy-ticket.service';
 import { Request } from 'express';
+import { PermissionGuard } from '../permissions/guards/permission.guard';
+import { RequirePermission } from '../permissions/decorators/require-permission.decorator';
 
 interface AuthenticatedRequest extends Request {
   user: { id: number; email: string };
@@ -36,6 +38,13 @@ export class PrivacyTicketController {
   @Get()
   async getTickets(@Req() req: AuthenticatedRequest) {
     return this.privacyTicketService.getUserTickets(req.user.id);
+  }
+
+  @Get('all')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('privacy:read')
+  async getAllTickets() {
+    return this.privacyTicketService.getAllTickets();
   }
 
   @Get(':id')

@@ -1,12 +1,13 @@
 export interface CaptchaResult {
-  captchaId: string;
-  imageBase64: string;
+  token: string;
+  challenge: string;
+  type: string;
   text?: string; // Only included for debugging
 }
 
 export interface CaptchaVerifyRequest {
-  captchaId: string;
-  userInput: string;
+  captchaToken: string;
+  captchaSolution: string;
 }
 
 export interface CaptchaVerifyResponse {

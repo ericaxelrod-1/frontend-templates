@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, FindOptionsWhere, In } from 'typeorm';
 import { User } from './entities/user.entity';
-import { Role } from './entities/role.entity';
+import { Role, SystemRoles } from '../roles/entities/role.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RoleMembershipResult } from './dto/role-membership-result.dto';
@@ -17,9 +17,15 @@ import { PasswordValidationService } from '../auth/password-validation.service';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { Group } from '../permissions/entities/group.entity';
+import { Readable } from 'stream';
+import { IPrivacyProvider } from '../../common/contracts/privacy/privacy-provider.interface';
+import { PrivacyProvider } from '../../common/decorators/privacy-provider.decorator';
 
+@PrivacyProvider()
 @Injectable()
-export class UsersService {
+export class UsersService implements IPrivacyProvider {
+  readonly providerName = 'users';
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -440,6 +446,19 @@ export class UsersService {
   }
 
   /**
+   * Find all users with admin or superadmin roles
+   */
+  async findAdmins(): Promise<User[]> {
+    return this.userRepository.find({
+      where: [
+        { roles: { name: SystemRoles.ADMIN } },
+        { roles: { name: SystemRoles.SUPERADMIN } },
+      ],
+      relations: ['roles'],
+    });
+  }
+
+  /**
    * Check if a user has a specific permission
    * @param userId The user ID to check
    * @param resource The resource part of the permission
@@ -814,4 +833,47 @@ export class UsersService {
       emailVerifiedAt: new Date(),
     });
   }
+
+  // --- IPrivacyProvider Implementation ---
+
+  async getPreview(userId: string): Promise<Record<string, number>> {
+    // Return count of major privacy-sensitive fields
+    return { 'User Profile': 5 };
+  }
+
+  getDisclosure(): string {
+    return 'We collect and process your primary account information (username, email, name) to provide core authentication and profile services. Role and group memberships are tracked for access control.';
+  }
+
+  async onExport(userId: string): Promise<Readable> {
+    const id = parseInt(userId);
+    const s = new Readable();
+    if (isNaN(id)) {
+      s.push('{}');
+      s.push(null);
+      return s;
+    }
+    const user = await this.findOne(id);
+    s.push(JSON.stringify(user, null, 2));
+    s.push(null);
+    return s;
+  }
+
+  async onDelete(userId: string): Promise<void> {
+    const id = parseInt(userId);
+    if (isNaN(id)) {
+      return;
+    }
+    await this.userRepository.update(id, {
+      email: `deleted_${id}@example.com`,
+      firstName: 'Deleted',
+      lastName: 'User',
+      username: `deleted_${id}`,
+      password: 'ANONYMIZED',
+      isActive: false,
+      isDeleted: true,
+      deletedAt: new Date()
+    });
+  }
 }
+

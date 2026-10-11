@@ -11,6 +11,7 @@ import { LoginAttempt } from '../auth/entities/login-attempt.entity';
 import { UserBehaviorProfile } from '../auth/entities/user-behavior-profile.entity';
 import { SecurityAlert } from '../auth/entities/security-alert.entity';
 import { UsersService } from '../users/users.service';
+import { PrivacyRegistryService } from './privacy-registry.service';
 
 export interface UserDataExport {
   profile: {
@@ -91,15 +92,19 @@ export class PrivacyService {
     private readonly securityAlertRepository: Repository<SecurityAlert>,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
+    private readonly privacyRegistry: PrivacyRegistryService,
   ) {}
 
   async exportUserData(userId: number): Promise<UserDataExport> {
     const user = await this.usersService.findOne(userId);
+    if (!user || user.isDeleted) {
+      throw new NotFoundException('User not found or already deleted');
+    }
 
     const loginHistory = await this.loginAttemptRepository.find({
       where: { user: { id: userId } } as any,
       order: { attemptedAt: 'DESC' as any },
-      take: 100,
+      take: 100, // ID 8: Hard limit to prevent memory bloat
     });
 
     const behaviorProfile = await this.behaviorProfileRepository.findOne({
@@ -109,7 +114,7 @@ export class PrivacyService {
     const securityAlerts = await this.securityAlertRepository.find({
       where: { user: { id: userId } } as any,
       order: { createdAt: 'DESC' as any },
-      take: 50,
+      take: 50, // ID 8: Hard limit
     });
 
     return {
@@ -166,8 +171,66 @@ export class PrivacyService {
     };
   }
 
+  async getExportPreview(userId: number): Promise<Record<string, number>> {
+    const userIdStr = userId.toString();
+    const providers = this.privacyRegistry.getProviders();
+
+    const results = await Promise.all(
+      providers.map(async (provider) => {
+        try {
+          return await provider.getPreview(userIdStr);
+        } catch (error) {
+          return {};
+        }
+      }),
+    );
+
+    return results.reduce((acc, curr) => {
+      Object.entries(curr).forEach(([key, value]) => {
+        acc[key] = (acc[key] || 0) + value;
+      });
+      return acc;
+    }, {});
+  }
+
   async deleteAccount(userId: number): Promise<DeleteAccountResult> {
     const user = await this.usersService.findOne(userId);
+    if (!user || user.isDeleted) {
+      throw new NotFoundException('User not found or already deleted');
+    }
+    const userIdStr = userId.toString();
+
+    // Polymorphic Purge with Timeout
+    const providers = this.privacyRegistry.getProviders();
+    const DELETION_TIMEOUT_MS = 30000; // 30 seconds
+
+    await Promise.allSettled(
+      providers.map(async (provider) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(
+          () => controller.abort(),
+          DELETION_TIMEOUT_MS,
+        );
+        try {
+          // ID 9: Missing Deletion Timeouts - Race between provider logic and system timeout
+          await Promise.race([
+            provider.onDelete(userIdStr),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`Timeout after ${DELETION_TIMEOUT_MS}ms`)),
+                DELETION_TIMEOUT_MS,
+              ),
+            ),
+          ]);
+        } catch (error) {
+          console.error(
+            `Privacy Provider ${provider.providerName} failed for user ${userId}: ${error.message}`,
+          );
+        } finally {
+          clearTimeout(timeout);
+        }
+      }),
+    );
 
     await this.userRepository.update(userId, {
       isDeleted: true,

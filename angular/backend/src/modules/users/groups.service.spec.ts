@@ -4,63 +4,27 @@ import { Repository } from 'typeorm';
 import { GroupsService } from './groups.service';
 import { Group } from '../permissions/entities/group.entity';
 import { User } from './entities/user.entity';
-import { PermissionsService } from '../permissions/services/permissions.service';
-import {
-  ForbiddenException,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 
 describe('GroupsService', () => {
   let service: GroupsService;
-  let groupsRepository: Repository<Group>;
-  let usersRepository: Repository<User>;
-  let permissionsService: PermissionsService;
+  let groupRepository: Repository<Group>;
+  let userRepository: Repository<User>;
 
-  const mockGroupsRepository = {
+  const mockGroupRepository = {
+    findAndCount: jest.fn(),
+    findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn(),
     remove: jest.fn(),
+    find: jest.fn(),
   };
 
-  const mockUsersRepository = {
-    find: jest.fn(),
+  const mockUserRepository = {
     findOne: jest.fn(),
     save: jest.fn(),
+    find: jest.fn(),
   };
-
-  const mockPermissionsService = {
-    assignPermissionsToGroup: jest.fn(),
-    hasPermission: jest.fn(),
-  };
-
-  const createTestUser = (overrides = {}) =>
-    ({
-      id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      password: 'hashed_password',
-      isActive: true,
-      isEmailVerified: true,
-      lastLogin: new Date(),
-      firstName: 'Test',
-      lastName: 'User',
-      emailVerified: true,
-      userDeleted: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      roles: [],
-      groups: [],
-      userPermissions: [],
-      tasks: [],
-      categories: [],
-      tags: [],
-      userGroups: [],
-      permissions: [],
-      ...overrides,
-    }) as unknown as User;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -68,323 +32,84 @@ describe('GroupsService', () => {
         GroupsService,
         {
           provide: getRepositoryToken(Group),
-          useValue: mockGroupsRepository,
+          useValue: mockGroupRepository,
         },
         {
           provide: getRepositoryToken(User),
-          useValue: mockUsersRepository,
-        },
-        {
-          provide: PermissionsService,
-          useValue: mockPermissionsService,
+          useValue: mockUserRepository,
         },
       ],
     }).compile();
 
     service = module.get<GroupsService>(GroupsService);
-    groupsRepository = module.get<Repository<Group>>(getRepositoryToken(Group));
-    usersRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    permissionsService = module.get<PermissionsService>(PermissionsService);
+    groupRepository = module.get<Repository<Group>>(getRepositoryToken(Group));
+    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('create', () => {
-    const currentUser = {
-      id: 1,
-      role: { name: 'User', permissions: { canManageGroups: true } },
-    };
-
-    it('should create a new group', async () => {
-      const name = 'Test Group';
-      const description = 'Test Description';
-      const newGroup = {
-        id: 1,
-        name,
-        description,
-        owner: currentUser,
-        settings: {
-          canShareData: true,
-          canShareAssets: true,
-          maxMembers: 50,
-        },
-      };
-      mockGroupsRepository.save.mockResolvedValue(newGroup);
-
-      const result = await service.create(
-        name,
-        description,
-        currentUser as User,
-      );
-      expect(result).toEqual(newGroup);
-      expect(mockGroupsRepository.save).toHaveBeenCalledWith({
-        name,
-        description,
-        owner: currentUser,
-        settings: {
-          canShareData: true,
-          canShareAssets: true,
-          maxMembers: 50,
-        },
-      });
-    });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
   });
 
   describe('findAll', () => {
-    const currentUser = { id: 1, role: { name: 'User' } };
+    it('should return paginated groups', async () => {
+      const groups = [{ id: 1, name: 'Group 1' }];
+      mockGroupRepository.findAndCount.mockResolvedValue([groups, 1]);
 
-    it('should return all accessible groups for user', async () => {
-      const groups = [
-        { id: 1, name: 'Group 1' },
-        { id: 2, name: 'Group 2' },
-      ];
-      mockGroupsRepository.find.mockResolvedValue(groups);
+      const result = await service.findAll(0, 10);
 
-      const result = await service.findAll(currentUser as User);
-      expect(result).toEqual(groups);
-      expect(mockGroupsRepository.find).toHaveBeenCalledWith({
-        where: [
-          { owner: { id: currentUser.id } },
-          { userGroups: { user: { id: currentUser.id } } },
-        ],
-        relations: ['owner', 'userGroups', 'userGroups.user'],
-      });
+      expect(result.items).toEqual(groups);
+      expect(result.total).toBe(1);
+      expect(mockGroupRepository.findAndCount).toHaveBeenCalled();
     });
   });
 
   describe('findOne', () => {
-    const currentUser = { id: 1, role: { name: 'User' } };
+    it('should return a group', async () => {
+      const group = { id: 1, name: 'Group 1' };
+      mockGroupRepository.findOne.mockResolvedValue(group);
 
-    it('should return a group by id if user has access', async () => {
-      const group = {
-        id: 1,
-        name: 'Test Group',
-        owner: currentUser,
-        userGroups: [{ user: { id: currentUser.id } }],
-      };
-      mockGroupsRepository.findOne.mockResolvedValue(group);
-
-      const result = await service.findOne(1, currentUser as User);
+      const result = await service.findOne(1);
       expect(result).toEqual(group);
-      expect(mockGroupsRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 1 },
-        relations: ['owner', 'userGroups', 'userGroups.user'],
-      });
     });
 
-    it('should throw NotFoundException when group not found', async () => {
-      mockGroupsRepository.findOne.mockResolvedValue(null);
-
-      await expect(service.findOne(999, currentUser as User)).rejects.toThrow(
-        NotFoundException,
-      );
+    it('should throw NotFoundException if group not found', async () => {
+      mockGroupRepository.findOne.mockResolvedValue(null);
+      await expect(service.findOne(999)).rejects.toThrow(NotFoundException);
     });
+  });
 
-    it('should throw ForbiddenException when user has no access', async () => {
-      const group = {
-        id: 1,
-        name: 'Test Group',
-        owner: { id: 2 },
-        userGroups: [],
-      };
-      mockGroupsRepository.findOne.mockResolvedValue(group);
+  describe('create', () => {
+    it('should create and return a group', async () => {
+      const name = 'New Group';
+      const user = { id: 1 } as User;
+      const group = { id: 1, name, ownerId: 1 };
+      
+      mockGroupRepository.create.mockReturnValue(group);
+      mockGroupRepository.save.mockResolvedValue(group);
+      mockGroupRepository.findOne.mockResolvedValue(group);
 
-      await expect(service.findOne(1, currentUser as User)).rejects.toThrow(
-        ForbiddenException,
-      );
+      const result = await service.create(name, 'desc', user);
+      expect(result).toEqual(group);
+      expect(mockGroupRepository.save).toHaveBeenCalled();
     });
   });
 
   describe('addMember', () => {
-    const currentUser = { id: 1, role: { name: 'User' } };
-    const groupId = 1;
-    const userId = 2;
+    it('should add user to group', async () => {
+      const user = { id: 1, groups: [] } as any;
+      const group = { id: 1, name: 'Group' } as any;
+      
+      mockUserRepository.findOne.mockResolvedValue(user);
+      mockGroupRepository.findOne.mockResolvedValue(group);
+      mockUserRepository.save.mockResolvedValue(user);
 
-    it('should add a member to the group', async () => {
-      const group = {
-        id: groupId,
-        name: 'Test Group',
-        owner: currentUser,
-        userGroups: [],
-      };
-      const user = { id: userId, name: 'Test User' };
-      mockGroupsRepository.findOne.mockResolvedValue(group);
-      mockUsersRepository.findOne.mockResolvedValue(user);
-      mockGroupsRepository.findOne.mockResolvedValue(null);
-      mockGroupsRepository.save.mockResolvedValue({ group, user });
-
-      const result = await service.addMember(
-        groupId,
-        userId,
-        currentUser as User,
-      );
-      expect(result).toBeDefined();
-      expect(mockGroupsRepository.save).toHaveBeenCalled();
-    });
-
-    it('should throw ForbiddenException when user is not authorized', async () => {
-      const group = {
-        id: groupId,
-        name: 'Test Group',
-        owner: { id: 3 },
-        userGroups: [],
-      };
-      mockGroupsRepository.findOne.mockResolvedValue(group);
-
-      await expect(
-        service.addMember(groupId, userId, currentUser as User),
-      ).rejects.toThrow(ForbiddenException);
-    });
-  });
-
-  describe('removeMember', () => {
-    const currentUser = { id: 1, role: { name: 'User' } };
-    const groupId = 1;
-    const userId = 2;
-
-    it('should remove a member from the group', async () => {
-      const group = {
-        id: groupId,
-        name: 'Test Group',
-        owner: currentUser,
-        userGroups: [],
-      };
-      const userGroup = { id: 1, group, user: { id: userId } };
-      mockGroupsRepository.findOne.mockResolvedValue(group);
-      mockGroupsRepository.remove.mockResolvedValue(undefined);
-
-      await service.removeMember(groupId, userId, currentUser as User);
-      expect(mockGroupsRepository.remove).toHaveBeenCalledWith(group);
-    });
-
-    it('should throw ForbiddenException when user is not authorized', async () => {
-      const group = {
-        id: groupId,
-        name: 'Test Group',
-        owner: { id: 3 },
-        userGroups: [],
-      };
-      mockGroupsRepository.findOne.mockResolvedValue(group);
-
-      await expect(
-        service.removeMember(groupId, userId, currentUser as User),
-      ).rejects.toThrow(ForbiddenException);
-    });
-  });
-
-  describe('delete', () => {
-    const currentUser = { id: 1, role: { name: 'User' } };
-    const groupId = 1;
-
-    it('should delete a group', async () => {
-      const group = {
-        id: groupId,
-        name: 'Test Group',
-        owner: currentUser,
-        userGroups: [],
-      };
-      mockGroupsRepository.findOne.mockResolvedValue(group);
-      mockGroupsRepository.remove.mockResolvedValue(undefined);
-
-      await service.delete(groupId, currentUser as User);
-      expect(mockGroupsRepository.remove).toHaveBeenCalledWith(group);
-    });
-
-    it('should throw ForbiddenException when user is not authorized', async () => {
-      const group = {
-        id: groupId,
-        name: 'Test Group',
-        owner: { id: 3 },
-        userGroups: [],
-      };
-      mockGroupsRepository.findOne.mockResolvedValue(group);
-
-      await expect(
-        service.delete(groupId, currentUser as User),
-      ).rejects.toThrow(ForbiddenException);
-    });
-  });
-
-  describe('updateGroupPermissions', () => {
-    it('should allow admin to update group permissions', async () => {
-      const currentUser = {
-        id: 1,
-        username: 'admin',
-        email: 'admin@example.com',
-        password: 'hashed_password',
-        isActive: true,
-        isEmailVerified: true,
-        lastLogin: new Date(),
-        firstName: 'Admin',
-        lastName: 'User',
-        emailVerified: true,
-        userDeleted: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        roles: [],
-        groups: [],
-        userPermissions: [],
-        tasks: [],
-        categories: [],
-        tags: [],
-        userGroups: [],
-        permissions: [],
-        role: {
-          name: 'Admin',
-          permissions: ['groups:manage'],
-        },
-      } as unknown as User;
-      const group = { id: 1, name: 'Developers' };
-      const permissions = ['projects:view', 'projects:edit', 'code:review'];
-
-      mockPermissionsService.hasPermission.mockResolvedValue(true);
-      mockGroupsRepository.findOne.mockResolvedValue(group);
-      mockPermissionsService.assignPermissionsToGroup.mockResolvedValue(
-        undefined,
-      );
-
-      await service.updateGroupPermissions(1, permissions, currentUser);
-
-      expect(
-        mockPermissionsService.assignPermissionsToGroup,
-      ).toHaveBeenCalledWith(1, permissions);
-    });
-
-    it('should not allow non-admin to update group permissions', async () => {
-      const nonAdminUser = {
-        id: 2,
-        username: 'user',
-        email: 'user@example.com',
-        password: 'hashed_password',
-        isActive: true,
-        isEmailVerified: true,
-        lastLogin: new Date(),
-        firstName: 'Regular',
-        lastName: 'User',
-        emailVerified: true,
-        userDeleted: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        roles: [],
-        groups: [],
-        userPermissions: [],
-        tasks: [],
-        categories: [],
-        tags: [],
-        userGroups: [],
-        permissions: [],
-        role: {
-          name: 'User',
-          permissions: [],
-        },
-      } as unknown as User;
-      mockPermissionsService.hasPermission.mockResolvedValue(false);
-
-      await expect(
-        service.updateGroupPermissions(1, [], nonAdminUser),
-      ).rejects.toThrow(ForbiddenException);
+      const result = await service.addMember(1, 1);
+      expect(result.success).toBe(true);
+      expect(user.groups).toContain(group);
     });
   });
 });

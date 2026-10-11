@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { LoggingFeatureComponent } from './logging-feature.component';
+import { TestingModule } from '../../../tests/test-utils';
 
 describe('LoggingFeatureComponent', () => {
   let component: LoggingFeatureComponent;
@@ -8,7 +8,7 @@ describe('LoggingFeatureComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [LoggingFeatureComponent]
+      imports: [LoggingFeatureComponent, TestingModule]
     })
     .compileComponents();
 

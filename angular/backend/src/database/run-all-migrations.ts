@@ -1,6 +1,5 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
-import { DirectAddMissingColumns1742536989662 } from '../migrations/1742536989662-DirectAddMissingColumns';
 
 // Load environment variables
 config();
@@ -9,9 +8,9 @@ config();
  * This script runs a direct migration to fix the permissions table schema.
  */
 async function runAllMigrations() {
-  console.log('Starting permissions schema alignment migration...');
+  console.log('Starting permissions schema verification...');
   console.log(
-    'This will ensure permissions table has the correct structure and relationships.',
+    'This will check if the permissions table has the correct structure and relationships.',
   );
 
   const dataSource = new DataSource({
@@ -20,7 +19,7 @@ async function runAllMigrations() {
     synchronize: false,
     logging: true,
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-    migrations: [DirectAddMissingColumns1742536989662],
+    migrations: [],
     subscribers: [],
   });
 
@@ -28,13 +27,7 @@ async function runAllMigrations() {
     await dataSource.initialize();
     console.log('Data source has been initialized!');
 
-    // Run the direct migration
-    const migration = new DirectAddMissingColumns1742536989662();
-    console.log(`Running migration: ${migration.name}`);
-    await migration.up(dataSource.createQueryRunner());
-    console.log(`Successfully completed migration: ${migration.name}`);
-
-    console.log('Migration completed successfully!');
+    console.log('Schema verification started...');
 
     // Verify the schema is now correct
     const queryRunner = dataSource.createQueryRunner();

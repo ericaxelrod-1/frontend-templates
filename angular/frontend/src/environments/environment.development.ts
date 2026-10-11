@@ -30,5 +30,8 @@ export const environment: Environment = {
     difficulty: 'easy', // Set to easy for development
     skipForDevelopment: false // Show CAPTCHA in development mode for testing
   },
+  privacy: {
+    verificationWindowHours: 24 // 24 hours before unverified privacy requests expire
+  },
   debugMode: true
 }; 

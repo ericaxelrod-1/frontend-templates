@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { PublicLayoutComponent } from './public-layout.component';
+import { TestingModule } from '../../tests/test-utils';
 
 describe('PublicLayoutComponent', () => {
   let component: PublicLayoutComponent;
@@ -8,7 +8,7 @@ describe('PublicLayoutComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PublicLayoutComponent]
+      imports: [PublicLayoutComponent, TestingModule]
     })
     .compileComponents();
 

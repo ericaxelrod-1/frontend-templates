@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
-import { CaptchaService } from './captcha.service';
+import { Module, forwardRef } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { CaptchaController } from './captcha.controller';
 
 @Module({
+  imports: [forwardRef(() => AuthModule)],
   controllers: [CaptchaController],
-  providers: [CaptchaService],
-  exports: [CaptchaService],
+  providers: [],
+  exports: [],
 })
 export class CaptchaModule {}

@@ -351,6 +351,8 @@ audit_reports/*.json
 audit_reports/*.log
 .env.gmail
 
+.worktrees/
+
 # Local agent tooling, not project content.
 # `.kilo/` is the agent's own configuration and `sandbox.toml` is its tool
 # permission rules. Neither belongs in a template that other people fork.

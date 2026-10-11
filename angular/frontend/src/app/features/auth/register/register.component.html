@@ -187,14 +187,13 @@
             </span>
           </div>
 
-          <!-- CAPTCHA verification -->
           <div class="form-group captcha-container">
             <label>Verify you're human</label>
-            <app-captcha-selector #captchaSelector formControlName="captcha"
+            <app-standard-captcha #captcha formControlName="captcha"
               [ngClass]="{ 'is-invalid': submitted && f['captcha'].errors }">
-            </app-captcha-selector>
+            </app-standard-captcha>
             <div *ngIf="submitted && f['captcha'].errors" class="invalid-feedback">
-              <div *ngIf="f['captcha'].errors['required']">CAPTCHA verification is required</div>
+              <div *ngIf="f['captcha'].hasError('required')">CAPTCHA verification is required</div>
             </div>
           </div>
         </div>

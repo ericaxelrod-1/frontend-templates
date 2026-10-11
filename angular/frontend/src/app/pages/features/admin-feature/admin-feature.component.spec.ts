@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { AdminFeatureComponent } from './admin-feature.component';
+import { TestingModule } from '../../../tests/test-utils';
 
 describe('AdminFeatureComponent', () => {
   let component: AdminFeatureComponent;
@@ -8,7 +8,7 @@ describe('AdminFeatureComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AdminFeatureComponent]
+      imports: [AdminFeatureComponent, TestingModule]
     })
     .compileComponents();
 

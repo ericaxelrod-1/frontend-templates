@@ -29,5 +29,8 @@ export const environment: Environment = {
     enabled: true,
     difficulty: 'hard'
   },
+  privacy: {
+    verificationWindowHours: 24 // 24 hours before unverified privacy requests expire
+  },
   debugMode: false
 }; 

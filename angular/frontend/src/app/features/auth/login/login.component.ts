@@ -8,23 +8,23 @@ import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { AppConfigService } from '../../../core/services';
 import { LoggerService } from '../../../services/logging/logger.service';
 import { CaptchaService } from '../../../core/services/captcha.service';
-import { CaptchaSelectorComponent } from '../../../shared/components/captcha/advanced/captcha-selector.component';
-import { AdvancedCaptchaService } from '../../../core/services/advanced-captcha.service';
+import { StandardCaptchaComponent } from '../../../shared/components/captcha/standard/standard-captcha.component';
 import { environment } from '../../../../environments/environment';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
+import { CustomValidators } from '../../../core/validators/custom-validators';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, CaptchaSelectorComponent, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule]
+  imports: [CommonModule, ReactiveFormsModule, StandardCaptchaComponent, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule]
 })
 export class LoginComponent implements OnInit, OnDestroy {
-  @ViewChild('captchaSelector') captchaSelector!: CaptchaSelectorComponent;
+  @ViewChild('captcha') captcha!: StandardCaptchaComponent;
 
   loginForm!: FormGroup;
   returnUrl = '/';
@@ -51,8 +51,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     private store: Store,
     private appConfig: AppConfigService,
     private logger: LoggerService,
-    private captchaService: CaptchaService,
-    private advancedCaptchaService: AdvancedCaptchaService
+    private captchaService: CaptchaService
   ) {
     this.logger.info('LoginComponent constructor called');
     try {
@@ -73,7 +72,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.logger.info('LoginComponent ngOnInit called');
     // Initialize form with conditional validation
     const formConfig: any = {
-      email: ['', [Validators.required, Validators.email]],
+      email: ['', [Validators.required, CustomValidators.email()]],
       password: ['', Validators.required]
     };
 
@@ -107,6 +106,9 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.error$.subscribe(error => {
           this.logger.debug('Error state changed:', error);
           this.error = error || '';
+          if (error && this.captchaEnabled && this.captcha) {
+            this.captcha.refreshChallenge();
+          }
         })
       );
 
@@ -136,111 +138,38 @@ export class LoginComponent implements OnInit, OnDestroy {
 
     // Mark fields as touched for validation
     this.loginForm.markAllAsTouched();
-    if (this.captchaEnabled && this.captchaSelector) {
-      this.captchaSelector.markAsTouched();
-    }
 
     // Stop here if form is invalid
     if (this.loginForm.invalid) {
       this.logger.warn('Form is invalid');
-
-      // Log which controls are invalid and why
-      Object.keys(this.loginForm.controls).forEach(key => {
-        const control = this.loginForm.get(key);
-        if (control?.invalid) {
-          this.logger.warn(`Control ${key} is invalid:`, control.errors);
-        }
-      });
-
       return;
     }
 
-    // If CAPTCHA is enabled, verify it before proceeding
-    if (this.captchaEnabled) {
-      // Get CAPTCHA data directly from the selector component
-      const captchaData = this.captchaSelector.getCaptchaData();
-      if (!captchaData) {
-        this.logger.warn('CAPTCHA data is missing');
-        return;
-      }
-
-      this.logger.info('Verifying CAPTCHA before login:', captchaData);
-      this.loading = true;
-
-      // Determine CAPTCHA type and verify with the appropriate service
-      const captchaType = this.determineCaptchaType(captchaData);
-
-      this.advancedCaptchaService.verifyAdvancedCaptcha(
-        captchaData.challengeId,
-        captchaData.selectedAnswer,
-        captchaType
-      ).subscribe({
-        next: (response) => {
-          this.logger.info('CAPTCHA verification response:', response);
-          if (response.success) {
-            this.logger.info('CAPTCHA verification successful, proceeding with login');
-            this.dispatchLogin();
-          } else {
-            this.logger.warn('CAPTCHA verification failed');
-            this.error = 'CAPTCHA verification failed. Please try again.';
-            this.loading = false;
-            // Refresh the captcha
-            const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-            if (activeCaptcha?.refreshChallenge) {
-              activeCaptcha.refreshChallenge();
-            }
-          }
-        },
-        error: (err) => {
-          this.logger.error('Error verifying CAPTCHA:', err);
-          this.error = 'An error occurred while verifying CAPTCHA. Please try again.';
-          this.loading = false;
-          // Refresh the captcha
-          const activeCaptcha = this.captchaSelector.getActiveCaptchaComponent();
-          if (activeCaptcha?.refreshChallenge) {
-            activeCaptcha.refreshChallenge();
-          }
-        }
-      });
-    } else {
-      // CAPTCHA is disabled, proceed directly with login
-      this.logger.info('CAPTCHA is disabled, proceeding directly with login');
-      this.loading = true;
-      this.dispatchLogin();
-    }
-  }
-
-  // Determine the CAPTCHA type based on the captcha data structure
-  private determineCaptchaType(captchaData: any): string {
-    if (captchaData.challengeId && captchaData.challengeId.startsWith('vr_')) {
-      return 'visual-reasoning';
-    } else if (captchaData.challengeId && captchaData.challengeId.startsWith('pw_')) {
-      return 'physical-world';
-    }
-    return 'visual-reasoning'; // Default to visual-reasoning captcha
+    this.dispatchLogin();
   }
 
   private dispatchLogin(): void {
     this.logger.info('Dispatching Login action');
 
-    // Create a structured data object for better code clarity
-    const loginData = {
-      email: this.f['email'].value,
-      password: this.f['password'].value,
-      recaptchaToken: this.captchaEnabled ? 'verified-via-advanced-captcha' : 'captcha-disabled'
-    };
+    let captchaToken = '';
+    let captchaSolution = '';
 
-    this.logger.debug('About to dispatch login action');
+    if (this.captchaEnabled) {
+      const captchaData = this.loginForm.get('captcha')?.value;
+      if (captchaData) {
+        captchaToken = captchaData.captchaToken;
+        captchaSolution = captchaData.captchaSolution;
+      }
+    }
 
     // Dispatch login action - NgRx actions don't return results, they update state
     this.store.dispatch(new AuthActions.Login(
-      loginData.email,
-      loginData.password,
-      loginData.recaptchaToken
+      this.f['email'].value,
+      this.f['password'].value,
+      'verified-via-captcha',
+      captchaToken,
+      captchaSolution
     ));
-
-    // Error handling is done via the error$ observable subscription in ngOnInit
-    // Loading state is handled via the loading$ observable subscription in ngOnInit
   }
 
   // Navigate to forgot password page
@@ -254,4 +183,4 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.logger.debug('NavigateToRegister called');
     this.router.navigate(['/register']);
   }
-} 
+}
