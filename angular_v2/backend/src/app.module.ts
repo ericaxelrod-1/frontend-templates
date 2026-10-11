@@ -1,6 +1,9 @@
 import './config/load-env-file.js';
 import { Module } from '@nestjs/common';
 import { ConfigModule, registerAs } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { AuthModule } from './auth/auth.module.js';
 import { loadEnvironment } from './config/environment.js';
 
 /**
@@ -22,6 +25,8 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
       ignoreEnvFile: true,
       load: [registerAs('environment', () => APP_ENVIRONMENT)],
     }),
+    AuthModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })
 export class AppModule {}

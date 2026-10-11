@@ -16,6 +16,10 @@ function validSource(overrides: Record<string, string | number> = {}): Record<st
     DB_PASSWORD: 'app',
     DB_NAME: 'app_dev',
     JWT_SECRET: SECRET,
+    AUTHENTICATOR_PASSWORD: 'authenticator-password',
+    APP_BASE_URL: 'https://app.example.test',
+    EMAIL_HOST: '127.0.0.1',
+    EMAIL_PORT: '1025',
     ...overrides,
   };
 }
@@ -36,8 +40,29 @@ describe('loadEnvironment', () => {
   it('returns the validated environment for a complete source', () => {
     expect(loadEnvironment(validSource({ PORT: '4000' }))).toEqual({
       database: { host: 'localhost', port: 5432, user: 'app', password: 'app', database: 'app_dev' },
-      jwt: { secret: SECRET },
+      authenticator: { user: 'pgrst_authenticator', password: 'authenticator-password' },
+      jwt: { secret: SECRET, accessTokenTtlSeconds: 900, refreshTokenTtlSeconds: 2592000 },
+      security: {
+        ipAllowlist: [],
+        failureWindowSeconds: 600,
+        delayScheduleSeconds: [0, 1, 4, 16],
+        delayCapSeconds: 30,
+        blockThreshold: 5,
+      },
       server: { port: 4000 },
+      email: {
+        appName: 'app.example.test',
+        baseUrl: 'https://app.example.test',
+        from: 'no-reply@app.example.test',
+        smtp: {
+          host: '127.0.0.1',
+          port: 1025,
+          user: null,
+          password: null,
+          secure: false,
+          rejectUnauthorized: true,
+        },
+      },
     });
   });
 
@@ -46,7 +71,7 @@ describe('loadEnvironment', () => {
   });
 
   it('never defaults a database coordinate', () => {
-    for (const key of ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'JWT_SECRET']) {
+    for (const key of ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'JWT_SECRET', 'AUTHENTICATOR_PASSWORD', 'APP_BASE_URL', 'EMAIL_HOST', 'EMAIL_PORT']) {
       const source = validSource();
       delete source[key];
 
@@ -94,6 +119,10 @@ describe('loadEnvironment', () => {
       'DB_NAME is required but was not set',
       'DB_PORT is required but was not set',
       'JWT_SECRET is required but was not set',
+      'AUTHENTICATOR_PASSWORD is required but was not set',
+      'APP_BASE_URL is required but was not set',
+      'EMAIL_HOST is required but was not set',
+      'EMAIL_PORT is required but was not set',
     ]);
   });
 
@@ -110,7 +139,7 @@ describe('loadEnvironment', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(EnvironmentError);
       expect((error as EnvironmentError).name).toBe('EnvironmentError');
-      expect((error as EnvironmentError).message).toContain('6 problem(s)');
+      expect((error as EnvironmentError).message).toContain('10 problem(s)');
     }
   });
 });

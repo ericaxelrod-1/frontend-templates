@@ -26,8 +26,8 @@ be forked and built upon. Two consequences drive most rules below:
 ```bash
 # Backend — backend/
 npm run build && npm run lint && npm test
-npm run migration:run        # apply migrations
-npm run db:seed              # seed roles/permissions/admin user
+npm run db:seed              # provision: roles, then migrations, then data
+npm run migration:run        # re-migrate a database whose roles already exist
 
 # Frontend — frontend/
 npm run lint
@@ -43,6 +43,38 @@ psql -h localhost -U postgres -c 'select version();'
 Postgres is expected to be running locally, from `DB_HOST` / `DB_PORT` / `DB_USER` /
 `DB_PASSWORD` / `DB_NAME` in `.env`. **Docker is not used and is not a supported
 path.**
+
+### Provisioning order
+
+**`npm run db:seed` provisions a database from nothing. `npm run migration:run`
+does not, so the order `migration:run` → `db:seed` cannot work on a fresh
+cluster.**
+
+`database/seed.ts` runs these steps in exactly this order, and the order is
+load-bearing: `database/bootstrap/001_roles.sql` **as a superuser** → the
+migrations, as the owner role → the authenticator's `LOGIN` password → the
+superuser-only grants that `0001` cannot apply itself → the seed data, connected
+as `pgrst_authenticator` and scoped by `SET LOCAL ROLE app_admin`.
+
+Roles come first because `0001_rls_foundation.sql` opens with a preflight that
+raises `missing role(s) […] — run database/bootstrap/001_roles.sql as a
+superuser first`, and because the seed's `assertUsersTableExists` needs
+`public.users`, which only `0002_refresh_tokens.sql` creates. `migration:run` on
+a cluster with no roles therefore dies on the preflight before any schema
+exists. It went unnoticed because a machine that was provisioned once already
+had the roles, so the same command sequence appeared to work on the next clone.
+
+- **New machine, no database:** `npm run db:seed`, and nothing before it. It
+  bootstraps the roles, applies the migrations and seeds, in that order.
+- **If you prefer explicit steps:** `database/bootstrap/001_roles.sql` as a
+  superuser, then `npm run migration:run`, then `npm run db:seed`. The last two
+  are idempotent, and it is the seed that adds the permissions, the group tree
+  and the admin user.
+- **An existing install:** `npm run migration:run` on its own is correct — it
+  applies only the files not already recorded in the `migrations` table.
+
+Role creation is deliberately not a migration (§B1), so there is no command that
+does step 1 and nothing else. That is a decision, not an oversight.
 
 ### The verification gate
 
@@ -178,8 +210,9 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
 
 ## B1. Database
 
-- **PostgreSQL.** Not SQLite. A locally-installed Postgres server is the
-  baseline — it requires no container runtime and no external account.
+- **PostgreSQL 18 or later.** Not SQLite. A locally-installed Postgres server is the
+  baseline — it requires no container runtime and no external account. The floor is
+  **18**, not a preference: every key defaults to `uuidv7()`, which is core from 18.
 - **No ORM.** TypeORM, Sequelize and Prisma are not dependencies. There is no
   `entityManager`, no `createQueryBuilder`, no raw-query escape hatch from
   application code. That absence is load-bearing: the previous implementation
@@ -208,6 +241,22 @@ Location: `backend/`. NestJS 12, Fastify adapter, PostgREST + `pg` (no ORM).
 - Store arrays and objects as `jsonb` (or a real Postgres array type). JSON blobs
   must be queryable.
 - Timestamps are `timestamptz`. Booleans are `boolean`. UUIDs are `uuid`.
+- **Every key is UUIDv7: `DEFAULT uuidv7()`, never `gen_random_uuid()`.** A v4
+  scatters index insertions across the whole btree; a v7 sorts by minting time and
+  lands at the right-hand edge. Take the **column default** — do not mint a key in
+  the application, in the seed, or in a migration, because a supplied value silently
+  bypasses the default and the catalog gate will not see it. Two consequences an
+  agent will otherwise get wrong:
+  - **One id cannot be left to a default.** The `refresh_tokens.jti` claim lives
+    inside the access token, which the refresh row is keyed on, so it must exist
+    before the row does. `src/auth/uuidv7.ts` mints it, matching the default's
+    layout — a v4 there would make the column half v4.
+  - **No backfill.** A v4 and a v7 are both valid UUIDs and nothing reads the
+    version nibble, so existing rows are left alone and age out. Rewriting keys
+    would mean updating every referencing row and rebuilding `authz.org_closure`, for
+    an index-locality gain. `test/rls/uuid-keys.spec.ts` gates this from
+    `pg_attrdef`, with no table names hardcoded — a new table with a v4 default fails
+    it, which a test listing the old nine would not.
 - Index anything you filter or sort on, including `jsonb` paths (GIN).
 
 ## B2. Authorization — two axes, two mechanisms, two key materials
@@ -349,11 +398,14 @@ CREATE POLICY row_scope ON projects USING (
 > **SHIPPED — `0001_rls_foundation.sql` implements the shape above and
 > `backend/test/rls/rls.spec.ts` proves it with 68 tests, run by `verify`.** The
 > superseded `sites` / `site_id`-claim / per-row-walk shape is **gone from the
-> tree**; `grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b' backend/database/`
-> returns nothing. **A green `verify` is therefore evidence for this section.** If a
-> claim here contradicts the shipped file, the file wins and the claim is a bug in
-> this document. One rule is **deliberately not enforced yet**: the **grant-subset
-> trigger** (§Capability).
+> tree**; `grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids|claim_site_id|request_claims)\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/`
+> returns nothing — it asserts on the **executable construct**, not on the bare
+> word, because the SUPERSEDED NOTE quotes `sites`, `claim_site_id()` and
+> `site_tree_ids()` in order to explain the withdrawal, so a substring gate returns
+> lines and reads as a failure. **A green `verify` is therefore evidence for this
+> section.** If a claim here contradicts the shipped file, the file wins and the
+> claim is a bug in this document. One rule is **deliberately not enforced yet**:
+> the **grant-subset trigger** (§Capability).
 
 - **Key the admin branch on `current_user`, never on the `role` claim.**
   `request_claims()->>'role' = 'admin'` is a **dead branch** — the claim is
@@ -432,13 +484,39 @@ CREATE POLICY row_scope ON projects USING (
   - **The rule — a design constraint, not a mechanical transform:** *A group-scoped
     table may only carry foreign keys that stay within the group-scoped set. Any FK
     leaving that set must terminate at a table members cannot write to.*
-  - **Declare every table in one of three categories**, and the primary key follows:
+  - **Declare every table in one of FOUR categories**, and the primary key follows.
+    A table that fits none of them is not an exception — it is a **fifth category
+    that has not been named yet**, and naming it is the work:
 
     | Category | Tables | Primary key | FK discipline |
     |---|---|---|---|
     | **Group-scoped** | `projects`, `customers` | `PRIMARY KEY (group_id, id)` | carries `group_id`, and **every** FK carries `group_id` |
     | **The hierarchy** | `groups` | simple `PRIMARY KEY (id)` | not scoped by `group_id` — it *is* the group; self-FK is admin-only-reachable |
-    | **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups` | simple primary keys | global reference data |
+    | **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups`, `refresh_tokens`, `login_attempts` | simple primary keys | global reference data |
+    | **DERIVED** | `email_messages` | simple `PRIMARY KEY (id)` | **has no `group_id` at all** — scope is another table's membership, so an FK to the referenced USER is expected and permitted only at a table members cannot write to |
+
+  - **DERIVED — what the category means, because it is the one an agent will get
+    wrong by pattern-matching the other three.** A derived row's scope is resolved
+    through **another table's membership**: `email_messages` has no `group_id`, and
+    an actor sees the mail history of exactly those users whose groups they can see.
+    - **Do not add a `group_id` to make it look like the other tables.** A single
+      `group_id` cannot express the two cases that force the category: a user in
+      **several** groups (one column means duplicating the row per group, so "which
+      groups is this message in?" becomes ambiguous), and a self-service reset that
+      names **no group at all** (inventing one puts the row in a scope nobody chose).
+      Both are why it is derived. ADR-0025.
+    - **The policy cannot read the membership table directly.** A policy's subquery
+      runs with the **querying** role's privileges, and `user_groups` carries its own
+      self-scoping policy, so an inline `EXISTS` over it sees only the caller's own
+      rows and silently degrades to "the recipient is me". Route it through a
+      `SECURITY DEFINER` helper (`authz.visible_user_ids()`) that reads with the
+      owner's privileges — the same reason `has_permission()` is `SECURITY DEFINER`.
+    - **Both axes go in ONE predicate**, capability AND-ed with scope, never two
+      PERMISSIVE policies (they OR). Assert the **function-call count**, not just the
+      plan: `loops = 1` for the subplan is necessary and **not sufficient**, because a
+      `STABLE` function sitting *beside* the hoisted subquery is still called once per
+      candidate row. Measured on this table: `loops = 1` with **1** call inside the
+      subquery, against **3,300** calls at 3,300 rows beside it.
 
 - **`groups`'s own policy goes through `authz.visible_group_ids()`, a `SECURITY
   DEFINER` helper — a decision SEPARATE from not FORCEing the table. Do not merge
@@ -456,6 +534,18 @@ CREATE POLICY row_scope ON projects USING (
   member scoped to a group sees its own row plus its descendants, and a member scoped
   to an unrelated group sees **its own single row and none of the subtree**. Anyone
   documenting "unrelated → 0" is describing a bug.
+- **`loops = 1` is necessary and NOT sufficient — a `STABLE` helper placed BESIDE a
+  hoisted subquery is still called once per candidate row.** This is the single most
+  expensive mistake available in a policy, and it is invisible in the plan's shape: the
+  subplan reads as a perfect `hashed SubPlan` with `loops = 1` while the function beside
+  it runs per row. `STABLE` means *"the same answer within this statement"*, **not**
+  *"called once"*. Put the helper **inside** the uncorrelated subquery and the planner
+  hoists it to a `One-Time Filter`; leave it beside the subquery and it is per-row.
+  Measured on `email_messages` at 3,300 rows: **1** call inside, **3,300** beside
+  (7.6 ms against 1.3 s), against 4.2 s for a correlated variant. **Assert the
+  function-call count from `pg_stat_user_functions`, not the plan alone** — and note
+  that a function that is never called has **no row** there, so read a missing row as
+  zero. ADR-0025.
 - **`EXECUTE` is granted to `PUBLIC` on new functions by default.** `REVOKE EXECUTE …
   FROM PUBLIC` on every function, or any `SECURITY DEFINER` helper is anonymously
   reachable. **A revoke is not a policy** — revoking from `PUBLIC` while granting to
@@ -597,6 +687,25 @@ $$;
 - **A new permission is one inserted row, no migration.** A new *tier* that is not a
   superset is a new database role — a bootstrap change plus an `ADMIN OPTION` grant.
   Say so before designing one.
+- **Give a NEW capability its own row — never reuse an existing one.** `email:read` is
+  not `user:read` and not `user:create`: a role holding `user:create` must read **zero**
+  email rows, asserted inside its own group. Reusing a permission makes the grant
+  invisible, because widening it for an unrelated reason silently widens email access
+  and nobody reading that diff would know. A dedicated row is its own line in
+  `role_permissions`, so revoking it touches nothing else. **A permission row and its
+  grants are written by BOTH the migration and `database/seed.ts`**: the migration owns
+  the schema, the seed owns the grant (roles are seeded, never migrated — §B1), and
+  both must be `ON CONFLICT DO NOTHING` so a fresh provision and a re-migrated one
+  agree. Assert both from the live catalog.
+- **A credential-bearing payload is suppressed by CODE that THROWS, never by a
+  convention and never by silently dropping the value.** `password_reset` and
+  `email_verification` bodies carry a bearer token; `contentClassFor` in
+  `src/email/email-content-class.ts` refuses one and is called **before** the
+  transaction opens, so the refusal costs no round trip and is never partially applied.
+  Silently nulling the column leaves the caller believing a body was stored, and the
+  failure surfaces as an empty column with nothing to say a body was refused — §2.1.
+  **Store no rendered body by default**, and prove the refusal red/green, because a
+  suppression rule that cannot fail is not a rule.
 - **`app_admin` is a superset, not a bypass:** all **rows** (RLS), all **tables**
   (grants), all **pages** (the resolver), all **endpoints** (the boundary `GRANT`).
   Four mechanisms, four tests. No flag turns enforcement off.

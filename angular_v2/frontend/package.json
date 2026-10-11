@@ -13,6 +13,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "serve:ssr:frontend": "node dist/frontend/server/server.mjs",
+    "dev": "npm run build && npm run serve:ssr:frontend",
     "typecheck": "ngc -p tsconfig.app.json --noEmit && ngc -p tsconfig.spec.json --noEmit",
     "lint": "eslint .",
     "test": "ng test",

@@ -1,6 +1,10 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { databaseConfig } from '../support/database.js';
+import { restoreAuthenticatorPassword } from '../support/cluster.js';
+import { databaseConfig, loadTestEnvironment } from '../support/database.js';
+import { BACKEND_ROOT } from '../support/paths.js';
 import {
   applyMigrationAsOwner,
   ASSUMABLE_ROLES,
@@ -15,7 +19,9 @@ import {
   ownerClient,
   OWNING_ROLE,
   PERMISSIONS,
+  PROOF_AUTHENTICATOR_PASSWORD,
   projectNamesVisibleTo,
+  dropProofDatabase,
   PROOF_JWT_SECRET,
   queryAsSuperuser,
   rebuildDatabase,
@@ -129,8 +135,28 @@ beforeAll(async () => {
 }, TIMEOUT);
 
 afterAll(async () => {
-  stopPostgrest?.();
-  await client?.end();
+  // `rebuildDatabase` rewrote a CLUSTER-scoped role's password, so the cluster is
+  // only restored once this runs. It is here — not at the end of the file — because
+  // `npm run verify` continues with the smoke check, and that check is what proves
+  // the restore happened by logging in with the configured password.
+  //
+  // Wrapped in `try/finally` because the restore is the one step that must not be
+  // skipped, and it used to sit behind `stopPostgrest?.()` and `await client?.end()`
+  // — neither of which can be trusted in the situation `afterAll` exists for. A
+  // PostgREST that died mid-suite, or a pool already closed by a failed teardown,
+  // leaves the role on the proof password and the next `npm run dev` unable to mint
+  // a token. The `finally` is nested so the proof database is still dropped if the
+  // restore itself is what failed.
+  try {
+    stopPostgrest?.();
+    await client?.end();
+  } finally {
+    try {
+      restoreAuthenticatorPassword();
+    } finally {
+      dropProofDatabase();
+    }
+  }
 });
 
 describe('W27 · escalation: the role claim is an attack surface, and the grant is the only boundary', () => {
@@ -2051,3 +2077,230 @@ async function snapshotPrivileges(): Promise<string> {
   );
   return JSON.stringify(result.rows);
 }
+
+/**
+ * Whether `pgrst_authenticator` can open a session on the DEVELOPMENT database
+ * with `password`.
+ *
+ * The only honest way to read a SCRAM verifier's effect is to authenticate with
+ * it, so that is what this does: `SELECT 1` through a real `pg` connection, and
+ * a refused login is reported as `false` rather than thrown. Anything that could
+ * inspect `pg_authid.rolpassword` instead would be asserting on an opaque hash
+ * and would pass whether or not the password is the configured one.
+ *
+ * The database is the development one on purpose. The damage this suite caused
+ * was not to the proof database — that is dropped anyway — it was to
+ * `app_dev`, which `npm run dev` and the login path use.
+ */
+async function canAuthenticateAs(password: string): Promise<boolean> {
+  const config = databaseConfig();
+  const probe = new Client({
+    host: config.host,
+    port: config.port,
+    user: 'pgrst_authenticator',
+    password,
+    database: config.database,
+  });
+  try {
+    await probe.connect();
+    const result = await probe.query<{ ok: number }>('SELECT 1 AS ok');
+    return result.rows[0]?.ok === 1;
+  } catch {
+    return false;
+  } finally {
+    await probe.end().catch(() => undefined);
+  }
+}
+
+/**
+ * Whether a spec file's `afterAll` restores the cluster-scoped authenticator
+ * password. A source scan, and the scan is shown to work on the shape it
+ * rejects.
+ *
+ * Source scanning is the honest instrument here rather than a second teardown
+ * run: `afterAll` runs AFTER the last `it`, so no test in the file can observe
+ * its effect, and a teardown that mutated the proof database to be re-observed
+ * would have to run twice and would leave the last run's state unrepresented.
+ * What can fail is the WIRING — a future edit that drops the call — and that is
+ * a fact about the file's text. The behavioural half, that the call actually
+ * restores the cluster, is the two `it()`s below.
+ */
+export function teardownFindings(source: string): string[] {
+  const findings: string[] = [];
+  const afterAllIndex = source.indexOf('afterAll(');
+  if (afterAllIndex === -1) {
+    return ['the file has no afterAll, so nothing undoes the cluster-scoped password'];
+  }
+  const block = source.slice(afterAllIndex, source.indexOf('\n});', afterAllIndex));
+  if (!/restoreAuthenticatorPassword\s*\(/.test(block)) {
+    findings.push('afterAll does not call restoreAuthenticatorPassword()');
+  }
+  return findings;
+}
+
+/**
+ * Whether a spec file reaches the mutation at all: it imports/calls the RLS
+ * fixture's `rebuildDatabase`, or it runs `database/seed.ts` — the two places
+ * that issue a CLUSTER-scoped `ALTER ROLE pgrst_authenticator … PASSWORD`.
+ *
+ * The seed is detected by its **argv literal** `'database/seed.ts'`, which is how
+ * every caller spawns it. That is narrower than matching the bare path, and the
+ * narrowness is the point: `test/rls/uuid-keys.spec.ts` `readFileSync`s
+ * `join(BACKEND_ROOT, 'database', 'seed.ts')` to assert the seed mints no key of
+ * its own, which mutates nothing, and a substring match would have dragged a
+ * suite that needs no teardown into the set. A gate that over-collects is a gate
+ * whose findings have to be argued with, and the next person to add a suite
+ * learns to ignore it.
+ */
+export function mutatesAuthenticatorPassword(source: string): boolean {
+  return /\brebuildDatabase\b/.test(source) || /'database\/seed\.ts'/.test(source);
+}
+
+/**
+ * Every spec file in `test/<directory>`, by directory scan and sorted for stable output.
+ *
+ * The suffix test is `endsWith('spec.ts')`, not `endsWith('.spec.ts')`: the e2e
+ * files are `*.e2e-spec.ts`, which does not end in a literal `.spec.ts`, and the
+ * narrower test would have scanned `test/rls` and silently returned an empty set
+ * for `test/e2e` — the same shape as a scan that matches nothing.
+ */
+function specFilesIn(directory: string): string[] {
+  return readdirSync(join(BACKEND_ROOT, 'test', directory), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('spec.ts'))
+    .map((entry) => join(BACKEND_ROOT, 'test', directory, entry.name))
+    .sort();
+}
+
+/**
+ * Every suite in the RLS and e2e directories that mutates the cluster-scoped
+ * authenticator password, as paths relative to `backend/`.
+ *
+ * This replaced a hand-written `['rls.spec.ts', 'grant-subset.spec.ts']`. A gate
+ * over a fixed list can only catch the suites somebody remembered to add to it,
+ * and the suites that actually leaked — every one that runs `database/seed.ts` —
+ * were absent from it, which is how the seed's `ALTER ROLE` survived a fix to
+ * the fixture next door. It is the same "list instead of catalog" antipathy
+ * `test/rls/uuid-keys.spec.ts` rejects when it reads `pg_attrdef` instead of
+ * naming the nine tables it happens to know about.
+ *
+ * Both directories, not just `test/rls`: `test:e2e` is a separate vitest project
+ * run earlier in `verify`, and its four seed-running specs reach the same
+ * statement. Scanning a directory rather than a list is also what makes a NEW
+ * suite fail this gate on its first run instead of on the day somebody reads
+ * this comment.
+ */
+function authenticatorMutatingSuites(): readonly string[] {
+  return [...specFilesIn('rls'), ...specFilesIn('e2e')]
+    .filter((file) => mutatesAuthenticatorPassword(readFileSync(file, 'utf8')))
+    .map((file) => relative(BACKEND_ROOT, file));
+}
+
+/** The findings for one suite, named by path so a failure says which file to open. */
+function authenticatorFindings(): string[] {
+  return authenticatorMutatingSuites().flatMap((suite) => {
+    const source = readFileSync(join(BACKEND_ROOT, suite), 'utf8');
+    return teardownFindings(source).map((finding) => `${suite}: ${finding}`);
+  });
+}
+
+describe('W27 · the proof leaves the cluster as it found it, on the ordinary green path', () => {
+  // This block mutates the cluster password, so it is last in the file: nothing
+  // after it may depend on the proof password still being in force.
+
+  it(
+    "the configured password is refused while the proof's is in force — which is the defect, observed rather than described",
+    async () => {
+      // The precondition every assertion below rests on. Without it, a restore that
+      // did nothing would still leave `canAuthenticateAs(configured) === true`
+      // afterwards and the whole block would be vacuous — which is exactly what
+      // happened for as long as no test looked.
+      const configured = loadTestEnvironment().authenticator.password;
+      expect(configured, '.env.test carries the same value the proof overwrites').not.toBe(PROOF_AUTHENTICATOR_PASSWORD);
+
+      expect(
+        await canAuthenticateAs(PROOF_AUTHENTICATOR_PASSWORD),
+        'rebuildDatabase did not set the proof password, so this block is proving nothing about the leak',
+      ).toBe(true);
+
+      // The observable damage: `npm run dev` mints no token while this holds.
+      expect(
+        await canAuthenticateAs(configured),
+        'the configured password still authenticates, so the leak this block is about is not present on this cluster',
+      ).toBe(false);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'restoring writes the configured password back, and the development login path works again',
+    async () => {
+      const configured = loadTestEnvironment().authenticator.password;
+      try {
+        restoreAuthenticatorPassword();
+
+        expect(await canAuthenticateAs(configured)).toBe(true);
+        expect(
+          await canAuthenticateAs(PROOF_AUTHENTICATOR_PASSWORD),
+          'the proof password still authenticates, so the restore did not replace it',
+        ).toBe(false);
+      } finally {
+        // The restore is the thing under test, so it is applied again in a `finally`:
+        // a failure below must not be the reason the next `npm run dev` is broken.
+        restoreAuthenticatorPassword();
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'every suite that reaches the cluster-scoped password mutation restores it in its afterAll, so a green verify cannot break the next npm run dev',
+    () => {
+      // The set is a directory scan, not a list: a suite added tomorrow that calls
+      // `rebuildDatabase` or runs `database/seed.ts` lands in it without anybody
+      // editing this file. The count assertion below is what stops that from
+      // becoming "the scan found nothing, so it passed".
+      const suites = authenticatorMutatingSuites();
+      expect(
+        suites.length,
+        'the scan found no cluster-mutating suite, so this gate is proving nothing',
+      ).toBeGreaterThan(2);
+
+      expect(authenticatorFindings()).toEqual([]);
+    },
+  );
+
+  it('the teardown scan is not vacuous: it reports an afterAll that drops the restore', () => {
+    expect(teardownFindings('afterAll(async () => {\n  stopPostgrest?.();\n});')).not.toEqual([]);
+    expect(teardownFindings('it("never tears anything down", () => {});')).not.toEqual([]);
+    expect(teardownFindings("afterAll(() => {\n  restoreAuthenticatorPassword();\n});")).toEqual([]);
+  });
+
+  it('the mutation scan is not vacuous: it sees both mutators and ignores a suite that only reads the seed', () => {
+    // The shape that actually leaked, written out as a suite: a file that runs the
+    // seed and never restores. Without this the gate above could be scanning with
+    // a regex that matches nothing and still be green.
+    const leakySuite = [
+      "import { spawnSync } from 'node:child_process';",
+      "spawnSync('node', ['--experimental-strip-types', 'database/seed.ts'], { encoding: 'utf8' });",
+      'afterAll(() => {\n  dropDatabase(PROOF_DB);\n});',
+    ].join('\n');
+
+    expect(mutatesAuthenticatorPassword(leakySuite)).toBe(true);
+    expect(teardownFindings(leakySuite)).toEqual(['afterAll does not call restoreAuthenticatorPassword()']);
+
+    // The fixture's own mutator, reached through the import it is always reached by.
+    expect(
+      mutatesAuthenticatorPassword("import { rebuildDatabase } from './support/fixture.js';\nrebuildDatabase();"),
+    ).toBe(true);
+
+    // `test/rls/uuid-keys.spec.ts` reads `join(…, 'database', 'seed.ts')` as TEXT to
+    // assert the seed mints no key. It mutates no cluster state, so a gate that
+    // collected it would be demanding a teardown it does not need.
+    expect(
+      mutatesAuthenticatorPassword(
+        "const seed = readFileSync(join(BACKEND_ROOT, 'database', 'seed.ts'), 'utf8');",
+      ),
+      'reading the seed as text is not running it',
+    ).toBe(false);
+  });
+});

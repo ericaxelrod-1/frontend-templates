@@ -18,30 +18,11 @@ const NPM_LIFECYCLE = /npm (test|start|restart|stop|ci)\b/g;
  * - an entry without a work item fails;
  * - the whole list is printed on every `npm run verify`.
  *
- * Remove an entry in the same change that adds the script.
+ * Remove an entry in the same change that adds the script. An entry whose script
+ * has landed is not inert — it turns `verify` red on the assertion above, and the
+ * fix is the deletion, never a skip or a relaxed comparison.
  */
-const DEFERRED_COMMANDS: ReadonlyArray<{ readonly command: string; readonly workItem: string; readonly reason: string }> = [
-  {
-    command: 'migration:run',
-    workItem: 'W09',
-    reason: 'plain-SQL migration runner and the baseline migration land in P1-N2',
-  },
-  {
-    command: 'migration:revert',
-    workItem: 'W09',
-    reason: 'revert support lands with the migration runner in P1-N2',
-  },
-  {
-    command: 'db:seed',
-    workItem: 'W10',
-    reason: 'seed data requires the baseline schema from W09',
-  },
-  {
-    command: 'dev',
-    workItem: 'W06',
-    reason: 'the dev orchestrator starts PostgREST, which cannot boot before the four database roles exist',
-  },
-];
+const DEFERRED_COMMANDS: ReadonlyArray<{ readonly command: string; readonly workItem: string; readonly reason: string }> = [];
 
 export function documentedCommands(source: string): Set<string> {
   const commands = new Set<string>();
@@ -126,6 +107,10 @@ describe('npm commands documented in docs/development.md', () => {
       `docs/development.md documents ${DEFERRED_COMMANDS.length} command(s) with no script yet:\n${report}`,
     );
 
-    expect(report).toContain('npm run');
+    if (DEFERRED_COMMANDS.length === 0) {
+      expect(report).toBe('');
+    } else {
+      expect(report).toContain('npm run');
+    }
   });
 });

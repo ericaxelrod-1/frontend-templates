@@ -108,20 +108,26 @@ Nest application at all.
 ### The thin app
 
 ```
-nest/
-├── main.ts  app.module.ts
-├── config/            registerAs namespaces, validated at boot
-├── common/            guards, interceptors, decorators, filters
+backend/
+├── src/
+│   ├── main.ts  app.module.ts
+│   ├── config/            registerAs namespaces, validated at boot
+│   │   ├── environment.ts     every key read once, problems reported together
+│   │   └── load-env-file.ts   the mode → env-file resolution, one loader
+│   ├── auth/              JWT issuance, refresh rotation, login orchestration
+│   └── email/             transactional email — see below
 ├── database/
-│   ├── migrations/    ONE directory, ONE table, plain SQL
+│   ├── migrations/        ONE directory, ONE table, plain SQL
+│   ├── bootstrap/         role creation, once, as a superuser
 │   └── seed.ts
-└── modules/
-    ├── auth/          JWT issuance, refresh rotation, login orchestration
-    ├── security/      rate limiting, IP reputation, pattern detection, cron
-    ├── captcha/       server-side challenge (unchanged — it is correct)
-    ├── email/         provider interface + console/mailpit default
-    └── privacy/       export, delete workflows
+└── test/
+    ├── unit/  e2e/  rls/  smoke/
 ```
+
+Later W11 slices add `security/` (rate limiting, IP reputation, pattern
+detection, cron), `captcha/` (the previous self-rolled challenge, which was
+correct and is kept) and `privacy/` (export, delete workflows). They are named
+here so the shape is predictable; nothing in the tree pretends they exist.
 
 **TypeORM, Passport and `@nestjs/swagger` are not dependencies.** That removes
 `entityManager.query()` and `createQueryBuilder()` from application code
@@ -129,17 +135,64 @@ entirely — which is how the previous implementation evaded its own RLS layer.
 Without an ORM there is no SQL path from application code; every read goes
 through PostgREST's uniform interface.
 
+### Transactional email
+
+```
+EmailService            two flows, two methods: sendVerificationEmail(),
+   │                    sendPasswordResetEmail(). Nothing else.
+   ├── EmailRenderer    handlebars, auto-escaping, templates/*.html
+   │      └── templates/verify-email.html · password-reset.html   ← copied to dist/
+   ├── EmailAuditWriter one email_messages row per ATTEMPT — sent and failed
+   └── EMAIL_PROVIDER   Symbol token ──▶ NodemailerEmailProvider (the only one)
+                              └── ONE transport: smtpTransport, in EVERY mode
+```
+
+**One provider and ONE transport; only the destination is configuration.** There is
+no `EMAIL_TRANSPORT` key and no `streamTransport`/`jsonTransport` branch anywhere —
+the transport is nodemailer's `smtpTransport` in development, in test and in
+production alike, and what differs between modes is `EMAIL_HOST`/`EMAIL_PORT`.
+Development and test run the code path production runs, which is the only
+arrangement in which "the suite passes" says anything about the deployed behaviour.
+ADR-0024.
+
+**Every attempt is recorded, and a credential-bearing body never is.**
+`EmailAuditWriter` writes exactly one `email_messages` row per attempt — *including*
+the ones the transport refused, because "this user was mailed a reset and it never
+arrived" is the first question an operator asks. The row carries **no token**: for
+`password_reset` and `email_verification` the body is `NULL` and `content_class` is
+`metadata_only`, enforced by `contentClassFor`, which **throws** rather than silently
+dropping a body so a caller can never believe one was stored. The row's `user_id` is
+the derived-scope key, so it is the only thing that makes the row visible to
+somebody; a send without one writes nothing and logs a warning naming what was
+missing. ADR-0025.
+
+**A send throws.** `EmailService` resolves only when the transport accepted the
+message, and rejects with `EmailDeliveryError` otherwise. The previous tree
+returned a `boolean` that its caller discarded, so a total send failure became
+HTTP 200 — a success-shaped failure, which is the defect `AGENTS.md` §2.3 names.
+
+**The templates are build output, and that is asserted.** They live in
+`src/email/templates/` and `nest-cli.json`'s `assets` entry copies them to
+`dist/email/templates/`, where `import.meta.url` finds them. Without that entry
+the previous renderer returned `<p>Email template error: …</p>` for every send
+and reported success; `test/unit/email/email-assets.spec.ts` runs a real
+`nest build` and renders from `dist/` so that cannot come back. ADR-0024;
+deliverability (SPF/DKIM/DMARC) is in
+[`deployment-guide.md`](./deployment-guide.md) §Transactional email in
+production.
+
 ### The data model
 
-Every table is declared in one of three categories before anything is written
+Every table is declared in one of four categories before anything is written
 about it, because the category determines its primary key and its foreign-key
-discipline (ADR-0023).
+discipline (ADR-0023, ADR-0025).
 
 | Category | Tables | Primary key |
 |---|---|---|
 | **Group-scoped** | `projects`, `customers`, and every future tenant table | `PRIMARY KEY (group_id, id)` |
 | **The hierarchy** | `groups` | simple `PRIMARY KEY (id)` |
-| **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups` | simple primary keys |
+| **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups`, `refresh_tokens`, `login_attempts` | simple primary keys |
+| **Derived** | `email_messages` | simple `PRIMARY KEY (id)` — **no `group_id`** |
 
 ```
 groups (parent_id → groups)              admin-writable; the hierarchy itself
@@ -154,7 +207,20 @@ groups (parent_id → groups)              admin-writable; the hierarchy itself
 users ──► user_groups                     membership, not a token claim
 roles (parent_id → roles) ──► user_roles  capability axis — a role is a ROW
    └──► role_permissions ──► permissions ──► actions   (resource, action)
+
+email_messages ──► users                 DERIVED: no group_id of its own
+   scope resolves through the RECIPIENT USER's memberships above
 ```
+
+**The derived category is the one a table does not fit into by accident.**
+`email_messages` has no `group_id`, so an actor sees the mail history of exactly
+those users whose groups they can see. A single `group_id` cannot express it: a user
+in **several** groups would need one row per group (and "which groups is this message
+in?" becomes ambiguous), and a self-service password reset names **no group at all**.
+Its policy must go through a `SECURITY DEFINER` helper, because a policy subquery runs
+with the *querying* role's privileges and `user_groups` is self-scoped — read inline,
+it sees only the caller's own rows and silently degrades to "the recipient is me".
+ADR-0025.
 
 **Scope is a table read, not a claim.** `user_groups` holds who belongs where and
 is not writable by the members in it; `groups` is admin-writable. Neither is
@@ -217,6 +283,13 @@ Each axis has its **own** key material, and neither is derived from the other.
   correlated variant. It appears as a `hashed SubPlan` — `x IN (SELECT …)` yields
   that form. **Uncorrelatedness is what buys once-per-statement; the node name
   does not.** Assert on `loops`, not on the apparent shape of the SQL.
+  **And `loops = 1` is not sufficient on its own:** a `STABLE` helper sitting
+  *beside* the hoisted subquery is still called once per candidate row, because
+  `STABLE` means "the same answer within this statement", not "called once". On
+  `email_messages` that is **1 call** with the helper inside the subquery against
+  **3,300** with it beside (7.6 ms against 1.3 s at 3,300 rows) — so the suite
+  asserts the function-call count from `pg_stat_user_functions` too, not the
+  plan alone. ADR-0025.
 - **Capability** resolves the same `sub` through `user_roles`, walking
   `roles.parent_id` **upward**, then `role_permissions` → `permissions` →
   `actions`. Inside its `SECURITY DEFINER` function identity is the **actor

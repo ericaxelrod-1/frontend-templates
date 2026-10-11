@@ -442,21 +442,38 @@ migrations. Every policy gets a test (per `AGENTS.md` B8).
 > `roles`, `role_permissions`, `user_roles` + `has_permission()` on the capability
 > side. The scoping subquery is uncorrelated and evaluated **once per statement**
 > (`loops = 1`). The `site_tree_ids()` walk, the `site_id` claim accessor and the
-> `sites` table are **gone**; the suite was rewritten with it and now runs **68**
-> tests. **Three clauses are declared and not enforced** — the grant-subset trigger
+> `sites` table are **gone** — asserted on the executable construct, not on the
+> bare word: `grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b\|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids\|claim_site_id\|request_claims)\b\|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/`
+> returns **nothing**. The bare-substring gate that gate replaced did **not**
+> reproduce — it returned three lines, all of them the SUPERSEDED NOTE explaining
+> the withdrawal, which §6.0.1 scores as a failure. The suite was rewritten with
+> the migration and now runs **68** tests.
+> **Three clauses are declared and not enforced** — the grant-subset trigger
 > (W08b) and the caller-writable identity GUC (W37). A green
 > `test:rls` is evidence for the shape, with those three exceptions.
 >
-> The rewritten baseline must also declare **every table in one of three
+> The rewritten baseline must also declare **every table in one of FOUR
 > scoping categories**, because the primary key follows from the category and
 > the FK discipline does not follow from either alone (ADR-0023 §Referential
-> integrity):
+> integrity, ADR-0025 §The fourth category):
 
 | Category | Tables | Primary key | FK discipline |
 |---|---|---|---|
 | **Group-scoped** | `projects`, `customers` | `PRIMARY KEY (group_id, id)` | carries `group_id`; **every** FK carries `group_id` too |
 | **The hierarchy** | `groups` | simple `PRIMARY KEY (id)` | not scoped — it *is* the group; self-FK `parent_id` is admin-only-reachable |
-| **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups` | simple primary keys | global reference data, not tenant rows |
+| **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups`, `refresh_tokens`, `login_attempts` | simple primary keys | global reference data, not tenant rows |
+| **DERIVED** | `email_messages` | simple `PRIMARY KEY (id)` | **no `group_id`** — scope is the referenced USER's membership; its FK to `users` is permitted because no serving member role may write to `users` |
+
+> **Why a fourth category was needed, in one line each.** `email_messages` has no
+> `group_id` because a single one cannot express a user in **several** groups (one
+> row per group makes "which groups is this message in?" ambiguous) or a
+> self-service reset that names **no group at all** (inventing one puts the row in a
+> scope nobody chose). Its policy therefore routes membership through
+> `authz.visible_user_ids()`, a `SECURITY DEFINER` helper: a policy subquery runs
+> with the **querying** role's privileges and `user_groups` is self-scoped, so read
+> inline the predicate silently degrades to "the recipient is me". **Measured**: a
+> colleague's message in the **same** group is visible through the helper and
+> **not visible** through the inline correlated form. ADR-0025.
 
 Declaring them late is not available: an FK that leaves the group-scoped set is
 an **existence oracle** even when every policy is correct, because FK checks are
@@ -682,16 +699,16 @@ it is deliberately narrower than it looks — see §6.0.1.
 | W23 | N5 | Zoneless opt-in; remove `NgZone` | `NgZone.isStable`-dependent code absent; SSR still renders |
 | W24 | ALL | Remove every mock service and stub; real tests replace the 14 assertion-free scripts | `grep` for mock factories in `src/` is empty; `no-restricted-imports` active |
 | W25 | N6 | Rewrite all docs against the built system | Every command runs; every claim is true; W03/W04 pass |
-| W26 | N2 | **DONE — the migration is the two-axis schema.** `backend/database/migrations/0001_rls_foundation.sql` was rewritten from the superseded design. `groups` (hierarchical, `parent_id` self-FK, `is_system_group`) + `user_groups` (membership, **not** member-writable) + `authz.org_closure` on the scope side; `actions` + `permissions` + `roles` (`parent_id`, `is_system_role`) + `role_permissions` + `user_roles` on the capability side; `authz.actor()` replaces `claim_site_id()`; `site_tree_ids()` and the `sites` table are **gone**. **No** `permission_rules`, `user_permissions`, `is_granted`, `rls_rules`, `rls_join_paths`, `rls_scope_templates`, `cache_permission_maps` or `api_endpoints` table — and **no** `sql`, `parameters` or `scope_sql` raw-SQL column. Every table declares its scoping category (group-scoped / hierarchy / unscoped) and takes the primary key that follows from it; every FK on a group-scoped table carries `group_id`. A separate `down` file reverses it, dependency-ordered. **Three design changes were forced during implementation and are recorded in the ADR, not here:** the `authz` schema (`db-schemas = "public"` cannot represent "restricted"); `groups`/`user_groups` deliberately **not** `FORCE`d; and `authz.visible_group_ids()` behind a `SECURITY DEFINER` helper | **Executed and passing.** `grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b' backend/database/` returns **nothing**; `grep -rn 'role_capability\|user_permissions\|is_granted\|permission_rules\|rls_rules\|rls_join\|rls_scope\|cache_permission\|api_endpoints\|frontend_routes\|ui_components' backend/database/` returns **nothing**; `role_permissions.role_id` is a real FK to `roles.id`; `projects` and `customers` report `PRIMARY KEY (group_id, id)`; the schema is applied twice in a row with no grant change; and `migration:revert` drops it in reverse dependency order. **Gaps recorded, not closed:** the grant-subset trigger (W08b) and `is_system_role` (W34) are absent from the file |
-| W27 | N2 | **DONE — the suite is rewritten and runs 68 tests.** `backend/test/rls/rls.spec.ts` was rewritten against the closure-join shape. It asserts, by name, the measured closure behaviours: a member of `EU` sees `EU`/`UK`/`FR` and **not** `HQ`, **not** `US`; a member of `HQ` sees everything beneath; a member of two disjoint groups sees the **union**; no membership rows → **zero** rows and no error; a membership revoked since the token was minted changes scope on the **next request with the same token**; a forged `"role":"app_admin"` in a member's own token still sees only its own subtree. Capability axis: `has_permission()` returns `true` for an actor who **holds** the permission (including **through a parent role**, and two levels up), `false` for a sibling; `role_permissions.role_id` is a real FK; `app_admin` holds **every** capability, so the resolver is a superset and not a bypass. Plus the structural gates: PK shape, no FK leaving the scoped set, `FORCE`d vs not-`FORCE`d, no function executable by `PUBLIC`, `NOSUPERUSER NOBYPASSRLS`, the column-revoke order in both directions, and the idempotent re-apply | **Executed: 68 tests green, `npm run verify` step 7 of 8.** `grep -rn 'site_id\|site_tree_ids' backend/test/rls/` returns **nothing**. **The §6.6.1 tamper matrix has NOT been re-measured against the rewritten file** — the `12 / 2 / 3 of 33` figures are the superseded suite's, and the baseline row is now 68. **That re-measurement is W33** |
+| W26 | N2 | **DONE — the migration is the two-axis schema.** `backend/database/migrations/0001_rls_foundation.sql` was rewritten from the superseded design. `groups` (hierarchical, `parent_id` self-FK, `is_system_group`) + `user_groups` (membership, **not** member-writable) + `authz.org_closure` on the scope side; `actions` + `permissions` + `roles` (`parent_id`, `is_system_role`) + `role_permissions` + `user_roles` on the capability side; `authz.actor()` replaces `claim_site_id()`; `site_tree_ids()` and the `sites` table are **gone**. **No** `permission_rules`, `user_permissions`, `is_granted`, `rls_rules`, `rls_join_paths`, `rls_scope_templates`, `cache_permission_maps` or `api_endpoints` table — and **no** `sql`, `parameters` or `scope_sql` raw-SQL column. Every table declares its scoping category (group-scoped / hierarchy / unscoped) and takes the primary key that follows from it; every FK on a group-scoped table carries `group_id`. A separate `down` file reverses it, dependency-ordered. **Three design changes were forced during implementation and are recorded in the ADR, not here:** the `authz` schema (`db-schemas = "public"` cannot represent "restricted"); `groups`/`user_groups` deliberately **not** `FORCE`d; and `authz.visible_group_ids()` behind a `SECURITY DEFINER` helper | **Executed and passing.** `grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b\|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids\|claim_site_id\|request_claims)\b\|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/` returns **nothing** — **restated, and executable where the gate it replaced was not.** The old gate keyed on the bare substrings `site_tree_ids\|claim_site_id\|\bsites\b` and therefore returned **three non-empty lines**: `0001_rls_foundation.sql:18`, `:19` and `:21`, which are the SUPERSEDED NOTE explaining that those constructs were withdrawn. §6.0.1 calls a non-empty `grep` result a failure, so the recorded gate did not reproduce and would have been scored as one. This gate asserts on the **executable construct** (`CREATE TABLE sites`, `CREATE FUNCTION site_tree_ids` / `claim_site_id` / `request_claims`, and `CREATE VIEW`) rather than on any occurrence of the word, so it is empty on the shipped file and **bites** when a superseded construct is reintroduced — proved by appending `CREATE TABLE sites (id uuid);`, `CREATE FUNCTION site_tree_ids(root uuid) …`, `CREATE OR REPLACE FUNCTION authz.claim_site_id() …`, `CREATE FUNCTION request_claims() …` and `CREATE VIEW site_totals …` to a scratch copy under `/tmp`, which returned all six lines; the scratch copy was discarded. `grep -rn 'role_capability\|user_permissions\|is_granted\|permission_rules\|rls_rules\|rls_join\|rls_scope\|cache_permission\|api_endpoints\|frontend_routes\|ui_components' backend/database/` returns **nothing**; `role_permissions.role_id` is a real FK to `roles.id`; `projects` and `customers` report `PRIMARY KEY (group_id, id)`; the schema is applied twice in a row with no grant change; and `migration:revert` drops it in reverse dependency order. **Gaps recorded, not closed:** the grant-subset trigger (W08b) and `is_system_role` (W34) are absent from the file |
+| W27 | N2 | **DONE — the suite is rewritten and runs 68 tests.** `backend/test/rls/rls.spec.ts` was rewritten against the closure-join shape. It asserts, by name, the measured closure behaviours: a member of `EU` sees `EU`/`UK`/`FR` and **not** `HQ`, **not** `US`; a member of `HQ` sees everything beneath; a member of two disjoint groups sees the **union**; no membership rows → **zero** rows and no error; a membership revoked since the token was minted changes scope on the **next request with the same token**; a forged `"role":"app_admin"` in a member's own token still sees only its own subtree. Capability axis: `has_permission()` returns `true` for an actor who **holds** the permission (including **through a parent role**, and two levels up), `false` for a sibling; `role_permissions.role_id` is a real FK; `app_admin` holds **every** capability, so the resolver is a superset and not a bypass. Plus the structural gates: PK shape, no FK leaving the scoped set, `FORCE`d vs not-`FORCE`d, no function executable by `PUBLIC`, `NOSUPERUSER NOBYPASSRLS`, the column-revoke order in both directions, and the idempotent re-apply | **Executed: 68 tests green, `npm run verify` step 7 of 8.** `grep -rn 'site_id\|site_tree_ids' backend/test/rls/` returns **nothing**. **The §6.6.1 tamper matrix was re-measured against the rewritten suite in W33 (2026-10-07)** — the table there is current; the `12 / 2 / 3 of 33` figures are superseded. |
 | W28 | N2 | **SHIPPED as far as the schema allows; three of the four shapes are not constructible under the current FK discipline.** FK, `UNIQUE` and primary-key checks are **not policy-governed**, so they bypass RLS and **fail open**. What shipped: `projects.group_id` and `customers.group_id` are `REFERENCES groups(id)` — a **hierarchy** target, so a cross-group write is refused by the policy's `WITH CHECK` *before* the constraint runs, which is why the existence oracle is not reachable from a group-scoped table. The structural gate **is** asserted: no FK on a group-scoped table leaves the group-scoped set, read from `pg_constraint`. What remains: the **silent `UNIQUE` + `ON CONFLICT DO NOTHING`** form is the dangerous one and needs a purpose-built fixture — the secondary `UNIQUE (id)` index on the scoped tables makes an insert of another group's `id` raise `23505`, which is a **documented cross-group existence signal**, not an exploit (the `id` is a 122-bit random uuid generated by the database, so a caller must already know the value it is probing for). Decide whether that trade is accepted or the `UNIQUE` dropped | The structural `pg_constraint` assertion exists and passes. Still to do: one test per oracle shape that can actually be built, each named after the leak, and an explicit written decision on the `projects_id_uniq` existence signal — either "accepted, ids are database-generated 122-bit random" or "drop `UNIQUE` and keep only the composite key" |
 | W29 | N2 | **DONE.** Assert no `SECURITY INVOKER` function is reachable by a serving role. Every helper in the migration is `SECURITY DEFINER` with a pinned `search_path`; `assert_group_acyclic` and `assert_role_acyclic` are granted to **nobody** because they are attached as triggers and never called | Suite asserts, per function, that `prosecdef = true`, that no function is executable by `PUBLIC`, that the two trigger functions are executable by **no** serving role, and that the helpers a policy evaluates are executable by **every** role whose requests evaluate it — `app_anon` included. Either half alone passes against a broken configuration |
 | W30 | N2 | **DONE, with three corrections the implementation forced.** `authz.org_closure` is created with `UNION` and **no accumulator column**, with `UNIQUE (ancestor, descendant)` — `REFRESH MATERIALIZED VIEW CONCURRENTLY` is refused without it — and refreshed from a **statement-level** trigger on `groups`, inside the writing transaction. **Corrections:** (1) the matview is in **`authz`**, not `public`, and **is granted** to `app_anon`/`app_member`/`app_admin` — "granted to nobody" is **unimplementable**, because a policy expression's subquery runs with the **querying** role's privileges and without the grant *no scoped read evaluates at all*; (2) `CONCURRENTLY` **can** run inside a transaction block that has already written — verified on 15.19 from a row-level trigger — so statement-level is chosen for **one rebuild per statement**, not for legality; (3) the earlier acceptance criterion quoting tenant-read timings during refresh is **withdrawn** — those figures do not reproduce on the shipped closure. The argument is the lock: a plain `REFRESH` holds an **`AccessExclusiveLock`** for the whole rebuild | `EXPLAIN` shows the policy subplan as a **`hashed SubPlan` with `loops = 1`** (assert on `loops`, never on the policy's apparent shape — an `EXISTS`-shaped variant is simplified back into a hashed SubPlan); a write to `groups` is visible to the next read in the **same** transaction; `authz.org_closure` is unreachable over HTTP and absent from the served spec; `has_table_privilege` shows the grant **is** present for the three serving roles. **Done.** |
 | W31 | N2 | **DONE, and the fragile property is now documented in the file.** A `BEFORE INSERT OR UPDATE OF parent_id FOR EACH ROW` trigger rejects a cycle on `groups` and on `roles`; the closure query uses `UNION` with **no accumulator**; `temp_file_limit` must be set on the refreshing session. `parent_id REFERENCES groups(id)` does **not** enforce acyclicity, and on an acyclic tree the unsafe and safe variants are indistinguishable — both return 361 rows — so the property is invisible until the data is broken. **The fragility, now stated in the migration:** the multi-row case is refused as a unit only because Postgres advances the **command counter** between trigger firings, so a `BEFORE ROW` trigger's own `SELECT` sees the partially built tree. Measured and stated by shape: a **forward** chain — every parent written later in the same statement — **is refused**; a **backward** chain is **admitted, and correctly so**, because it is genuinely acyclic when each row is checked and no cycle exists afterwards | A two-node group cycle is refused and both rows survive; a group cannot be re-parented onto its own descendant and cannot parent itself; a two-node role cycle is refused; `has_permission` against a cyclic role graph **terminates** (the `UNION` form — the `UNION ALL` form hangs, which is how the shipped `UNION` was arrived at) |
 | W32 | N2 | **DONE.** `actor()` catches the `uuid` cast. It lives at **`authz.actor()`** — outside `db-schemas`, so PostgREST does not publish it as an RPC nobody asked for — and the guarded form is preserved exactly: `nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'`, parenthesised before the cast, then wrapped in `EXCEPTION WHEN others THEN RETURN NULL` | Over HTTP, a token with `"sub":"garbage"` and one with **no** `sub` return **zero rows**, not `HTTP 500`. **Done**, and asserted for a member *and* for an admin (a malformed `sub` must not break the admin branch, because `OR` does not short-circuit past a raising operand) |
-| W33 | N2 | **Re-measure the §6.6.1 tamper matrix against the rewritten suite.** The `12 / 2 / 3 of 33` figures were taken against the superseded claim-keyed migration and the baseline is now **68**. Removing a control and confirming the gate goes red at step 7 is a **procedure** and it transfers; the **numbers do not**, and neither does the green. At minimum re-run: `ENABLE ROW LEVEL SECURITY` → `DISABLE`; the column `REVOKE` lines deleted; the boundary `GRANT` widened to reach the table-owning role. **Add two rows that only the closure design makes meaningful:** `ALTER TABLE groups FORCE ROW LEVEL SECURITY` (must go red — and note that if it does **not**, the failure mode is an **empty closure**, not a red test) and the `UNION ALL` variant of the closure query (must hang or exceed `temp_file_limit`) | Every row executed and recorded with its real failing-test count against the **68**-test suite. A carried-over number is a stale result wearing a current one's clothes |
+ | W33 | N2 | **DONE — re-measured 2026-10-07.** The `12 / 2 / 3 of 33` figures were taken against the superseded claim-keyed migration and cannot be carried forward. Re-run against the rewritten suite (baseline **73**: 68 `rls.spec.ts` + 5 `seed.spec.ts`), removing each control in turn, against a throwaway database (`rls_proof`): `ENABLE→DISABLE ROW LEVEL SECURITY` → **19 of 73 red**; column `REVOKE` lines deleted → **3 of 73 red**; boundary `GRANT` widened to the owning role `app` → bootstrap's own `pg_auth_members` assertion fails the fixture first (73 skipped), and with that assertion neutralized the suite catches it, **3 of 73 red**; `ALTER TABLE groups FORCE ROW LEVEL SECURITY` → **17 of 73 red**, and the data-level failure mode is the **empty closure** (`authz.org_closure` = 0 rows, 7 `groups` rows present, no error); `UNION` → `UNION ALL` in the closure query → **0 of 73 red** on the acyclic fixture (the control is invisible without a cycle — a carried-over red count would be a fabrication), and the bounded cycle probe (two-row cycle inserted with `session_replication_role='replica'`, `statement_timeout=3s`, `temp_file_limit=32MB`) fails with `ERROR: temporary file size exceeds temp_file_limit (32768kB)` while the shipped `UNION` form terminates at **4 rows**. Full table: §6.6.1 | Every row executed and recorded with its real failing-test count against the current suite. A carried-over number is a stale result wearing a current one's clothes |
 | W34 | N2 | **DONE — the administrative floor is enforced.** `is_system_role` / `is_system_group` were declared and read by nothing: `app_admin` holds `DELETE` on both tables, `DELETE FROM roles WHERE is_system_role = true` returned `204`, and the row was gone. **A column documented as a control and enforced by nothing is worse than no column**, because the comment tells a reader the control is there. The shipped trigger: a row that *is* a floor row may not be `UPDATE`d or `DELETE`d except from a superuser session; **`INSERT` is deliberately uncovered** so the floor stays creatable. `SECURITY INVOKER` and it must stay — a `DEFINER` body would answer about the **owner** and every check would pass, i.e. a floor that never fires. The superuser path is `current_setting('is_superuser')`, **not** `current_user`, because it derives from `SESSION_USER` and survives `SET ROLE`, which keeps the provisioning path distinguishable from a request | A `DELETE` and an `UPDATE` of a system row are refused as `app_admin`; the same delete succeeds from a superuser session; an `INSERT` of a floor row succeeds (it must); and **no serving role holds `TRUNCATE`** on either table — asserted per role, because `TRUNCATE` does not fire a row trigger and a future table-level grant is the change that would reopen this |
-| W35 | N2 | **Correct the migration's own comments — three false claims survive in the shipped file.** (1) The `groups` comment says a `FORCE`d refresh *"wrote a closure containing 1 row instead of 2 — the matview silently lost half the tree"*. Re-measured: the closure **empties entirely, 0 rows**. Half-loss is the lucky case and is the figure most likely to be copied forward as tolerable. (2) The refresh comment repeats the `CONCURRENTLY`-cannot-run-after-a-write claim and cites the unreproducible 13.5 / 6.7 / 7606 ms table; the argument is the `AccessExclusiveLock`. (3) The `has_permission` comment describes the recursive term's hazards correctly but the file is where an agent copies from — confirm the shipped body and the comment agree after any change | `grep -n 'half the tree\|7606\|7,606\|13\.5 ms' backend/database/` returns **nothing**; the `groups` comment says **0 rows**; the refresh comment names `AccessExclusiveLock`; no comment asserts a number that was not measured on the shipped schema |
+| W35 | N2 | **Correct the migration's own comments — three false claims survive in the shipped file.** (1) The `groups` comment says a `FORCE`d refresh *"wrote a closure containing 1 row instead of 2 — the matview silently lost half the tree"*. Re-measured: the closure **empties entirely, 0 rows**. Half-loss is the lucky case and is the figure most likely to be copied forward as tolerable. (2) The refresh comment repeats the `CONCURRENTLY`-cannot-run-after-a-write claim and cites the unreproducible 13.5 / 6.7 / 7606 ms table; the argument is the `AccessExclusiveLock`. (3) The `has_permission` comment describes the recursive term's hazards correctly but the file is where an agent copies from — confirm the shipped body and the comment agree after any change | **Restated gate:** `grep -rnE '[0-9]+(\.[0-9]+)?[[:space:]]*ms\b\|[0-9]+[[:space:]]+rows?[^.]*instead[[:space:]]+of[[:space:]]+[0-9]+' backend/database/` returns **nothing** — it asserts on the **bare numeric timing literal** and the **"N rows instead of M"** claim, not on the prose that quotes them. The gate it replaced, `grep -n 'half the tree\|7606\|7,606\|13\.5 ms' backend/database/`, **did not reproduce**: it returned `0001_rls_foundation.sql:160`, whose text is `containing ZERO rows — not "half the tree". The failure is TOTAL` — i.e. the *corrected* claim, quoting the old phrase in order to refute it. Intent satisfied, verification not: under §6.0.1 a non-empty `grep` result is a failure, so an auditor would score W35 as failed. The restated gate is empty on the shipped file and **bites**: appending `-- The FORCE'd refresh wrote a closure containing 1 row instead of 2 -- half the tree.` and `-- Baseline 13.5 ms, CONCURRENTLY 6.7 ms, plain 7,606 ms, trigger-held 8466 ms.` to a scratch copy under `/tmp` returned both lines (the old gate also caught the second one, but only by quoting a specific retired number rather than the shape of the claim); the scratch copy was discarded. The `groups` comment says **0 rows**; the refresh comment names `AccessExclusiveLock`; no comment asserts a number that was not measured on the shipped schema |
 | W36 | N2 | **Fix the `down` script's refuted claim, and the `postgrest.conf` role list.** (1) `0001_rls_foundation.down.sql` states that `GRANT USAGE ON SCHEMA public TO PUBLIC` *"does NOT put it back … Verified twice."* **False.** It emits **no warning**, exits 0, and `has_schema_privilege(role,'public','USAGE')` flips to `true`. The revert exists and the file omits it. Leaving the narrowing in place is the right call; documenting a **non-existent** limitation is not, and "verified twice" on a negative result is a claim about an absence. (2) `postgrest.conf` documents a role `app_migrator` as "the migration/owner role". **No such role exists**: `backend/database/bootstrap/001_roles.sql` creates `pgrst_authenticator`, and `DB_USER`/the `PGRST_DB_URI` user in `.env` is `app`. The comment block is the only place the name appears | The down script either issues `GRANT USAGE ON SCHEMA public TO PUBLIC` or states plainly that the narrowing is **accepted as a residual** and not that the revert "does not exist"; `grep -rn app_migrator` returns **nothing**; a comment in `postgrest.conf` names the role that actually connects |
 | W37 | N2 | **Assert the absence of a `request.jwt.claims` write surface — before `db-pre-request` exists.** The whole scope axis is keyed on a **custom GUC that any role may `SET`**. Verified: a member set it directly and read another tenant's rows. No grant or policy can prevent this; the only control is that **no request-reachable SQL path can reach the `SET`**, which is an absence, not a defence. `db-pre-request` (revocation) is a planned request-reachable path and is a **P0** the moment it can set it | A test or structural check that fails if any `pg` client in request-handling code, any RPC accepting SQL or settings, or the `db-pre-request` hook can reach `SET` on `request.jwt.claims`. Until this exists, treat every new SQL surface as **P0 until shown otherwise** — and prefer a design in which the authenticator cannot be talked into it |
 
@@ -726,8 +743,9 @@ everything they were proved against was keyed on a `site_id` claim and a
 per-candidate-row walk. **Their replacements, W26 (the schema) and W27 (the suite),
 are now done**, so W06 and W07 have moved from *not started as work* to
 *implemented, proved against a design that no longer exists*. Their verification
-columns are therefore **not** to be re-run as written; §6.6.1's tamper matrix must
-be re-measured against the rewritten file (**W33**) before any of it is cited again.
+columns are therefore **not** to be re-run as written; §6.6.1's tamper matrix has
+been re-measured against the rewritten file (**W33**, 2026-10-07) — the table
+there is the current record.
 
 ### 6.1 Where the boundary sits
 
@@ -973,17 +991,17 @@ that stays green whether or not the protection exists is worse than no suite,
 because it converts an absent control into a documented one.
 
 > **This table was measured against the SUPERSEDED schema, and that limits what it
-> proves.** The `12 / 2 / 3 of 33` figures describe a suite exercising
+> proves.** The original `12 / 2 / 3 of 33` figures described a suite exercising
 > `site_tree_ids()` + a `site_id` claim. Two consequences, both required reading:
 >
 > 1. **The *method* is what transfers.** Removing a control and confirming the
 >    gate goes red at step 7 is a procedure, not a number. It applies unchanged to
 >    the closure-join schema.
 > 2. **The *numbers* do not transfer, and neither does the green.** The suite has
->    since been rewritten and now runs **68** tests against the closure-join design.
->    **These rows have not been re-measured against it.** Re-measuring them is
->    **W33**; until that runs, treat every number in the table below as belonging to
->    a migration that is no longer in the tree.
+>    since been rewritten and now runs **73** tests (68 in `rls.spec.ts` +
+>    5 in `seed.spec.ts`) against the closure-join design. **Re-measured in W33
+>    (2026-10-07); the table below is the current record. The old `12 / 2 / 3 of
+>    33` figures are superseded and cannot be carried forward.**
 
 Each row below was executed by removing one control from the shipped SQL, running
 the full gate, and restoring the file byte-for-byte. In every case the run ended at
@@ -993,12 +1011,19 @@ this.** Only step 7 can.
 
 | Control removed | Result | Failing tests |
 |---|---|---|
-| *(baseline, nothing removed)* | `verify passed` | — (33 RLS tests green; **every row in this table is a SUPERSEDED figure — see W33**) |
-| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | `verify failed at step 7/8` | **12 of 33** — **STALE** |
-| the two `REVOKE SELECT ON … FROM app_member/app_admin` lines deleted | `verify failed at step 7/8` | **2 of 33** — both the leak assertion and the `has_column_privilege` check. **STALE** |
-| the boundary `GRANT` widened to reach the table-owning role | `verify failed at step 7/8` | **3 of 33** — the two escalation tests and the whole-cluster allowlist test. **STALE** |
-| **NOT YET RUN:** `ALTER TABLE groups FORCE ROW LEVEL SECURITY` | must fail step 7 | and note the *data* failure mode is an **empty closure**, not a red test — this row is the one that matters most and it has never been executed |
-| **NOT YET RUN:** closure query rewritten with `UNION ALL` + a `depth` accumulator | must hang or exceed `temp_file_limit` | the cycle-safety property, proved the only way it can be proved |
+| *(baseline, nothing removed)* | `verify passed` | — (73 green: 68 `rls.spec.ts` + 5 `seed.spec.ts`; W33 re-measure, 2026-10-07) |
+| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` (all four tenant tables) | step 7 red | **19 of 73** — every scope assertion leaks: e.g. `a member of EU sees EU, UK and FR, and does not see HQ or US` received `project-APAC, project-EU, project-FR, project-HQ, project-UK, project-US…` |
+| the two `REVOKE SELECT ON … FROM app_member` column-hide lines deleted | step 7 red | **3 of 73** — `internal_notes cannot be selected by app_member, and the secret is absent from the body`, plus the projects and cross-role variants |
+| the boundary `GRANT` widened to name the table-owning role `app` | step 7 red | Bootstrap's own `pg_auth_members` assertion fails first (fixture refuses, **73 skipped**). With that assertion neutralized for the probe: **3 of 73** — the two escalation tests and `every role other than the three granted ones is refused, including the owner` |
+| `ALTER TABLE groups FORCE ROW LEVEL SECURITY` added | step 7 red | **17 of 73** — and the data-level failure mode is the **empty closure**, verified in the database: `authz.org_closure` = **0 rows**, `groups` still holds its 7 rows, no error anywhere. The suite goes red only because scope tests observe the empty scope |
+| closure query rewritten with `UNION ALL` | **step 7 green** | **0 of 73** — on the shipped acyclic fixture the two forms are indistinguishable, so the suite does **not** assert this control. The failure mode is real and bounded: with a two-row cycle inserted (`session_replication_role='replica'`), `UNION ALL` fails with `ERROR: temporary file size exceeds temp_file_limit (32768kB)` under `statement_timeout=3s`; the shipped `UNION` terminates with **4 rows** on the same cyclic data |
+| `email_messages`: `authz.can_read_email()` removed from the read policy, leaving scope only | step 7 red | **5 of 21** in `email-messages.spec.ts` — a member holding **no** `email:read` received `[ 'reset-for-deep-member', …(3) ]` instead of `[]`, i.e. the full EU subtree's mail history; plus the `user:create`-but-not-`email:read` case, the one-policy structural gate, the `loops = 1`/call-count gate, and the tamper test itself. **This is the OR-ed-capability escalation ADR-0023 §Withdrawn describes, re-measured on a table that did not exist then** |
+| `email_messages`: `contentClassFor`'s refusal removed from `src/email/email-content-class.ts` | step 7 red | **1 of 21** — `expected [Function] to throw an error`. The probe showed `password_reset` returning `{"contentClass":"full_body","body":"<a href=\"https://x/reset?token=SECRET\">Reset</a>"}`, i.e. a live reset token accepted for persistence |
+| `email_messages`: the derived-scope subquery replaced by the inline correlated `EXISTS` over `user_groups` | step 7 red **and wrong answers** | Not a red-count row — a **correctness** row. A reader could no longer see a **colleague's** message in the **same group** (`visible: false`), while their own stayed visible: a silent under-read with no error, which is indistinguishable from a correctly scoped policy. Also 3,300 `can_read_email()` calls at 3,300 rows against 1, and 4.2 s against 7.6 ms |
+
+Rows 7–9 were measured against the `email-messages` slice's own file (21 tests, baseline green) rather than against the 73-test suite, and each was run by editing the file, executing it, and restoring it byte-for-byte — verified afterwards with `diff` against a pre-tamper copy, because "restored" is a claim and this table is about claims. **`loops = 1` alone would not have caught row 7**: the subplan is a perfect `hashed SubPlan` either way, and only the `pg_stat_user_functions` call count shows the per-row cost.
+
+The baseline for every row in this table is **73 tests** (68 in `rls.spec.ts` + 5 in `seed.spec.ts`). Per-tamper environment note: the boundary-`GRANT` tamper is cluster-global — after the W33 run the widened membership was undone with `REVOKE app FROM pgrst_authenticator` as a superuser and `pg_auth_members` re-checked (exactly `app_anon, app_member, app_admin`), not inferred from the diff.
 
 Two things about that table are worth stating rather than leaving implicit:
 
@@ -1378,15 +1403,20 @@ three-argument form.
 >
 > - `backend/database/migrations/0001_rls_foundation.sql` **has been rewritten**
 >   (**W26, done**). The recursive `site_tree_ids()` walk and the `sites` table are
->   **gone**; `grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b' backend/database/`
->   returns nothing.
+>   **gone**; the executable-construct gate in **W26** below (`CREATE TABLE sites`,
+>   `CREATE FUNCTION site_tree_ids` / `claim_site_id` / `request_claims`,
+>   `CREATE VIEW`) returns **nothing**. The bare-substring gate that gate replaced
+>   did **not** reproduce — it returned `0001_rls_foundation.sql:19` and `:21`,
+>   which are the SUPERSEDED NOTE explaining the withdrawal, so under §6.0.1 it
+>   read as a failure.
 > - `backend/test/rls/` **has been rewritten too** (**W27, done**). It runs **68**
 >   tests against the closure-join schema and `verify` is green at step 7 of 8. So
 >   items 1–8 above are now **evidence for the shipped design**, which they were not
 >   when they were written.
-> - **But the §6.6.1 tamper table was NOT re-measured.** Its `12 / 2 / 3 of 33`
->   figures belong to the superseded suite. Re-running it is **W33**, and no number
->   from it should be cited until that runs.
+> - **The §6.6.1 tamper table has now been re-measured** (**W33**, 2026-10-07). Its
+>   `12 / 2 / 3 of 33` figures belonged to the superseded suite and are superseded;
+>   the current table sits in §6.6.1 with real failing-test counts against the
+>   73-test suite.
 > - **Three clauses of the shipped design are declared and not enforced**, and every
 >   item above that depends on them inherits the gap: the **grant-subset trigger**
 >   (**W08b**) and the
@@ -1470,6 +1500,59 @@ error. Work item **W36**.
 > mechanism, the query plan's `loops`) over a figure tied to a fixture, and where a
 > figure is unavoidable, name the fixture beside it.
 
+### 6.7 Raised to PostgreSQL 18, and a measurement that had been passing for the wrong reason
+
+The move to **PostgreSQL 18** (ADR-0026) is a prerequisite for UUIDv7, not an
+independent improvement: `uuidv7()` is core from 18 and there is no extension to
+install. Everything in §6.6 that says "verified on 15.19" remains true **as a record
+of that experiment**; the floor moved, and the historical measurements were not
+re-run against 18 because none of them depend on the server version.
+
+**The baseline was run before any schema change, and it earned its place.** The
+first `npm run verify` on 18 failed at step 7 with one test red:
+`can_read_email() ran 0 times over 3306 rows: expected 1`. With the schema
+completely unchanged, that could only be the server version — so the question became
+*which* behaviour changed, and the answer was neither the planner nor the policy.
+
+**It was the test, and it had been green for the wrong reason.**
+`test/rls/email-messages.spec.ts` asserts a `STABLE` function is resolved once per
+statement by reading `pg_stat_user_functions`. That view is populated only when the
+session has `track_functions` enabled, and the default is `none` — so the assertion
+was reading an **empty view** and interpreting the absence of a row as zero calls.
+It only ever passed because `ALTER SYSTEM SET track_functions = 'all'` had been run
+by hand on the development machine and persisted in that cluster's
+`postgresql.auto.conf`. A fresh cluster has an empty `auto.conf`.
+
+The failure mode is the one this file exists to prevent: **a security assertion whose
+result depended on undocumented manual machine state.** A stock checkout, a CI
+runner, or a new contributor's laptop would have reported zero calls — the exact
+tamper the assertion exists to catch — and a reviewer would have seen a green suite.
+Verified directly: with tracking off the plan still shows `One-Time Filter:
+authz.can_read_email()` executing over 3,300 rows, and the view still reads zero.
+
+The fix is to make the measurement **hermetic rather than to relax it**. The throwaway
+proof database sets `ALTER DATABASE … SET track_functions = 'all'` when it is created
+and is dropped in `afterAll`, so the setting lives and dies with the database and no
+box-level configuration is required. The assertion itself is unchanged and still
+requires exactly one call.
+
+> **The generalisable lesson.** A test that measures something through a
+> **statistics view** inherits that view's configuration requirement. Assert on bodies
+> and row counts wherever possible; where the only available measurement is a counter,
+> the test must set up the conditions that make the counter meaningful, and *that
+> setup is part of the test*. "It passed here" was never evidence — the evidence is
+> that it passes on a cluster nobody configured.
+
+**Two other corrections fell out of the same run, both now in the tree:**
+`test/rls/email-messages.spec.ts` read its migration list from a hardcoded array of
+five files, so `0006` would have been silently excluded and every assertion would
+have run against a schema the application no longer ships; it now reads the
+directory. And the documented provisioning order — `npm run migration:run` then
+`npm run db:seed` — **cannot work on a fresh cluster**, because the migration runner
+requires roles that only `db:seed` bootstraps. On a database that already had them
+(from a previous provision) the order appeared to work, which is why it went
+unnoticed.
+
 ---
 
 **Everything in items 1–8 of §6.6.4 is implemented and proved by the shipped
@@ -1497,12 +1580,28 @@ grep -rn "typeorm" package.json   # must be absent
 # P1 — closure-join scope (W26–W32). Written before implementation so the rebase is
 # auditable; none of these has been executed. Each is the verification its item
 # claims, not an additional aspiration.
-grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b' backend/database/   # must be empty
+# Must be empty. Assert on the EXECUTABLE construct, not on the bare word: the
+# superseded-design note in 0001_rls_foundation.sql quotes `sites`,
+# `claim_site_id()` and `site_tree_ids()` in order to explain the withdrawal, so
+# a substring gate returns three lines and reads as a failure under §6.0.1.
+grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids|claim_site_id|request_claims)\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/   # must be empty
 # EXPLAIN the scoped SELECT: the policy subplan must be a hashed SubPlan with
 #   loops = 1 at 305 rows AND at 3305 rows — assert on loops, never on the SQL's
 #   apparent shape, because an EXISTS-shaped variant is simplified back to hashed.
 # psql: has_table_privilege(<serving role>, 'org_closure', 'SELECT') must be false
 #       for every serving role; the matview has no RLS and PostgREST auto-publishes it.
+#
+# W26 slice — email_messages (the DERIVED category). loops = 1 is NECESSARY BUT NOT
+# SUFFICIENT: a STABLE helper BESIDE the hoisted subplan is still called once per
+# candidate row. Measured on this table at 3300 rows, track_functions counting:
+#   capability INSIDE the subquery   7.6 ms   can_read_email() =    1 call   <- shipped
+#   capability BESIDE the IN         1.3 s    can_read_email() = 3300 calls
+#   correlated EXISTS (as drafted)   4.2 s    can_read_email() = 3300 calls
+# So assert the CALL COUNT from pg_stat_user_functions, not the plan alone — and read
+# a MISSING row there as zero calls, since a function never invoked has no row. That
+# distinction is load-bearing: removing the capability conjunct produced "ran
+# undefined times", which reads as a broken measurement rather than as the escalation
+# it had actually caught. email-messages.spec.ts asserts both.
 
 # P2
 npm run test -- --watch=false

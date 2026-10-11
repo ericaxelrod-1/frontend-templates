@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from 'pg';
+import { psqlAsSuperuser } from '../../support/cluster.js';
 import { loadTestEnvironment } from '../../support/database.js';
 import { BACKEND_ROOT } from '../../support/paths.js';
 
@@ -35,7 +36,17 @@ import { BACKEND_ROOT } from '../../support/paths.js';
  *                            none ......... no membership row at all
  */
 
-const AUTHENTICATOR_PASSWORD = 'w26-proof-authenticator';
+/**
+ * The PROOF's own password for `pgrst_authenticator`, set on the cluster by
+ * `rebuildDatabase` and used by the proof's PostgREST process for the whole run.
+ *
+ * Named for what it is rather than simply `AUTHENTICATOR_PASSWORD`, because the
+ * configured password with that name is a DIFFERENT value, loaded from
+ * `.env.test`, and the two being confused is precisely how this cluster-scoped
+ * mutation went unnoticed. A test that only knows the configured value cannot
+ * prove the proof password was replaced; one that knows both can.
+ */
+export const PROOF_AUTHENTICATOR_PASSWORD = 'w26-proof-authenticator';
 export const PROOF_JWT_SECRET = 'w26-proof-signing-secret-0123456789abcdef';
 
 /**
@@ -59,16 +70,6 @@ export const ASSUMABLE_ROLES = ['app_anon', 'app_member', 'app_admin'] as const;
 
 /** The role that owns every table. A token naming it is the escalation attempt. */
 export const OWNING_ROLE = 'app';
-
-function psqlAsSuperuser(sql: string, database: string): string {
-  const result = spawnSync('sudo', ['-u', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-q', '-d', database, '-c', sql], {
-    encoding: 'utf8',
-  });
-  if (result.status !== 0) {
-    throw new Error(`superuser psql failed against ${database}:\n${result.stderr}`);
-  }
-  return result.stdout;
-}
 
 function psqlAsSuperuserFile(path: string, database: string): void {
   const result = spawnSync(
@@ -108,14 +109,42 @@ export function rebuildDatabase(): void {
   // The authenticator needs a password because PostgREST authenticates with a login
   // role. It is set here rather than in the committed bootstrap because a committed
   // file must not carry a credential.
+  //
+  // `ALTER ROLE` is CLUSTER-scoped, so this one statement rewrites the password of
+  // every database in the cluster — including `app_dev`, the development database
+  // nothing in this suite is allowed to touch. `rebuildDatabase` therefore creates
+  // a leak, and `restoreAuthenticatorPassword()` — `test/support/cluster.ts`, shared
+  // with the suites that run `database/seed.ts` — is the only thing that undoes it.
+  // Every suite that reaches this function calls it from `afterAll`, `test/rls/rls.spec.ts`
+  // gates that wiring by scanning the spec directories rather than a hand-written list,
+  // and the smoke check that runs after them asserts the outcome from the outside. Read
+  // the comment on that function before assuming a green run left the machine as it
+  // found it.
   psqlAsSuperuser(
-    `ALTER ROLE pgrst_authenticator LOGIN PASSWORD '${AUTHENTICATOR_PASSWORD}'`,
+    `ALTER ROLE pgrst_authenticator LOGIN PASSWORD ${quoteSqlLiteral(PROOF_AUTHENTICATOR_PASSWORD)}`,
     PROOF_DATABASE,
   );
 
   psqlAsSuperuserFile(BOOTSTRAP_SQL, PROOF_DATABASE);
   applyMigrationAsOwner();
   applyMigrationAsOwner();
+}
+
+/**
+ * Drops the proof database.
+ *
+ * `rebuildDatabase` creates it from nothing on every run, so without this each
+ * `verify` leaves a stale copy of a schema behind — and a leftover database is
+ * indistinguishable from a correct one to whoever inspects the cluster next.
+ * Terminate first, for the reason `rebuildDatabase` gives: a leaked PostgREST child
+ * or an unclosed pool makes DROP fail naming a connection the operator cannot see.
+ */
+export function dropProofDatabase(): void {
+  psqlAsSuperuser(
+    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${PROOF_DATABASE}' AND pid <> pg_backend_pid()`,
+    'postgres',
+  );
+  psqlAsSuperuser(`DROP DATABASE IF EXISTS ${PROOF_DATABASE}`, 'postgres');
 }
 
 /**
@@ -537,7 +566,7 @@ export function authenticatorClient(): Client {
     host: 'localhost',
     port: 5432,
     user: 'pgrst_authenticator',
-    password: AUTHENTICATOR_PASSWORD,
+    password: PROOF_AUTHENTICATOR_PASSWORD,
     database: PROOF_DATABASE,
   });
 }
@@ -630,7 +659,7 @@ export async function startPostgrest(): Promise<{ stop: () => void; directory: s
     }
     return {
       ...env,
-      PGRST_DB_URI: `postgresql://pgrst_authenticator:${AUTHENTICATOR_PASSWORD}@localhost:5432/${PROOF_DATABASE}`,
+      PGRST_DB_URI: `postgresql://pgrst_authenticator:${PROOF_AUTHENTICATOR_PASSWORD}@localhost:5432/${PROOF_DATABASE}`,
     };
   }
 

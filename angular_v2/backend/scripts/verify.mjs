@@ -1,7 +1,10 @@
-import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readdirSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
 
 const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const frontendRoot = resolve(backendRoot, '..', 'frontend');
@@ -35,14 +38,96 @@ function banner(stepNumber, total, name) {
   console.log(`\n${label}\n${'-'.repeat(label.length)}`);
 }
 
-function preflight() {
-  if (!existsSync(join(frontendRoot, 'node_modules'))) {
+/**
+ * Directories the pipeline owns and that therefore must never be walked as
+ * source. `node_modules` and `dist` are build output; `coverage` is a report.
+ */
+const IGNORED_DIRECTORIES = new Set(['node_modules', 'dist', 'coverage', '.angular', '.git']);
+
+/** Every `.ts` file in the backend tree, whether or not `tsconfig.json` claims it. */
+function backendTypeScriptFiles(directory = backendRoot, found = []) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (!IGNORED_DIRECTORIES.has(entry.name)) {
+        backendTypeScriptFiles(path, found);
+      }
+    } else if (entry.name.endsWith('.ts')) {
+      found.push(path);
+    }
+  }
+  return found;
+}
+
+/**
+ * The set of files the backend TypeScript project actually covers, read through
+ * the TypeScript API rather than by re-implementing `include` globbing — the
+ * question is "what does `tsc -p tsconfig.json` see", and the compiler is the
+ * only authority on that (`AGENTS.md` §3).
+ *
+ * A file outside `include` is invisible to `typecheck` and unlintable under the
+ * typed parser, which is how `database/seed.ts` shipped with a duplicate
+ * `const euId` declaration while the gate stayed green.
+ */
+function filesInBackendProject() {
+  const ts = require('typescript');
+  const configPath = join(backendRoot, 'tsconfig.json');
+  const { config, error } = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (error !== undefined) {
+    throw new Error(`backend/tsconfig.json could not be read: ${ts.flattenDiagnosticMessageText(error.messageText, ' ')}`);
+  }
+  const parsed = ts.parseJsonConfigFileContent(config, ts.sys, backendRoot);
+  if (parsed.errors.length > 0) {
+    throw new Error(
+      `backend/tsconfig.json is invalid:\n${parsed.errors
+        .map((diagnostic) => `  - ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`)
+        .join('\n')}`,
+    );
+  }
+  return new Set(parsed.fileNames.map((file) => resolve(file)));
+}
+
+function checkProjectCoverage() {
+  let covered;
+  try {
+    covered = filesInBackendProject();
+  } catch (error) {
+    console.error(`preflight failed: ${error.message}`);
+    return false;
+  }
+
+  const uncovered = backendTypeScriptFiles()
+    .map((file) => resolve(file))
+    .filter((file) => !covered.has(file))
+    .map((file) => `  - ${relative(backendRoot, file)}`)
+    .sort();
+
+  if (uncovered.length > 0) {
     console.error(
-      `frontend/node_modules is missing. The gate lints and type-checks the frontend, so run:\n\n  cd frontend && npm ci\n\nbefore running verify.`,
+      `backend/tsconfig.json does not cover every .ts file in the backend tree:\n${uncovered.join('\n')}\n\n` +
+        'A file outside "include" is invisible to `npm run typecheck` and rejected by the typed ESLint parser, ' +
+        'so nothing in the gate can see it. Add the directory to "include" in backend/tsconfig.json.',
     );
     return false;
   }
+
   return true;
+}
+
+function preflight() {
+  for (const [label, root] of [
+    ['backend/node_modules', backendRoot],
+    ['frontend/node_modules', frontendRoot],
+  ]) {
+    if (!existsSync(join(root, 'node_modules'))) {
+      console.error(
+        `${label} is missing. The gate lints and type-checks ${label === 'backend/node_modules' ? 'the backend' : 'the frontend'}, so run:\n\n  cd ${relative(resolve(root, '..'), root)} && npm ci\n\nbefore running verify.`,
+      );
+      return false;
+    }
+  }
+
+  return checkProjectCoverage();
 }
 
 function run() {

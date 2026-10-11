@@ -1,0 +1,11 @@
+{
+  "name": "angular-v2",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix backend run dev",
+    "prod": "npm --prefix backend run prod",
+    "verify": "npm --prefix backend run verify"
+  }
+}

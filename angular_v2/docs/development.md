@@ -9,9 +9,9 @@ PostgreSQL instance — no container runtime.
 
 | Tool | Version | Notes |
 |---|---|---|
-| Node.js | `^22.22.3 \|\| ^24.15.0 \|\| >=26` | Angular 22's floor, and the floor `verify` fails on. `frontend/.npmrc` sets `engine-strict=true`, so a forker hits this at install rather than at build. Nest 12 also requires ≥ 20.19 — the 21.x line is unsupported. **Verify the version from a login shell** — see [Troubleshooting](#troubleshooting) |
+| Node.js | `^22.22.3 \|\| ^24.15.0 \|\| >=26` | Angular 22's floor, and the floor `verify` fails on. `frontend/.npmrc` sets `engine-strict=true`, so a forker hits this at install rather than at build. The backend declares `>=22.18.0` — above Nest 12's own ≥ 20.19 — because `npm run dev` imports the local SMTP sink directly and needs Node's native TypeScript stripping. **Verify the version from a login shell** — see [Troubleshooting](#troubleshooting) |
 | TypeScript | 6.0.x | pinned by Angular 22. See the codegen note below |
-| PostgreSQL | **15 or later** | verified on 15.19; 16/17 also fine. `security_invoker` views need 15+, though this template creates none |
+| PostgreSQL | **18 or later** | **Required, not a preference**: every key defaults to `uuidv7()`, which is a core function from 18. `0006_uuidv7.sql` refuses to run on an older server with a message naming the version. Verified on 18.6. Install from the PGDG apt repository — Debian's own `postgresql` package is still on 15 |
 
 ```bash
 node --version
@@ -40,25 +40,84 @@ entry, which is what the backend uses today. Treat this as temporary: when
 git clone <repo> && cd angular_v2
 cd backend && npm install
 cp .env.example .env          # then edit — see below
-npm run migration:run
-npm run db:seed               # creates roles, permissions, and an admin user
+cp .env.test.example .env.test  # same coordinates; suites never read .env
+npm run db:seed               # roles, then migrations, then permissions + admin user
 cd ../frontend && npm install
 npm run generate:client       # reads ../openapi.json
 ```
 
-One command once the above is done:
+**`db:seed` alone provisions a new database, and running `migration:run` first
+is wrong on a fresh cluster.** `database/seed.ts` runs, in this order:
+
+1. `database/bootstrap/001_roles.sql`, through `sudo -u postgres psql` — a
+   superuser session, because `CREATE ROLE` needs `CREATEROLE`;
+2. `scripts/migrate.ts`, as the owner role — the same script `npm run
+   migration:run` runs;
+3. the authenticator's `LOGIN` password, again through a superuser session;
+4. the superuser-only grants on `users`, `user_roles` and `user_groups` that the
+   migrations cannot apply, after asserting `public.users` exists;
+5. the seed data, connected as `pgrst_authenticator` and scoped by
+   `SET LOCAL ROLE app_admin`.
+
+Roles come first because `0001_rls_foundation.sql` opens with a preflight that
+raises `missing role(s) [app_admin, app_anon, app_member, pgrst_authenticator] —
+run database/bootstrap/001_roles.sql as a superuser first`, so
+`npm run migration:run` against a cluster with no roles dies there before any
+schema exists. It survived this long because a machine provisioned once already
+had the roles: the same two commands worked the second time.
+
+Prefer to see the steps? Run `database/bootstrap/001_roles.sql` as a superuser
+(`sudo -u postgres psql -d <DB_NAME> -v ON_ERROR_STOP=1 -f
+database/bootstrap/001_roles.sql`), then `npm run migration:run`, then `npm run
+db:seed`. The second and third are idempotent, and the seed is what adds the
+permissions, the group tree and the admin user.
+
+`npm run migration:run` **on its own** is correct only for a database whose
+roles already exist — a re-migration of an existing install. It applies just the
+files missing from the `migrations` table.
+
+One command once the above is done — from the repo root, or from `backend/`:
 
 ```bash
 npm run dev
 ```
 
-Serves SSR on `:4000`. The seeded admin credentials are printed by `db:seed`.
+`npm run dev` boots the whole stack: PostgREST on `http://127.0.0.1:3001`, the
+thin app on `http://localhost:3000`, and the Angular SSR server on
+`http://localhost:4000`. It runs the frontend build once if
+`frontend/dist/frontend/server/server.mjs` is missing, waits for each process
+to answer its port, prints a readiness banner, and on Ctrl+C (or if any child
+dies) shuts the rest down — no orphans. A PostgREST boot failure surfaces here,
+not in a silently dead API. To iterate on SSR alone, `cd frontend &&
+npm run dev`; to run everything against production config, build both projects
+(`npm run build` in `backend/` and `frontend/`) and then `npm run prod`.
+
+`npm run prod` requires `backend/.env.production` (copy
+`backend/.env.production.example` and fill in real secrets) and existing build
+output. `npm run start:prod` in `backend/` boots only the thin app in
+production mode and **fails loudly, naming `backend/.env.production`**, when it
+is absent — there is no development fallback.
 
 ---
 
 ## Environment
 
-Only `.env.example` is committed. Real `.env` files are never tracked.
+Only `*.example` files are committed. Real `.env*` files are never tracked
+(`.gitignore` allows `!.env.example` and `!.env.*.example`, blocks
+everything else).
+
+Which file loads depends on `NODE_ENV` (lowercased, default `development`),
+via `backend/src/config/load-env-file.ts` — one loader for the app, the
+suites, and the orchestrators:
+
+| Mode | File loaded | If absent |
+|---|---|---|
+| `development` | `backend/.env`, else `backend/.env.development` | Nothing — a zero-config checkout still boots, or `loadEnvironment` names every missing key |
+| `test` | `backend/.env.test` — the development file is never read from a test | Nothing — the same `loadEnvironment` key check fails loudly |
+| `production` | `backend/.env.production` | **Throws, naming the file** — no development fallback |
+
+Unknown `NODE_ENV` values throw, naming the value. A variable already present
+in the real environment wins, as with Node's own `--env-file`.
 
 ```ini
 # Required — the app refuses to boot without this
@@ -67,20 +126,53 @@ JWT_SECRET=<>=32 chars, asserted at bootstrap>
 # Database
 DB_HOST=localhost
 DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=postgres
+DB_USER=app
+DB_PASSWORD=app
 DB_NAME=app_dev
 
 # Optional
 PORT=3000
-ACCESS_TOKEN_EXPIRES_IN=15m
-REFRESH_TOKEN_EXPIRES_IN=7d
-THROTTLE_TTL=60
-THROTTLE_LIMIT=10
+
+# Required. The login password of `pgrst_authenticator` — the role BOTH
+# the thin app's login path and PostgREST connect as
+AUTHENTICATOR_PASSWORD=<pgrst role's LOGIN password>
+
+# Required by PostgREST / the login path. There is NO PGRST_DB_URI: `npm run
+# dev` composes it from DB_HOST/DB_PORT/DB_NAME and AUTHENTICATOR_PASSWORD,
+# always as `pgrst_authenticator`. Naming any other role in it is either a dead
+# data layer (`permission denied to set role "app_anon"` — the owner is a member
+# of none of the three serving roles) or a silent RLS bypass (the owner is exempt
+# from every policy and nothing errors when it is).
+PGRST_JWT_SECRET=<same value as JWT_SECRET>
+
+# Required in every mode. The application's public origin: every email
+# template carries an absolute link, so there is no default — and no
+# localhost one either. https in production.
+APP_BASE_URL=http://localhost:4000
+
+# Transactional email. The transport follows NODE_ENV and no key selects it:
+# development logs the rendered message to the terminal, test serialises it
+# and sends nothing, production talks SMTP. The five keys below are required
+# in production with no defaults, and are not read at all in the other modes.
+# EMAIL_HOST=
+# EMAIL_PORT=587
+# EMAIL_USER=
+# EMAIL_PASSWORD=
+# EMAIL_FROM=
+# EMAIL_SECURE=false
+# APP_NAME=
 ```
 
-Note the names. The current codebase documents `DB_DATABASE` while reading
-`DB_NAME`, and sets `DATABASE_SYNCHRONIZE` while reading `DB_SYNCHRONIZE` — the
+With no SMTP credentials, a development checkout still completes a
+verification or a reset: the message — link included — is printed by the Nest
+`Logger`. That is the `stream` transport, and it is unreachable in production
+because the transport is derived from the mode rather than from a key. See
+[`adr.md`](./adr.md) ADR-0024 and, for a real deployment,
+[`deployment-guide.md`](./deployment-guide.md) §Transactional email in
+production.
+
+Note the names. The previous codebase documented `DB_DATABASE` while reading
+`DB_NAME`, and set `DATABASE_SYNCHRONIZE` while reading `DB_SYNCHRONIZE` — the
 developer intent was silently ignored. `angular_v2/` documents one canonical set.
 
 **There is no default `JWT_SECRET`.** Bootstrap throws if it is missing or too
@@ -108,12 +200,17 @@ against a live database.
 
 | Command | Purpose |
 |---|---|
+| `npm run dev` | Boot the full dev stack: PostgREST + thin app + SSR |
+| `npm run prod` | Boot the full stack with production config (needs `backend/.env.production` and build output) |
+| `npm run start:prod` | Thin app only, `NODE_ENV=production` — fails loudly without `backend/.env.production` |
 | `npm run lint` | ESLint, both projects |
-| `npm test` | Unit tests |
+| `npm test` | Unit tests (`NODE_ENV=test`) |
 | `npm run test:e2e` | Integration tests against a throwaway schema |
 | `npm run test:rls` | Row-level security proof — real Postgres, real PostgREST |
+| `npm run smoke` | Database smoke check against a live instance |
 | `npm run generate:client` | Regenerate the Angular client from `openapi.json` |
-| `npm run migration:run` | Apply migrations |
+| `npm run db:seed` | Provision from nothing — bootstrap the roles, apply pending migrations, seed permissions/group tree/admin user. **On a new database, run only this** |
+| `npm run migration:run` | Apply pending migrations to a database whose roles already exist (a re-migration) |
 | `npm run migration:revert` | Revert the last migration |
 
 Run `generate:client` after **any** DTO or route change. A change that alters the
@@ -149,7 +246,7 @@ drops its own schema.
 `npm run test:rls` is a **gating step of `verify`**, and it needs more than the
 other suites do:
 
-- a running PostgreSQL, reachable with the credentials in `backend/.env`;
+- a running PostgreSQL, reachable with the credentials in `backend/.env.test`;
 - `sudo -u postgres psql`, because role bootstrap needs `CREATEROLE`;
 - the `postgrest` binary on `PATH` at `/usr/local/bin/postgrest`.
 
@@ -180,8 +277,9 @@ never touches the other PostgREST instance on 3002.
 >
 > The tamper table was measured against the **old** file and the **old** suite, so
 > read it as a **method** — remove a control, confirm the gate goes red at step 7 of
-> 8 — and not as current figures. **Re-measuring it is W33**; the `of 33` numbers
-> below are the superseded suite's.
+> 8 — and not as current figures. It was **re-measured in W33 (2026-10-07)**; the
+> current figures are in `rebase.md` §6.6.1, and the old `of 33` numbers below are
+> the superseded suite's.
 > rather than as current numbers. Both the migration rewrite and the suite rewrite
 > are tracked as work items; `rebase.md` §6.0.1, W06/W07 and W26/W27 have the
 > detail.
@@ -198,17 +296,17 @@ control from the shipped SQL, running the full gate, and restoring the file:
 
 | Control removed | Result |
 |---|---|
-| *(nothing — baseline)* | `verify passed`, **33** RLS tests green — **SUPERSEDED FIGURE, see W33** |
-| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | `verify failed at step 7/8`, **12 of 33** — superseded |
-| the `REVOKE SELECT ON … FROM app_member/app_admin` lines | `verify failed at step 7/8`, **2 of 33** — superseded |
-| the boundary `GRANT` widened to reach the table owner | `verify failed at step 7/8`, **3 of 33** — superseded |
+| *(nothing — baseline)* | `verify passed`, **73** tests green (68 `rls.spec.ts` + 5 `seed.spec.ts`) — W33 re-measure, 2026-10-07 |
+| `ALTER TABLE … ENABLE ROW LEVEL SECURITY` → `DISABLE` | `verify failed at step 7/8`, **19 of 73** |
+| the column-hide `REVOKE SELECT ON … FROM app_member` line deleted | `verify failed at step 7/8`, **3 of 73** |
+| the boundary `GRANT` widened to name the table-owning role | bootstrap assertion fires first (73 skipped); with it neutralized, **3 of 73** |
+| `ALTER TABLE groups FORCE ROW LEVEL SECURITY` | `verify failed at step 7/8`, **17 of 73** — data failure mode: **empty closure** (0 rows) |
+| closure query rewritten with `UNION ALL` | **green, 0 of 73** — invisible on the acyclic fixture; bounded probe: temp-file overflow |
 
-> **STALE — these numbers are from the superseded suite and must be re-measured.**
-> They were taken against the claim-keyed, per-row-walk migration. The suite has been
-> rewritten against the closure-join design and now runs **68** tests; the tamper rows
-> above have not been re-run against it, and a proof carried across a schema change
-> is a stale result wearing a current one's clothes. **Re-run the whole matrix before
-> citing any figure in it** (`rebase.md` §6.6.1, **W27**).
+> Superseded figures (`12 / 2 / 3 of 33`) were taken against the claim-keyed,
+> per-row-walk migration. The current matrix is `rebase.md` §6.6.1 (**W33**,
+> 2026-10-07); a proof carried across a schema change is a stale result wearing a
+> current one's clothes.
 
 The other steps cannot see any of this: typecheck, lint and both unit suites stay
 green with every policy in the database disabled. Note also that `verify` stops at

@@ -34,6 +34,8 @@ Status key: **Accepted** — settled, to be implemented as written.
 | [0021](#adr-0021) | Keep NestJS 11 → 12 upgrade in the final phase | Accepted |
 | [0022](#adr-0022) | **One naming convention end to end** — no views, no transform | Accepted (reverses an earlier view/transform decision) |
 | [0023](#adr-0023) | **Two orthogonal authorization axes** — scope in RLS, capability in OLS | Accepted (row scope, hierarchy and the capability resolver all revised after testing) |
+| [0024](#adr-0024) | **One email provider, mode-driven transport**, handlebars, and templates that must reach `dist/` | Accepted |
+| [0025](#adr-0025) | **`email_messages` is the FOURTH scoping category — "derived"**; scope resolves through the recipient user's memberships | Accepted |
 
 ---
 
@@ -766,7 +768,10 @@ old, so ecosystem compatibility (`@nestjs/swagger`, `@nestjs/config`,
 
 **Consequences.** Keep ESLint rather than adopting the oxlint default, since the
 Angular rules live in ESLint. Node `^22.22.3 || ^24.15.0 || >=26` is Angular 22's
-floor; Nest 12 additionally requires ≥ 20.19 and does not support 21.x.
+floor, and it is the effective floor for the whole repository. The backend
+separately declares `>=22.18.0` — above Nest 12's own ≥ 20.19 — because `npm run
+dev` imports the local SMTP sink directly and relies on Node's native TypeScript
+stripping (ADR-0024).
 ---
 
 <a id="adr-0023"></a>
@@ -1042,8 +1047,11 @@ CREATE POLICY row_scope ON projects USING (
 
 > **Migration status, stated plainly.** `0001_rls_foundation.sql` **has** been
 > rewritten to this design and the RLS suite has been rewritten against it: **68
-> tests**, green, run by `verify`. `grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b'
-> backend/database/` returns nothing. A green `test:rls` **is** evidence for this
+> tests**, green, run by `verify`. `grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids|claim_site_id|request_claims)\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/`
+> returns nothing — it asserts on the **executable construct**, not on the bare
+> word, because the SUPERSEDED NOTE quotes `sites`, `claim_site_id()` and
+> `site_tree_ids()` in order to explain the withdrawal, so a substring gate returns
+> lines and reads as a failure. A green `test:rls` **is** evidence for this
 > ADR, with two stated exceptions: the **grant-subset trigger** is **not** enforced
 > (§Least privilege) and the whole scope axis rests on a caller-writable GUC (§F1).
 
@@ -2480,9 +2488,12 @@ The claims that replaced it, each directly checkable:
 
 **The design in this ADR is shipped.** `backend/database/migrations/0001_rls_foundation.sql`
 implements it and `backend/test/rls/rls.spec.ts` proves it with **68** tests run by
-`npm run verify`. `grep -rn 'site_tree_ids\|claim_site_id\|\bsites\b' backend/database/`
-returns nothing. A green `test:rls` **is** evidence for this ADR — which it was not
-before the W26/W27 rewrite.
+`npm run verify`. `grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids|claim_site_id|request_claims)\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/`
+returns nothing — it asserts on the **executable construct**, not on the bare
+word, because the SUPERSEDED NOTE quotes `sites`, `claim_site_id()` and
+`site_tree_ids()` in order to explain the withdrawal, so a substring gate returns
+lines and reads as a failure. A green `test:rls` **is** evidence for this ADR —
+which it was not before the W26/W27 rewrite.
 
 | Claim | Status |
 |---|---|
@@ -2501,3 +2512,571 @@ defect but is easy to mistake for one:
 > **The tamper table in `rebase.md` §6.6.1 was measured against the superseded
 > suite and must be re-measured against the rewritten file.** A proof carried across
 > a schema change is a stale result wearing a current one's clothes.
+
+---
+
+<a id="adr-0024"></a>
+## ADR-0024: One email provider, one transport, two destinations, handlebars, and templates that must reach `dist/`
+
+**Status:** Accepted, and **shipped**. `backend/src/email/` implements it;
+`backend/test/unit/email/` (80 tests) and `backend/test/e2e/email.e2e-spec.ts`
+(9 tests) prove it, both run by `npm run verify`. **Decision 2 was rewritten**:
+the mode-driven three-transport table it originally carried is superseded by the
+one-transport/two-destination shape below, and the rest of the ADR stands.
+
+**Context.** `angular/` had two email implementations and both were wrong in
+ways that compounded:
+
+| | `backend/src/modules/email/` | `frontend/server/email-service/` |
+|---|---|---|
+| mechanism | nodemailer behind an `EmailProvider` interface | a **second** standalone nodemailer service |
+| DI token | the bare string `'EmailProvider'` | its own, outside Nest's container |
+| rendering | hand-rolled `{{var}}` loop | — |
+| surfaces | 8 send methods | — |
+
+Six of the eight send methods (`sendWelcomeEmail` plus five privacy-ticket
+methods) had **zero callers**. `base-layout.html` was dead and broken: it used
+a `{{{content}}}` triple-stash against a renderer that only understood
+`{{var}}`, and had an unmatched CSS brace. `EmailProvider` and `EMAIL_ENABLED`
+were defined in the configuration and read by nothing, so a deployment could
+believe it had chosen a transport and had not. `FRONTEND_URL` defaulted to
+`http://localhost:4200` and `EMAIL_HOST`/`EMAIL_USER`/`EMAIL_PASSWORD`/
+`EMAIL_PORT`/`EMAIL_FROM` all had defaults, so a production deployment with no
+mail configuration booted happily and mailed nobody.
+
+**Decision.**
+
+1. **One provider mechanism.** `EmailProvider` is a one-method port —
+   `send(EmailMessage): Promise<SentEmail>` — registered once behind
+   `EMAIL_PROVIDER = Symbol('EMAIL_PROVIDER')`. Not the string token: a string
+   token shares a process-global namespace with every other library, so a typo
+   fails at runtime against somebody else's provider. The frontend's standalone
+   service is **not** ported; `AGENTS.md` §2.4 has one mechanism per concern.
+
+2. **One transport, two destinations, and the destination is configuration and
+   nothing else.** There is exactly one transport — nodemailer's `smtpTransport`
+   — built in development, in test and in production, from the same
+   `EmailConfig.smtp`. No code path anywhere branches on the runtime mode to
+   choose a transport, and there is no `EMAIL_TRANSPORT` / `EMAIL_PROVIDER` /
+   `EMAIL_ENABLED` read anywhere: what differs between modes is **where the
+   transport connects**.
+
+   | mode | transport | destination |
+   |---|---|---|
+   | `development` | nodemailer `smtpTransport` | the local sink on `EMAIL_HOST`/`EMAIL_PORT` — `npm run dev` hosts it in-process |
+   | `test` | nodemailer `smtpTransport` | a local sink the suite starts itself, on port `0` so it can never collide with another listener |
+   | `production` | nodemailer `smtpTransport` | a managed relay, named by `EMAIL_HOST` |
+
+   **This supersedes the earlier decision in this ADR**, which selected one of
+   three transports by mode (`streamTransport` in development, `jsonTransport` in
+   test, `smtpTransport` in production). That shape was wrong twice over. It was
+   three mechanisms for one concern, which is the duplication `AGENTS.md` §2.4
+   exists to remove. And because only production spoke SMTP, **the transport
+   layer's first real run happened in production** — no development session and
+   no test had ever opened a socket, so the EHLO, the `DATA` framing, the `250`
+   and every handshake bug below it shipped unexercised. With one transport,
+   development and test run the code path production runs, which is the only
+   arrangement in which "the test suite passes" says anything about the deployed
+   behaviour.
+
+   **The local sink** is `startSmtpSink` in `backend/scripts/smtp-sink.ts` — one
+   implementation, imported by both `scripts/dev.mjs` and the test suites, built
+   on the `smtp-server` package. Not `maildev`: that ships a web UI, and this
+   subsystem has no web UI and does not want one. Not a container and not an
+   external binary: `npm run dev` is **one Node process** for the app plus
+   PostgREST, and the sink is a listener inside it. It binds **127.0.0.1 only**,
+   refuses a non-loopback address before a socket exists, and re-reads the bound
+   address afterwards.
+
+3. **Required configuration, no defaults — and production may not name a sink.**
+   `EMAIL_HOST` and `EMAIL_PORT` are asserted in **every** mode: there is one
+   transport, so every mode needs a destination, and a mode that guesses one picks
+   something nobody is listening on. `EMAIL_USER`, `EMAIL_PASSWORD` and
+   `EMAIL_FROM` are asserted in production only — a loopback sink may
+   legitimately accept a message from an unauthenticated client, and demanding a
+   credential there would be demanding a fake one (`AGENTS.md` §2.2).
+   `EMAIL_SECURE` is configurable and defaults from the port (`465` → implicit
+   TLS, otherwise STARTTLS). Missing in production throws `EnvironmentError` at
+   bootstrap, naming every absent key at once, exactly as a missing `JWT_SECRET`
+   does.
+
+   **Production additionally refuses a non-routable `EMAIL_HOST`** — loopback
+   (`127.0.0.0/8`, `::1`), the unspecified address (`0.0.0.0`, `::`), link-local
+   (`169.254.0.0/16`, `fe80::/10`) or private (`10/8`, `172.16/12`, `192.168/16`,
+   `fc00::/7`), and `localhost` by name — because of the next paragraph.
+
+   **`EMAIL_TLS_REJECT_UNAUTHORIZED`** is the one added key. It defaults to `true`
+   and is **refused as `false` in production**: it exists so the sink's
+   run-time-generated self-signed certificate can be used, and a relay whose
+   certificate cannot be verified is a relay whose traffic anyone can read. Same
+   shape as the host refusal — a setting that only makes sense against a sink
+   cannot be set in production.
+
+   **`APP_BASE_URL` is required in every mode** with no default anywhere. It is
+   the application's own public origin, and `http://localhost:4200` is the
+   precise value that survives into a real deployment and mails every user a
+   link to the developer's own machine. `EMAIL_FROM` defaults to
+   `no-reply@<hostname of APP_BASE_URL>` outside production, so no mode invents a
+   sender domain, and `APP_BASE_URL` must be `https:` in production because an
+   emailed token over plain HTTP is readable by every hop in between.
+
+4. **`250` is an acknowledgement, not a delivery, and configuration may not
+   pretend otherwise.** SMTP's final reply means *"I accept responsibility for
+   this message"*. It does not mean the recipient has it, that the domain exists,
+   or that anything was relayed onward. A sink is the limiting case: it answers
+   `250` to everything and stores it in an array in one process, and no user is
+   ever contacted.
+
+   Two consequences, and both are enforced rather than documented:
+
+   - **`SentEmail` is a receipt, not a delivery confirmation.** It carries the
+     `messageId` and nothing else. The previous `transport` and `serialised`
+     fields are gone: one transport makes the label a constant, and the
+     serialised MIME belonged to the deleted JSON transport, which has no
+     analogue over SMTP. A field named like a delivery confirmation would be the
+     wrong shape to keep. **Only bounce and delivery webhooks answer "did the
+     recipient get it", and this subsystem has neither.**
+   - **A production process cannot be pointed at a sink.** That is the loopback
+     refusal in point 3. Without it, the failure mode is the worst kind: every
+     password reset and every address verification mails into a void, every send
+     "succeeds", and **nothing anywhere errors** — because from the application's
+     point of view nothing did.
+
+5. **Handlebars, auto-escaping on, and a typed context.** The previous renderer
+   interpolated a context key into a `RegExp` **unescaped**, and its escape set
+   covered `<`, `>` and `"` while omitting `&`. Handlebars with
+   `Handlebars.compile<T>(source)` removes both failure modes: nothing is built
+   from a caller-supplied string, and the escape set is the library's. Templates
+   are `{{var}}` substitution only — no helper, no partial, no logic. The
+   context is `VerifyEmailContext | PasswordResetContext`, never
+   `Record<string, any>`.
+
+6. **`sendEmail` throws; there is no failure-shaped success.** `EmailService`
+   returns `SentEmail` only when the transport accepted the message, and rejects
+   with `EmailDeliveryError` otherwise. It does not return a boolean and does
+   not return a discriminated result. The old `boolean` was returned by all
+   eight methods and discarded by `AuthService`, so a total send failure became
+   **HTTP 200** with a user who never received their reset link. A discriminated
+   result would fix the service while leaving every future caller free to ignore
+   the `failed` arm; a throw cannot be ignored without a `catch` that visibly
+   swallows it.
+
+7. **A missing template is an error, not a paragraph.** The old renderer caught
+   every failure and returned `<p>Email template error: …</p>`, which the
+   provider then reported as `success: true`. `EmailTemplateError` replaces it.
+
+8. **The templates must reach `dist/`, and that is asserted by a build.**
+   `nest-cli.json` gains
+   `"assets": [{ "include": "email/templates/*.html", "watchAssets": true }]`.
+   `src/email/templates/*.html` lands in `dist/email/templates/`, which is where
+   `import.meta.url` resolves it in a built process.
+
+   **This is the regression the record exists for.** Without the `assets` entry
+   the previous tree's renderer hit `ENOENT` on every send and shipped
+   `<p>Email template error: …</p>` to every recipient while every log reported
+   success. `backend/test/unit/email/email-assets.spec.ts` runs a real
+   `nest build` and then **renders both templates from `dist/`** — not merely
+   checks that the files exist — so a stale, truncated or absent copy fails too.
+
+9. **Only what is live ships.** Exactly two templates: `verify-email.html` and
+   `password-reset.html`. `base-layout.html` and the six orphan templates are
+   not ported. A template with no caller is a maintenance surface that rots
+   silently, and the previous nine proved it.
+
+10. **What may be logged.** Recipient, subject, destination and message id on
+    the success path; recipient, subject and destination on the failure path.
+    **Never a body, and never a token — with no exception at all.** The deleted
+    `stream` transport wrote the whole MIME at `debug`, and the rule needed an
+    exception plus a structural argument about why production could not construct
+    it. With one transport there is nothing to make safe: no configuration can
+    put a verification or reset token into an application log, because no code
+    path writes a body anywhere. Development reads the message out of the **sink
+    it just talked to** — `scripts/dev.mjs` prints the accepted envelope, subject
+    and plain-text part on a timer — which is a loopback listener in the
+    developer's own terminal, not a log line in the application. A recipient that
+    fails validation is **not** echoed into the error: it is attacker-controlled
+    and may carry a CRLF, which would forge a log line in whatever handles the
+    exception.
+
+**Consequences.**
+
+- `nodemailer` and `handlebars` are dependencies. `smtp-server`, `selfsigned`
+  and `@types/smtp-server` are **dev** dependencies: the sink is test and
+  development infrastructure and must never be reachable from a production
+  bundle, which `test/unit/email/smtp-sink.spec.ts` asserts by scanning `src/`
+  for any reference to it. `canvas` is **not** added in this slice.
+- **`backend/package.json` requires Node ≥ 22.18.** `scripts/dev.mjs` imports
+  `scripts/smtp-sink.ts` directly, so the dev orchestrator needs native type
+  stripping. That is not a preference: the alternative was a second, hand-written
+  copy of the sink in plain JavaScript, and two copies of one sink is precisely
+  the failure this slice exists to remove.
+- `EmailService` currently has **no production caller**. That is stated, not
+  stubbed: the routes that will call it — registration and password reset — need
+  a token table, and `backend/database/**` is not this slice's to touch.
+  `AuthModule` imports `EmailModule` so the provider is configured and the
+  wiring stops at the module edge. Writing a `sendVerificationEmail(...)` call
+  with nowhere real to call from would be a stub that reads as a feature
+  (`AGENTS.md` §2.1), so it does not exist.
+- `verify` step 4 grows by roughly ten seconds: the build assertion runs
+  `nest build` once. It is the cheapest possible insurance against a
+  whole-subsystem silent failure.
+- **SPF, DKIM and DMARC are not this subsystem's job.** They are DNS `TXT`
+  records on the sending domain, published by whoever controls that domain, and
+  an application cannot assert them. The application can only be configured to
+  send *from* a domain that has them. The records, the `dig` verification
+  command, provider-side domain verification for SES / SendGrid / Mailgun, and
+  why a mail-catch sink is not a production transport are in
+  [`deployment-guide.md`](./deployment-guide.md) §Transactional email in
+  production. This ADR is not that document and does not drift into it.
+
+---
+
+<a id="adr-0025"></a>
+## ADR-0025: `email_messages` is the FOURTH scoping category — "derived"
+
+**Status:** Accepted, and **shipped**.
+`backend/database/migrations/0005_email_messages.sql` implements it;
+`backend/test/rls/email-messages.spec.ts` (**21 tests**) proves it, and it is a
+gating step of `npm run verify`.
+
+**Context.** ADR-0023 declared every table in one of **three** scoping categories,
+and the category was load-bearing rather than descriptive: it determined the
+primary key, and it determined the foreign-key discipline. Every table that
+existed fitted. `email_messages` — one row per transactional email attempt, added
+so a user's mail history is queryable — does not fit any of the three, and the
+reason it does not fit is the design working correctly rather than a gap in it.
+
+### The fourth category: derived
+
+| Category | Scope key | Primary key | FK discipline |
+|---|---|---|---|
+| **Group-scoped** | its own `group_id` | `(group_id, id)` | every FK carries `group_id` |
+| **The hierarchy** | it *is* the group | simple `(id)` | admin-only-reachable self-FK |
+| **Unscoped** | none | simple | global reference data |
+| **DERIVED** | **another table's membership** | simple `(id)` | may leave the set, at a non-member-writable table only |
+
+**A derived row has no `group_id` column at all**, and that is the decision. Its
+visibility is resolved through the **recipient user's** `user_groups`: an actor
+sees the mail history of exactly those users whose groups they can see.
+
+### Why a single `group_id` was rejected
+
+It was the obvious design and it cannot express two real cases:
+
+1. **A user belongs to several groups.** Duplicating one message row per group so
+   a `group_id` can be carried makes *"which groups is this message in?"*
+   ambiguous, and every read then has to de-duplicate or pick one arbitrarily —
+   with a count that disagrees with the rows.
+2. **A self-service password reset names no group at all.** The recipient is found
+   by address; nobody decided which group the message belongs to. Putting the row
+   in a group the reset never asked for invents a scope, and inventing a scope is
+   how this repository's worst past defects happened.
+
+Resolving through membership handles both: multi-group membership is the **union**
+(never an intersection), and a group-less message simply has no rows pointing at
+it.
+
+### Capability: a dedicated `email:read`, not `user:create`
+
+Capability is `resource` + `action` over a table, so `('email','read')` is one
+inserted row, granted to the `admin` and `manager` roles and **not** to `member`.
+
+**Why not reuse a user capability.** Reading a user's mail history is a different
+question from reading the user row, and reusing an existing permission makes the
+grant invisible: widening `user:read` for an unrelated reason would silently widen
+email access, and nobody reading that diff would know. A dedicated row is a
+separate line in `role_permissions`, so revoking email access touches nothing else.
+The suite proves the two are distinct — a role holding `user:create` and not
+`email:read` reads **zero** rows, inside its own group.
+
+**The migration AND the seed both write it.** The migration owns the schema and
+seeds the `permissions` row; the seed owns the `role_permissions` grant, because
+`admin`/`manager` are seeded and never migrated (§B1 — roles are not a migration).
+Both statements are `ON CONFLICT DO NOTHING`, so a fresh provision and a
+re-migrated one agree; asserted from the live catalog.
+
+### Scope and capability are AND-ed in ONE policy
+
+```sql
+CREATE POLICY email_read_scope ON public.email_messages FOR SELECT USING (
+  email_messages.user_id IN (
+    SELECT u.user_id
+      FROM authz.visible_user_ids() AS u (user_id)
+     WHERE authz.can_read_email()
+  )
+);
+```
+
+One predicate, both axes, never two PERMISSIVE policies on one operation — those
+are **OR**-ed, so a scope policy covering `DELETE` admits it alone. The measured
+failure that produced that rule: a member holding **zero** capabilities ran
+`DELETE` and `INSERT` with no error and no warning (ADR-0023 §Withdrawn).
+
+`authz.can_read_email()` is a **no-argument** `SECURITY DEFINER` function wrapping
+`has_permission(authz.actor(), 'email', 'read')`. No `who` parameter — the same
+rule as `authz.visible_group_ids()`, because a `who` parameter turns a policy helper
+into a disclosure oracle that can enumerate another user's capabilities (measured
+on `has_permission`: 63 unauthenticated probes recovered an administrator's whole
+permission set). `EXECUTE` is revoked from `PUBLIC` and granted to `app_anon`,
+`app_member` and `app_admin`: a policy expression is evaluated for **every** role
+that reaches the table, so a helper it calls must be executable by the anonymous
+role too, or an unauthenticated read fails with `permission denied for function` —
+a denial-of-service surface that also names the policy to anyone probing.
+
+`app_anon` gets **no** table grant at all, so its read is refused at the **grant**
+layer (`permission denied for table`), never at the policy layer.
+
+### The correlated `EXISTS` was wrong twice, and both are measured
+
+The first draft of this policy was:
+
+```sql
+USING (
+  authz.can_read_email()
+  AND EXISTS (
+    SELECT 1 FROM user_groups ug
+    WHERE ug.user_id = email_messages.user_id
+      AND ug.group_id IN (/* uncorrelated closure join */)
+  )
+);
+```
+
+**It is correctness-broken, not merely slow.** A policy expression's subquery runs
+with the **querying** role's privileges, and `user_groups` carries its own policy
+(`user_id = authz.actor()`, or every row for `app_admin`). For any role but the
+admin it can therefore see only the **caller's own** membership rows, so
+`ug.user_id = email_messages.user_id` degenerates to *"the recipient is me"*.
+
+> **MEASURED.** A reader and a colleague in the **same** group: the colleague's
+> message is visible under the shipped policy and **NOT visible** under the
+> correlated form. No error, no warning — a silent under-read that looks exactly
+> like a correctly scoped policy.
+
+`authz.visible_user_ids()` is `SECURITY DEFINER` for the same reason
+`has_permission()` is: it must read a table the caller cannot read in full.
+
+**It is also the per-row cost, twice over.** A `STABLE` function in a qual means
+*"the same answer within this statement"*, **not** *"called once"*. At 3,300 rows,
+with `track_functions` counting:
+
+| shape | exec | `can_read_email()` calls |
+|---|---|---|
+| **shipped** — capability **inside** the subquery | **7.6 ms** | **1** |
+| capability **beside** the uncorrelated `IN` | 1.3 s | 3,300 |
+| correlated `EXISTS` (as first drafted) | 4.2 s | 3,300 |
+
+Beside the `IN` the planner emits `Filter: (hashed SubPlan 1) AND
+authz.can_read_email()` and calls the function per candidate row; **inside**, it
+becomes a `One-Time Filter` above the function scan and runs once. That is the
+documented trap (ADR-0023: the withdrawn walk ran 400,001 times over 400,000
+rows), and it is why the capability check sits where it does rather than where it
+reads most naturally.
+
+**`loops = 1`.** The scoping subplan is a `hashed SubPlan` with `loops=1` at 3,300
+rows, and `visible_user_ids()` and `can_read_email()` are called **once each**.
+Asserted on the plan *and* on the call counts, because a plan alone cannot tell you
+how many times a function ran. This is the "assert on `loops`, not on the SQL's
+apparent shape" rule paying out twice: the shape that reads as correct was the
+broken one.
+
+### The foreign key
+
+`user_id uuid NOT NULL REFERENCES public.users (id)` **leaves** the group-scoped
+set, which the referential-integrity rule forbids except at a table members cannot
+write to. `users` is that table: `app_member` holds no `INSERT`/`UPDATE`/`DELETE`
+on it, asserted per role. The residual is the documented one — FK checks bypass RLS
+and fail **OPEN**, so this is an existence oracle over `users.id` — and it is
+accepted because a nullable `user_id` would mean a message with **no derivable
+scope**, which on a scoped table is worse than a narrow oracle. For `app_admin`,
+which *does* hold write grants on `users` (0002, the provisioning path), the oracle
+discloses nothing: it already reads the whole table. Asserted, because "it can read
+users anyway" is the entire argument and an unasserted argument is not one.
+
+### No DELETE, no TRUNCATE
+
+Email history is an append-only audit trail: `app_admin` gets `SELECT, INSERT,
+UPDATE` and nothing else. A future table-level `DELETE`/`TRUNCATE` grant is exactly
+the change that would reopen it, so the absence is asserted **per role** and the
+refusal is proven by executing it.
+
+### Credential-bearing suppression
+
+`password_reset` and `email_verification` carry a **bearer token** in the body —
+the link *is* the credential. Persisting it would put a working token in a table
+read over HTTP, in every backup and every replica, turning a leak of the mail
+history into account takeover.
+
+So those templates are forced to `content_class = 'metadata_only'` with `body` NULL,
+and the rule **throws** rather than silently nulling the column: a caller must never
+believe a body was stored when the column is empty. `contentClassFor` is the single
+place the decision is made, it runs **before** the transaction opens (so a refusal
+costs no round trip and is never partially applied), and both red/green proofs are
+recorded in `rebase.md`. Other templates may set `full_body`; **no rendered body is
+stored by default.**
+
+### Consequences, stated rather than discovered later
+
+- **`EmailService` records one row per attempt, sent and failed.** A provider that
+  refuses still produces a row, because "this user was mailed a reset and it never
+  arrived" is the first question an operator asks. A **rejected recipient** produces
+  none: the address never became an envelope, and persisting an attacker-controlled
+  string that failed validation is the one case where the audit table is the wrong
+  place for it.
+- **The write path carries no scope predicate, deliberately.** Scope is not knowable
+  at write time: the send happens before the recipient's membership is consulted, and
+  a password reset names no group. Scoping the insert would mean inventing a group,
+  which is the design this category exists to avoid. The read policy is the
+  authorization boundary; the write is reachable only through the escalation
+  boundary, by the superset principal.
+- **`sendVerificationEmail`/`sendPasswordResetEmail` take `userId` as an OPTIONAL
+  fourth argument, and that is a documented residual, not a preference.** A row's
+  scope is derived from the recipient user's memberships and `email_messages.user_id`
+  is `NOT NULL`, so there is nothing to attach a message to without one. The methods
+  are called with three arguments in **19 places** across
+  `test/unit/email/email.service.spec.ts` and `test/e2e/email.e2e-spec.ts`, and that
+  suite's environment names a database (`app_test`) that **does not exist** and
+  deliberately opens no connection. A required fourth parameter would not compile it
+  and an unconditional write would fail it for a reason unrelated to what it tests.
+  So when `userId` is absent nothing is written **and a warning names exactly what was
+  missing** — a hole in the trail, reported rather than swallowed. There is no
+  production caller yet (ADR-0024 §Consequences), so it costs nothing today and
+  closes when the registration and reset routes land, since they already hold the
+  user row they are mailing. **Every production caller must pass `userId`.**
+- **The migration disables `role_permissions`' grant-subset trigger for one
+  statement**, because `assert_grant_subset()` (0004) refuses a write with no caller
+  identity that is not the superset principal — which is exactly what a migration is,
+  and a migration has no boundary connection. The window is a single `DO` block, so
+  it is atomic under either caller: verified, a failure inside it rolls the disable
+  back with it. A `BEGIN … COMMIT` pair would have closed the **runner's** transaction
+  early and turned a partially applied migration into a committed one.
+- **No route, no controller, no frontend.** PostgREST serves the table once a later
+  slice exposes it and the spec and client are regenerated. The table is in `public`
+  and PostgREST will publish it on the next `NOTIFY`; nothing in this slice depends
+  on that.
+
+---
+
+## ADR-0026: Every key is UUIDv7, and the server floor moves to PostgreSQL 18
+
+### The decision
+
+Every primary key in `public` defaults to `uuidv7()`. The `refresh_tokens.jti`
+column is retyped from `text` to `uuid` and defaults to `uuidv7()` too. The
+PostgreSQL floor is **18**, because `uuidv7()` is a core function from 18 and there
+is no extension to install — `gen_random_uuid()` has been core for far longer, so
+the `pgcrypto` requirement older drafts of the deployment guide carried was already
+false and is now gone as well.
+
+### Why v7 and not v4
+
+The reason is index locality, and it is worth being precise about that, because a
+vague version of this argument is how a schema ends up on v7 for no reason.
+
+`gen_random_uuid()` returns a v4: 122 random bits in random order. Every insert
+therefore picks a random position in the btree, so a bulk load dirties pages all the
+way across the index and leaves it fragmented. `uuidv7()` puts a 48-bit millisecond
+timestamp in the leading bits, so ids minted now sort at the right-hand edge of the
+index and inserts are close to sequential — which is the same locality a
+`bigserial` would give, with ids that carry no enumeration.
+
+This is a **write-amplification and bloat** argument. It is not a security argument,
+and it does not make a v7 unguessable: the timestamp is public, so the unguessable
+part is the remaining 74 random bits. That is still ample, and it is the number the
+`projects` unique-index comment in `0001` now quotes instead of the v4's 122.
+
+### Clock skew is accepted, not fixed
+
+A v7 embeds the minting host's clock. Two hosts whose clocks disagree will mint ids
+out of order relative to each other: an id from the slow host sorts *before* an id
+the fast host minted a second earlier.
+
+The consequence is bounded, and stating the bound is the point: **it costs index
+locality and nothing else.** Uniqueness does not depend on the timestamp — 74 random
+bits carry it — and no policy, foreign key or query reads the version nibble or
+assumes monotonicity. So a skewed fleet gets a slightly less tidy index and correct
+data.
+
+It is therefore **documented rather than fixed.** The fixes all cost more than the
+problem: a monotonic counter needs shared state to be correct across processes, and
+taking the timestamp from the database's clock instead of the host's moves the skew
+to the single database host without removing it. Neither is worth it for what is, in
+the worst case, some extra page splits.
+
+### One id cannot be left to a default
+
+`refresh_tokens.jti` is the exception that proves the rule is a rule and not a
+default-setting habit. The `jti` claim is **inside** the access token, and the
+refresh-token row is written afterwards and keyed on that token — so the value has to
+exist before the row does, and the database never gets the chance to mint it.
+
+`src/auth/uuidv7.ts` mints it instead: `randomUUID()` for the random bits, then the
+timestamp written into the leading 48 bits and the version and variant nibbles set,
+which is the RFC 9562 layout. It produces the same kind of value a default would,
+so a `jti` and a row id are not two different kinds of thing. The column is retyped
+to `uuid` so the database validates and holds it rather than trusting an arbitrary
+string, and the cast in the migration is deliberately unguarded — a `jti` that is not
+a UUID aborts the migration rather than being silently rewritten, because coercing
+it under a `NOT NULL` column or minting a replacement for a value already inside a
+live token are both wrong answers delivered quietly.
+
+The low bits are random, not a monotonic counter, so two ids minted in the same
+millisecond do not order by creation. Accepted, for the same reason as the skew.
+
+### What was rejected
+
+- **Stay on `gen_random_uuid()`.** Free, and pays the random-insertion cost on every
+  table forever.
+- **Keep `jti` as `text`.** It is a key and was carrying **two** indexes on one
+  column — `refresh_tokens_jti_key` (UNIQUE) and `refresh_tokens_jti_idx` (plain).
+  A plain btree on a column that already has a unique btree is strictly a subset of
+  it. Dropped here, where the change is visible.
+- **Install the `uuid` npm package for the one id that needs minting.** A dependency
+  and a runtime cost for a function that is a timestamp and two nibbles.
+
+### No backfill
+
+Existing rows keep their ids. A v4 and a v7 are both valid UUIDs, nothing reads the
+version nibble, and rewriting keys would mean updating every referencing row and
+rebuilding `authz.org_closure` — a large, lock-taking, irreversible operation bought
+with the smallest possible benefit. New rows are v7; old ones age out.
+
+This is also why the rollback is cheap: a forward migration that backfilled would
+make `0006_uuidv7.down.sql` lossy, because a v7 in a `uuid` column is still a valid
+uuid but a v4 written back into a `text` column is not recoverable.
+
+### Measured
+
+On a **fresh** provision through the real pipeline — bootstrap, every migration, then
+the real `database/seed.ts` — every seeded key is a v7:
+
+| Table | v7 / total |
+|---|---|
+| `users` | 1 / 1 |
+| `groups` | 5 / 5 |
+| `roles` | 3 / 3 |
+| `permissions` | 25 / 25 |
+| `projects` | 2 / 2 |
+| `customers` | 1 / 1 |
+
+The pre-`0006` development database still holds v4 rows, which is the no-backfill
+decision and not a failure.
+
+Getting to that number required removing four `gen_random_uuid()` calls from
+`database/seed.ts` that named `id` explicitly. **A supplied value bypasses the
+column default**, so those four inserts would have kept minting v4s indefinitely
+while the catalog still read `uuidv7()` — the failure is invisible to any test that
+looks at the schema. That is why the gate has a separate assertion on the seed's
+source.
+
+### The gate
+
+`test/rls/uuid-keys.spec.ts` queries `pg_attrdef` and asserts that **every** uuid
+default in `public` is `uuidv7()`, with no table names hardcoded. A test listing the
+nine tables that existed when `0006` was written passes forever after a tenth table
+is added with a v4 default, which is the exact regression worth catching. It also
+reads a freshly inserted row's version nibble back — the default's *text* is not
+evidence — checks the leading 48 bits against the wall clock, and asserts the seed
+source carries no `gen_random_uuid`.
+
+Proven able to fail: reverting one line of `0006` to `gen_random_uuid()` turns two
+of its assertions red and names `users.id`.

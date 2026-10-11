@@ -3,6 +3,7 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,
+    "rewriteRelativeImportExtensions": true,
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,
@@ -31,6 +32,8 @@
   "include": [
     "src/**/*.ts",
     "test/**/*.ts",
+    "database/**/*.ts",
+    "scripts/**/*.ts",
     "vitest.config.ts",
     "vitest.config.e2e.ts",
     "vitest.config.rls.ts",
