@@ -1,0 +1,86 @@
+-- Resource ceilings for the database itself.
+-- Target: PostgreSQL 18+, applied as the migration/owner role like every migration.
+--
+-- WHY THIS IS A MIGRATION AND NOT application code
+--
+-- These three are the load-bearing replacement for the legacy "Sentinel"
+-- (ADR-0027). There is no health service and no interceptor here, and there is
+-- deliberately none to add: PostgREST serves the CRUD surface from a SEPARATE
+-- PROCESS, so no guard, interceptor or pipe in the thin Nest app can observe a
+-- PostgREST request. An application-level gate would cover four auth routes,
+-- report itself Healthy, and gate nothing anyone could attack. The ceiling has to
+-- sit below both runtimes.
+--
+-- `ALTER DATABASE` rather than `ALTER ROLE`, and that is not a style choice.
+-- PostgreSQL applies role-level settings at LOGIN: "this only happens at login
+-- time; executing SET ROLE or SET SESSION_AUTHORIZATION does not cause new
+-- configuration values to be set." Every connection in this deployment logs in as
+-- `pgrst_authenticator` and then `SET ROLE`s to a serving role
+-- (`database/bootstrap/001_roles.sql:67`). So `ALTER ROLE app_member SET ...`
+-- would be a setting that is applied to NOTHING — a protection that reads as
+-- present and protects nothing. `ALTER DATABASE` is the only primitive that
+-- reaches these connections.
+--
+-- Database-scoped, so a migration is the correct home for it. Roles live in
+-- `database/bootstrap/001_roles.sql` precisely because they are CLUSTER-scoped;
+-- `ALTER DATABASE` is database-scoped, which is what a migration is.
+--
+-- THE VALUES, and why they are literals here
+--
+-- `AGENTS.md` §B6 says thresholds come from config, never hardcoded literals. It
+-- is worth being explicit about why this migration is the exception rather than
+-- quietly breaking the rule. These are not application thresholds: they are
+-- PostgreSQL session defaults, and `ALTER DATABASE ... SET` does not read the
+-- application's environment. A `SENTINEL_*` env key would have to be read by
+-- application code, which is precisely the layer that cannot enforce it here. The
+-- honest tuning surface is `ALTER DATABASE`, and §B6's intent — a value nobody
+-- chose must not silently apply — is served by naming each one here and in
+-- `docs/development.md` rather than by inventing a variable nothing reads.
+--
+--   statement_timeout            30s  A single statement may not run forever. The
+--                                    measured reason: a non-terminating recursive
+--                                    closure writes to `authz.org_closure` until
+--                                    the filesystem is exhausted. 30s is far above
+--                                    the closure refresh (27-37ms measured) and far
+--                                    below any human wait.
+--   lock_timeout                  5s  A statement that cannot take its lock fails
+--                                    fast instead of queueing behind a long
+--                                    transaction and turning one slow query into a
+--                                    queue of them.
+--   idle_in_transaction_session_timeout 60s  An abandoned transaction holds its
+--                                    snapshot open and blocks VACUUM across the
+--                                    whole database. This is the classic way a
+--                                    template's database grows without any query
+--                                    getting slower.
+--
+-- NOT SET HERE, DELIBERATELY:
+--
+--   temp_file_limit  `PGC_SUSET`, which PostgreSQL 18 reports as `superuser`
+--                    context. The migration role is deliberately NOT a superuser,
+--                    so a migration cannot set it. It belongs in
+--                    `database/bootstrap/001_roles.sql` with the same
+--                    cluster-scoped reasoning §B1 already records for the
+--                    escalation `GRANT`, and only if that file is run by a
+--                    superuser. Until then this is a known, documented gap rather
+--                    than a setting that silently does nothing -- see
+--                    `docs/development.md` §Resource ceilings.
+--
+-- WHAT THIS DOES NOT DO: it bounds a query. It does not limit concurrent
+-- connections (that is PostgREST's `db-pool`), and it cannot express a per-verb
+-- rule such as "block exports, allow writes" -- `db-pre-request` runs in a
+-- read-only transaction and cannot throttle. Those tiers are a reverse proxy,
+-- which is not in this tree.
+
+-- The database name is interpolated with `current_database()` rather than written
+-- literally, because a migration must work on a freshly-provisioned database whose
+-- name comes from the operator's environment. `ALTER DATABASE` takes an identifier,
+-- not an expression, so `CURRENT_DATABASE` is not usable here either -- the identifier
+-- is resolved inside `format('%I', ...)`. It is also why these are not written as
+-- bare `ALTER DATABASE <name> SET` statements: those cannot run inside a transaction
+-- block, and a future runner that wraps migrations in one would fail here.
+DO $$
+BEGIN
+  EXECUTE format('ALTER DATABASE %I SET statement_timeout = %L', current_database(), '30s');
+  EXECUTE format('ALTER DATABASE %I SET lock_timeout = %L', current_database(), '5s');
+  EXECUTE format('ALTER DATABASE %I SET idle_in_transaction_session_timeout = %L', current_database(), '60s');
+END $$;
