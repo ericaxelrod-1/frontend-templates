@@ -89,6 +89,8 @@ describe('every shipped migration has a down script the runner can execute', () 
       '0004_grant_subset.sql',
       '0005_email_messages.sql',
       '0006_uuidv7.sql',
+      '0007_resource_ceilings.sql',
+      '0008_user_identity.sql',
     ]);
   });
 
