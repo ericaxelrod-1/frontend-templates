@@ -113,6 +113,10 @@
     ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
+    "moduleNameMapper": {
+      "^@our-org/nestjs-typeorm-rls$": "<rootDir>/../packages/nestjs-typeorm-rls/src/index.ts",
+      "^@our-org/nestjs-typeorm-rls/(.*)$": "<rootDir>/../packages/nestjs-typeorm-rls/src/$1"
+    },
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },

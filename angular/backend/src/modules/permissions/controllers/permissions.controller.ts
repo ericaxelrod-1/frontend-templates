@@ -15,7 +15,6 @@ import {
   Req,
   ParseIntPipe,
   DefaultValuePipe,
-  ForbiddenException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../guards/permission.guard';
@@ -32,7 +31,6 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiTags,
   ApiResponse,
 } from '@nestjs/swagger';
@@ -45,6 +43,10 @@ import { FastifyRequest } from 'fastify';
 import { UiComponent } from '../entities/ui-component.entity';
 import { FrontendRoute } from '../entities/frontend-route.entity';
 import { ApiEndpoint } from '../entities/api-endpoint.entity';
+
+interface AuthenticatedRequest extends FastifyRequest {
+  user?: { id: number; email: string };
+}
 
 // DTOs for permission management
 class CreatePermissionDto {
@@ -93,14 +95,11 @@ export class PermissionsController {
   // Permission check endpoint
   @Get('check/:resource/:action')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Check if a user has a specific permission' })
+  @ApiOperation({
+    summary: 'Check if the authenticated user has a specific permission',
+  })
   @ApiParam({ name: 'resource', description: 'Resource name' })
   @ApiParam({ name: 'action', description: 'Action name' })
-  @ApiQuery({
-    name: 'userId',
-    description: 'User ID (optional)',
-    required: false,
-  })
   @ApiResponse({
     status: 200,
     description: 'Permission check result',
@@ -109,18 +108,28 @@ export class PermissionsController {
   async checkPermission(
     @Param('resource') resource: string,
     @Param('action') action: string,
-    @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
-    @Req() req?: FastifyRequest,
+    @Req() req: AuthenticatedRequest,
   ): Promise<PermissionCheckResponseDto> {
-    // If userId is not provided, use the authenticated user
-    if (!userId && (req as any)?.user) {
-      userId = (req as any).user['id'];
-    }
+    // The subject is the caller. Always.
+    //
+    // This handler used to accept a caller-supplied `?userId=`, and that made
+    // it a disclosure oracle rather than a self-check: `resource` and `action`
+    // are caller-controlled and so was the subject, so sweeping
+    // `(userId, resource, action)` recovers the entire permission matrix of
+    // the user table — one boolean per cell, and a 403-free way to learn who is
+    // privileged before attempting anything. The Postgres tree reached the same
+    // conclusion about `has_permission(who, ...)` and banned it from
+    // request-handling code for exactly this reason.
+    //
+    // "Does user N hold permission P" is a legitimate question, so it is not
+    // dropped — it moves to `PermissionInspectorController`, which answers it
+    // behind `permissions:view` for callers entitled to ask about other
+    // people. `GET /permissions/user-permissions` remains the bulk form of the
+    // self-check.
+    const userId = req.user?.id;
 
     if (!userId) {
-      throw new UnauthorizedException(
-        'User not authenticated or userId not provided',
-      );
+      throw new UnauthorizedException('User not authenticated');
     }
 
     return {
@@ -158,9 +167,9 @@ export class PermissionsController {
     type: [String],
   })
   @ApiResponse({ status: 401, description: 'User not authenticated' })
-  async getUserPermissions(@Req() req?: FastifyRequest): Promise<string[]> {
-    // Get userId from authenticated user
-    const userId = (req as any)?.user?.['id'];
+  async getUserPermissions(@Req() req: AuthenticatedRequest): Promise<string[]> {
+    // userId comes from the authenticated user, never from the caller
+    const userId = req.user?.['id'];
     if (!userId) {
       throw new UnauthorizedException('User not authenticated');
     }
@@ -448,8 +457,11 @@ export class PermissionsController {
    */
   @Get('route-access-test/:id')
   @UseGuards(JwtAuthGuard)
-  async testRouteAccess(@Param('id') id: string, @Req() req: FastifyRequest) {
-    const userId = (req as any).user['id'];
+  async testRouteAccess(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    const userId = req.user?.['id'];
+    if (!userId) {
+      throw new UnauthorizedException('User not authenticated');
+    }
     return {
       hasAccess: await this.permissionsService.canUserAccessRoute(userId, id),
     };
@@ -514,9 +526,12 @@ export class PermissionsController {
   async testEndpointAccess(
     @Param('id') id: string,
     @Query('method') method: string = 'GET',
-    @Req() req: FastifyRequest,
+    @Req() req: AuthenticatedRequest,
   ) {
-    const userId = (req as any).user['id'];
+    const userId = req.user?.['id'];
+    if (!userId) {
+      throw new UnauthorizedException('User not authenticated');
+    }
     return {
       hasAccess: await this.permissionsService.canUserAccessEndpoint(
         userId,
@@ -571,28 +586,17 @@ export class PermissionsController {
   }
 
   @Post('seed')
-  @ApiOperation({ summary: 'Seed default permissions (admin only)' })
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:refresh')
+  @ApiOperation({
+    summary: 'Seed default permissions (requires permissions:refresh)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Default permissions seeded successfully',
   })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  @UseGuards(JwtAuthGuard)
-  async seedDefaultPermissions(@Req() req) {
-    // Only allow admins to execute this
-    const userId = req.user.id;
-    const userRoles = await this.permissionsService.getUserRoles(userId);
-
-    const isAdmin = userRoles.some((role) =>
-      ['admin', 'administrator', 'superadmin'].includes(
-        role.name.toLowerCase(),
-      ),
-    );
-
-    if (!isAdmin) {
-      throw new ForbiddenException('Only administrators can seed permissions');
-    }
-
+  async seedDefaultPermissions() {
     await this.permissionsService.seedDefaultPermissions();
 
     return {

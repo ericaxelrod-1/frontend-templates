@@ -39,6 +39,14 @@ describe('PermissionsController', () => {
   describe('authorization', () => {
     type Held = string[];
 
+    /**
+     * Either a flat held-set, which is how every caller in this file states
+     * "this caller holds exactly these", or a per-user map. The map exists for
+     * one reason: a test about *whose* permissions get read needs two users
+     * with different answers, and a flat set cannot distinguish them.
+     */
+    type HeldSet = Held | Record<number, Held>;
+
     interface Harness {
       app: NestFastifyApplication;
       moduleRef: TestingModule;
@@ -48,6 +56,9 @@ describe('PermissionsController', () => {
 
     const CALLER = { id: 42, email: 'member@example.com' };
 
+    /** The victim of the disclosure tests: a different user, different grants. */
+    const SUBJECT = { id: 7, email: 'other@example.com' };
+
     /**
      * A real Nest application around the real controller and the real
      * PermissionGuard. Only the collaborators below the controller are stubbed,
@@ -55,16 +66,21 @@ describe('PermissionsController', () => {
      * permission?" — comes from an explicit held-set, so "this member can do
      * this" is a fact the test states rather than an assumption it inherits.
      */
-    async function appFor(held: Held): Promise<Harness> {
+    async function appFor(held: HeldSet): Promise<Harness> {
+      const holds = (userId: number): Held =>
+        Array.isArray(held) ? held : (held[userId] ?? []);
+
       const checkUserPermission = jest.fn(
-        async (_userId: number, resource: string, action: string) =>
-          held.includes(`${resource}:${action}`),
+        async (userId: number, resource: string, action: string) =>
+          holds(userId).includes(`${resource}:${action}`),
       );
 
       const permissionsService: Record<string, jest.Mock> = {
         checkUserPermission,
         findAll: jest.fn().mockResolvedValue([]),
         findById: jest.fn().mockResolvedValue({ id: 1, name: 'reports:view' }),
+        getUserRoles: jest.fn().mockResolvedValue([]),
+        seedDefaultPermissions: jest.fn().mockResolvedValue(undefined),
         create: jest.fn().mockImplementation(async (dto: object) => ({
           id: 99,
           ...dto,
@@ -152,7 +168,7 @@ describe('PermissionsController', () => {
 
     let harness: Harness | undefined;
 
-    async function withApp<T>(held: Held, body: (h: Harness) => Promise<T>) {
+    async function withApp<T>(held: HeldSet, body: (h: Harness) => Promise<T>) {
       harness = await appFor(held);
       try {
         return await body(harness);
@@ -306,6 +322,258 @@ describe('PermissionsController', () => {
             'delete',
           );
         });
+      });
+    });
+
+    describe('GET /permissions/check — the permission-existence oracle', () => {
+      /**
+       * This handler used to take a caller-supplied `?userId=`. `resource` and
+       * `action` were already caller-controlled, so with the subject also
+       * caller-controlled, sweeping `(userId, resource, action)` recovered the
+       * entire permission matrix of the user table — one boolean per cell, and
+       * no 403 anywhere in the sweep to hint that it was not intended.
+       *
+       * Every test below puts the caller and the subject on *different* answers,
+       * so a handler that answered about the caller and one that answered about
+       * the subject cannot both pass.
+       */
+      async function sweepHeld(): Promise<HeldSet> {
+        return {
+          // The caller holds nothing. Anything the route reports true for is
+          // therefore information it could not have obtained legitimately.
+          [CALLER.id]: [],
+          // The subject holds exactly one permission — enough to prove the
+          // route would answer differently about them.
+          [SUBJECT.id]: ['users:delete'],
+        };
+      }
+
+      it('answers about the CALLER when handed another user’s id', async () => {
+        await withApp(await sweepHeld(), async ({ app, checkUserPermission }) => {
+          const response = await app.inject({
+            method: 'GET',
+            url: `/permissions/check/users/delete?userId=${SUBJECT.id}`,
+          });
+
+          // The subject HOLDS users:delete. The caller does not. A route that
+          // honoured ?userId= would answer true here and leak it.
+          expect(response.statusCode).toBe(200);
+          expect(JSON.parse(response.payload)).toEqual({ hasPermission: false });
+
+          expect(checkUserPermission).toHaveBeenCalledWith(
+            CALLER.id,
+            'users',
+            'delete',
+          );
+          expect(checkUserPermission).not.toHaveBeenCalledWith(
+            SUBJECT.id,
+            'users',
+            'delete',
+          );
+        });
+      });
+
+      it('leaks nothing for any id, so the matrix cannot be swept', async () => {
+        // The shape of the original attack: enumerate subjects × permissions.
+        // With the subject pinned to the caller, every cell of the sweep
+        // returns the caller's own answer and the victim's column is constant.
+        await withApp(await sweepHeld(), async ({ app }) => {
+          for (const resource of ['users', 'roles', 'permissions']) {
+            for (const action of ['read', 'update', 'delete', 'manage']) {
+              for (const targetId of [SUBJECT.id, 1, 999]) {
+                const response = await app.inject({
+                  method: 'GET',
+                  url: `/permissions/check/${resource}/${action}?userId=${targetId}`,
+                });
+
+                expect(response.statusCode).toBe(200);
+                expect(JSON.parse(response.payload)).toEqual({
+                  hasPermission: false,
+                });
+              }
+            }
+          }
+        });
+      });
+
+      it('still answers truthfully about the caller’s own permissions', async () => {
+        // Self-only is not "always false". A member who holds a capability
+        // must still be able to ask about it — otherwise the fix is a denial of
+        // service dressed up as a security fix.
+        await withApp(['reports:view'], async ({ app }) => {
+          const held = await app.inject({
+            method: 'GET',
+            url: '/permissions/check/reports/view',
+          });
+          const notHeld = await app.inject({
+            method: 'GET',
+            url: '/permissions/check/reports/delete',
+          });
+
+          expect(JSON.parse(held.payload)).toEqual({ hasPermission: true });
+          expect(JSON.parse(notHeld.payload)).toEqual({ hasPermission: false });
+        });
+      });
+
+      it('ignores a junk userId rather than failing, so it is not a user-existence oracle', async () => {
+        // `?userId=not-a-number` used to flow through ParseIntPipe. It must not
+        // now produce a 400-vs-200 difference keyed on whether the id exists.
+        await withApp([], async ({ app }) => {
+          const response = await app.inject({
+            method: 'GET',
+            url: '/permissions/check/users/read?userId=not-a-number',
+          });
+
+          expect(response.statusCode).toBe(200);
+          expect(JSON.parse(response.payload)).toEqual({ hasPermission: false });
+        });
+      });
+
+      it('advertises no userId parameter at all', async () => {
+        // Structural, so the parameter cannot reappear quietly. The Swagger
+        // @ApiQuery that documented it was removed with the parameter — and
+        // the OpenAPI spec the frontend client is generated from would
+        // otherwise keep advertising a parameter the server ignores.
+        const parameters = (
+          Reflect.getMetadata(
+            'swagger/apiParameters',
+            (
+              PermissionsController.prototype as unknown as Record<string, object>
+            ).checkPermission,
+          ) as Array<{ name?: string; in?: string }> | undefined
+        ) ?? [];
+
+        expect(parameters.map((parameter) => parameter.name)).not.toContain(
+          'userId',
+        );
+        expect(
+          parameters.filter((parameter) => parameter.in === 'query'),
+        ).toEqual([]);
+      });
+
+      it('takes no userId from anywhere in the source', () => {
+        // The belt to the braces above: the handler's own text mentions no
+        // userId parameter, so a future edit that reintroduces one shows up as
+        // a diff against this test rather than as a working route.
+        const source = readFileSync(
+          join(__dirname, 'permissions.controller.ts'),
+          'utf8',
+        );
+        const handler = source.slice(
+          source.indexOf('async checkPermission('),
+          source.indexOf('// Get all permissions'),
+        );
+
+        expect(handler).not.toContain('userId?:');
+        expect(handler).not.toContain("@Query('userId'");
+      });
+    });
+
+    describe('POST /permissions/seed — no authorization by role-name string', () => {
+      /**
+       * This handler used to read `req.user`'s roles and match the role NAME
+       * against `['admin','administrator','superadmin']` inside the handler
+       * body — a second mechanism for a concern the permission model owns
+       * (§2.4), and one that could not be granted, revoked or audited the way
+       * a permission row can.
+       *
+       * It was also wrong in the shipped database. `Super Administrator`
+       * lowercases to `super administrator`, which is not in that list, so the
+       * single most privileged account in `db.sqlite` was refused; and `ADMIN`
+       * lowercases to `admin`, which IS in the list, so a role holding no
+       * permissions at all would have been let through.
+       */
+      it('REFUSES a plain member with 403', async () => {
+        await withApp(['users:view', 'dashboard:view'], async ({ app }) => {
+          const response = await app.inject({
+            method: 'POST',
+            url: '/permissions/seed',
+          });
+
+          expect(response.statusCode).toBe(403);
+        });
+      });
+
+      it('never reaches the service on a refusal', async () => {
+        // A 403 raised after the fact would still be an escalation if the
+        // permission table had already been written.
+        await withApp(['users:view'], async ({ app, permissionsService }) => {
+          await app.inject({ method: 'POST', url: '/permissions/seed' });
+
+          expect(permissionsService.seedDefaultPermissions).not.toHaveBeenCalled();
+        });
+      });
+
+      it('REFUSES a member holding only permissions:view', async () => {
+        // `permissions:view` is what the read handlers on this controller
+        // require, so it is the most likely thing to be mistaken for sufficient
+        // here. Seeding writes the permission table; reading it must not imply
+        // that.
+        await withApp(['permissions:view', 'permissions:list'], async ({ app }) => {
+          expect(
+            (await app.inject({ method: 'POST', url: '/permissions/seed' }))
+              .statusCode,
+          ).toBe(403);
+        });
+      });
+
+      it('ALLOWS a member holding permissions:refresh, and the seed runs', async () => {
+        // `permissions:refresh` is the capability already required by
+        // `POST /permissions/sync`, the sibling operation that also writes the
+        // permission table from code. Requiring the same capability is what
+        // "one mechanism per concern" means here, and it is why this handler
+        // needs no bespoke rule of its own.
+        await withApp(['permissions:refresh'], async ({ app, permissionsService }) => {
+          const response = await app.inject({
+            method: 'POST',
+            url: '/permissions/seed',
+          });
+
+          expect(response.statusCode).toBe(201);
+          expect(permissionsService.seedDefaultPermissions).toHaveBeenCalledTimes(1);
+        });
+      });
+
+      it('asks the permission service about the caller, not a role name', async () => {
+        await withApp(['permissions:refresh'], async ({ app, checkUserPermission }) => {
+          await app.inject({ method: 'POST', url: '/permissions/seed' });
+
+          expect(checkUserPermission).toHaveBeenCalledWith(
+            CALLER.id,
+            'permissions',
+            'refresh',
+          );
+        });
+      });
+
+      it('does not consult the caller’s role names at all', () => {
+        // The hand-rolled check is gone, not merely outranked: getUserRoles
+        // was the only reader of role names in this handler, and the literal
+        // list is gone with it.
+        const source = readFileSync(
+          join(__dirname, 'permissions.controller.ts'),
+          'utf8',
+        );
+        const handler = source.slice(
+          source.indexOf('async seedDefaultPermissions'),
+        );
+
+        expect(handler).not.toContain('getUserRoles');
+        expect(handler).not.toContain("'superadmin'");
+        expect(handler).not.toContain('toLowerCase()');
+      });
+
+      it('states the requirement on the handler, not only in the body', () => {
+        const handler = (
+          PermissionsController.prototype as unknown as Record<string, object>
+        ).seedDefaultPermissions;
+
+        expect(Reflect.getMetadata(PERMISSIONS_KEY, handler)).toBe(
+          'permissions:refresh',
+        );
+        expect(Reflect.getOwnMetadata('__guards__', handler)).toContain(
+          PermissionGuard,
+        );
       });
     });
 
@@ -510,16 +778,19 @@ describe('PermissionsController', () => {
     });
 
     it('gives every handler a deliberate permission posture', () => {
-      // Handlers carrying no requirement are either scoped to the caller's own
-      // identity or make their own decision. Enumerating them means a new route
-      // cannot slip in as "no requirement, therefore open".
+      // Handlers carrying no requirement are scoped to the caller's own
+      // identity. Enumerating them means a new route cannot slip in as "no
+      // requirement, therefore open".
+      //
+      // The backend-wide allow-list, covering every controller, lives in
+      // src/permission-wiring.spec.ts. This entry is the local subset, kept so
+      // that a new handler on THIS controller names itself here.
       const withoutMetadata = {
         checkPermission:
-          'exposure not closed here: it answers one boolean per (caller-supplied userId, permission) pair',
+          'self-only: the subject is forced to req.user.id and the caller-supplied userId is gone',
         getUserPermissions: 'reads only the calling user',
         testRouteAccess: 'reads only the calling user',
         testEndpointAccess: 'reads only the calling user',
-        seedDefaultPermissions: 'hand-rolled admin check in the handler body',
       } as const;
 
       expect(
