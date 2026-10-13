@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Param,
-  Query,
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -14,9 +13,29 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RolePermission } from '../entities/role-permission.entity';
 import { GroupPermission } from '../entities/group-permission.entity';
+import { PermissionGuard } from '../guards/permission.guard';
+import { RequirePermission } from '../decorators/require-permission.decorator';
 
+/**
+ * Disclosure surface, not a self-service endpoint. Every handler here answers a
+ * question about somebody *other* than the caller: a user's email, roles,
+ * groups and full effective permission set; a role's ancestors and descendants;
+ * a group's member list including email addresses.
+ *
+ * The requirement is deliberately class-level. `PermissionGuard.getRequiredPermissions`
+ * concatenates controller and handler metadata and evaluates the result with OR,
+ * which would weaken a handler that asked for something narrower — but no handler
+ * here carries its own metadata, so the class-level value is the only value the
+ * guard sees. `permissions.controller.spec.ts` asserts that, so adding a
+ * handler-level override later cannot silently widen this.
+ *
+ * See the Task 2 note in the report: a dedicated `permissions:inspect`
+ * capability is the honest long-term shape, but it needs a migration plus a
+ * role grant (outside this module) and is therefore not introduced here.
+ */
 @Controller('permissions-inspector')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('permissions:view')
 export class PermissionInspectorController {
   constructor(
     private readonly usersService: UsersService,

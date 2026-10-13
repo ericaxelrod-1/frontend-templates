@@ -42,7 +42,6 @@ import { RouteScannerService } from '../scanners/route-scanner.service';
 import { EndpointScannerService } from '../scanners/endpoint-scanner.service';
 import { CacheSyncService } from '../../cache/cache-sync.service';
 import { FastifyRequest } from 'fastify';
-import { RequirePermissions } from '../decorators/require-permissions.decorator';
 import { UiComponent } from '../entities/ui-component.entity';
 import { FrontendRoute } from '../entities/frontend-route.entity';
 import { ApiEndpoint } from '../entities/api-endpoint.entity';
@@ -135,7 +134,8 @@ export class PermissionsController {
 
   // Get all permissions
   @Get()
-  @RequirePermissions('permissions:list')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:list')
   @ApiOperation({ summary: 'Get all permissions' })
   @ApiResponse({
     status: 200,
@@ -169,7 +169,8 @@ export class PermissionsController {
 
   // Get permission by ID
   @Get(':id')
-  @RequirePermissions('permissions:view')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:view')
   @ApiOperation({ summary: 'Get permission by ID' })
   @ApiParam({ name: 'id', description: 'Permission ID' })
   @ApiResponse({
@@ -188,7 +189,8 @@ export class PermissionsController {
 
   // Create permission
   @Post()
-  @RequirePermissions('permissions:create')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:create')
   @ApiOperation({ summary: 'Create a new permission' })
   @ApiResponse({
     status: 201,
@@ -208,7 +210,8 @@ export class PermissionsController {
 
   // Update permission
   @Put(':id')
-  @RequirePermissions('permissions:update')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:update')
   @ApiOperation({ summary: 'Update a permission' })
   @ApiParam({ name: 'id', description: 'Permission ID' })
   @ApiResponse({
@@ -233,7 +236,8 @@ export class PermissionsController {
 
   // Delete permission
   @Delete(':id')
-  @RequirePermissions('permissions:delete')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:delete')
   @ApiOperation({ summary: 'Delete a permission' })
   @ApiParam({ name: 'id', description: 'Permission ID' })
   @ApiResponse({ status: 200, description: 'Permission deleted' })
@@ -351,7 +355,8 @@ export class PermissionsController {
    * Get a specific UI component by ID
    */
   @Get('component/:id')
-  @RequirePermissions('permissions:view')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:view')
   @ApiOperation({ summary: 'Get a specific UI component by ID' })
   @ApiParam({ name: 'id', description: 'Component ID' })
   @ApiResponse({
@@ -372,7 +377,8 @@ export class PermissionsController {
    * Update a UI component's permissions
    */
   @Put('components/:id/permissions')
-  @RequirePermissions('permissions:update')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:update')
   @ApiOperation({ summary: 'Update component permissions' })
   @ApiParam({ name: 'id', description: 'Component ID' })
   async updateComponentPermissions(
@@ -400,7 +406,8 @@ export class PermissionsController {
    * Get a specific route by ID
    */
   @Get('route/:id')
-  @RequirePermissions('permissions:view')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:view')
   @ApiOperation({ summary: 'Get a specific route by ID' })
   @ApiParam({ name: 'id', description: 'Route ID' })
   @ApiResponse({
@@ -421,7 +428,8 @@ export class PermissionsController {
    * Update a route's permissions
    */
   @Put('routes/:id/permissions')
-  @RequirePermissions('permissions:update')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:update')
   @ApiOperation({ summary: 'Update route permissions' })
   @ApiParam({ name: 'id', description: 'Route ID' })
   async updateRoutePermissions(
@@ -461,7 +469,8 @@ export class PermissionsController {
    * Get a specific API endpoint by ID
    */
   @Get('endpoint/:id')
-  @RequirePermissions('permissions:view')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:view')
   @ApiOperation({ summary: 'Get a specific API endpoint by ID' })
   @ApiParam({ name: 'id', description: 'Endpoint ID' })
   @ApiResponse({
@@ -482,7 +491,8 @@ export class PermissionsController {
    * Update an API endpoint's permissions
    */
   @Put('endpoints/:id/permissions')
-  @RequirePermissions('permissions:update')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('permissions:update')
   @ApiOperation({ summary: 'Update endpoint permissions' })
   @ApiParam({ name: 'id', description: 'Endpoint ID' })
   async updateEndpointPermissions(

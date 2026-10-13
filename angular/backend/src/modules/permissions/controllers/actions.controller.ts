@@ -15,8 +15,8 @@ import { CreateActionDto, UpdateActionDto } from '../dtos';
 import { PermissionsService } from '../services/permissions.service';
 import { Action } from '../entities/action.entity';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { RequirePermission } from '../permission.decorator';
-import { PermissionGuard } from '../permission.guard';
+import { RequirePermission } from '../decorators/require-permission.decorator';
+import { PermissionGuard } from '../guards/permission.guard';
 
 @ApiTags('actions')
 @Controller('actions')

@@ -49,8 +49,17 @@ class ResourceResponseDto {
 @ApiTags('resources')
 @ApiBearerAuth()
 @Controller('resources')
+// There is deliberately NO class-level @RequirePermission here.
+//
+// PermissionGuard.getRequiredPermissions concatenates handler metadata with
+// controller metadata into one array and canActivate evaluates that array with
+// OR logic, so a class-level `permissions:access` beside a handler-level
+// `resources:delete` resolves to "permissions:access OR resources:delete" —
+// letting a member who holds only the broad read gate delete resources. Each
+// handler therefore states its own requirement, which is the only value the
+// guard sees. resources.controller.spec.ts exercises the real guard over this
+// real metadata and fails if the class decorator comes back.
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@RequirePermission('permissions:access')
 export class ResourcesController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
