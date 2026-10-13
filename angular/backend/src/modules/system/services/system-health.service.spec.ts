@@ -74,13 +74,31 @@ describe('SystemHealthService', () => {
   });
 
   it('reports host memory from os, not process.memoryUsage()', async () => {
+    // Pin the host readings. Calling os.freemem() a second time to compare
+    // against the snapshot raced the measurement — free memory moves between
+    // the capture and the assertion, so the test failed for reasons that had
+    // nothing to do with the code under test. A pinned host reading makes the
+    // assertion say what it actually means: the snapshot carries the figure
+    // `os` reported at capture time, and derives `used` and `percentage` from
+    // that same figure rather than from a later sample.
+    const hostTotal = 16 * GIGABYTE;
+    const hostFree = 9 * GIGABYTE;
+    jest.spyOn(require('os'), 'totalmem').mockReturnValue(hostTotal);
+    jest.spyOn(require('os'), 'freemem').mockReturnValue(hostFree);
+
     const service = makeService();
 
     await withStatfs(usage(10), () => service.checkDiskSpace());
 
     const snapshot = service.getSnapshot();
-    expect(snapshot.memory.total).toBe(require('os').totalmem());
-    expect(snapshot.memory.free).toBe(require('os').freemem());
+    expect(snapshot.memory.total).toBe(hostTotal);
+    expect(snapshot.memory.free).toBe(hostFree);
+    expect(snapshot.memory.used).toBe(hostTotal - hostFree);
+    expect(snapshot.memory.percentage).toBeCloseTo(43.75);
+
+    // The process figures travel alongside the host figures rather than
+    // standing in for them, which is the distinction under test.
+    expect(snapshot.memory.total).not.toBe(snapshot.memory.process.heapTotal);
     expect(snapshot.memory.total).toBeGreaterThan(snapshot.memory.process.rss);
   });
 
