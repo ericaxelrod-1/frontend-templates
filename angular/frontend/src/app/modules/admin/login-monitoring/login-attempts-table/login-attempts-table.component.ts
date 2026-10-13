@@ -204,7 +204,7 @@ export class LoginAttemptsTableComponent implements OnInit, AfterViewInit, OnDes
   }
 
   navigateToLoginAttempt(attemptId: number): void {
-    this.router.navigate(['/app/admin/login-monitoring/attempt', attemptId]);
+    this.router.navigate(['/app/admin/login-monitoring']);
   }
 
   // Trigger method to manually refresh data

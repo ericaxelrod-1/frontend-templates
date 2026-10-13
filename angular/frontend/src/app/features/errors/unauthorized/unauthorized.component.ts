@@ -21,7 +21,7 @@ export class UnauthorizedComponent implements OnInit {
     
     // Get the return URL from query parameters or default to '/dashboard'
     const urlTree = this.router.parseUrl(this.router.url);
-    this.returnUrl = urlTree.queryParams['returnUrl'] || '/dashboard';
+    this.returnUrl = urlTree.queryParams['returnUrl'] || '/app/dashboard';
   }
 
   goBack(): void {
@@ -35,6 +35,6 @@ export class UnauthorizedComponent implements OnInit {
   }
 
   goToDashboard(): void {
-    this.router.navigate(['/dashboard']);
+    this.router.navigate(['/app/dashboard']);
   }
 } 

@@ -130,12 +130,12 @@ export class ChangePasswordComponent implements OnInit {
           this.logger.info('Password changed successfully', response);
           
           // Show success message
-          this.router.navigate(['/profile'], { queryParams: { passwordChanged: 'true' } });
+          this.router.navigate(['/app/profile'], { queryParams: { passwordChanged: 'true' } });
           
           // If this was a required password change, navigate to dashboard
           if (this.isRequiredChange) {
             this.logger.info('Redirecting to dashboard after required password change');
-            this.router.navigate(['/dashboard']);
+            this.router.navigate(['/app/dashboard']);
           }
         },
         error: (error) => {

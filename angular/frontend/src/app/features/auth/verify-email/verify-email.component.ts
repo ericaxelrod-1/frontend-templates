@@ -85,6 +85,6 @@ export class VerifyEmailComponent implements OnInit {
   }
 
   navigateToLogin() {
-    this.router.navigate(['/auth/login']);
+    this.router.navigate(['/login']);
   }
 } 

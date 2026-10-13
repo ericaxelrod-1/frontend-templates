@@ -60,9 +60,6 @@ import { Observable } from 'rxjs';
       </div>
       
       <mat-divider></mat-divider>
-      <div class="dropdown-footer">
-        <button mat-button (click)="viewAll()">View all notifications</button>
-      </div>
     </div>
   `,
   styles: [`
@@ -170,9 +167,5 @@ export class NotificationDropdownComponent implements OnInit {
     if (notification.link) {
       this.router.navigateByUrl(notification.link);
     }
-  }
-
-  viewAll(): void {
-    this.router.navigate(['/app/notifications']);
   }
 }

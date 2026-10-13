@@ -140,7 +140,10 @@ export class UserSidebarComponent implements OnInit, OnDestroy {
   }
 
   navigateToSettings(): void {
-    this.router.navigate(['/app/settings']);
+    // '/app/settings' is not a route. The user's account settings live on the
+    // profile page; the dead path matched the `**` catch-all and dropped the
+    // user on the public landing page.
+    this.router.navigate(['/app/profile']);
     this.close();
   }
 

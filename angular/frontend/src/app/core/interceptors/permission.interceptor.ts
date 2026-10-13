@@ -28,7 +28,10 @@ export class PermissionInterceptor implements HttpInterceptor {
         if (error.status === 401) {
           // Unauthorized - User is not logged in or token expired
           this.authService.logout();
-          this.router.navigate(['/auth/login'], {
+          // The login route is mounted at the root by features/auth/auth.routes.ts,
+          // so the path is '/login'. '/auth/login' matched the `**` catch-all and
+          // ejected the user to the public landing page.
+          this.router.navigate(['/login'], {
             queryParams: { returnUrl: this.router.url }
           });
         } else if (error.status === 403) {

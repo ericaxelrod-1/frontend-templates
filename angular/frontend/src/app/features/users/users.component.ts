@@ -411,7 +411,13 @@ export class UsersComponent implements OnInit {
 
   editUser(user: User): void {
     this.ngZone.run(() => {
-      this.router.navigate(['/app/users', user.id, 'edit']);
+      // There is no `:id/edit` route and no edit component in the tree, so this
+      // path matched the `**` catch-all and ejected the operator to the public
+      // landing page. Landing on the list is at least a real, in-context page.
+      // Building the edit screen (or dropping this button) is a separate change.
+      this.router.navigate(['/app/users'], {
+        queryParams: { edit: user.id },
+      });
     });
   }
 

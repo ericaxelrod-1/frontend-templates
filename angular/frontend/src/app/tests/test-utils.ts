@@ -68,6 +68,11 @@ export class MockPermissionService {
   private permissionsLoadedSubject = new BehaviorSubject<boolean>(true);
   permissionsLoaded$ = this.permissionsLoadedSubject.asObservable();
 
+  /** The flat `resource:action` list the sidebar and NGXS AuthState consume. */
+  userPermissions$ = new BehaviorSubject<string[]>(
+    (mockUser.permissions || []).map(p => `${p.resourceName}:${p.actionName}`)
+  ).asObservable();
+
   constructor() {
     // Pre-populate cache with mock user permissions
     mockUser.permissions?.forEach(p => {

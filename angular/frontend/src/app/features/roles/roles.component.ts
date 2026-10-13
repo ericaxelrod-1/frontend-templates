@@ -326,7 +326,7 @@ export class RolesComponent implements OnInit, AfterViewInit {
   }
 
   goToDashboard(): void {
-    this.router.navigate(['/dashboard']);
+    this.router.navigate(['/app/dashboard']);
   }
 
   createRole(): void {

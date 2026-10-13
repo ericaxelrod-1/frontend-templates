@@ -55,6 +55,6 @@ export class DashboardComponent implements OnInit {
    * Navigate to Activity monitoring page
    */
   navigateToActivity(): void {
-    this.router.navigate(['/admin/login-monitoring']);
+    this.router.navigate(['/app/admin/login-monitoring']);
   }
 }

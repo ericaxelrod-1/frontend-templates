@@ -87,8 +87,23 @@ export const routes: Routes = [
       {
         path: 'admin',
         canActivate: [PasswordChangeGuard, PermissionGuard],
+        // The parent is a coarse gate: it answers "may this user enter the
+        // admin section at all", not "may this user see every page in it".
+        // Naming a single permission here (it was `system:admin`) denied the
+        // whole section to anyone holding only a page's own permission — the
+        // Administrator role holds `system:health` and `privacy:read` but not
+        // `system:admin`, so it could see the links and never reach them.
+        // Holding ANY of the permissions the section grants is sufficient;
+        // holding none of them is still refused. Each child below is guarded
+        // individually as well.
         data: {
-          permissions: 'system:admin'
+          permissions: [
+            'system:admin',
+            'system:health',
+            'login-monitoring:read',
+            'rls:admin',
+            'privacy:read',
+          ]
         },
         children: [
           {
@@ -140,8 +155,12 @@ export const routes: Routes = [
             path: 'system-health',
             loadComponent: () => import('./features/admin/system-health/system-health.component').then(c => c.SystemHealthComponent),
             canActivate: [PermissionGuard],
+            // `system:health` is the granular permission seeded for this page
+            // ("View system health and resource stats") and granted to the
+            // Administrator role. Requiring `system:admin` here contradicted
+            // the sidebar, which offers the link on `system:health`.
             data: {
-              permissions: 'system:admin'
+              permissions: 'system:health'
             }
           },
           {
@@ -238,6 +257,17 @@ export const routes: Routes = [
         loadComponent: () => import('./features/blocked/blocked.component').then(c => c.BlockedComponent)
       }
     ]
+  },
+  {
+    // Where `PermissionInterceptor` sends a 403. This route did not exist, so
+    // every forbidden response matched the `**` catch-all and dropped the user
+    // on the public landing page instead of telling them they were refused.
+    // Intentionally outside the `app` shell and unguarded: a 403 is only issued
+    // to an authenticated caller, and the page must stay reachable while a
+    // session is being torn down (adding AuthGuard here risks a redirect loop
+    // against the interceptor that navigates to it).
+    path: 'access-denied',
+    loadComponent: () => import('./shared/components/access-denied/access-denied.component').then(c => c.AccessDeniedComponent)
   },
   {
     path: '**',

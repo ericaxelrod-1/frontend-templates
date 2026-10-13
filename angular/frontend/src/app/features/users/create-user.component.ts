@@ -620,7 +620,7 @@ export class CreateUserComponent implements OnInit {
         next: (response) => {
           this.logger.info('CreateUserComponent', 'User created successfully', { userId: response.id });
           this.snackBar.open('User created successfully', 'Close', { duration: 3000 });
-          this.router.navigate(['/users']);
+          this.router.navigate(['/app/users']);
         },
         error: (error) => {
           this.loading = false;
@@ -632,6 +632,6 @@ export class CreateUserComponent implements OnInit {
   }
 
   cancel(): void {
-    this.router.navigate(['/users']);
+    this.router.navigate(['/app/users']);
   }
 }

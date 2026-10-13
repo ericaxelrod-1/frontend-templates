@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { RouterModule } from '@angular/router';
 import { Subject, takeUntil, Observable, map } from 'rxjs';
-import { Store, Select } from '@ngxs/store';
+import { Store } from '@ngxs/store';
 import { AuthService } from '../../core/services/auth.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { SystemHealthState } from '../../store/system-health/system-health.state';
@@ -33,20 +33,34 @@ export interface NavItem {
 export class SidebarComponent implements OnInit, OnDestroy {
   @Input() isCollapsed = false;
   @Input() isAdminContext = false;
-  
-  @Select(SystemHealthState.getStatus) healthStatus$!: Observable<string>;
-  
+
+  /**
+   * Bound through `store.select` rather than `@Select`: `@Select` installs a
+   * prototype getter, which the `foo$!: Observable<T>` field declaration
+   * shadows with `undefined` under `useDefineForClassFields` (implied by
+   * `target: ES2022`). AsyncPipe swallows the null, so the status-driven icon
+   * colour below was silently never applied.
+   */
+  readonly healthStatus$: Observable<string>;
+
   currentUser: User | null = null;
   private destroy$ = new Subject<void>();
   
   private commonNavItems: NavItem[] = [
-    { label: 'Dashboard', route: '/', icon: 'dashboard' },
+    // Every route below must exist under the authenticated `/app` shell. `/`
+    // resolves to the public landing page via the catch-all, so the old
+    // Dashboard entry logged the user out of the app shell.
+    { label: 'Dashboard', route: '/app/dashboard', icon: 'dashboard' },
     { label: 'Privacy Preferences', route: '/app/privacy/settings', icon: 'privacy_tip' }
   ];
 
+  // `permission` must name the same permission the target route's guard names,
+  // otherwise the link is shown to someone who cannot open it, or hidden from
+  // someone who can. The route guards use the `:view` action for users and
+  // roles; these were `:read`.
   private adminNavItems: NavItem[] = [
-    { label: 'User Management', route: '/admin/users', icon: 'people', permission: 'users:read' },
-    { label: 'Role Management', route: '/admin/roles', icon: 'security', permission: 'roles:read' },
+    { label: 'User Management', route: '/app/users', icon: 'people', permission: 'users:view' },
+    { label: 'Role Management', route: '/app/roles', icon: 'security', permission: 'roles:view' },
     { label: 'Groups', route: '/app/groups', icon: 'group_work', permission: 'groups:view' }
   ];
 
@@ -60,8 +74,11 @@ export class SidebarComponent implements OnInit, OnDestroy {
     { label: 'Join Paths', route: '/app/admin/join-paths', icon: 'account_tree', permission: 'rls:admin' },
     { label: 'Scope Templates', route: '/app/admin/scope-templates', icon: 'layers', permission: 'rls:admin' },
     { label: 'Permission Inspector', route: '/app/admin/permission-inspector', icon: 'search', permission: 'rls:admin' },
-    { label: 'Privacy Dashboard', route: '/app/admin/privacy', icon: 'policy', permission: 'privacy:read' },
-    { label: 'System Health', route: '/admin/health', icon: 'health_and_safety', permission: 'system:health' }
+    { label: 'Privacy Requests', route: '/app/admin/privacy-requests', icon: 'policy', permission: 'privacy:read' },
+    // The route is /app/admin/system-health; `/admin/health` matched nothing
+    // and fell through to the catch-all, which redirects to the public landing
+    // page — signing the user out of the app shell from an admin-only link.
+    { label: 'System Health', route: '/app/admin/system-health', icon: 'health_and_safety', permission: 'system:health' }
   ];
 
   filteredCommonNavItems$!: Observable<NavItem[]>;
@@ -74,7 +91,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private permissionService: PermissionService,
     private store: Store
-  ) {}
+  ) {
+    this.healthStatus$ = this.store.select(SystemHealthState.getStatus);
+  }
   
   ngOnInit() {
     this.authService.currentUser$
@@ -87,10 +106,10 @@ export class SidebarComponent implements OnInit, OnDestroy {
     const permissions$ = this.permissionService.userPermissions$;
 
     this.isAdminOrManager$ = permissions$.pipe(
-      map(perms => perms.includes('users:read') || 
-                   perms.includes('roles:read') || 
-                   perms.includes('groups:view') || 
-                   perms.includes('system:admin'))
+      map(perms => perms.includes('users:view') ||
+                   perms.includes('roles:view') ||
+                   perms.includes('groups:view') ||
+                   perms.includes('system:health'))
     );
 
     this.hasAdminAccess$ = permissions$.pipe(
@@ -125,7 +144,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   /**
    * Returns a CSS class or color for navigation icons based on system health
    */
-  getIconColor(item: any, healthStatus: string | null): string {
+  getIconColor(item: NavItem, healthStatus: string | null): string {
     if (item.label === 'System Health') {
       switch (healthStatus?.toLowerCase()) {
         case 'warning': return 'status-warning';

@@ -79,7 +79,7 @@
       
       <ul class="nav-list" role="menu" aria-labelledby="account-nav-heading">
         <li>
-          <a [routerLink]="'/profile'" 
+          <a [routerLink]="'/app/profile'"
              routerLinkActive="active"
              aria-label="Navigate to Profile page"
              class="nav-link"
@@ -88,9 +88,9 @@
             <span class="nav-text" *ngIf="!isCollapsed">Profile</span>
           </a>
         </li>
-        
+
         <li>
-          <a [routerLink]="'/profile/password-change'" 
+          <a [routerLink]="'/app/profile/change-password'"
              routerLinkActive="active"
              aria-label="Navigate to Change Password page"
              class="nav-link"
@@ -99,18 +99,12 @@
             <span class="nav-text" *ngIf="!isCollapsed">Change Password</span>
           </a>
         </li>
-        
-        <li>
-          <a class="nav-link" 
-             [routerLink]="'/profile/delete-account'" 
-             routerLinkActive="active"
-             aria-label="Navigate to Delete Account page (Warning: This action is destructive)"
-             role="menuitem">
-            <span class="nav-icon" aria-hidden="true">delete_forever</span>
-            <span class="nav-text" *ngIf="!isCollapsed">Delete Account</span>
-          </a>
-        </li>
       </ul>
+
+      <!-- The former "Delete Account" link pointed at /profile/delete-account,
+           which is not a route. Account deletion lives on the Profile page
+           (`/app/profile`) and in Privacy Settings, so the dead link was
+           removed rather than left pointing at the catch-all. -->
     </div>
   </div>
 </div>

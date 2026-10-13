@@ -4,9 +4,15 @@ import { Router } from '@angular/router';
 
 /**
  * Component shown when a user tries to access a resource they don't have permission for.
+ *
+ * Standalone so `app.routes.ts` can mount it with `loadComponent`. It was
+ * declared in `SharedModule` and therefore unreachable by the router: the
+ * permission interceptor navigated to `/access-denied`, which matched the `**`
+ * catch-all and dumped the user on the public landing page.
  */
 @Component({
   selector: 'app-access-denied',
+  standalone: true,
   template: `
     <div class="access-denied-container" role="main" aria-labelledby="access-denied-title">
       <div class="access-denied-card">
@@ -155,6 +161,8 @@ export class AccessDeniedComponent {
    * Navigate to the dashboard
    */
   goHome(): void {
-    this.router.navigate(['/dashboard']);
+    // The dashboard is mounted under the authenticated shell at /app. A bare
+    // '/dashboard' matched the `**` catch-all and landed on the landing page.
+    this.router.navigate(['/app/dashboard']);
   }
 } 
