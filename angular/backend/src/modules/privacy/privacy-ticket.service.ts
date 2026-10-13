@@ -162,6 +162,24 @@ export class PrivacyTicketService {
     });
   }
 
+  /**
+   * Real count of queued background work, across every user.
+   *
+   * The health dashboard previously called `getUserTickets(0)` to stand in for
+   * "global tickets" and counted the result. User 0 has no tickets, so the
+   * figure was structurally always zero regardless of the queue depth.
+   */
+  async countActiveJobs(): Promise<number> {
+    return this.jobRepository.count({ where: { status: PrivacyJobStatus.PENDING } });
+  }
+
+  /** Real count of open privacy requests, across every user. */
+  async countPendingTickets(): Promise<number> {
+    return this.ticketRepository.count({
+      where: { status: PrivacyTicketStatus.PENDING },
+    });
+  }
+
   async getAllTickets(): Promise<PrivacyTicket[]> {
     return this.ticketRepository.find({
       relations: ['jobs', 'user'],

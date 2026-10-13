@@ -6,6 +6,15 @@ import { PrivacyJob, PrivacyJobStatus } from './entities/privacy-job.entity';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/** Outcome of one purge pass. Reported to the caller; never a bare "done". */
+export interface ExpiredExportPurgeResult {
+  scannedFiles: number;
+  removedFiles: number;
+  freedBytes: number;
+  /** One entry per file that could not be removed. A partial purge is not a success. */
+  errors: string[];
+}
+
 @Injectable()
 export class PrivacyCleanupService {
   private readonly logger = new Logger(PrivacyCleanupService.name);
@@ -45,30 +54,65 @@ export class PrivacyCleanupService {
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async tempFileCleaner() {
     this.logger.log('Running TempFileCleaner...');
-    
+
+    const result = await this.purgeExpiredExports();
+
+    if (result.removedFiles > 0) {
+      this.logger.log(
+        `Deleted ${result.removedFiles} expired export files ` +
+          `(${result.freedBytes} bytes freed).`,
+      );
+    }
+    for (const error of result.errors) {
+      this.logger.error(error);
+    }
+  }
+
+  /**
+   * Delete finished export files that are past their retention window.
+   *
+   * This is the *only* deletion path for exports: the nightly cron and the
+   * on-demand `POST admin/system-health/clear-temp` both call this one method,
+   * so an operator-triggered purge cannot drift from the scheduled one.
+   *
+   * It is safe to invoke at any time because it applies the same retention rule
+   * the cron does — it never removes a file inside the 24h window, so it cannot
+   * break an export still being written or a download link that has not expired.
+   * It is useful out of band because the cron only runs at midnight, which is no
+   * help to an operator at 03:00 with a full disk.
+   */
+  async purgeExpiredExports(): Promise<ExpiredExportPurgeResult> {
+    const result: ExpiredExportPurgeResult = {
+      scannedFiles: 0,
+      removedFiles: 0,
+      freedBytes: 0,
+      errors: [],
+    };
+
     if (!fs.existsSync(this.EXPORT_ROOT)) {
-      return;
+      return result;
     }
 
     const files = fs.readdirSync(this.EXPORT_ROOT);
     const now = Date.now();
-    let deletedCount = 0;
 
     for (const file of files) {
       const filePath = path.join(this.EXPORT_ROOT, file);
+      result.scannedFiles += 1;
+
       try {
         const stats = fs.statSync(filePath);
         if (now - stats.mtimeMs > this.FILE_EXPIRY_MS) {
           fs.unlinkSync(filePath);
-          deletedCount++;
+          result.removedFiles += 1;
+          result.freedBytes += stats.size;
         }
       } catch (err) {
-        this.logger.error(`Failed to delete file ${file}: ${err.message}`);
+        const message = err instanceof Error ? err.message : String(err);
+        result.errors.push(`Failed to delete file ${file}: ${message}`);
       }
     }
 
-    if (deletedCount > 0) {
-      this.logger.log(`Deleted ${deletedCount} expired export files.`);
-    }
+    return result;
   }
 }
