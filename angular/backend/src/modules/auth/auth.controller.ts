@@ -23,6 +23,8 @@ import {
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { PermissionGuard } from '../permissions/guards/permission.guard';
+import { RequirePermission } from '../permissions/decorators/require-permission.decorator';
 import {
   LoginDto,
   RegisterDto,
@@ -170,6 +172,24 @@ export class AuthController {
     summary: 'Diagnostic endpoint to check database schema health',
   })
   @ApiResponse({ status: 200, description: 'Database check results' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - requires system:health',
+  })
+  // This handler carries no class-level guard (`@Controller('auth')` at line 39
+  // has none) and had none of its own, so `POST /auth/diag/db-check` answered
+  // unauthenticated callers with the user count, whether the admin account
+  // exists, the role count, the permission count and the driver's own health
+  // errors. Useful pre-reconnaissance for finding the seeded
+  // admin@example.com account.
+  //
+  // `system:health` ("View system health and resource stats") already exists in
+  // the permission table and is granted to Administrator and Super
+  // Administrator, so this names an existing capability instead of minting a
+  // `diag:run` row nobody would hold. Two-part, so the guard's `split(':')`
+  // reconstructs it.
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('system:health')
   @Post('diag/db-check')
   @HttpCode(200)
   async checkDatabaseHealth() {

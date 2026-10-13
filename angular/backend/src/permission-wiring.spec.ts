@@ -207,61 +207,34 @@ const NO_PERMISSION_REQUIREMENT: Record<string, string> = {
   // test, a listed one is at least a recorded decision — not because they are
   // acceptable. The pinned count below makes adding or removing one a
   // deliberate edit rather than a silent drift.
-  'SchemaController.getAllTables': (
-    'UNSCOPED AND UNAUTHENTICATED — the class carries no guard at all, so ' +
-    'this enumerates every table in the database to anyone, token or not. ' +
-    'KNOWN GAP.'
-  ),
-  'SchemaController.getTableColumns': (
-    'UNSCOPED AND UNAUTHENTICATED: full column list for any named table. ' +
-    'KNOWN GAP.'
-  ),
-  'SchemaController.getTableMetadata': (
-    'UNSCOPED AND UNAUTHENTICATED: the same disclosure. KNOWN GAP.'
-  ),
-  'SchemaController.getPrimaryKeys': (
-    'UNSCOPED AND UNAUTHENTICATED: the same disclosure. KNOWN GAP.'
-  ),
-  'SchemaController.getRelations': (
-    'UNSCOPED AND UNAUTHENTICATED: the same disclosure. KNOWN GAP.'
-  ),
-  'SchemaController.getReferencedTables': (
-    'UNSCOPED AND UNAUTHENTICATED: the same disclosure. KNOWN GAP.'
-  ),
-  'SchemaController.getReferencingTables': (
-    'UNSCOPED AND UNAUTHENTICATED: the same disclosure. KNOWN GAP.'
-  ),
-  'GroupsController.findAll': (
-    'UNSCOPED WRITE SURFACE, 12 handlers: the class authenticates but not ' +
-    'one handler requires a permission, so any member can rewrite the ' +
-    'group tree and read its membership. KNOWN GAP.'
-  ),
-  'GroupsController.findOne': 'UNSCOPED: reads one group row. KNOWN GAP.',
-  'GroupsController.create': 'UNSCOPED WRITE. KNOWN GAP.',
-  'GroupsController.update': 'UNSCOPED WRITE. KNOWN GAP.',
-  'GroupsController.delete': 'UNSCOPED WRITE. KNOWN GAP.',
-  'GroupsController.getMembers': (
-    'UNSCOPED DISCLOSURE: group membership. KNOWN GAP.'
-  ),
-  'GroupsController.addMember': 'UNSCOPED WRITE. KNOWN GAP.',
-  'GroupsController.removeMember': 'UNSCOPED WRITE. KNOWN GAP.',
-  'GroupsController.updateSettings': 'UNSCOPED WRITE. KNOWN GAP.',
-  'GroupsController.getAncestors': (
-    'UNSCOPED: walks the group hierarchy. KNOWN GAP.'
-  ),
-  'GroupsController.getDescendants': (
-    'UNSCOPED: walks the group hierarchy. KNOWN GAP.'
-  ),
-  'GroupsController.getHierarchyPath': (
-    'UNSCOPED: walks the group hierarchy. KNOWN GAP.'
-  ),
-  'GroupsController.setParent': (
-    'UNSCOPED WRITE: re-parents the group tree. KNOWN GAP.'
-  ),
-  'AuthController.checkDatabaseHealth': (
-    'UNSCOPED DIAGNOSTIC: reports database driver internals and ' +
-    'connectivity. KNOWN GAP.'
-  ),
+  //
+  // As of this pass the count is ZERO. Every KNOWN GAP below this comment has
+  // been closed and removed, not reworded:
+  //
+  //   GroupsController (13)  all 13 handlers now carry a per-handler
+  //     @RequirePermission with @UseGuards(PermissionGuard). Vocabulary taken
+  //     from the rows that already exist: groups:view for the read handlers,
+  //     groups:create / groups:update / groups:delete for CRUD, groups:manage
+  //     for addMember, removeMember, updateSettings and setParent — the four
+  //     that move a user's scope.
+  //
+  //   SchemaController (7)  was recorded here as UNSCOPED AND
+  //     UNAUTHENTICATED. It was NOT dead code, despite a report that said so:
+  //     SchemaModule is imported at app.module.ts:38 and registered at
+  //     app.module.ts:101, and four frontend callers read its response shape.
+  //     Kept and guarded — JwtAuthGuard + PermissionGuard + a per-handler
+  //     @RequirePermission('rls_rules:manage'), an existing capability granted
+  //     to exactly the administrative roles whose RLS screens call it.
+  //
+  //   AuthController.checkDatabaseHealth (1)  POST /auth/diag/db-check had no
+  //     guard at all, on the handler or the class. Now requires the existing
+  //     `system:health`.
+  //
+  // A note for whoever adds the next gap: SchemaController is the cautionary
+  // tale. It was classified as dead code because its class name appeared in no
+  // module outside its own, which is true, and which says nothing about whether
+  // its module is imported. Reachability follows the module graph, so grep the
+  // module, not the class.
 };
 
 /**
@@ -441,11 +414,17 @@ describe('permission wiring across the whole backend', () => {
       // count is pinned so that fixing one is a deliberate edit to this number
       // and an explicit re-worded reason, not a silent disappearance — and so
       // that a new gap cannot be added without someone counting it.
+      //
+      // This is ZERO as of this pass: all 21 (13 GroupsController, 7
+      // SchemaController, 1 AuthController.checkDatabaseHealth) were closed and
+      // removed from the map above rather than reworded. The assertion is kept
+      // rather than deleted because a count of 0 is itself the finding: the
+      // next gap re-arms it.
       const marked = Object.entries(NO_PERMISSION_REQUIREMENT)
         .filter(([, reason]) => reason.includes('KNOWN GAP'))
         .map(([key]) => key);
 
-      expect(marked.length).toBe(21);
+      expect(marked).toEqual([]);
     });
   });
 
