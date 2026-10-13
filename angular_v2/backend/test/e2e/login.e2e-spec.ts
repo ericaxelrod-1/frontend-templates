@@ -164,13 +164,26 @@ describe('login orchestration', () => {
     expect(body.expiresIn).toBe(900);
 
     const verifier = new JwtService({ secret: TEST_JWT_SECRET });
-    const payload = await verifier.verifyAsync<{ sub: string; role: string; exp: number; jti: string }>(body.accessToken);
+    const payload = await verifier.verifyAsync<{ sub: string; role: string; exp: number; iat: number; jti: string }>(body.accessToken);
 
     expect(payload.sub).toMatch(/^[0-9a-f-]{36}$/);
     expect(payload.role).toBe('app_admin');
     expect(['app_anon', 'app_member', 'app_admin']).toContain(payload.role);
-    const expectedExp = Math.floor(Date.now() / 1000) + 900;
-    expect(Math.abs(payload.exp - expectedExp)).toBeLessThanOrEqual(10);
+
+    // The token's lifetime is asserted as a relationship BETWEEN ITS OWN CLAIMS,
+    // never against a separately sampled `Date.now()`.
+    //
+    // The previous form compared `payload.exp` to `Date.now() / 1000 + 900` with a
+    // 10-second tolerance, which made the result a function of how long the login
+    // took rather than of the TTL. Login performs a bcrypt cost-12 comparison —
+    // ~324ms idle, and well over a second on a loaded machine — so on a busy box a
+    // perfectly correct token failed the assertion. Same defect as the delay
+    // ceilings removed from brute-force.e2e-spec.ts.
+    //
+    // `exp - iat` is what "expiresIn" actually means, and it is exact. Comparing it
+    // to the `expiresIn` the response advertised also pins the two together: a token
+    // whose lifetime disagreed with the value handed to the client would fail here.
+    expect(payload.exp - payload.iat).toBe(body.expiresIn);
 
     const rows = await withAdminClient(async (client) => {
       const result = await client.query<{ jti: string; token_hash: string; expires_at: string }>(
