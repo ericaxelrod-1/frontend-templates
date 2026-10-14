@@ -75,7 +75,18 @@ export type PurgeExecutor = {
 /**
  * The only executor.
  *
- * **The dispatch is CLOSED.** An unrecognised reason raises rather than falling
+ * **The queue's own writes are not here, and that is deliberate.** This class is
+ * given a claim and deletes what the claim names. Claiming it, completing it,
+ * failing it and enqueueing it happen in `authz` — `authz.claim_due_purge()`,
+ * `authz.complete_purge()`, `authz.fail_purge()`, `authz.requeue_purge()` and
+ * `authz.enqueue_inactive_purges()` (`0016`) — because a bare `UPDATE` on
+ * `privacy_purge_queue` is governed by a capability policy that a claimless
+ * machine session cannot satisfy, and the measured result of shipping it that way
+ * was a claim that matched zero rows forever with no error anywhere. `0016` also
+ * revoked `UPDATE` on that table from `app_admin`, so those statements are not
+ * merely unused here: they are not executable by anyone.
+ *
+ * The dispatch is CLOSED. An unrecognised reason raises rather than falling
  * through to a no-op, because a caller that reaches a reason this table does not
  * implement has found a bug, and returning success there is exactly the defect
  * §2.3 exists to prevent.

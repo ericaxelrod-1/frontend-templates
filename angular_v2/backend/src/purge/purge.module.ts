@@ -3,14 +3,29 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { BreakerModule } from '../breaker/breaker.module.js';
 import type { Environment } from '../config/environment.js';
+import { PurgeEnqueuer } from './purge-enqueuer.service.js';
 import { PURGE_POOL, PurgeSweeper } from './purge-sweeper.service.js';
 import { SqlPurgeExecutor } from './purge-executor.js';
 import { PURGE_EXECUTOR } from './purge-executor.js';
+import { loadRetentionEnvironment } from './retention-environment.js';
+import { RETENTION_ENV } from './retention-environment.js';
 
 /** Explicit, because `pg`'s default of 10 is a number nobody chose (§B6). */
 const PURGE_POOL_MAX = 4;
 
 const PURGE_POOL_IDLE_TIMEOUT_MS = 30_000;
+
+/**
+ * The retention window, read and validated at **module-evaluation time** — after
+ * `.env` is loaded (`app.module.ts:1`) and before `ConfigModule.forRoot()`, before
+ * any Nest call, and therefore before either retention job registers its interval.
+ *
+ * The same moment and the same shape as `APP_BREAKER_ENVIRONMENT`, for the same
+ * reason: `RETENTION_TOMBSTONE_DAYS` decides which users' rows are destroyed, so
+ * a process that cannot name the window must refuse to start rather than start a
+ * purge job with a window it invented. There is no default, in any mode.
+ */
+export const APP_RETENTION_ENVIRONMENT = loadRetentionEnvironment(process.env);
 
 /**
  * The purge sweeper, and the pool it talks to.
@@ -62,7 +77,9 @@ const PURGE_POOL_IDLE_TIMEOUT_MS = 30_000;
       },
     },
     { provide: PURGE_EXECUTOR, useClass: SqlPurgeExecutor },
+    { provide: RETENTION_ENV, useValue: APP_RETENTION_ENVIRONMENT },
     PurgeSweeper,
+    PurgeEnqueuer,
   ],
 })
 export class PurgeModule {}

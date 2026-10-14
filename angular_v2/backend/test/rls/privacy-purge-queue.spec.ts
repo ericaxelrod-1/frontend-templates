@@ -31,13 +31,35 @@ import { BACKEND_ROOT } from '../support/paths.js';
  *     for work that did not happen (§2.3).
  *
  *  3. **There is no human path to enqueue or delete a queue row**, and the proof is
- *     structural — no serving role holds INSERT or DELETE — rather than a rule in the
- *     migration file. `privacy_purge:create` and `privacy_purge:delete` do not exist as
- *     permission rows at all.
+ *     structural — no serving role holds ANY write verb on this table — rather than a
+ *     rule in the migration file. `privacy_purge:create` and `privacy_purge:delete` do
+ *     not exist as permission rows at all.
  *
  *  4. **Anonymisation is a STATUS and not a second queue population**, so the admin
  *     list is ONE filterable list. No reason code names a second lifecycle, no column
  *     restates `users.email_anonymized`, and the compliance record is on no purge path.
+ *
+ * ## What changed here in `0016`, and why every change is a strengthening
+ *
+ * `0016` moved the four writes behind narrowly-granted `SECURITY DEFINER` functions in
+ * `authz`, because the bare `UPDATE` this suite used to run matched **zero rows in
+ * production** — its inner `SELECT … FOR UPDATE SKIP LOCKED` was governed by
+ * `privacy_purge_read`, which is a capability call on `authz.actor()`, and the sweeper
+ * has no claims document in scope. Three assertions changed with it, and none of them
+ * lost a check:
+ *
+ *  * **`UPDATE 1` / `UPDATE 0` became the exact returned value.** `toContain('UPDATE
+ *    1')` passes on `UPDATE 11`, so the substring form was never asserting a count; the
+ *    exact form is, and it is asserted through a helper that fails if the statement
+ *    printed anything other than exactly one value.
+ *  * **The grant assertion GREW.** It used to be "no serving role holds INSERT, DELETE
+ *    or TRUNCATE, and `app_admin` holds SELECT and UPDATE". `0016` revokes that UPDATE,
+ *    so the assertion is now "no serving role holds ANY write verb, `app_admin` or not"
+ *    — a strictly larger set of denials over a strictly larger set of verbs.
+ *  * **The UPDATE POLICY assertion is unchanged, and its comment is corrected.** The
+ *    policy survives deliberately as the second half of the control; what changed is
+ *    that no serving role can reach it, which the comment now says instead of claiming
+ *    the sweeper still relies on it.
  *
  * ## Determinism
  *
@@ -49,16 +71,16 @@ import { BACKEND_ROOT } from '../support/paths.js';
  * ## Execution
  *
  * **These tests have now been run against a real provisioned database** — bootstrap,
- * all thirteen migrations, the real `database/seed.ts` — and 20 of 20 pass. Getting them
- * to execute required two fixes to the spec itself, both recorded at the site: the
- * column list expected `timestamptz` where `format_type` prints
+ * every migration in directory order, the real `database/seed.ts` — and all of them
+ * pass. Getting them to execute required two fixes to the spec itself, both recorded at
+ * the site: the column list expected `timestamptz` where `format_type` prints
  * `timestamp with time zone`, and the four imported sweeper statements needed `bind`
  * because `psql` cannot resolve `$1`.
  *
  * The ownership test drives the SHIPPED `COMPLETE_PURGE_SQL` rather than a hand-written
- * copy, so it is the test that goes red if the `claimed_by = $2` predicate is removed
- * from `src/purge/purge-claim.ts`. That was verified by removing it and observing the
- * failure.
+ * copy, so it is the test that goes red if the `claimed_by = p_instance` predicate is
+ * removed from `authz.complete_purge()` in `0016`. That was verified by removing it and
+ * observing the failure.
  */
 
 const TIMEOUT = 240_000;
@@ -72,6 +94,48 @@ function migrationFiles(): readonly string[] {
   return readdirSync(MIGRATIONS_DIR)
     .filter((name) => /^\d{4,}_.*\.sql$/.test(name) && !name.endsWith('.down.sql'))
     .sort();
+}
+
+/**
+ * psql's own transaction echo, which is not any statement's answer.
+ *
+ * `attemptAsRole` runs with `-q` OFF so that a statement's command tags survive —
+ * `UPDATE 0` (matched nothing) and a refused write are different outcomes and
+ * telling them apart is half the assertion — and that means `BEGIN`, `SET`,
+ * `COMMIT` and `ROLLBACK` are interleaved with the output. They are filtered here
+ * rather than by turning `-q` back on, because the tags are still what proves a
+ * refused statement was refused AT ALL rather than silently matching nothing.
+ */
+const PSQL_TRANSACTION_ECHO = new Set(['BEGIN', 'COMMIT', 'ROLLBACK', 'SET', 'ROLLBACK TO SAVEPOINT purge_work']);
+
+function statementOutput(output: string): readonly string[] {
+  return output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !PSQL_TRANSACTION_ECHO.has(line));
+}
+
+/**
+ * The single value a settle call returned — `authz.complete_purge()` and its two
+ * siblings return the number of rows they matched, and `psql` prints it and nothing
+ * else.
+ *
+ * `toContain('UPDATE 1')` was the previous assertion and it was weaker than it
+ * looked: `UPDATE 11` contains `UPDATE 1`, so the substring form never asserted a
+ * count. This asserts there is exactly one line and reports what it was, which is
+ * both the count and the fact that the statement produced no other output — a
+ * `NOTICE` or a second result set would otherwise pass unnoticed.
+ */
+function settledRows(output: string): string {
+  const lines = statementOutput(output);
+  if (lines.length !== 1) {
+    throw new Error(`expected exactly one returned value, got ${String(lines.length)}:\n${output}`);
+  }
+  const value = lines[0] ?? '';
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`expected the number of rows matched, got '${value}':\n${output}`);
+  }
+  return value;
 }
 
 // =============================================================================
@@ -514,7 +578,13 @@ describe('privacy_purge_queue · the column contract the sweeper was written aga
 
       const claimed = attemptAsRole('app_admin', IDS.adminProbe, [bind(CLAIM_DUE_PURGE_SQL, [SWEEPER_INSTANCE])]);
       expect(claimed.ok, claimed.output).toBe(true);
-      expect(claimed.output).toContain('UPDATE 1');
+      // Exactly one row back, and it is the fixture's row. `authz.claim_due_purge()`
+      // returns the claim or returns nothing, so a zero-row answer would be visible
+      // here as an empty output — which is what the shipped statement produced in
+      // production before `0016`, silently.
+      const claimRows = statementOutput(claimed.output);
+      expect(claimRows).toHaveLength(1);
+      expect(claimRows[0]).toContain(id);
 
       const afterClaim = queueRow(id);
       expect(afterClaim?.status).toBe('claimed');
@@ -522,6 +592,9 @@ describe('privacy_purge_queue · the column contract the sweeper was written aga
       // The substituted value is visible in the row, not only in the SQL text: this is
       // what says the bind actually reached `claimed_by`.
       expect(afterClaim?.claimed_by).toBe(SWEEPER_INSTANCE);
+      // …and in the row the claim RETURNED, which is a second, independent read of
+      // the same fact rather than a re-read of the table the claim wrote.
+      expect(claimRows[0]).toContain(SWEEPER_INSTANCE);
 
       // `REQUEUE_PURGE_SQL` clears the owner together with the status, so the row is
       // claimable again and the CHECK `pending ⇒ unowned` holds.
@@ -529,7 +602,7 @@ describe('privacy_purge_queue · the column contract the sweeper was written aga
         bind(REQUEUE_PURGE_SQL, [id, SWEEPER_INSTANCE, 'transient']),
       ]);
       expect(requeued.ok, requeued.output).toBe(true);
-      expect(requeued.output).toContain('UPDATE 1');
+      expect(settledRows(requeued.output)).toBe('1');
 
       const afterRequeue = queueRow(id);
       expect(afterRequeue?.status).toBe('pending');
@@ -538,9 +611,10 @@ describe('privacy_purge_queue · the column contract the sweeper was written aga
 
       const reclaimed = attemptAsRole('app_admin', IDS.adminProbe, [bind(CLAIM_DUE_PURGE_SQL, [SWEEPER_INSTANCE])]);
       expect(reclaimed.ok, reclaimed.output).toBe(true);
+      expect(statementOutput(reclaimed.output)).toHaveLength(1);
       const completed = attemptAsRole('app_admin', IDS.adminProbe, [bind(COMPLETE_PURGE_SQL, [id, SWEEPER_INSTANCE, '1'])]);
       expect(completed.ok, completed.output).toBe(true);
-      expect(completed.output).toContain('UPDATE 1');
+      expect(settledRows(completed.output)).toBe('1');
 
       const done = queueRow(id);
       expect(done?.status).toBe('done');
@@ -555,11 +629,11 @@ describe('privacy_purge_queue · the column contract the sweeper was written aga
     'a sweeper that no longer owns a row matches ZERO rows, and the outcome says so rather than reporting success',
     () => {
       // The N-sweeper safety story in one assertion, run through the SHIPPED statement
-      // rather than a copy of it. `COMPLETE_PURGE_SQL`'s `claimed_by = $2` is the
-      // predicate, so this is the test that goes red if that conjunct is removed from
-      // `src/purge/purge-claim.ts` — a hand-written `UPDATE` here would have proved only
-      // that the SCHEMA tolerates the predicate, while saying nothing whatever about the
-      // statement that actually ships it.
+      // rather than a copy of it. `authz.complete_purge()`'s `claimed_by = p_instance`
+      // is the predicate, so this is the test that goes red if that conjunct is
+      // removed from `0016_purge_machine_path.sql` — a hand-written `UPDATE` here would
+      // have proved only that the SCHEMA tolerates the predicate, while saying nothing
+      // whatever about the statement that actually ships it.
       const id = enqueue(IDS.targets.ownership);
       const claimed = attemptAsRole('app_admin', IDS.adminProbe, [bind(CLAIM_DUE_PURGE_SQL, [SWEEPER_INSTANCE])]);
       expect(claimed.ok, claimed.output).toBe(true);
@@ -567,11 +641,10 @@ describe('privacy_purge_queue · the column contract the sweeper was written aga
 
       const competitor = attemptAsRole('app_admin', IDS.adminProbe, [bind(COMPLETE_PURGE_SQL, [id, 'sweeper-9999', '1'])]);
       expect(competitor.ok, competitor.output).toBe(true);
-      // `UPDATE 0` is the whole assertion. Reporting success here is `sweepOne`'s §2.3
+      // ZERO is the whole assertion. Reporting success here is `sweepOne`'s §2.3
       // failure mode: work that happened on somebody else's row recorded as work this
-      // sweeper did.
-      expect(competitor.output).toContain('UPDATE 0');
-      expect(competitor.output).not.toContain('UPDATE 1');
+      // sweeper did. Exact equality, so a statement that wrote two rows cannot pass.
+      expect(settledRows(competitor.output)).toBe('0');
 
       // The refused write left NO trace: a completion that matched zero rows must not
       // still have stamped a count or a completion instant (§2.3, in the other
@@ -584,14 +657,14 @@ describe('privacy_purge_queue · the column contract the sweeper was written aga
       // …and the instance that DOES own it still can.
       const owner = attemptAsRole('app_admin', IDS.adminProbe, [bind(COMPLETE_PURGE_SQL, [id, SWEEPER_INSTANCE, '1'])]);
       expect(owner.ok, owner.output).toBe(true);
-      expect(owner.output).toContain('UPDATE 1');
+      expect(settledRows(owner.output)).toBe('1');
       expect(queueRow(id)?.status).toBe('done');
 
       // …and the same owner cannot complete it twice: `status = 'claimed'` is the second
       // conjunct, and a second erasure from one row is the whole reason it is there.
       const again = attemptAsRole('app_admin', IDS.adminProbe, [bind(COMPLETE_PURGE_SQL, [id, SWEEPER_INSTANCE, '1'])]);
       expect(again.ok, again.output).toBe(true);
-      expect(again.output).toContain('UPDATE 0');
+      expect(settledRows(again.output)).toBe('0');
     },
     TIMEOUT,
   );
@@ -607,7 +680,7 @@ describe('privacy_purge_queue · the column contract the sweeper was written aga
         bind(FAIL_PURGE_SQL, [id, SWEEPER_INSTANCE, 'unsupported reason']),
       ]);
       expect(failed.ok, failed.output).toBe(true);
-      expect(failed.output).toContain('UPDATE 1');
+      expect(settledRows(failed.output)).toBe('1');
 
       const row = queueRow(id);
       expect(row?.status).toBe('failed');
@@ -781,10 +854,18 @@ describe('privacy_purge_queue · a double sweep cannot report rows_deleted = 0 a
 
 describe('privacy_purge_queue · enqueue and execute have no human path', () => {
   it(
-    'no serving role holds INSERT, DELETE or TRUNCATE — the control is the grant, not a rule in a file',
+    'no serving role holds ANY write verb — the control is the grant, not a rule in a file',
     () => {
+      // INSERT, UPDATE, DELETE and TRUNCATE, for every serving role INCLUDING
+      // `app_admin`. Before `0016` this list was missing UPDATE, because the sweeper's
+      // claim was a bare `UPDATE`; that grant is revoked now, so the assertion covers
+      // one more verb than it did and there is one fewer role that can write here.
+      //
+      // The reason for removing it is in `0016`: with the grant in place the bare
+      // statements remain a second, WORKING route to the same job, and the one that is
+      // inert fails SILENTLY — `UPDATE 0` reads exactly like an empty queue.
       for (const role of ['app_anon', 'app_member', 'app_admin']) {
-        for (const privilege of ['INSERT', 'DELETE', 'TRUNCATE']) {
+        for (const privilege of ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) {
           expect(
             superuserRows<{ holds: boolean }>(
               `SELECT has_table_privilege('${role}', 'public.privacy_purge_queue', '${privilege}') AS holds`,
@@ -794,25 +875,27 @@ describe('privacy_purge_queue · enqueue and execute have no human path', () => 
         }
       }
 
-      // …and the two the sweeper needs ARE there, because withholding them would make the
-      // shipped sweeper fail rather than be denied.
-      for (const privilege of ['SELECT', 'UPDATE']) {
-        expect(
-          superuserRows<{ holds: boolean }>(
-            `SELECT has_table_privilege('app_admin', 'public.privacy_purge_queue', '${privilege}') AS holds`,
-          )[0]?.holds,
-          `app_admin is missing ${privilege}, so the sweeper cannot run`,
-        ).toBe(true);
-      }
+      // …and the one verb that remains is the admin list. It is still gated by
+      // `privacy_purge_read`, so an admin whose role lacks `privacy_purge:read` reads
+      // ZERO rows despite holding it — asserted in the capability section below, which
+      // is why this file can name the grant as the admin's read without it being a
+      // bypass.
+      expect(
+        superuserRows<{ holds: boolean }>(
+          `SELECT has_table_privilege('app_admin', 'public.privacy_purge_queue', 'SELECT') AS holds`,
+        )[0]?.holds,
+        'app_admin is missing SELECT, so the admin list cannot be read at all',
+      ).toBe(true);
     },
     TIMEOUT,
   );
 
   it(
-    'an app_admin INSERT and DELETE are refused, and the refusal names the TABLE rather than a policy',
+    'an app_admin INSERT, UPDATE and DELETE are all refused, and the refusal names the TABLE rather than a policy',
     () => {
       for (const statement of [
         `INSERT INTO privacy_purge_queue (target_kind, target_ref, reason, scheduled_for) VALUES ('file', '/tmp/x', 'retention_export_artefact', now())`,
+        `UPDATE privacy_purge_queue SET status = 'done', completed_at = now(), rows_deleted = 1 WHERE status = 'pending'`,
         'DELETE FROM privacy_purge_queue',
       ]) {
         const attempt = attemptAsRole('app_admin', IDS.adminProbe, [statement]);
@@ -835,13 +918,19 @@ describe('privacy_purge_queue · enqueue and execute have no human path', () => 
         ).map((row) => row.cmd),
       ).toEqual(['SELECT', 'UPDATE']);
 
-      // The UPDATE predicate is `current_user` and nothing else, deliberately: the sweeper
-      // connects through the escalation boundary with NO claims in scope, so
-      // `authz.actor()` is NULL inside it and any capability conjunct would deny the
-      // retention job on a database whose seed had never run — retention that silently
-      // stops deleting anything, which is worse than not having the queue. The gate on a
-      // human UPDATE is therefore the GRANT: `app_member` holds no UPDATE at all, so
-      // there is no member who can write here.
+      // CORRECTED, 2026-10-14, by `0016`. The predicate is still `current_user` and
+      // nothing else, and the reasoning that made it so still holds: the retention job
+      // carries no claims document, so `authz.actor()` is NULL inside it and any
+      // capability conjunct would deny it on a database whose seed had never run.
+      //
+      // What is no longer true is that any serving role can REACH this policy. `0016`
+      // revoked `UPDATE` from `app_admin`, so no serving role holds the grant this
+      // policy would admit — which is why it is KEPT: it is the second half of the
+      // control, and a future `GRANT UPDATE` is refused at the row layer as well as at
+      // the grant layer. That is the same two-halves arrangement `privacy_request_audits`
+      // uses in the other direction (no policy AND no grant), and asserting the policy
+      // set is what stops a "tidy-up" from deleting the half that is not obviously load
+      // bearing.
       const update = superuserRows<{ qual: string }>(
         `SELECT qual FROM pg_policies WHERE schemaname = 'public' AND tablename = 'privacy_purge_queue' AND cmd = 'UPDATE'`,
       )[0];

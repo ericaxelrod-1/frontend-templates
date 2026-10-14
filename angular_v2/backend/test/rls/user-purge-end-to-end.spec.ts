@@ -6,7 +6,7 @@ import type { PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SqlPurgeExecutor } from '../../src/purge/purge-executor.js';
 import type { PurgeClaim, PurgeClaimRow } from '../../src/purge/purge-claim.js';
-import { CLAIM_DUE_PURGE_SQL, COMPLETE_PURGE_SQL } from '../../src/purge/purge-claim.js';
+import { CLAIM_DUE_PURGE_SQL, COMPLETE_PURGE_SQL, writtenRows } from '../../src/purge/purge-claim.js';
 import { restoreAuthenticatorPassword } from '../support/cluster.js';
 import { databaseConfig, loadTestEnvironment } from '../support/database.js';
 import { BACKEND_ROOT } from '../support/paths.js';
@@ -45,6 +45,14 @@ import { BACKEND_ROOT } from '../support/paths.js';
  * `pgrst_authenticator` — the escalation boundary PostgREST itself uses — with
  * `SET LOCAL ROLE app_admin`, inside `BEGIN` / `SAVEPOINT purge_work` /
  * `RELEASE` / `COMMIT` in the exact order `PurgeSweeper.sweepOne()` uses them.
+ *
+ * **That session is now the whole of it.** This file used to add
+ * `set_config('request.jwt.claims', …)` on top, because the bare-`UPDATE` claim it
+ * drove could not see a row without an identity to be capability-checked as. Since
+ * `0016` the claim is `authz.claim_due_purge()` and needs none, so the fixture's
+ * session is byte-for-byte the sweeper's — which upgrades what this file proves from
+ * "the executor can delete a real user" to "the sweeper's transaction completes a
+ * real user purge". The removal is argued at `SWEEPER_INSTANCE`, below.
  *
  * There is no stand-in for `pg.PoolClient` anywhere in this file and no fake in
  * application code (§2.2). A double for a pg client is exactly the shape that hid
@@ -85,7 +93,10 @@ import { BACKEND_ROOT } from '../support/paths.js';
  *  6. the escalations the cascade is documented as granting stay bounded: no
  *     serving role other than `app_admin` can delete a `users` row at all, and
  *     `app_admin` still cannot delete a mail row or a token row on its own, so
- *     the referential action is the only route by which a purge empties them.
+ *     the referential action is the only route by which a purge empties them;
+ *  7. and, since `0016`, that the claim and the completion both happen in a session
+ *     with **no claims document in scope** — which is the condition under which the
+ *     shipped sweeper claimed nothing at all.
  */
 
 const TIMEOUT = 300_000;
@@ -94,52 +105,34 @@ const PROOF_DB = 'user_purge_end_to_end_proof';
 const BOOTSTRAP_SQL = join(BACKEND_ROOT, 'database', 'bootstrap', '001_roles.sql');
 const MIGRATIONS_DIR = join(BACKEND_ROOT, 'database', 'migrations');
 
-/**
- * The identity the queue's claim is made under, as a claims document.
- *
- * ## THIS IS NOT WHAT `PurgeSweeper` DOES, AND THE DIFFERENCE IS A SEPARATE DEFECT
- *
- * `PurgeSweeper.sweepOne()` opens its transaction, runs `SET LOCAL ROLE app_admin`
- * and calls `CLAIM_DUE_PURGE_SQL` with NO `request.jwt.claims` in scope.
- * `privacy_purge_read` — the SELECT policy on `privacy_purge_queue` — is
- * `authz.can_read_privacy_purge()` alone, with no `current_user` shortcut, so
- * `authz.actor()` is NULL inside the sweeper and the claim's own inner
- * `SELECT … FOR UPDATE SKIP LOCKED` matches ZERO rows. Measured on this schema:
- *
- *     claimless                        →  UPDATE 0   (0 due rows visible)
- *     with an `admin`-role holder's sub →  UPDATE 1
- *
- * So the shipped sweeper cannot claim a row at all, for reasons that have nothing
- * to do with the foreign keys this suite is about. It is reported rather than
- * fixed here: the obvious fixes are a `current_user = 'app_admin'` branch on
- * `privacy_purge_read` — which `privacy-purge-queue.spec.ts` asserts AGAINST, on
- * the deliberate ground that capability is resolved from role rows and never from
- * the database role — and giving the retention job a caller identity, which is an
- * identity-model decision this change is not entitled to make.
- *
- * So the claim in this file is made under a claims document belonging to the
- * SEEDED admin user, which holds the seeded `admin` role and therefore
- * `privacy_purge:read`. That is a fixture accommodation for the defect above, and
- * it is called out here rather than buried: **what this suite proves is that
- * `SqlPurgeExecutor.deleteUser()` can delete a real user, which is the subject of
- * migration `0015`.** It is not, and does not claim to be, a proof that the
- * sweeper can run.
- */
-function claimIdentity(sub: string): string {
-  return JSON.stringify({ sub, role: 'app_admin' });
-}
-
 /** The sweeper instance this file speaks as — the value every write predicates on. */
 const SWEEPER_INSTANCE = 'sweeper-purge-proof-0001';
 
 /**
- * The subject the queue claim is made under. Read from the SEEDED admin user
- * rather than created, so the identity holds `privacy_purge:read` through the seed's
- * own grant (`0011:297-312`) and this suite proves nothing about capability by
- * arranging it itself. See `claimIdentity` for why a claims document is set here at
- * all — it is NOT what the shipped sweeper does.
+ * ## There is no claims document in this file, and there must not be one
+ *
+ * It used to set one: the claim was the bare `UPDATE` from `purge-claim.ts`, whose
+ * inner `SELECT … FOR UPDATE SKIP LOCKED` is governed by `privacy_purge_read` — a
+ * capability call on `authz.actor()` — so a claimless session matched zero rows and
+ * this suite had to lend the sweeper an identity to get past it. The comment that
+ * explained the workaround called it a defect.
+ *
+ * **The workaround has been removed rather than copied**, and `0016` is what makes
+ * removing it possible: the claim now goes through `authz.claim_due_purge()`, a
+ * `SECURITY DEFINER` function granted to `app_admin` alone, which performs the
+ * claim as the table's owner. This file's session is now byte-for-byte the session
+ * `PurgeSweeper.sweepOne()` opens — `pgrst_authenticator`, `SET LOCAL ROLE
+ * app_admin`, and nothing else.
+ *
+ * That matters beyond tidiness. `request.jwt.claims` is a **custom GUC that any
+ * role may `SET`** — `AGENTS.md` §B2 F1 records it as verified exploitable — and
+ * the entire mitigation is architectural: *no request-reachable SQL path may write
+ * it*. A test that sets it is normalising the hazard, and a scheduled job that set
+ * it would be that path, promoted to a standing P0 so a cron entry could drain a
+ * queue. A fixture accommodation for a defect is how a defect survives a fix: the
+ * next reader sees a claims document in the retention path and concludes the
+ * retention path needs one.
  */
-let claimSubject = '';
 
 /** Read from the directory: a hand-kept list goes stale the day a migration lands. */
 function migrationFiles(): readonly string[] {
@@ -337,29 +330,38 @@ type PurgeOutcome =
  * `src/purge/purge-claim.ts`, so this exercises the real queue contract rather
  * than a hand-written copy of it — and a fixture INSERT that the sweeper's own
  * `LIMIT 1` would never have claimed could not masquerade as a purge here.
+ *
+ * **Both are calls into `authz` since `0016`**, and both report their outcome as a
+ * RETURNED VALUE rather than as a command tag: the claim returns the row it took
+ * (or nothing at all), and the completion returns the number of rows it matched.
+ * Reading either from `rowCount` would be wrong — `pg` reports one row for a
+ * `SELECT` whether or not the function found anything — and `0` is the answer that
+ * matters, because it means this sweeper no longer owns the row.
  */
 async function runPurge(claim: PurgeClaim): Promise<PurgeOutcome> {
   const client = await escalationConnection();
   try {
     await client.query('BEGIN');
     await client.query('SET LOCAL ROLE app_admin');
-    await client.query('SELECT set_config($1, $2, true)', ['request.jwt.claims', claimIdentity(claimSubject)]);
 
     const claimed = await client.query<PurgeClaimRow>(CLAIM_DUE_PURGE_SQL, [SWEEPER_INSTANCE]);
-    if ((claimed.rowCount ?? 0) !== 1) {
-      throw new Error(`the claim matched ${String(claimed.rowCount ?? 0)} rows; the fixture did not enqueue`);
-    }
     const claimedId: string | undefined = claimed.rows[0]?.id;
+    if (claimedId === undefined) {
+      throw new Error(
+        `the claim returned no row; the fixture enqueued ${claim.id} and the sweeper's own statement ` +
+          'claimed nothing. Before `0016` this is exactly what a claimless session produced — UPDATE 0.',
+      );
+    }
     if (claimedId !== claim.id) {
-      throw new Error(`the sweeper's own claim statement claimed ${String(claimedId)}, not the fixture's row`);
+      throw new Error(`the sweeper's own claim statement claimed ${claimedId}, not the fixture's row`);
     }
 
     await client.query('SAVEPOINT purge_work');
     try {
       const rowsDeleted = await new SqlPurgeExecutor().execute(client, claim);
       await client.query('RELEASE SAVEPOINT purge_work');
-      const completed = await client.query(COMPLETE_PURGE_SQL, [claim.id, SWEEPER_INSTANCE, String(rowsDeleted)]);
-      if ((completed.rowCount ?? 0) !== 1) {
+      const completed = await client.query(COMPLETE_PURGE_SQL, [claim.id, SWEEPER_INSTANCE, rowsDeleted]);
+      if (writtenRows(completed) !== 1) {
         throw new Error('the completion statement matched zero rows; the ownership predicate did not hold');
       }
       await client.query('COMMIT');
@@ -470,19 +472,6 @@ beforeAll(() => {
   const memberRole = superuserRows<{ id: string }>(`SELECT id FROM roles WHERE name = 'member'`)[0]?.id;
   if (memberRole === undefined) {
     throw new Error('the seeded `member` role is absent, so the fixture cannot give its users an authority row');
-  }
-
-  claimSubject = superuserRows<{ id: string }>(
-    `SELECT u.id FROM users u
-       JOIN user_roles ur ON ur.user_id = u.id
-       JOIN roles r       ON r.id = ur.role_id
-      WHERE r.name = 'admin'
-      LIMIT 1`,
-  )[0]?.id ?? '';
-  if (claimSubject === '') {
-    throw new Error(
-      'no seeded user holds the `admin` role, so the queue claim cannot be made under an identity that holds privacy_purge:read',
-    );
   }
 
   superuserExec(`INSERT INTO groups (id, name) VALUES ('${IDS.groups.purge}', 'PURGE-PROOF')`);

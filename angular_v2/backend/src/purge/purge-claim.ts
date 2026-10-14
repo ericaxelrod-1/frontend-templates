@@ -28,7 +28,7 @@ export type PurgeClaim = {
  * reclaimed by the stale-job monitor would re-read a row that was no longer the
  * row it claimed and process it too. Two erasures from one request.
  *
- * This statement cannot reproduce that: the sub-select takes the row locks and
+ * The statement cannot reproduce that: the sub-select takes the row locks and
  * the outer `UPDATE` marks the very rows that sub-select returned, in one
  * statement, so there is no interval in which a row is locked but unmarked, and
  * no follow-up read at all. `SKIP LOCKED` is also what removes the need for a
@@ -45,56 +45,45 @@ export type PurgeClaim = {
  * window this exists to remove.
  *
  * =============================================================================
- * OPEN DEFECT, MEASURED 2026-10-14 — THIS STATEMENT MATCHES ZERO ROWS IN
- * PRODUCTION, BECAUSE OF THE SELECT POLICY ON THIS TABLE
+ * WHY THIS IS A CALL AND NOT THE `UPDATE` — migration `0016`, and the two routes
+ * that were closed rather than chosen
  * =============================================================================
- * `PurgeSweeper.sweepOne()` opens its transaction, runs `SET LOCAL ROLE app_admin`
- * and calls this statement with **no `request.jwt.claims` in scope**. The sub-select
- * below is a plain `SELECT` against `privacy_purge_queue`, so `privacy_purge_read`
- * — which is `authz.can_read_privacy_purge()` ALONE, with no `current_user`
- * shortcut, by the deliberate decision recorded at `0011:383-388` — governs it.
- * `authz.actor()` is NULL inside the sweeper, so `has_permission(NULL, …)` is false
- * and the sub-select is empty. Measured on a provisioned database:
+ * This used to be the bare `UPDATE` above, and it matched **zero rows in
+ * production**: `PurgeSweeper.sweepOne()` runs it with no
+ * `request.jwt.claims` in scope, the inner `SELECT` is a plain `SELECT` on
+ * `privacy_purge_queue`, and `privacy_purge_read` is `authz.can_read_privacy_purge()`
+ * ALONE — no `current_user` shortcut, by the deliberate decision recorded at
+ * `0011:383-388`. `authz.actor()` is NULL inside the sweeper, so
+ * `has_permission(NULL, …)` is false and the sub-select was empty. Measured on
+ * this schema, no claims document in scope: `UPDATE 0`.
  *
- *     claimless                             →  UPDATE 0   (0 due rows visible)
- *     with an `admin`-role holder's `sub`   →  UPDATE 1
+ * So the claim is now `authz.claim_due_purge()`, a `SECURITY DEFINER` function in
+ * `authz` granted to `app_admin` alone (`0016`). It carries the statement above
+ * verbatim — one statement, `SKIP LOCKED`, `LIMIT 1`, the same tie-break — and
+ * runs it as the table's owner, which is the only identity whose read of the
+ * queue is not filtered by a policy written for a human holding a token.
  *
- * So the sweeper drains nothing, for reasons that have nothing to do with the
- * statement's own correctness. It is recorded here, at the statement, rather than
- * fixed by this change because every fix is a decision this change does not own:
- * a `current_user = 'app_admin'` branch on `privacy_purge_read` contradicts the
- * shipped, tested rule that capability is resolved from ROLE ROWS and never from
- * the database role (`privacy-purge-queue.spec.ts` asserts an admin WITHOUT
- * `privacy_purge:read` reads ZERO rows, and would have to be weakened to
- * accommodate it), and giving the retention job a caller identity is an
- * identity-model decision about what the sweeper IS.
+ * Two alternatives were closed, and neither of them is reopened here:
  *
- * `test/rls/user-purge-end-to-end.spec.ts` sets a claims document for exactly this
- * reason and says so at the call site.
- * =============================================================================
+ *   * **A `current_user = 'app_admin'` branch on `privacy_purge_read`** contradicts
+ *     the shipped, tested rule that capability resolves from ROLE ROWS and never
+ *     from the database role, and `privacy-purge-queue.spec.ts` asserts against
+ *     it.
+ *   * **Giving the sweeper a claims document** is `AGENTS.md` §B2 F1: that GUC is
+ *     a custom setting ANY ROLE MAY `SET`, verified exploitable, and the whole
+ *     mitigation is architectural — no request-reachable SQL path may write it. A
+ *     scheduled job that writes its own claims document is that path, promoted to
+ *     a standing P0 so a cron entry can drain a queue. Nothing in `src/` sets it,
+ *     and nothing in this tree's tests sets it either.
+ *
+ * `0016` also revokes `UPDATE` on `privacy_purge_queue` from `app_admin`, so the
+ * bare statement is no longer executable by anyone: a claim written inline fails
+ * with `permission denied for table` and names itself, instead of matching zero
+ * rows and reading as an empty queue.
  */
 export const CLAIM_DUE_PURGE_SQL = `
-UPDATE privacy_purge_queue AS q
-   SET status       = 'claimed',
-       claimed_at   = now(),
-       claimed_by   = $1,
-       attempt      = q.attempt + 1
-  FROM (
-        SELECT id
-          FROM privacy_purge_queue
-         WHERE status = 'pending'
-           AND scheduled_for <= now()
-         ORDER BY scheduled_for, id
-         FOR UPDATE SKIP LOCKED
-         LIMIT 1
-       ) AS due
- WHERE q.id = due.id
-RETURNING q.id,
-          q.target_kind,
-          q.target_id,
-          q.target_ref,
-          q.reason,
-          q.attempt
+SELECT *
+  FROM authz.claim_due_purge($1) AS q
 `;
 
 /**
@@ -105,20 +94,19 @@ RETURNING q.id,
  * claimed_by = $instance` is the predicate that makes a write safe when there are
  * N sweepers, and it is the same predicate every read after the claim carries.
  *
+ * The statement lives in `authz.complete_purge()` (`0016`) for the reason
+ * `CLAIM_DUE_PURGE_SQL` names, and the function returns **the number of rows it
+ * matched** rather than nothing.
+ *
  * Zero rows affected is not an error here — it means this sweeper no longer owns
  * the row (reclaimed, cancelled, or completed), and reporting success on it would
  * be §2.3's success-shaped value for work that did not happen. `sweepOne` throws
- * instead.
+ * instead, and it can only tell the two apart because the return value is the
+ * count: a `void` function would make "matched nothing" and "succeeded" the same
+ * value.
  */
 export const COMPLETE_PURGE_SQL = `
-UPDATE privacy_purge_queue
-   SET status       = 'done',
-       completed_at = now(),
-       rows_deleted = $3,
-       error        = NULL
- WHERE id = $1
-   AND status = 'claimed'
-   AND claimed_by = $2
+SELECT authz.complete_purge($1, $2, $3::integer)
 `;
 
 /**
@@ -128,19 +116,14 @@ UPDATE privacy_purge_queue
  * `ROLLBACK TO SAVEPOINT` — which is what makes its ownership predicate match at
  * all. See `PURGE_WORK_SAVEPOINT`: the alternative (roll the whole transaction
  * back and then write the failure) un-does the claim along with the delete, so the
- * row is `pending` with `claimed_by = NULL` again and this `UPDATE` matches zero
+ * row is `pending` with `claimed_by = NULL` again and this write matches zero
  * rows — the failure is recorded nowhere, `attempt` never advances, the row is
  * retried forever, and `RETENTION_PURGE_MAX_ATTEMPTS` is unreachable code.
  *
  * See `REQUEUE_PURGE_SQL`, which is this statement minus the terminal status.
  */
 export const FAIL_PURGE_SQL = `
-UPDATE privacy_purge_queue
-   SET status = 'failed',
-       error  = $3
- WHERE id = $1
-   AND status = 'claimed'
-   AND claimed_by = $2
+SELECT authz.fail_purge($1, $2, $3)
 `;
 
 /**
@@ -157,14 +140,7 @@ UPDATE privacy_purge_queue
  * unguarded re-read came from.
  */
 export const REQUEUE_PURGE_SQL = `
-UPDATE privacy_purge_queue
-   SET status     = 'pending',
-       claimed_at = NULL,
-       claimed_by = NULL,
-       error      = $3
- WHERE id = $1
-   AND status = 'claimed'
-   AND claimed_by = $2
+SELECT authz.requeue_purge($1, $2, $3)
 `;
 
 /**
@@ -194,6 +170,16 @@ export const PURGE_WORK_SAVEPOINT = 'SAVEPOINT purge_work';
 export const ROLLBACK_TO_PURGE_WORK = 'ROLLBACK TO SAVEPOINT purge_work';
 export const RELEASE_PURGE_WORK = 'RELEASE SAVEPOINT purge_work';
 
+/**
+ * The fields of a claimed queue row this build reads.
+ *
+ * `authz.claim_due_purge()` returns `SETOF public.privacy_purge_queue`, so the row
+ * carries every column the queue has; this names the six the sweeper acts on, and
+ * `toPurgeClaim` copies exactly those. The extra columns are the queue's own
+ * record — `error`, `completed_at`, `rows_deleted` — and reading them into the
+ * claim would put an operator's failure text into the object the executor
+ * dispatches on.
+ */
 export type PurgeClaimRow = {
   readonly id: string;
   readonly target_kind: string;
@@ -222,4 +208,56 @@ export function toPurgeClaim(row: PurgeClaimRow): PurgeClaim | undefined {
     reason: row.reason,
     attempt: row.attempt,
   };
+}
+
+/**
+ * The number of rows a `COMPLETE` / `FAIL` / `REQUEUE` write matched.
+ *
+ * Those three are calls into `authz.complete_purge()` and its two siblings
+ * (`0016`), and each returns the count rather than nothing. **`rowCount` cannot be
+ * used for them**: `pg` reports one row for a `SELECT` whether or not the
+ * function found anything, so a write that matched nothing and a write that
+ * matched the one row this sweeper owns are the same `rowCount` of 1.
+ *
+ * That distinction is the whole N-sweeper contract — `claimed_by` is what makes a
+ * write safe, and "matched zero rows" is what says this sweeper no longer owns
+ * the row — so the returned value is read, and a shape this function cannot
+ * understand is an error rather than a number it invents. Defaulting an
+ * unrecognised answer to `0` would be the worst available choice: `0` here means
+ * "you no longer own the row", and a driver that changed its wire format would
+ * quietly turn every successful purge into a thrown error.
+ *
+ * A scalar function's column arrives named after the function — `pg` hands back
+ * `{ complete_purge: 1 }` — so a single-column row is unwrapped rather than
+ * guessed at by key. Two columns would mean two answers to "how many rows", and
+ * the shape is refused instead.
+ */
+export function writtenRows(result: { readonly rows: readonly unknown[] }): number {
+  const value = unwrapSingleValue(result.rows[0]);
+  if (typeof value === 'number') {
+    return value;
+  }
+  // `int4` arrives as a number over the wire; a text-returning driver
+  // configuration delivers the same count as a digit string, so both are read and
+  // nothing else is.
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    return Number.parseInt(value, 10);
+  }
+  throw new Error(
+    `a purge write returned ${JSON.stringify(value ?? null)} instead of the number of rows it matched`,
+  );
+}
+
+/** The value of a one-column row, or `undefined` for anything else. */
+function unwrapSingleValue(row: unknown): unknown {
+  if (typeof row === 'number' || typeof row === 'string') {
+    return row;
+  }
+  if (typeof row === 'object' && row !== null) {
+    const values = Object.values(row);
+    if (values.length === 1) {
+      return values[0];
+    }
+  }
+  return undefined;
 }

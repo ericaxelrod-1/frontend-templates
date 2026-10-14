@@ -17,6 +17,7 @@ import {
   RELEASE_PURGE_WORK,
   ROLLBACK_TO_PURGE_WORK,
   toPurgeClaim,
+  writtenRows,
 } from './purge-claim.js';
 import { UnsupportedPurgeReasonError } from './purge-executor.js';
 import type { PurgeExecutor } from './purge-executor.js';
@@ -234,44 +235,59 @@ export class PurgeSweeper implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  /**
-   * One purge, in one transaction: claim, delete, mark done.
-   *
-   * `BEGIN` first, so the claim's row locks and its `status = 'claimed'` marker
-   * are the same transaction as the deletion. Committing the claim on its own
-   * would mean a process death between claim and delete strands a row in
-   * `claimed` with nothing to reclaim it — precisely the `locked_at` situation the
-   * legacy needed a staleness monitor to clean up. This design has neither the
-   * column nor the monitor, because there is no window to strand a row in.
-   *
-   * `SET LOCAL ROLE app_admin` before any write: claims alone cannot buy write
-   * access, because the admin branch of a policy discriminates on `current_user`
-   * and never on a token field (`AGENTS.md` §B2). This is the same escalation
-   * boundary `database/seed.ts` and `AuthService` use.
-   *
-   * ## The savepoint, and why the failure is not written after the rollback
-   *
-   * A `DELETE` that raises aborts the transaction, so the failure cannot be
-   * written after a whole-transaction `ROLLBACK`: that rollback restores the row
-   * to `pending` with `claimed_by = NULL`, so the failure write's ownership
-   * predicate (`status = 'claimed' AND claimed_by = $instance`) matches **zero**
-   * rows. The error would be recorded nowhere, `attempt` would never advance, and
-   * a purge that always fails would be retried forever with `failed: true`
-   * reported for each attempt — a success-shaped outcome for work that did not
-   * happen, and `RETENTION_PURGE_MAX_ATTEMPTS` unreachable.
-   *
-   * So the delete is wrapped in `SAVEPOINT purge_work`: a failed purge unwinds
-   * the deletion alone, keeps the claim, writes the terminal or requeue status in
-   * the same transaction and commits. The row therefore never leaves this
-   * transaction in `claimed` — the ownership key is set and cleared inside one
-   * transaction, so there is still no window for another sweeper to see a stranded
-   * claim and no `locked_at`.
-   *
-   * An ABORT of the whole transaction (the gate's STOP, a dropped connection, a
-   * process death) still rolls back the claim with the deletion. That is the
-   * "aborting leaves no partial state" criterion, and a partial purge is not
-   * representable.
-   */
+/**
+ * One purge, in one transaction: claim, delete, mark done.
+ *
+ * `BEGIN` first, so the claim's row locks and its `status = 'claimed'` marker
+ * are the same transaction as the deletion. Committing the claim on its own
+ * would mean a process death between claim and delete strands a row in
+ * `claimed` with nothing to reclaim it — precisely the `locked_at` situation the
+ * legacy needed a staleness monitor to clean up. This design has neither the
+ * column nor the monitor, because there is no window to strand a row in.
+ *
+ * `SET LOCAL ROLE app_admin` before anything, and it is doing TWO jobs now rather
+ * than one. It is still the escalation boundary for `DELETE FROM users` — the
+ * only principal that holds `DELETE`, and a claim alone cannot buy write access
+ * because the admin branch of a policy discriminates on `current_user` and never
+ * on a token field (`AGENTS.md` §B2). And it is the identity the queue's four
+ * `authz` functions are granted to, which is where every write to
+ * `privacy_purge_queue` happens now: migration `0016` revoked `UPDATE` on that
+ * table from `app_admin`, so the bare statements this file used to issue no
+ * longer exist for anyone and an inline claim would fail with `permission denied
+ * for table` rather than silently matching zero rows.
+ *
+ * There is **no claims document in this session**, and there must never be one.
+ * `request.jwt.claims` is a custom GUC any role may `SET` (`AGENTS.md` §B2 F1);
+ * the mitigation is architectural — no request-reachable SQL path may write it —
+ * and a scheduled job that wrote its own identity document would be that path,
+ * promoted to a standing P0 so a cron entry can drain a queue. That is why the
+ * claim path is a narrowly-granted `SECURITY DEFINER` function rather than a
+ * policy change: the machine is identified by the escalation boundary, not by a
+ * document it wrote for itself.
+ *
+ * ## The savepoint, and why the failure is not written after the rollback
+ *
+ * A `DELETE` that raises aborts the transaction, so the failure cannot be
+ * written after a whole-transaction `ROLLBACK`: that rollback restores the row
+ * to `pending` with `claimed_by = NULL`, so the failure write's ownership
+ * predicate (`status = 'claimed' AND claimed_by = $instance`) matches **zero**
+ * rows. The error would be recorded nowhere, `attempt` would never advance, and
+ * a purge that always fails would be retried forever with `failed: true`
+ * reported for each attempt — a success-shaped outcome for work that did not
+ * happen, and `RETENTION_PURGE_MAX_ATTEMPTS` unreachable.
+ *
+ * So the delete is wrapped in `SAVEPOINT purge_work`: a failed purge unwinds
+ * the deletion alone, keeps the claim, writes the terminal or requeue status in
+ * the same transaction and commits. The row therefore never leaves this
+ * transaction in `claimed` — the ownership key is set and cleared inside one
+ * transaction, so there is still no window for another sweeper to see a stranded
+ * claim and no `locked_at`.
+ *
+ * An ABORT of the whole transaction (the gate's STOP, a dropped connection, a
+ * process death) still rolls back the claim with the deletion. That is the
+ * "aborting leaves no partial state" criterion, and a partial purge is not
+ * representable.
+ */
   private async sweepOne(): Promise<
     | {
         readonly id: string;
@@ -298,7 +314,7 @@ export class PurgeSweeper implements OnApplicationBootstrap, OnModuleDestroy {
         const rowsDeleted = await this.executor.execute(client, claim);
         await client.query(RELEASE_PURGE_WORK);
         const completed = await client.query(COMPLETE_PURGE_SQL, [claim.id, this.instanceId, rowsDeleted]);
-        if ((completed.rowCount ?? 0) !== 1) {
+        if (writtenRows(completed) !== 1) {
           // The ownership predicate did not match, which means this sweeper no
           // longer owns the row. Reporting success here would be §2.3's
           // success-shaped value for work that did not happen.
@@ -333,7 +349,12 @@ export class PurgeSweeper implements OnApplicationBootstrap, OnModuleDestroy {
 
   /**
    * `SELECT … FOR UPDATE SKIP LOCKED` and the `UPDATE` that marks the claim, in
-   * ONE statement — see `CLAIM_DUE_PURGE_SQL` for why the two cannot be separate.
+   * ONE statement — see `CLAIM_DUE_PURGE_SQL` for why the two cannot be separate,
+   * and for why that statement now lives in `authz.claim_due_purge()`.
+   *
+   * NOTHING DUE ARRIVES AS ZERO ROWS, not as a row of nulls and not as an error,
+   * and the caller reads `rows[0]` rather than a count: `SELECT * FROM
+   * authz.claim_due_purge($1)` returns the claim or returns nothing.
    */
   private async claimOne(client: PoolClient): Promise<PurgeClaim | undefined> {
     const claimed = await client.query<PurgeClaimRow>(CLAIM_DUE_PURGE_SQL, [this.instanceId]);
@@ -383,7 +404,7 @@ export class PurgeSweeper implements OnApplicationBootstrap, OnModuleDestroy {
       this.instanceId,
       detail.slice(0, 2000),
     ]);
-    if ((written.rowCount ?? 0) !== 1) {
+    if (writtenRows(written) !== 1) {
       throw new Error(
         `purge ${claim.id} could not record its failure: no row matched status 'claimed' for this instance`,
       );
