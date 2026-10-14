@@ -2409,7 +2409,7 @@ the system.
 
 | ID | Status as of 2026-10-14 |
 |---|---|
-| W38 | **PARTIAL, unchanged.** `user_roles`/`user_groups` carry the `ON DELETE CASCADE` from `0008:242`. `refresh_tokens.user_id` (`0002:73`) and `email_messages.user_id` (`0005:56`) are still `NO ACTION`. **See §9A.8: this is no longer a theoretical gap — it is on the only path the shipped purge executor takes.** |
+| W38 | **SHIPPED, 2026-10-14, by `0015_purge_user_cascade.sql`.** `user_roles`/`user_groups` carried the `ON DELETE CASCADE` from `0008:242`; `refresh_tokens.user_id` (`0002:73`) and `email_messages.user_id` (`0005:56`) were the last two `NO ACTION` FKs naming `users`, and are now `CASCADE`. **They were the only reason the shipped purge executor could not complete**, and it was invisible because the RLS fixture user was deliberately given no refresh tokens and no mail history. ADR-0032 records why `email_messages` is deleted rather than retained; §9A.8.3 records the diagnosis; `test/rls/user-purge-end-to-end.spec.ts` proves it against a real database and gates the class. |
 | W39 | **SHIPPED**, in `0010`. Predicated, uncorrelated, capability inside the subquery; `loops = 1` and one capability call at 1,205 rows. The shipped policy has the two-branch subject/operator shape of §9.8.2 (3), not §9.4's one-branch shape. |
 | W40 | **SHIPPED with a difference.** `privacy_request:create/read/update` and `privacy_request_audit:read` are seeded, in both `0010` and `database/seed.ts`, both `ON CONFLICT DO NOTHING`; `privacy_request:delete` is absent from `permissions` entirely. The read grant is `SELECT, INSERT, UPDATE` — §9.6 says `SELECT, INSERT`, and `UPDATE` is required because self-service **withdrawal** is a member's own verb and the `WITH CHECK` on the update policy is what stops that same member writing `fulfilled`. |
 | W41 | **SHIPPED.** `privacy_request_audits` has no `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` grant for any serving role, `app_admin` included, and no write policy. Asserted per role, `TRUNCATE` included. **The `CHECK`-on-`INSERT`-only rationale in the spec is `0010:270-283` and is the reason the absence of grants is the control.** |
@@ -2441,11 +2441,19 @@ the section says so rather than inventing some.
 > The last sentence above is now false in the way that matters: this section was
 > executed, and three of its stated mechanisms are not what shipped — **the
 > schedule library, the `SECURITY DEFINER` writer, and the failure semantics.**
-> It is left as written on purpose. **§9A.8 is the reconciliation**, and its first
-> finding is the one that matters most to an operator: **nothing in this tree
-> enqueues.** The sweeper is a real, working drain over a queue that only the
-> migration role and the test fixtures ever write to, so an empty admin list is
-> not evidence that retention is running.
+> It is left as written on purpose. **§9A.8 is the reconciliation.**
+>
+> **AND THE RECONCILIATION HAS BEEN RE-CHECKED.** On 2026-10-14, after `0015` and
+> `0016`, §9A.8's first finding — *"**nothing in this tree enqueues.** The sweeper
+> is a real, working drain over a queue that only the migration role and the test
+> fixtures ever write to"* — **is no longer true and never will be again.**
+> `PurgeEnqueuer` fills the queue hourly. The finding is kept rather than deleted
+> because it is the clearest record in this document of what a careful audit found
+> and how long the finding stood; it is marked **RESOLVED** with the migration that
+> closed it, and the same has been done for the `23503` cascade defect in
+> §9A.8.3. An empty admin list is still not evidence that retention is running —
+> but that is now a weaker sentence, because the enqueuer logs every sweep
+> including the empty ones.
 
 ### 9A.0 Why this is written at all
 
@@ -3145,13 +3153,25 @@ that is the part worth keeping.** Three reasons, in order:
 not prevent the guess; **it moved the guess into a `.env` that nobody reviews.**
 The moment a fork set `RETENTION_TOMBSTONE_DAYS`, the number became an
 unreviewed choice made by the first person to type one — exactly the decision
-the deferral was avoiding, wearing a `.env` as a disguise. The mechanism is now
-built end to end, so the only thing the deferral still protected was the
-operator's own convenience. And the decision is no longer hypothetical for the
+the deferral was avoiding, wearing a `.env` as a disguise. The mechanism is built
+end to end **for tombstones**, so the only thing the deferral still protected was
+the operator's own convenience. And the decision is no longer hypothetical for the
 schema: **`0008_user_identity.sql:115` already says "The planned 5-year
 inactivity purge deletes user rows"**, and 1825 is now the number the committed
 migration is written against. Leaving the rest of the section saying "unset"
 while a shipped migration says "5-year" is the drift §2.4 exists to prevent.
+
+> **CORRECTED, 2026-10-14: "built end to end" overstated it, and the two anchors
+> are not equivalent.** The scan below reads **two** predicates — a tombstone on
+> `deleted_at` **and** a dormant live account on `last_activity_at`. What shipped in
+> `0016` is the first only: `authz.retention_due_tombstones()` selects
+> `deleted_at IS NOT NULL AND deleted_at < now() - make_interval(days => $1)`, and
+> `users.last_activity_at` **is not in the schema at any point**. So the shipped
+> producer enqueues a user whose erasure has already happened, and **does not
+> enqueue an account that has merely gone quiet.** The reason code is still
+> `inactivity_purge` for every row, which is §9A.1's one-population design; it is
+> the *population* that is narrower than the reason code's name suggests. §9A.8.1
+> says the same thing from the other direction.
 
 #### The candidate scan — one population, one query, no per-class variant
 
@@ -3265,29 +3285,68 @@ becomes untrustworthy.
 > and — first, because it is the one an operator has to know — **the gap the
 > shipped state leaves open.**
 
-#### 9A.8.1 Nothing enqueues, and that is a gap rather than a design
+> **SECOND PASS — 2026-10-14, later the same day.** The gap this section leads
+> with has since been closed by `0015` and `0016`, and so has the claim-path
+> failure it records two subsections down. **§9A.8.1 and §9A.8.3 are resolved and
+> their headings say so; §9A.8.2 (2) and (6) are partly resolved.** The
+> reasoning inside them is kept rather than deleted, because a reader needs to
+> know those defects existed, what each one cost, and which migration closed it —
+> and because the failure mode of careful prose is that it is trusted after it
+> stops being true. Every remaining present-tense claim in this subsection has
+> been re-checked against the tree as it stands.
 
-**There is no producer for `privacy_purge_queue` in this tree.** No enqueue
-function, no enqueue route, no enqueue RPC, no seed row.
-`authz.enqueue_inactive_purges(p_days)` (§9A.6, W66) was **not built**, and
-`database/seed.ts` writes none. The only statements that `INSERT` into the table
-anywhere in the repository are the RLS suite's own fixtures, which enqueue as the
-**owner** because — as the suite says at its own helper — no serving role holds
-`INSERT` and that refusal is the control under test.
+#### 9A.8.1 ~~Nothing enqueues~~ **RESOLVED — `PurgeEnqueuer` fills the queue**
 
-So the shipped system is a **real, working drain over a queue nothing fills.**
-The sweeper ticks, gates correctly, claims atomically, deletes transactionally and
-writes `rows_deleted` truthfully; and on any installation it will report
-`nothing_due` forever, because there is never anything due. **An empty admin
-list is not evidence that retention is running**, and a `done` row in a
-screenshot is a fixture.
+**This subsection described a real defect. It does not describe the tree any
+more.** Nothing is deleted from it, because the diagnosis was correct and a
+reader who has to reason about retention needs to know what was broken and what
+fixed it.
 
-This is recorded as an **open gap**, not as the finished mechanism. The two
-producers this section designed are each blocked on something that does not exist
-yet: the inactivity scan needs `users.last_activity_at` (§9A.6 says it is
-"proposed rather than shipped" and it still is — `0009` did not add it), and the
-erasure that would enqueue a tombstone needs W44's route, which also did not land
-(§9.8.4).
+**What was true on 2026-10-14, before `0015` and `0016`.** There was no producer
+for `privacy_purge_queue` in this tree. No enqueue function, no enqueue route, no
+enqueue RPC, no seed row. `authz.enqueue_inactive_purges` (§9A.6, W66) had not
+been built, and `database/seed.ts` wrote none. The only statements that `INSERT`
+into the table anywhere in the repository were the RLS suite's own fixtures,
+which enqueue as the **owner** because — as the suite says at its own helper — no
+serving role holds `INSERT` and that refusal is the control under test.
+
+So the shipped system was a **real, working drain over a queue nothing filled.**
+The sweeper ticked, gated correctly, claimed atomically, deleted transactionally
+and wrote `rows_deleted` truthfully; and on any installation it would report
+`nothing_due` forever, because there was never anything due. **An empty admin
+list was not evidence that retention was running**, and a `done` row in a
+screenshot was a fixture.
+
+**What is true now, and there are two fixes, not one.** The mechanism was inert
+for two *independent* reasons, and closing only one would have produced a queue
+that was filled but could not be drained:
+
+| | Defect | Closed by | How |
+|---|---|---|---|
+| 1 | the `DELETE` could never complete — `refresh_tokens.user_id` and `email_messages.user_id` were `NO ACTION`, so purging any user who had ever authenticated raised `23503` (§9A.8.3) | `0015_purge_user_cascade.sql` | both FKs made `CASCADE`, with a preflight asserting the child tables are owned by the role whose privileges govern the referential action |
+| 2 | the claim could never match — `privacy_purge_read` is `authz.can_read_privacy_purge()` alone, and `authz.actor()` is `NULL` in a claimless session, so the claim's inner `SELECT` was empty and the `UPDATE` affected `0` rows, silently | `0016_purge_machine_path.sql` | five narrowly-granted `SECURITY DEFINER` functions in `authz`, and `UPDATE` revoked from `app_admin` so the inert path now fails loudly instead of returning `UPDATE 0` |
+
+**With both closed, there is a producer and a consumer.** `PurgeEnqueuer`
+(`src/purge/purge-enqueuer.service.ts`) sweeps on its own hourly interval for
+tombstones older than `RETENTION_TOMBSTONE_DAYS` and enqueues them in **one**
+transaction through `authz.enqueue_inactive_purges(uuid[])` — the only `INSERT`
+into the table in the tree. It logs every sweep including `scanned: 0,
+enqueued: 0`, so the empty admin list and the dead enqueuer are distinguishable
+from the log, which was the whole of what this subsection used to have to say.
+
+**What is still missing, precisely, because "the mechanism is now built end to
+end" overstates it.** The shipped scan is over `users.deleted_at` — **tombstones
+only**. §9A.6's second anchor, the dormant *live* account on
+`users.last_activity_at`, **still does not exist**: that column is not in the
+schema at any point, and §9A.6 says so ("proposed rather than shipped"). So the
+shipped producer enqueues a user whose erasure has already happened, not a user
+who has merely gone quiet. The reason code is still `inactivity_purge` for every
+row, which is §9A.1's one-population design and not a second one, but the
+population is narrower than the design's name suggests. **A dormant live account
+is not purged by this tree.**
+
+There is still no erasure route (W44) and no cancel route (W52); those were never
+touched by `0015`/`0016` and remain recorded in §9.8.4 and §9A.8.4.
 
 #### 9A.8.2 Where §9A's stated mechanism is not what shipped
 
@@ -3312,25 +3371,51 @@ So the plan correctly refused `@Cron` and incorrectly refused the library. Recor
 rather than quietly corrected, because the next reader will otherwise re-derive the
 "do not add it" sentence from a tree that plainly has the dependency.
 
-**(2) There is no `SECURITY DEFINER` writer, and the plan's whole write-path
-argument is about one.** §9A.2 says *"**No serving role holds `INSERT`, `UPDATE`
-or `DELETE`** — not `app_admin` included. Every write goes through a `SECURITY
-DEFINER` function in `authz`"*, and W49 lists five of them:
-`enqueue_inactive_purges`, `claim_due_purges`, `execute_purge`, `cancel_purge`,
-`can_read_privacy_purge`.
+**(2) ~~There is no `SECURITY DEFINER` writer~~ — **SUPERSEDED BY `0016`. What
+§9A.2 and W49 described is now what shipped, with one deliberate difference.**
+§9A.2 says *"**No serving role holds `INSERT`, `UPDATE` or `DELETE`** — not
+`app_admin` included. Every write goes through a `SECURITY DEFINER` function in
+`authz`"*, and W49 lists five of them: `enqueue_inactive_purges`,
+`claim_due_purge`, `complete_purge`, `fail_purge`, `requeue_purge` (W49's spelling
+`claim_due_purges` / `cancel_purge` / `execute_purge` did not survive; `cancel_purge`
+and `execute_purge` are still unbuilt because W52 and §9A.1's executor call were
+never implemented).
 
-Shipped: **`app_admin` holds `SELECT, UPDATE`.** The sweeper's four statements are
-ordinary `UPDATE`s executed by `PurgeSweeper` over `pgrst_authenticator` with
-`SET LOCAL ROLE app_admin`, from four constants in `src/purge/purge-claim.ts`.
-The only `SECURITY DEFINER` function touching this table is
-`authz.can_read_privacy_purge()`, which reads no table at all. `INSERT` and
-`DELETE` are genuinely absent for every serving role, and that half of §9A.2 is
-true and is asserted per role by `test/rls/privacy-purge-queue.spec.ts`, `TRUNCATE`
-included.
+**What shipped, and it is very nearly the plan.** Five functions in `authz`,
+all `SECURITY DEFINER`, all outside `db-schemas` so PostgREST cannot address
+them at `/rpc/`, `EXECUTE` revoked from `PUBLIC` and granted to `app_admin` alone.
+`app_admin` keeps `SELECT` — the admin list — and **loses `UPDATE`**. So the plan's
+"not `app_admin` included" half is now literally true of all three verbs, and it
+is enforced by the grant rather than by an absence: a bare `UPDATE` on this table
+now fails with `permission denied for table` instead of matching zero rows.
 
-`0011`'s comments repeated the false part for a while and have been corrected in
-place (comments only; the executable SQL is byte-identical). The correction is
-recorded there rather than only here.
+**The difference, and it is a security decision rather than an oversight.** None of
+the five functions reads `authz.actor()` or `current_user`. Identity is not their
+business; they are reached by *identification* of the machine — the escalation
+boundary `pgrst_authenticator` + `SET LOCAL ROLE app_admin`, which a token can
+only assume if the signature verifies. **The two rejected alternatives are
+recorded because they were the cheap ones:**
+
+- **a `current_user = 'app_admin'` branch on `privacy_purge_read`** would have
+  satisfied the claim with three words, and it contradicts the rule that capability
+  resolves from role rows and never from the database role.
+  `test/rls/privacy-purge-queue.spec.ts` asserts **against** it — an admin holding
+  the table grant and lacking `privacy_purge:read` must read **zero** rows. Taking
+  it would have meant weakening a security test.
+- **a `request.jwt.claims` document written by the job** would also have worked,
+  and §B2 F1 names it a **P0**: the GUC is a custom setting any role may `SET`,
+  verified exploitable. The mitigation for that is architectural — *no
+  request-reachable SQL path may write it* — and a cron entry that wrote its own
+  identity document would be that path, promoted to a permanent P0 so a background
+  job could drain a queue. It is the same defect as the `db-pre-request` hook F1
+  warns about, wearing a cron expression. **Nothing in this tree sets one, and the
+  end-to-end test that used to set one as a workaround was removed in `090ed5a`.**
+
+ADR-0031 records the decision and the reasoning. The `0011` comments that
+repeated the false part were corrected in place on 2026-10-14 (comments only; the
+executable SQL is byte-identical) and corrected **again** the same day, once
+`0016` made the first correction false as well. The second correction is recorded
+in the file rather than the first being quietly overwritten.
 
 **(3) The transaction boundary is right and the failure semantics are the
 opposite of what §9A.3 argued.** §9A.3 is emphatic:
@@ -3394,27 +3479,56 @@ from a dormant live account.** `0011`'s reason table carries the distinction on
 the target row instead, and the RLS suite's `anonymised` fixture exists to prove
 the queue row survives its target — not to prove a label.
 
-**(5) `FORCE` was not applied, and the reason recorded for it was false.**
+**(5) `FORCE` was not applied, and the reason recorded for it was false — twice.**
 §9A.2 says *"`FORCE`d RLS"*. `0011` enables RLS and deliberately does not FORCE
-it — but until 2026-10-14 the paragraph justifying that named a `SECURITY DEFINER`
-enqueue function, which does not exist. The corrected paragraph states what is
-actually true, which is weaker and worth quoting: **FORCE binds the table OWNER,
-not `app_admin`**, and the shipped writer is `app_admin`, so FORCE would change
-nothing for the sweeper in either direction. The residual is that the owner
-bypasses the policies, which is bounded by the owner never receiving a request —
-and the RLS suite asserts the grant state and the policy set but **not**
+it. The paragraph justifying that originally named a `SECURITY DEFINER` enqueue
+function that did not exist; a 2026-10-14 correction repeated the same falsehood
+one layer down; and `0016` then built the function.
+
+**The corrected paragraph, as it now stands, is weaker than either.** `FORCE` binds
+the table OWNER, not `app_admin`, and `app_admin` owns nothing. It also does not
+need a verb to be relevant: since `0016` `app_admin` holds **no `UPDATE` at all**
+on this table, so FORCE would change nothing for the machine path in either
+direction — the writers are `SECURITY DEFINER` functions whose `current_user` is
+the owner, and both with and without FORCE they read and write this table with no
+policy applied to them.
+
+**So the residual is now larger than this paragraph used to record, and it is
+stated rather than assumed:** five `SECURITY DEFINER` functions have unrestricted
+access to this table, including through `privacy_purge_read`'s capability gate,
+because the owner bypasses RLS on a table that is enabled but not forced. That is
+bounded by two facts and only two: the owner never receives a request, and each
+function's `EXECUTE` is revoked from `PUBLIC` and granted to `app_admin` alone.
+**The narrowness is carried entirely by `EXECUTE`** — which is a weaker control
+than a policy, and the reason is worth naming: a policy cannot be applied to a
+`SECURITY DEFINER` body, because that body *is* the owner. Forcing the table would
+have closed the machine path entirely rather than narrowed it, which is the one
+argument for FORCE that this design does not make and should not be mistaken for.
+
+The RLS suite asserts the grant state and the policy set but **not**
 `relforcerowsecurity` for this table, so this is a recorded trade rather than a
 proven one.
 
-**(6) The retention floors do not exist.** §9A.4's seven-row table and W51's
-`assertRetentionConfig()` are unbuilt. The only retention key in the tree is
-`RETENTION_PURGE_MAX_ATTEMPTS` (default 3), which is the poison-pill threshold
-and lives in `src/breaker/breaker-environment.ts` alongside the sweeper's
-`PURGE_POLL_SECONDS` and `PURGE_DRAIN_BUDGET` — not in `environment.ts`, and not
-in a `RETENTION_*` namespace of its own. So `RETENTION_TOMBSTONE_DAYS`,
-`RETENTION_AUDIT_DAYS`, `RETENTION_LOGIN_ATTEMPTS_DAYS`,
-`RETENTION_UNVERIFIED_REQUEST_HOURS` and `RETENTION_EXPORT_ARTEFACTS_HOURS` are
-five decisions written down and not yet wired to anything.
+**(6) The retention floors are still mostly missing, but the one that destroys
+data is not.** §9A.4's seven-row table and W51's `assertRetentionConfig()` are
+unbuilt. **What has changed is the one number that matters.**
+`RETENTION_TOMBSTONE_DAYS` **now exists**, is required with **no default in any
+of the six `.env*` files**, is validated at module-evaluation time by
+`src/purge/retention-environment.ts` (bounds 1..36500, and `0` is refused with the
+reason spelled out), and is bound as `RETENTION_ENV` into `purge.module.ts` — the
+same shape as `APP_BREAKER_ENVIRONMENT`, for the same reason: a control whose
+value proposition is refusing bad configuration must refuse it before it has acted
+on it. §9A.4's floor below 1825 days is **still not enforced as a floor**; the
+shipped bound is 1..36500, so the number is required and non-degenerate but a
+fork may set it to 1.
+
+The other four — `RETENTION_AUDIT_DAYS`, `RETENTION_LOGIN_ATTEMPTS_DAYS`,
+`RETENTION_UNVERIFIED_REQUEST_HOURS`, `RETENTION_EXPORT_ARTEFACTS_HOURS` — are
+four decisions still written down and not wired to anything, and the three reason
+codes they would drive have no executor either (7). `RETENTION_PURGE_MAX_ATTEMPTS`
+(default 3), `PURGE_POLL_SECONDS` and `PURGE_DRAIN_BUDGET` live in
+`src/breaker/breaker-environment.ts`, which is where this paragraph already said
+they were.
 
 **(7) Three of the four reason codes have no executor, and say so by raising.**
 `SqlPurgeExecutor` implements `inactivity_purge` and nothing else;
@@ -3425,52 +3539,80 @@ answer — §9A.2 itself insists that a `rows_deleted = 0` for un-executed work 
 purpose**: the CHECK admits four, the executor implements one, and a row for the
 other three ends as `failed` with the reason attached.
 
-#### 9A.8.3 The live defect this leaves behind
+#### 9A.8.3 ~~The live defect this leaves behind~~ **RESOLVED — `0015`, and proven end to end**
 
-**The one reason code that does have an executor cannot succeed against a real
-user.**
+**This was the single reason code that had an executor could not succeed against a
+real user.** It is closed. The analysis is kept in full because it is the clearest
+example in this document of a defect that was invisible to every test that existed
+at the time, and a reader deciding how much to trust this section should know that.
 
-`SqlPurgeExecutor.deleteUser()` is `DELETE FROM users WHERE id = $1`.
-`refresh_tokens.user_id` (`0002_refresh_tokens.sql:73`) and
-`email_messages.user_id` (`0005_email_messages.sql:56`) are both
-`REFERENCES public.users (id)` with **no `ON DELETE` clause**, i.e. `NO ACTION`.
-W38 recorded this as a half-closed item and §9A.1 said "**W38 survives as those
-two cascades and nothing else**" — correct, and nobody noticed what it now blocks,
-because at the time the consumer of that `DELETE` was a function that had not been
-written.
+**The defect, as diagnosed.** `SqlPurgeExecutor.deleteUser()` is
+`DELETE FROM users WHERE id = $1`. `refresh_tokens.user_id`
+(`0002_refresh_tokens.sql:73`) and `email_messages.user_id`
+(`0005_email_messages.sql:56`) were both `REFERENCES public.users (id)` with **no
+`ON DELETE` clause**, i.e. `NO ACTION`. W38 recorded this as a half-closed item and
+§9A.1 said "**W38 survives as those two cascades and nothing else**" — correct, and
+nobody noticed what it now blocked, because at the time the consumer of that
+`DELETE` was a function that had not been written.
 
-So: purging any user who has ever authenticated raises **`23503`**, the sweeper's
-savepoint unwinds the deletion, the row is requeued, and after
-`RETENTION_PURGE_MAX_ATTEMPTS` it is `failed` with the constraint violation in
-`error`. **The failure is loud and attributable — which is the mechanism working as
-designed — and the retention it was built to perform does not happen.**
+So: purging any user who had ever authenticated raised **`23503`**, the sweeper's
+savepoint unwound the deletion, the row was requeued, and after
+`RETENTION_PURGE_MAX_ATTEMPTS` it was `failed` with the constraint violation in
+`error`. **The failure was loud and attributable — which is the mechanism working
+as designed — and the retention it was built to perform did not happen.**
 
-It is untested end to end, and it is untested for an uninteresting reason: no
-suite runs a real purge against a real user. `test/rls/privacy-purge-queue.spec.ts`
-exercises queue mechanics (claims, the double-sweep `UNIQUE`, the CHECKs, the
-grant state, the capability-gated read) and writes its rows as the owner; the unit
-suite exercises the sweeper through a structural port with no database at all. The
-gap between those two is exactly this statement.
+It was untested end to end for an uninteresting reason: no suite ran a real purge
+against a real user. `test/rls/privacy-purge-queue.spec.ts` exercised queue
+mechanics (claims, the double-sweep `UNIQUE`, the CHECKs, the grant state, the
+capability-gated read) and wrote its rows as the owner; the unit suite exercised
+the sweeper through a structural port with no database at all. **The fixture user
+was deliberately given no refresh tokens and no mail history**, so the one
+combination that failed was the one the fixture avoided.
 
-**The fix is W38's two remaining cascades and nothing else** — and it is a
-migration, so it belongs to whoever owns the migration directory. It is listed
-here because this section is the only place that states the consequence.
+**The fix is W38's two remaining cascades and nothing else.**
+`0015_purge_user_cascade.sql` makes both `CASCADE`, and two decisions inside it are
+worth recording because both were the *other* obvious answer:
+
+- **The explicit ordered child-delete was measured out and is not available.**
+  `email_messages` is `FORCE`d RLS with `SELECT` and `INSERT` policies only, and
+  `FORCE` binds the owner — so a `SECURITY DEFINER` helper does not help, because
+  a definer *is* the owner. **The referential action is the only route**, and
+  `0015` therefore preflights that the child tables are owned by the role whose
+  privileges govern an `RI_Trigger`, so the documented behaviour is the actual
+  behaviour rather than a coincidence of this cluster's grant history.
+- **`email_messages` is cascade-deleted rather than retained.** ADR-0032 records
+  the decision and the reason: the 24-month obligation already has its home in
+  `privacy_request_audits`, which has no FK to `users` by design. A second,
+  quieter retention on the mail log is a worse outcome than its absence, and
+  `0008` already named leaving the rows behind as the defect.
+
+**And it is proven, not asserted.** `test/rls/user-purge-end-to-end.spec.ts` drives
+the **shipped** executor over a real pool with the shipped claim and complete SQL,
+and asserts row counts read as a superuser — plus a **class-level gate**: every
+foreign key naming `users` must be `CASCADE`, so a sixth referencing table added
+later as `NO ACTION` fails the gate rather than waiting to be discovered by the
+next real erasure. That gate is the difference between fixing this instance and
+fixing the class.
 
 #### 9A.8.4 Status of the work items in §9A.7
 
-| ID | Status as of 2026-10-14 |
+**Re-checked 2026-10-14 after `0015`/`0016`.** Two rows below changed on that day
+and are marked.
+
+| ID | Status as of 2026-10-14, re-checked after `0015`/`0016` |
 |---|---|
-| W47 | **SHIPPED as `0011_privacy_purge_queue.sql`** (the plan's number, `0010`, was taken by `privacy_requests` — so the renumbering note above is itself out of date, and the file is `0011`). DDL as specified except: **not** `FORCE`d, `status` without `cancelled`, no `subject_anonymized`, no `supersedes`. Everything else — the `uuidv7()` PK, the closed enums, the two target-column `CHECK`s, the `rows_deleted`/`completed_at` consistency, no FK to `users`, and all three partial indexes including the one-open-per-target `UNIQUE` — is as written. Two of the shipped `CHECK`s are additions: a claimed row must name its owner, and a pending row must name none. |
+| W38 | **SHIPPED, 2026-10-14, by `0015`.** `user_roles`/`user_groups` carried the `ON DELETE CASCADE` from `0008:242`; `refresh_tokens.user_id` and `email_messages.user_id` are now `CASCADE` as well, so **every FK naming `users` cascades**. §9.8.4 carries the same update. The class-level gate is in `test/rls/user-purge-end-to-end.spec.ts`: a new referencing table added as `NO ACTION` fails it. |
+| W47 | **SHIPPED as `0011_privacy_purge_queue.sql`** (the plan's number, `0010`, was taken by `privacy_requests` — so the renumbering note above is itself out of date, and the file is `0011`). DDL as specified except: **not** `FORCE`d, `status` without `cancelled`, no `subject_anonymized`, no `supersedes`. Everything else — the `uuidv7()` PK, the closed enums, the two target-column `CHECK`s, the `rows_deleted`/`completed_at` consistency, no FK to `users`, and all three partial indexes including the one-open-per-target `UNIQUE` — is as written. Two of the shipped `CHECK`s are additions: a claimed row must name its owner, and a pending row must name none. **Its comments have been corrected twice** — once for the absent enqueue function, once when `0016` made the first correction false. Comments only; the comment-stripped checksum of the file is unchanged. |
 | W48 | **SHIPPED.** `privacy_purge:read` and `privacy_purge:update`, in `0011` **and** `database/seed.ts`, both `ON CONFLICT DO NOTHING`; `create` and `delete` absent from `permissions` entirely, asserted from the live catalog. `update` currently gates a capability **no route implements** — the same §2.1 shape as `cancelled`, one layer up. |
-| W49 | **PARTIAL.** `can_read_privacy_purge()` shipped, `REVOKE … FROM PUBLIC` then granted to `app_anon, app_member, app_admin` with the denial-must-arrive-as-a-denial reason. The four writer functions were not built, and the shipped writer is a Node service, not SQL at all — see §9A.8.2 (2). |
-| W50 | **SHIPPED, with the plan's library decision reversed** — §9A.8.2 (1). The `unref()`ed interval in `onApplicationBootstrap` is exactly as specified; `SchedulerRegistry` was added around it. The `SKIP LOCKED` claim is one statement (`UPDATE … FROM (SELECT … FOR UPDATE SKIP LOCKED LIMIT 1)`) rather than the plan's separate batch-select and compare-and-set, which §9A.8.2 (3) explains is the only shape that can record a failure. |
-| W51 | **NOT LANDED.** See §9A.8.2 (6). Only the poison-pill key exists. |
+| W49 | **SHIPPED, 2026-10-14, by `0016`.** `can_read_privacy_purge()` from `0011`, plus the five writers W49 asked for and §9A.2 described: `claim_due_purge`, `complete_purge`, `fail_purge`, `requeue_purge`, `enqueue_inactive_purges` — all `SECURITY DEFINER`, all in `authz`, `EXECUTE` revoked from `PUBLIC` and granted to `app_admin` alone. `cancel_purge` is still absent, because W52 is still absent. **ADR-0031** records why the machine path does not set `request.jwt.claims` and does not take a `current_user` branch on the policy. |
+| W50 | **SHIPPED, with the plan's library decision reversed** — §9A.8.2 (1). The `unref()`ed interval in `onApplicationBootstrap` is exactly as specified; `SchedulerRegistry` was added around it. The `SKIP LOCKED` claim is one statement (`UPDATE … FROM (SELECT … FOR UPDATE SKIP LOCKED LIMIT 1)`) rather than the plan's separate batch-select and compare-and-set, which §9A.8.2 (3) explains is the only shape that can record a failure. **The statement moved into `authz.claim_due_purge()` in `0016` and is otherwise unchanged.** |
+| W51 | **PARTIAL.** `RETENTION_TOMBSTONE_DAYS` is now a required key with no default in every `.env*` file, validated at module-evaluation time and bound through `RETENTION_ENV` (`src/purge/retention-environment.ts`). **§9A.4's 1825-day floor is not enforced as a floor** — the shipped bound is 1..36500 — and the other four `RETENTION_*` keys are still unbuilt. See §9A.8.2 (6). |
 | W52 | **NOT LANDED.** No route, no `authz.cancel_purge`, no `cancelled` status. The 409-on-already-claimed design stands and is unimplemented. |
-| W53 | **SHIPPED for everything that exists.** Permitted and denied cases per access path, on row counts and on bodies; the double-sweep `UNIQUE`, the CHECKs, the per-role grant state including `TRUNCATE`, and the capability-gated read (an admin whose role lacks the row reads **zero** rows despite holding the table grant). **The `subject_anonymized` half is not applicable** — the column does not exist. |
+| W53 | **SHIPPED for everything that exists.** Permitted and denied cases per access path, on row counts and on bodies; the double-sweep `UNIQUE`, the CHECKs, the per-role grant state including `TRUNCATE`, and the capability-gated read (an admin whose role lacks the row reads **zero** rows despite holding the table grant). **The `subject_anonymized` half is not applicable** — the column does not exist. `test/rls/purge-machine-path.spec.ts` adds the `0016` grant state and the `authz` function surface. |
 | W54 | **SUPERSEDED by a different mechanism.** The supersession §9A.1 describes happened; the membership deletes are explicit — but in `authz.revoke_subject_authority()`, a **trigger**, not the "anonymisation function" W42/W54 describe. Assertion 6 is asserted on the anonymisation path, and the tamper (remove the two `DELETE`s) is what the trigger's test does. |
 | W55 | **PARTIAL, and still open.** `docs/security.md` and `docs/architecture.md` still do not mention a purge queue, a privacy module or a breaker. `architecture.md`'s `src/` tree names a `privacy/` directory that does not exist and omits the two that do; corrected in this change. `AGENTS.md` §B2's four-category table still lists only `email_messages` as DERIVED. |
-| W65 | **SHIPPED as `0009_anonymisation.sql`**, with one substantive difference: `email_anonymized` is `GENERATED ALWAYS AS (deletion_reason = 'rtbf') STORED`, not `(deleted_at IS NOT NULL)` — §9.8.2 (1). **`users.last_activity_at` was not added**, which is the direct cause of §9A.8.1. |
-| W66 | **NOT LANDED.** No `authz.enqueue_inactive_purges`, no scan, no admin list. The single-list design stands and nothing renders it beyond the PostgREST table itself. |
+| W65 | **SHIPPED as `0009_anonymisation.sql`**, with one substantive difference: `email_anonymized` is `GENERATED ALWAYS AS (deletion_reason = 'rtbf') STORED`, not `(deleted_at IS NOT NULL)` — §9.8.2 (1). **`users.last_activity_at` was not added, and still is not** — which is why the shipped enqueue covers tombstones only. §9A.8.1. |
+| W66 | **LANDED, 2026-10-14, as half of W66.** `authz.enqueue_inactive_purges(uuid[])` exists (`0016`) and is driven hourly by `PurgeEnqueuer`; the single admin list renders as the PostgREST table itself, capability-gated. **The other half is still missing: the scan reads `users.deleted_at`, so a dormant *live* account on `users.last_activity_at` is not enqueued, and that column is not in the schema.** `subject_anonymized` is still absent, so an operator cannot tell a scrubbed tombstone from a dormant live account by reading the queue — the loss §9A.8.2 (4) records, and the reason `retention-environment`'s bounds are the only thing distinguishing them. |
 
 ---
 
@@ -4344,24 +4486,38 @@ and this one changes no decision". The offset is deliberately **not** a multiple
 the meter period, so the two do not land together and the gate does not always read
 a reading that is up to a full poll interval old.
 
-**(4) There is a third job, and it is the whole breakable set.** §9B.8 says *"`angular_v2`
-has zero background work today"* and §9B.9 says *"the breakable set is therefore
-empty"*. Shipped: three registered intervals — `breaker.meter`, `breaker.gate` and
-**`purge.sweeper`** — and `purge.sweeper` is **not** in `BREAKER_PROTECTED`. So:
+**(4) There is a third job and a fourth, and together they are the whole breakable
+set.** §9B.8 says *"`angular_v2` has zero background work today"* and §9B.9 says
+*"the breakable set is therefore empty"*. Shipped: **four** registered intervals —
+`breaker.meter`, `breaker.gate`, **`purge.sweeper`** and **`purge.enqueuer`** — and
+neither of the last two is in `BREAKER_PROTECTED`. So:
 
-- the breakable set is exactly **{ `purge.sweeper` }**, and the interceptor's refusal
-  branch still has **no runtime exercise at all**, because all four thin-app routes
-  are named in `BREAKER_PROTECTED` and therefore admitted at every zone;
+- the breakable set is exactly **{ `purge.sweeper`, `purge.enqueuer` }**, and the
+  interceptor's refusal branch still has **no runtime exercise at all**, because
+  all four thin-app routes are named in `BREAKER_PROTECTED` and therefore admitted
+  at every zone;
 - which means W71's named e2e assertion (*"with the breaker OPEN at 99 %,
   `POST /auth/login` is admitted and the health surface still reports 99 %"*) has no
   HTTP-level exercise, and the job dispatcher is what exercises GATE. The unit
   suite covers it with a fake clock instead.
 
+**Both breakable jobs are absent from the protected list deliberately, and the
+reason differs between them.** `purge.sweeper` drains the queue; `purge.enqueuer`
+fills it (`0016`). Neither has a caller waiting, so shedding either under memory
+pressure is correct behaviour rather than a gap, and **the four tokens an operator
+would expect to find there are all request-path or instrument work**: the four
+`auth.*` routes, plus `breaker.meter` and `breaker.gate`. ADR-0031 §Consequences
+records the enqueuer's case in full, and
+`test/unit/purge/purge-enqueuer-scheduling.spec.ts` asserts the omission against
+the `.env*` files themselves — so "fixing" it is a decision somebody has to take
+deliberately rather than a line they have to notice.
+
 §9B.9's four-row table of *stoppable* services is also out of date in the same
-direction: **the purge sweeper is the one stoppable service that exists**, it is
-stoppable because its whole operation is one transaction, and it is the only
-stoppable dispatch in the tree. `data export`, `erasure` and `email send` are still
-exactly as the table says — two deferred, one present but not wired to a signal.
+direction: **the two retention jobs are the stoppable services that exist**, both
+because each one's whole operation is one transaction, and they are the only
+stoppable dispatches in the tree. `data export`, `erasure` and `email send` are
+still exactly as the table says — two deferred, one present but not wired to a
+signal.
 
 **(5) The health surface is a snapshot builder and a log line, not a route.** W72
 asks for `GET /admin/system-health` plus a `system_health:read` permission row in a
@@ -4457,5 +4613,5 @@ rather than dressed up as a gate — the same honesty W55 and W74 already use.
 | W70 | **SHIPPED**, with the cold-start fix the plan did not ask for and could not have predicted (§9B.12.1). Both jobs are separate, named, `unref()`ed, registry-registered, and protected. The gate **fails stopped on a stale reading**; it **admits a never-measured one**, which is the correction. |
 | W71 | **SHIPPED in the gate**; `decideDispatch()` admits a protected token at every zone and `buildHealthSnapshot()` still reports the pressure, including `breaker.protected` echoing the exemption list back. **No e2e assertion** — with all four routes protected the refusal branch is unreachable over HTTP (§9B.12.2 (4)). |
 | W72 | **HALF.** The snapshot and the no-aggregate-`status` assertion shipped. The route, the controller and the `system_health:read` permission row did not, for the reason the shipped file argues in full. |
-| W73 | **NOT LANDED, and out of this change's ownership.** `0007_resource_ceilings.sql:6-12` still reads *"An application-level gate would cover four auth routes, report itself Healthy, and gate nothing anyone could attack"* — half wrong, exactly as §9B.0 says, now that the app-level gate exists and the thin app serves four routes plus three jobs. **ADR-0027 is now the record that file forward-references**, so half of W73 is answered by the ADR and the other half — the amended comment and its `grep` — is still open. |
+| W73 | **NOT LANDED, and out of this change's ownership.** `0007_resource_ceilings.sql:6-12` still reads *"An application-level gate would cover four auth routes, report itself Healthy, and gate nothing anyone could attack"* — half wrong, exactly as §9B.0 says, now that the app-level gate exists and the thin app serves four routes plus four jobs (`breaker.meter`, `breaker.gate`, `purge.sweeper`, `purge.enqueuer`). **ADR-0027 is now the record that file forward-references**, so half of W73 is answered by the ADR and the other half — the amended comment and its `grep` — is still open. |
 | W74 | **PARTIAL.** `architecture.md`'s `src/` tree was corrected in this change (it named a `privacy/` directory that does not exist and omitted `breaker/` and `purge/`). **`docs/security.md` still does not mention the breaker, a privacy module or a purge queue at all**, which is the actual substance of W74 and it is still open. The `.env` blocks shipped with values in both files; W74 asked for `.env.production.example` to be **present and blank**, and it is not blank. |

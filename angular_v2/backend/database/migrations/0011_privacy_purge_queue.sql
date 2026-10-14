@@ -340,36 +340,49 @@ GRANT EXECUTE ON FUNCTION authz.can_read_privacy_purge() TO app_anon, app_member
 -- =============================================================================
 -- ENABLE, and deliberately NOT FORCE.
 --
--- CORRECTED, 2026-10-14. This paragraph previously justified the choice with a
--- "`SECURITY DEFINER` enqueue function that runs as the OWNER". **There is no such
--- function, and there never was.** `pg_proc` holds no function over
--- `privacy_purge_queue` other than `authz.can_read_privacy_purge()`, which is a
--- read helper and reads no table at all; the sweep deletes with an ordinary
--- `DELETE FROM users`, so it touches this table with four plain `UPDATE`s and
--- nothing else. `grep -rn "INSERT INTO .*privacy_purge_queue" database/` returns
--- nothing outside `test/rls/`, which enqueues as the owner because no other
--- identity can. The reason recorded here was not a weakened version of the
--- truth; it named a mechanism that does not exist.
+-- CORRECTED, 2026-10-14 — and then CORRECTED AGAIN the same day, which is worth
+-- recording rather than tidying away. This paragraph originally justified the
+-- choice with a "`SECURITY DEFINER` enqueue function that runs as the OWNER".
+-- The first correction said **"there is no such function, and there never was"**,
+-- and `0016_purge_machine_path.sql` then built it. Three statements in this
+-- comment have each been true and each has stopped being true, which is exactly
+-- the failure mode careful prose invites and why its present tense has to be
+-- re-checked rather than trusted. **The executable SQL of this file has never
+-- changed** — every edit to it is comments only, and the comment-stripped
+-- checksum is identical before and after.
 --
--- What the shipped writer actually needs is worth saying precisely, because it
--- is a weaker statement than the one it replaces and pretending otherwise would
--- repeat the error. The writer is `PurgeSweeper`, over `pgrst_authenticator`
--- with `SET LOCAL ROLE app_admin` (`src/purge/purge-sweeper.service.ts`), and
--- `privacy_purge_write` below admits it on `current_user = 'app_admin'`. **FORCE
--- binds the table OWNER, not `app_admin`**, which owns nothing, so FORCE would
--- change nothing for the sweeper: it would neither be required by it nor refused
--- by it. The choice is therefore not forced by the writer in either direction,
--- and this file does not claim it is.
+-- WHAT IS TRUE NOW. `pg_proc` holds six functions over `privacy_purge_queue`:
+-- `authz.can_read_privacy_purge()` from this file, plus `claim_due_purge`,
+-- `complete_purge`, `fail_purge`, `requeue_purge` and `enqueue_inactive_purges`
+-- from `0016`. Five of the six are `SECURITY DEFINER` and run as the OWNER, and
+-- `app_admin` LOST `UPDATE` on this table in `0016` — so the four bare `UPDATE`s
+-- `src/purge/purge-claim.ts` used to issue no longer exist for any role, and would
+-- now fail with `permission denied for table` rather than silently matching zero
+-- rows.
+--
+-- What the writer needs is still worth saying precisely, because it is a weaker
+-- statement than the reason it replaces. Every write arrives through the
+-- escalation boundary `pgrst_authenticator` + `SET LOCAL ROLE app_admin`, and
+-- `privacy_purge_write` below is the policy that admits `app_admin` — **but no
+-- serving role holds `UPDATE` any more**, so that policy is presently unreachable
+-- and is deliberately KEPT as the second half of the control, so a future
+-- table-level `GRANT UPDATE` cannot open a write by itself. **FORCE binds the
+-- table OWNER, not `app_admin`**, which owns nothing, so FORCE would change
+-- nothing for the machine path in either direction. The choice is therefore not
+-- forced by the writer, and this file does not claim it is.
 --
 -- THE RESIDUAL, stated rather than papered over: not FORCEd, so the migration /
 -- owner role bypasses every policy on this table, including the read. That is the
 -- same trade `groups` and `user_groups` make (`0001:156-180`, `0001:945-948`),
--- and it is bounded by the same fact — the owner never receives a request. What
--- a future SECURITY DEFINER writer over this table WOULD break under FORCE is
--- named here so the dependency is not discovered by a failing enqueue: such a
--- body reads the table as the owner, the policy's `authz.actor()` is NULL inside
--- it, and every enqueue fails with no error anywhere. That is a hypothetical, and
--- it is labelled as one.
+-- and it is bounded by the same fact — the owner never receives a request.
+--
+-- The "future SECURITY DEFINER writer" this paragraph used to label a
+-- hypothetical is now the shipped mechanism, so it is restated as what it is:
+-- **the `authz` writers run as the owner, this table is not FORCEd, and therefore
+-- those five functions have no policy applied to them at all.** That is a
+-- property of the design rather than an accident, and it is why their narrowness
+-- is carried entirely by `EXECUTE` — granted to `app_admin` alone, revoked from
+-- `PUBLIC` (`0016`).
 --
 -- `test/rls/privacy-purge-queue.spec.ts` asserts the GRANT state, the policy set
 -- and the per-role denials. It does **not** assert `relforcerowsecurity` for this
@@ -411,12 +424,26 @@ CREATE POLICY privacy_purge_write ON public.privacy_purge_queue
 -- property of a grant somebody has to widen visibly, not of a rule in this file
 -- that anybody can edit.
 --
--- CORRECTED, 2026-10-14. The text here previously said the enqueue path "is the
--- owner's, through a SECURITY DEFINER function". **No such function exists** — see
--- the RLS paragraph above and §9A.8 of `docs/rebase.md`. There is consequently no
--- absent policy to be "the second half" of anything: a policy that can be edited
--- is not a control, and the absence of one is here because the privilege it would
--- have gated is absent, not as a rule in its own right.
+-- CORRECTED TWICE, 2026-10-14, and the second correction is the current text.
+-- The original said the enqueue path "is the owner's, through a SECURITY DEFINER
+-- function". The first correction said **no such function exists**, which was true
+-- and is no longer: `0016_purge_machine_path.sql` built
+-- `authz.enqueue_inactive_purges(uuid[])`, the only `INSERT` into this table in the
+-- tree. **The absence of an INSERT policy is therefore still exactly right, and
+-- for a stronger reason than it was written with.** The insert happens inside a
+-- `SECURITY DEFINER` body that runs as the table OWNER, and the owner is exactly
+-- the principal this grant deliberately does not name — no grant is needed to
+-- write as yourself, and the function's narrowness is carried entirely by
+-- `EXECUTE`, revoked from `PUBLIC` and granted to `app_admin` alone. Had the
+-- enqueue been a bare `INSERT`, closing it would have meant a table-level
+-- privilege somebody could widen; it is a body, and the privilege to reach the
+-- body is one line above.
+--
+-- So the accurate statement is not "there is no policy because there is no
+-- function" and not "there is no policy because there is a function". It is:
+-- **no INSERT grant exists for any serving role, and the one writer does not need
+-- one.** The policy that would have gated it is absent because the privilege it
+-- would gate is absent from every principal that could have used it.
 --
 -- NO DELETE POLICY AND NO TRUNCATE POLICY. `GRANT DELETE` to nobody, and
 -- `TRUNCATE` does not fire a row trigger, so the suite asserts it per role.
@@ -448,6 +475,35 @@ REVOKE ALL ON public.privacy_purge_queue FROM PUBLIC, app_anon, app_member, app_
 -- for whoever reads the admin view next — an empty queue is not evidence that
 -- retention is running. `docs/rebase.md` §9A.8 records it as an open gap rather
 -- than a design.
+--
+-- >>> SUPERSEDED BY `0016_purge_machine_path.sql`, 2026-10-14. The two paragraphs
+-- >>> above are kept verbatim because they record a defect that was real and that
+-- >>> a reader must know was closed. Both of their load-bearing claims are now
+-- >>> false, and the current position is:
+-- >>>
+-- >>>   * **There IS an enqueue function**, `authz.enqueue_inactive_purges(uuid[])`,
+-- >>>     and there is a producer: `PurgeEnqueuer` in
+-- >>>     `src/purge/purge-enqueuer.service.ts`, on its own hourly interval,
+-- >>>     sweeping for tombstones past `RETENTION_TOMBSTONE_DAYS` and enqueuing
+-- >>>     them in one transaction. The queue is no longer filled only by the
+-- >>>     migration role and the test fixtures.
+-- >>>   * **`UPDATE` is REVOKED from `app_admin` by `0016`**, so the `GRANT` on the
+-- >>>     next line no longer describes the live grant state. It is left as written
+-- >>>     because a migration file records what it did, and `0016` is the file that
+-- >>>     changed it. Every write to this table is now through `authz`.
+-- >>>   * **The reason INSERT is withheld is now the strong one**, not the weak
+-- >>>     one: the enqueue is a `SECURITY DEFINER` body running as the owner, and
+-- >>>     the owner holds no grant on this table. See the INSERT-policy paragraph
+-- >>>     above.
+-- >>>
+-- >>> The window is still a decision with no default: `RETENTION_TOMBSTONE_DAYS` is
+-- >>> required in every mode and validated at module-evaluation time
+-- >>> (`src/purge/retention-environment.ts`).
+-- >>>
+-- >>> STILL TRUE, and worth keeping: an empty queue is not evidence that retention
+-- >>> is running. That is now a weaker statement rather than a false one — the
+-- >>> enqueuer logs every sweep including `scanned: 0, enqueued: 0`, which is the
+-- >>> difference between the two.
 GRANT SELECT, UPDATE ON public.privacy_purge_queue TO app_admin;
 
 -- `app_member` gets NOTHING. Not "not yet" — nothing: there is no member-scoped

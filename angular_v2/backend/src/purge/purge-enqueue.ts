@@ -81,7 +81,17 @@ export type DueTombstone = {
 export type EnqueueSummary = {
   /** Tombstones the scan found due. */
   readonly scanned: number;
-  /** Queue rows the enqueue actually created. */
+  /** Queue rows the enqueue actually created. Committed rows, always. */
   readonly enqueued: number;
-  readonly outcome: 'enqueued' | 'nothing_due' | 'gated';
+  /**
+   * `gated` — the breaker refused the sweep; nothing was scanned and nothing was
+   * written. `aborted` — the sweep was **stopped in flight** after it had already
+   * scanned; the transaction was rolled back, so the queue is exactly as it was.
+   *
+   * `aborted` is a separate value rather than a `gated` with a non-zero `scanned`
+   * because the two are different facts for an operator: one says the machine
+   * never let the job start, the other says it let the job start and then took it
+   * back. Collapsing them would hide the second, which is the one worth noticing.
+   */
+  readonly outcome: 'enqueued' | 'nothing_due' | 'gated' | 'aborted';
 };

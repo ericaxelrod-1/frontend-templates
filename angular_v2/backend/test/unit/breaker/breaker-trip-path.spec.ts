@@ -1,20 +1,23 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { describe, expect, it } from 'vitest';
-import { loadBreakerEnvironment } from '../../../src/breaker/breaker-environment.js';
 import type { BreakerEnvironment } from '../../../src/breaker/breaker-environment.js';
 import { BreakerGate } from '../../../src/breaker/breaker-gate.js';
-import type { DispatchAdmission } from '../../../src/breaker/breaker-gate.js';
 import { BreakerMeter } from '../../../src/breaker/breaker-meter.js';
 import { BreakerRegistry } from '../../../src/breaker/breaker-registry.js';
-import type { DispatchRefusal } from '../../../src/breaker/breaker-state.js';
-import { AUTH_LOGIN, BREAKER_METER, PURGE_SWEEPER } from '../../../src/breaker/dispatch-token.js';
-import { CGROUP_V2_LIMIT_FILE, CGROUP_V2_USAGE_FILE } from '../../../src/breaker/memory-reading.js';
-import type { MemoryProbeDeps } from '../../../src/breaker/memory-reading.js';
 import { buildHealthSnapshot } from '../../../src/breaker/breaker-health.js';
+import { AUTH_LOGIN, BREAKER_METER, PURGE_SWEEPER } from '../../../src/breaker/dispatch-token.js';
 import { PurgeSweeper } from '../../../src/purge/purge-sweeper.service.js';
-import type { PurgeConnectionSource } from '../../../src/purge/purge-sweeper.service.js';
-import type { PurgeExecutor } from '../../../src/purge/purge-executor.js';
 import type { PurgeClaim } from '../../../src/purge/purge-claim.js';
+import {
+  connectionSource,
+  executorThatMustNotRun,
+  probeAt,
+  ProbeNeverReachedError,
+  refusalOf,
+  TRIP_ENV,
+  T0,
+  unreadableProbe,
+} from '../../support/breaker-harness.js';
 
 /**
  * **The trip path, executed.**
@@ -32,55 +35,15 @@ import type { PurgeClaim } from '../../../src/purge/purge-claim.js';
  *     connection source below throws if `connect()` is reached at all, so "GATE
  *     blocks dispatch, not the request" is proved by the absence of a connection
  *     rather than by a status code.
+ *
+ * The harness itself — the environment, the memory probe, the refusing connection
+ * source, the refusal reader — lives in `test/support/breaker-harness.ts` rather
+ * than here, because the retention scheduling specs need the identical shape and
+ * a second copy would be free to drift away from this one.
  */
 
-const MIB = 1024 * 1024;
-const LIMIT_BYTES = 256 * MIB;
-
-const ENV: BreakerEnvironment = loadBreakerEnvironment({
-  BREAKER_MEMORY_GREEN: '60',
-  BREAKER_MEMORY_YELLOW: '80',
-  BREAKER_MEMORY_RED: '90',
-  BREAKER_POLL_SECONDS: '30',
-  BREAKER_COOLDOWN_SECONDS: '120',
-  BREAKER_PROBE_TIMEOUT_SECONDS: '60',
-  BREAKER_PROTECTED: 'auth.login,auth.refresh,auth.logout,auth.me,breaker.meter,breaker.gate',
-});
-
-/** A 256 MB cgroup v2 container reporting `percent` used. */
-function probeAt(percent: number): MemoryProbeDeps {
-  const used = Math.round((LIMIT_BYTES * percent) / 100);
-  return {
-    readTextFile: (path) =>
-      path === CGROUP_V2_LIMIT_FILE ? String(LIMIT_BYTES) : path === CGROUP_V2_USAGE_FILE ? String(used) : undefined,
-    totalMemBytes: () => LIMIT_BYTES,
-    freeMemBytes: () => LIMIT_BYTES - used,
-  };
-}
-
-/** A connection source that records being reached and then refuses. */
-class ProbeNeverReachedError extends Error {}
-
-function connectionSource(): { readonly source: PurgeConnectionSource; readonly connects: () => number } {
-  let connects = 0;
-  return {
-    source: {
-      connect(): Promise<never> {
-        connects += 1;
-        return Promise.reject(new ProbeNeverReachedError('the sweeper reached the database'));
-      },
-    },
-    connects: () => connects,
-  };
-}
-
-function executorThatMustNotRun(): PurgeExecutor {
-  return {
-    execute(): Promise<number> {
-      return Promise.reject(new Error('the executor ran while the breaker was open'));
-    },
-  };
-}
+/** The protection set this file asserts against, spelled out rather than inherited. */
+const ENV: BreakerEnvironment = TRIP_ENV;
 
 function build(percent: number): {
   readonly registry: BreakerRegistry;
@@ -96,23 +59,6 @@ function build(percent: number): {
   const pool = connectionSource();
   const sweeper = new PurgeSweeper(ENV, gate, pool.source, executorThatMustNotRun(), scheduler);
   return { registry, meter, gate, sweeper, connects: pool.connects };
-}
-
-const T0 = 1_700_000_000_000;
-
-/**
- * The refusal reason, off a union that must be narrowed to be read.
- *
- * `admission.refusal` on the admitted arm is a compile error, which is the point:
- * a test that asserted a refusal on an admission that was never refused could only
- * be written if the admission were a value that lies. The throw is therefore also
- * the assertion — an admitted dispatch cannot reach `toBe('probe_in_flight')`.
- */
-function refusalOf(admission: DispatchAdmission): DispatchRefusal {
-  if (admission.admit) {
-    throw new Error('expected the dispatch to be refused, and it was admitted');
-  }
-  return admission.refusal;
 }
 
 describe('the breaker guards a real job', () => {
@@ -248,15 +194,7 @@ describe('the breaker guards a real job', () => {
     const registry = new BreakerRegistry(ENV);
     const scheduler = new SchedulerRegistry();
     const gate = new BreakerGate(registry, ENV, scheduler);
-    const meter = new BreakerMeter(
-      registry,
-      {
-        readTextFile: () => undefined,
-        totalMemBytes: () => 0,
-        freeMemBytes: () => 0,
-      },
-      scheduler,
-    );
+    const meter = new BreakerMeter(registry, unreadableProbe(), scheduler);
 
     await meter.tick(T0);
 

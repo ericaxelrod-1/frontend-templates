@@ -122,9 +122,12 @@ backend/
 │   │   ├── breaker-state.ts   the state machine, pure
 │   │   ├── breaker.interceptor.ts  the APP_INTERCEPTOR: GATE for thin-app routes
 │   │   └── dispatch-token.ts  service.method, the one vocabulary §9B.1 shares
-│   └── purge/             the retention sweeper — see docs/rebase.md §9A
+│   └── purge/             retention — see docs/rebase.md §9A
 │       ├── purge-sweeper.service.ts  purge.sweeper — claims, deletes, marks done
+│       ├── purge-enqueuer.service.ts  the producer; scans tombstones hourly
 │       ├── purge-claim.ts           the four SQL statements, one text per operation
+│       ├── purge-enqueue.ts         the scan's two statements, one text each
+│       ├── retention-environment.ts  the window, required, no default
 │       └── purge-executor.ts        the closed reason dispatch; the one executor
 ├── database/
 │   ├── migrations/        ONE directory, ONE table, plain SQL
@@ -141,15 +144,24 @@ the tree pretends they exist.
 
 **There is no `src/privacy/`, and that is the design rather than a gap.** The
 privacy/DSAR feature (`docs/rebase.md` §9, ADR-0029, ADR-0030) is **migrations and
-nothing else**: `0009`–`0014` create `privacy_requests`,
+two jobs**: `0009`–`0016` create `privacy_requests`,
 `privacy_request_regulations`, `privacy_request_audits`, `privacy_purge_queue`, the
 `users` anonymisation and geo columns, the company profile, and the RLS policies and
 grants that carry them. Every table is CRUD over rows, so PostgREST serves it and
-PostgREST is the API layer (§B1/ADR-0004). **No application path writes any of them
-yet** — there is no erasure route, no cancel route and no enqueue — which is
-recorded as an open gap in `docs/rebase.md` §9.8.4 and §9A.8.1 rather than papered
-over. `src/breaker/` and `src/purge/` exist for the opposite reason: a schedule, an
-algorithm and a set of transactions are what PostgREST cannot do.
+PostgREST is the API layer (§B1/ADR-0004).
+
+**Which of them has an application path is now a mixed answer, and it is worth
+getting right rather than rounding down.** Three tables are written **only** by
+migrations and fixtures — there is no erasure route and no cancel route, so
+nothing in `src/` writes `privacy_request_audits` or `privacy_requests`, and
+neither exists (`docs/rebase.md` §9.8.4, W42/W44). **`privacy_purge_queue` does
+have two application paths**: `PurgeEnqueuer` fills it (hourly, through
+`authz.enqueue_inactive_purges`, `0016`) and `PurgeSweeper` drains it. That is the
+whole of what justifies `src/purge/`, and it is why the retention part of this
+feature is application code while the DSAR part is not. **`src/breaker/`** exists
+for the third reason — a measurement and a decision, neither of which is CRUD.
+ADR-0031 records how the machine reaches the queue without setting
+`request.jwt.claims`.
 
 **TypeORM, Passport and `@nestjs/swagger` are not dependencies.** That removes
 `entityManager.query()` and `createQueryBuilder()` from application code

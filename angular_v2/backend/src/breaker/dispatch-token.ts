@@ -2,10 +2,10 @@
  * `service.method`, the unit both `BREAKER_PROTECTED` and the gate speak.
  *
  * A token is a **dispatch site**, not a route: `breaker.meter` and
- * `breaker.gate` have no HTTP route at all, and `purge.sweeper` is a cron job.
- * Keeping all three in one vocabulary is what lets the protected list mean the
- * same thing to the interceptor and to the job dispatcher, instead of growing a
- * second naming convention nobody cross-checks.
+ * `breaker.gate` have no HTTP route at all, and `purge.sweeper` and
+ * `purge.enqueuer` are scheduled jobs. Keeping all four in one vocabulary is what
+ * lets the protected list mean the same thing to the interceptor and to the job
+ * dispatcher, instead of growing a second naming convention nobody cross-checks.
  *
  * **An unknown token in the PROTECTION LIST is a boot error, not a warning.** A
  * typo in `BREAKER_PROTECTED` means the site it was supposed to protect is
@@ -34,14 +34,53 @@ export const BREAKER_GATE: DispatchToken = 'breaker.gate';
 export const PURGE_SWEEPER: DispatchToken = 'purge.sweeper';
 
 /**
+ * `PurgeEnqueuer` — the retention scan that FILLS the queue the sweeper drains.
+ *
+ * ## Why the token exists at all, given what it used to be
+ *
+ * `PurgeEnqueuer` used to pass `undefined` here, with a comment saying so and
+ * calling it the honest fix. That was fail-closed and it was undocumented
+ * infrastructure behaving by accident: `undefined` is the gate's "this build
+ * cannot name this site" answer, so the job was *unnamed* rather than *shedding
+ * the right way*. A reader of `BREAKER_PROTECTED` could not tell whether the
+ * absence was a decision.
+ *
+ * ## Why it is NOT in `BREAKER_PROTECTED` — and why the next reader must not "fix" that
+ *
+ * **The default is STOP, and shedding this job under memory pressure is correct
+ * behaviour, not a gap.** `BREAKER_PROTECTED` holds exactly six tokens, and every
+ * one of them is request-path work whose caller is waiting: four `auth.*` routes,
+ * plus `breaker.meter` and `breaker.gate`, which are protected because a breaker
+ * that stops measuring cannot stop anything.
+ *
+ * This job is the opposite of all six. It is **batch work with nobody waiting**: an
+ * hourly scan over tombstones, enqueueing in one transaction, with no request
+ * anywhere near it. Deferring NEW enqueues while the machine is unhealthy is
+ * exactly the right answer, and the queue already holds whatever was enqueued
+ * before the pressure started — `PurgeSweeper` keeps draining it. **Adding
+ * `purge.enqueuer` to `BREAKER_PROTECTED` would make a job nobody is waiting on
+ * run through a memory crisis to produce more work for a job that is being held
+ * back.** The omission is deliberate. If you are reading this because the enqueuer
+ * seems to be the one job missing from the list, that is this paragraph.
+ *
+ * Being sheddable is not the same as being unprotected. It still asks the gate for
+ * a **stoppable** lease (`PurgeEnqueuer.sweep(nowMs)` passes `stoppable = true`), so
+ * a scan already in flight is aborted mid-transaction and the transaction rolls
+ * back whole — a queue row exists for every due tombstone or for none of them.
+ */
+export const PURGE_ENQUEUER: DispatchToken = 'purge.enqueuer';
+
+/**
  * Every dispatch site this build knows about.
  *
  * The interceptor derives a token from `AuthController` + method name, and the
- * three jobs below name themselves. **Membership here means exactly one thing:**
+ * four jobs below name themselves. **Membership here means exactly one thing:**
  * `BREAKER_PROTECTED` may name the token, so a site that carries it is admitted
  * at every zone including `red`. Absence means the opposite — an unnamed site is
  * *unnamed*, and unnamed is not protected, so it is sheddable while the breaker
- * is open.
+ * is open. Being in this list is therefore **not** a protection, and adding a
+ * token here is not a statement that it should survive an open breaker; see
+ * `PURGE_ENQUEUER`, which is named, sheddable, and says why.
  *
  * ## This is not a route-coverage gate, and nothing here enforces completeness
  *
@@ -88,6 +127,7 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   BREAKER_METER,
   BREAKER_GATE,
   PURGE_SWEEPER,
+  PURGE_ENQUEUER,
 ]);
 
 /**

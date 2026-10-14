@@ -240,6 +240,34 @@ is a single copy of each rule and each message. And **a scoped rule that has nev
 fired proves nothing**: before landing one, add the violation, watch the lint go
 red, and revert.
 
+### Two conventions that stay structurally enforced, and why a lint rule is the wrong tool for either
+
+Asked whether these should become `no-restricted-syntax` rules, and the answer is
+**no for both** — recorded here so "nothing was done" is not mistaken for "nobody
+looked".
+
+- **No `set_config('request.jwt.claims', …)` outside the PostgREST boundary.**
+  This is the single most important invariant in the schema (§B2 F1) and it is
+  enforced by `test/unit/claims-write-surface.spec.ts`, which walks `src/` **and**
+  `database/`, strips comments, and reports the offending file by path. A lint rule
+  can only match an AST node shape, and the shapes that matter here are *inside
+  strings*: `client.query('SELECT set_config($1, $2, true)', ['request.jwt.claims',
+  '{}'])`, a `$$`-quoted `EXECUTE` in a migration, and a setting name built by
+  concatenation. A `no-restricted-syntax` selector over `CallExpression` catches the
+  bare call and misses the three that an attacker would actually write, which makes
+  it a **second, narrower mechanism** for the same convention (§2.4) rather than a
+  stronger one. The scanner also runs in `npm test` (step 4), inside `verify`.
+- **The purge queue is written through `authz`, never a bare `UPDATE`.**
+  `test/unit/purge/purge-claim.spec.ts` already asserts it from three directions:
+  the four application SQL constants are one statement each and each calls an
+  `authz` seam, no constant begins with `UPDATE privacy_purge_queue`, and
+  `0016` carries the `REVOKE UPDATE … FROM app_admin` plus the retained write
+  policy. The danger is a *string* changing, so the enforcement has to read the
+  string; a selector cannot.
+
+The general form: **a lint rule is the right tool when the violation is a node, and
+the wrong tool when the violation is a payload.** Both of these are payloads.
+
 ---
 
 # BACKEND RULES

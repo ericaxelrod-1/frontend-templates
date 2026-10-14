@@ -41,6 +41,8 @@ Status key: **Accepted** — settled, to be implemented as written.
 | [0028](#adr-0028) | **`ccpa_applicable()` is address-triggered and deliberately over-applies**, with no config flag | Accepted (shipped) |
 | [0029](#adr-0029) | **Three privacy/DSAR tables, three scoping categories**, and a working copy that may be cascade-deleted | Accepted (shipped) |
 | [0030](#adr-0030) | **`privacy_request_audits` carries no FK to `users`**, and append-only is enforced by the absence of grants | Accepted (shipped; the subject half of the append gate corrected by `0014`) |
+| [0031](#adr-0031) | **The retention machine reaches `privacy_purge_queue` through narrowly-granted `SECURITY DEFINER` functions in `authz`** — never `request.jwt.claims`, never a `current_user` branch on the policy | Accepted (shipped in `0016`) |
+| [0032](#adr-0032) | **`email_messages` is cascade-deleted with its subject**, and the 24-month obligation keeps its home in `privacy_request_audits` | Accepted (shipped in `0015`) |
 
 ---
 
@@ -3605,3 +3607,201 @@ for a shared `STABLE` helper to hide inside and be hoisted past — pointing the
 at one would have **added** a second per-row resolution to save one `OR`. The
 accepted drift runs the other way: the policy stays as `0010` shipped it, the
 function is the copy changed to match, and the comment is written on both sides.
+
+---
+
+<a id="adr-0031"></a>
+## ADR-0031: The retention machine writes the queue through `authz`, not through a claims document and not through a policy branch
+
+**Status:** Accepted, and **shipped** — `0016_purge_machine_path.sql`, with the
+claim proven in `test/rls/purge-machine-path.spec.ts` and the control path in
+`test/unit/purge/purge-enqueuer-scheduling.spec.ts`.
+
+**Context.** `0011` built `privacy_purge_queue` with two policies and granted
+`SELECT, UPDATE` to `app_admin`, because `PurgeSweeper` issues four ordinary
+`UPDATE`s on it. That grant let the claim be *attempted*. The attempt matched
+nothing, silently:
+
+```
+-- pgrst_authenticator, SET LOCAL ROLE app_admin, NO claims in scope,
+-- exactly PurgeSweeper.sweepOne()'s session:
+UPDATE privacy_purge_queue AS q SET status = 'claimed', … RETURNING q.id;
+=>  UPDATE 0
+```
+
+The claim's inner `SELECT … FOR UPDATE SKIP LOCKED` is a plain `SELECT`, so it is
+governed by `privacy_purge_read`, which is `authz.can_read_privacy_purge()` alone.
+`authz.actor()` is `NULL` in a claimless session, `has_permission(NULL, …)` is
+false, the sub-select is empty, and the retention job drains nothing — with no
+error anywhere. **An `UPDATE 0` is indistinguishable from an empty queue.**
+
+### The three routes out, and why two are closed
+
+**1. A `current_user = 'app_admin'` branch on `privacy_purge_read`. CLOSED.**
+Three words, and it contradicts the shipped rule that capability resolves from
+`role_permissions` → `roles` and never from the database role. It is worse than
+contradictory: `test/rls/privacy-purge-queue.spec.ts` asserts **against** it — an
+admin holding the table grant whose role lacks `privacy_purge:read` must read
+**zero** rows. Satisfying the machine would have meant weakening a security test to
+admit a background job, which is the trade ADR-0023 §Withdrawn already records going
+the other way.
+
+**2. A `request.jwt.claims` document written by the job. CLOSED, and this is the
+important one.** `AGENTS.md` §B2 F1 records that `request.jwt.claims` is a **custom
+GUC and that any role may `SET` it** — verified exploitable: a member set it
+directly and read another tenant's rows. Nothing in the schema prevents it, and
+**no grant, policy or constraint can restrict a custom GUC.** The only control is
+architectural: *no request-reachable SQL path may write it*, which is an absence
+rather than a defence.
+
+A scheduled job that wrote its own claims document would be exactly such a path,
+promoted to a standing P0 so that a cron entry could drain a queue. `AGENTS.md`
+F1 already names a `db-pre-request` hook that can reach that `SET` a P0; this
+would be the same defect wearing a cron expression, and it would be **permanent** —
+a cron expression is not something a security review declines. The end-to-end test
+that had been setting a claims document as a workaround was removed rather than
+kept, and `test/unit/claims-write-surface.spec.ts` asserts the whole `src/` and
+`database/` trees reach no such `SET`.
+
+**3. A narrowly-granted `SECURITY DEFINER` function in `authz`. TAKEN.** It is the
+seam the schema already had: `authz.append_privacy_request_audit()` (`0010`) is the
+working precedent for a write through exactly this route, and `0011` had already
+named `authz.enqueue_inactive_purges` as the enqueue writer — a function that did
+not exist until this decision was taken.
+
+**Why `authz` and not `public`:** `db-schemas = "public"` (`postgrest.conf`), so
+nothing in `authz` is addressable at `/rpc/…` and nothing in it appears in the
+generated OpenAPI contract. A write seam PostgREST can address is a write seam a
+token can reach.
+
+### What shipped
+
+Five functions — `claim_due_purge`, `complete_purge`, `fail_purge`,
+`requeue_purge`, `enqueue_inactive_purges` — plus `retention_due_tombstones`, which
+is `SECURITY INVOKER` because a definer cannot read `users` (see below).
+
+**`UPDATE` is revoked from `app_admin`.** This is not a tidy-up. With the grant
+still held, the four bare `UPDATE`s remain a second, *working* way to do the same
+job (§2.4), and the one that is inert fails **silently** — `UPDATE 0`, read as
+"nothing due". Revoking turns it into `permission denied for table`, which names
+the defect at the statement that caused it, and leaves the seam as the only writer.
+`privacy_purge_write` is **kept**: it is the second half of the control, so a
+future table-level `GRANT UPDATE` cannot open a write by itself.
+
+**Four functions rather than one `settle_purge(id, instance, status, …)`.** A
+status *parameter* turns a closed set of transitions into an open one at the
+function boundary, and `done` without a count or `failed` without a reason are
+exactly the two shapes the table's `CHECK`s exist to refuse (§2.3's success-shaped
+value, expressible one argument away).
+
+**Each returns the number of rows it matched, not `void`.** `pg` reports
+`rowCount === 1` for a `SELECT` whether or not the function found anything, so a
+void function would make "matched nothing" and "succeeded" the same value — and
+"matched nothing" is what says a sweeper no longer owns the row.
+
+**`retention_due_tombstones` is INVOKER, the other five are DEFINER, and that
+asymmetry is measured rather than stylistic.** `public.users` is FORCE ROW LEVEL
+SECURITY, so the table OWNER is bound by `users_read_scope`; and inside a
+`SECURITY DEFINER` body `current_user` *is* the owner. A definer scan therefore
+reads **zero** tombstones: measured on this schema, 0 rows against a table holding
+1, where `app_admin` returns 1. The read has to run as `app_admin` — the superset
+principal, for which `users_read_scope` deliberately keeps the admin branch first —
+while the write has to run as the owner, which is the only principal with `EXECUTE`.
+
+### Consequences
+
+- **The machine is identified, not authenticated.** The boundary is
+  `pgrst_authenticator` + `SET LOCAL ROLE app_admin`, the same one
+  `database/seed.ts` and `AuthService` use, which a token can only assume if the
+  signature verifies. None of the five functions reads `authz.actor()` or
+  `current_user`: identity is not their business.
+- **These functions have no policy applied to them at all.** The table is enabled
+  but not forced (`0011`), and a definer body *is* the owner. Bounded by two facts
+  and only two: the owner never receives a request, and each function's `EXECUTE`
+  is revoked from `PUBLIC` and granted to `app_admin` alone. **The narrowness is
+  carried entirely by `EXECUTE`, which is a weaker control than a policy** — a
+  policy cannot be applied to a `SECURITY DEFINER` body, and forcing the table
+  would have closed the machine path entirely rather than narrowed it.
+- **A dormant live account is still not purged.** The scan reads `users.deleted_at`
+  — tombstones only. `users.last_activity_at` is not in the schema, and the reason
+  is §9A.6's: it would have to be written by application code on every
+  authenticated request, so the template would be measuring application activity
+  and not database activity. `docs/rebase.md` §9A.8.1 says so in the same words.
+
+---
+
+<a id="adr-0032"></a>
+## ADR-0032: `email_messages` is cascade-deleted with its subject, and the 24-month obligation keeps its home in `privacy_request_audits`
+
+**Status:** Accepted, and **shipped** — `0015_purge_user_cascade.sql`, proven in
+`test/rls/user-purge-end-to-end.spec.ts`.
+
+**Context.** `SqlPurgeExecutor.deleteUser()` issues `DELETE FROM users WHERE id = $1`.
+`refresh_tokens.user_id` (`0002:73`) and `email_messages.user_id` (`0005:56`) were
+both `REFERENCES public.users (id)` with no `ON DELETE` clause — `NO ACTION`. So
+**every real purge raised `23503`**: the sweeper's savepoint unwound the deletion,
+the row was requeued, and after `RETENTION_PURGE_MAX_ATTEMPTS` it sat in the admin
+list as `failed` with the constraint violation in `error`. The failure was loud and
+attributable, which is the mechanism working as designed — and the retention it
+was built to perform did not happen.
+
+**Why this was invisible to every test that existed.** The RLS fixture user was
+deliberately given no refresh tokens and no mail history, so the one combination
+that failed was the one the fixture avoided. `privacy-purge-queue.spec.ts` exercised
+queue mechanics and wrote its rows as the owner; the unit suite drove the sweeper
+through a structural port with no database at all. Neither could observe an FK.
+
+### The decision that was actually available
+
+**It was not "add a CASCADE or fix the SQL".** The explicit ordered child-delete
+was measured first and **is not available**:
+
+- `email_messages` is **FORCE**d RLS with `SELECT` and `INSERT` policies only;
+- `FORCE` binds the table **owner** — and `SECURITY DEFINER` does not help, because
+  a definer *is* the owner, so it reads the table through the very policies the
+  child-delete would be violating.
+
+**The referential action is the only route.** `CASCADE` on both FKs is what closes
+it, and `0015` **preflights that the child tables are owned by the role whose
+privileges govern an `RI_Trigger`**, because that is what makes the documented
+behaviour the actual behaviour rather than a coincidence of this cluster's grant
+history. An `RI_Trigger` runs as the *table owner* and is exempt from RLS — so
+FORCE on the child does not bind it, and a forker who changes the owner breaks
+this silently. The preflight is the assertion.
+
+### Why `email_messages` is deleted rather than retained
+
+The obvious counter-argument is that a mail log should outlive the person: a
+24-month obligation exists somewhere, and cascading the mail away looks like
+destroying evidence.
+
+**The obligation already has its correct home, and it is not the mail log.**
+ADR-0030 is why: CPRA §1798.130(a)(2) requires the *record of a consumer request*
+to be retained for at least 24 months, and `privacy_request_audits` is that record —
+which is exactly why it carries **no foreign key to `users`**, carries a keyed
+digest as `subject_hmac` rather than the id, and is append-only by the absence of
+grants. An audit row can answer *"were all requests from this subject answered?"*
+long after the subject's row is gone, and that is the obligation.
+
+So keeping `email_messages` would have created **a second, quieter retention on the
+mail log** — one with no obligation attached, no clock, no audit, and no reader —
+which is worse than its absence. `0008` had already named leaving those rows behind
+as the defect: a mail body is personal data, it is the copy that actually contains
+what the user wrote, and "retain it because the user asked to be forgotten" is the
+outcome the whole module exists to prevent.
+
+### Consequences
+
+- **The cascade is a property of the schema, not of a caller's discipline.** Both
+  `privacy_requests` (ADR-0029) and `email_messages` cascade; that is the second
+  precedent for *working copy versus record* in this schema, and the pattern is:
+  the working copy may follow its subject out, the record may not.
+- **The trade is stated rather than assumed.** The mail history of a purged user is
+  gone, and if a fork needs it for abuse investigation it has to retain an
+  *encrypted copy in a system that is not reachable by the purge* — which is a
+  decision to make deliberately, not a default to inherit.
+- **It is gated as a class.** `test/rls/user-purge-end-to-end.spec.ts` asserts that
+  **every foreign key naming `users` is `CASCADE`**, so a sixth referencing table
+  added later as `NO ACTION` fails the gate rather than waiting to be discovered by
+  the next real erasure. That gate is the difference between fixing this instance
+  and fixing the family.
