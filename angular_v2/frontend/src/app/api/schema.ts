@@ -3,13 +3,3976 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>;
+export interface paths {
+    "/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OpenAPI description (this document) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.users.id"];
+                    username?: components["parameters"]["rowFilter.users.username"];
+                    email?: components["parameters"]["rowFilter.users.email"];
+                    password_hash?: components["parameters"]["rowFilter.users.password_hash"];
+                    created_at?: components["parameters"]["rowFilter.users.created_at"];
+                    deleted_at?: components["parameters"]["rowFilter.users.deleted_at"];
+                    deletion_reason?: components["parameters"]["rowFilter.users.deletion_reason"];
+                    email_anonymized?: components["parameters"]["rowFilter.users.email_anonymized"];
+                    country_code?: components["parameters"]["rowFilter.users.country_code"];
+                    region_code?: components["parameters"]["rowFilter.users.region_code"];
+                    city?: components["parameters"]["rowFilter.users.city"];
+                    geo_source?: components["parameters"]["rowFilter.users.geo_source"];
+                    geo_accuracy_km?: components["parameters"]["rowFilter.users.geo_accuracy_km"];
+                    geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["users"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["users"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["users"][];
+                        "text/csv": components["schemas"]["users"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["users"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.users.id"];
+                    username?: components["parameters"]["rowFilter.users.username"];
+                    email?: components["parameters"]["rowFilter.users.email"];
+                    password_hash?: components["parameters"]["rowFilter.users.password_hash"];
+                    created_at?: components["parameters"]["rowFilter.users.created_at"];
+                    deleted_at?: components["parameters"]["rowFilter.users.deleted_at"];
+                    deletion_reason?: components["parameters"]["rowFilter.users.deletion_reason"];
+                    email_anonymized?: components["parameters"]["rowFilter.users.email_anonymized"];
+                    country_code?: components["parameters"]["rowFilter.users.country_code"];
+                    region_code?: components["parameters"]["rowFilter.users.region_code"];
+                    city?: components["parameters"]["rowFilter.users.city"];
+                    geo_source?: components["parameters"]["rowFilter.users.geo_source"];
+                    geo_accuracy_km?: components["parameters"]["rowFilter.users.geo_accuracy_km"];
+                    geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.users.id"];
+                    username?: components["parameters"]["rowFilter.users.username"];
+                    email?: components["parameters"]["rowFilter.users.email"];
+                    password_hash?: components["parameters"]["rowFilter.users.password_hash"];
+                    created_at?: components["parameters"]["rowFilter.users.created_at"];
+                    deleted_at?: components["parameters"]["rowFilter.users.deleted_at"];
+                    deletion_reason?: components["parameters"]["rowFilter.users.deletion_reason"];
+                    email_anonymized?: components["parameters"]["rowFilter.users.email_anonymized"];
+                    country_code?: components["parameters"]["rowFilter.users.country_code"];
+                    region_code?: components["parameters"]["rowFilter.users.region_code"];
+                    city?: components["parameters"]["rowFilter.users.city"];
+                    geo_source?: components["parameters"]["rowFilter.users.geo_source"];
+                    geo_accuracy_km?: components["parameters"]["rowFilter.users.geo_accuracy_km"];
+                    geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["users"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/privacy_request_audits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_request_audits.id"];
+                    request_key?: components["parameters"]["rowFilter.privacy_request_audits.request_key"];
+                    event_type?: components["parameters"]["rowFilter.privacy_request_audits.event_type"];
+                    requested_at?: components["parameters"]["rowFilter.privacy_request_audits.requested_at"];
+                    request_nature?: components["parameters"]["rowFilter.privacy_request_audits.request_nature"];
+                    request_channel?: components["parameters"]["rowFilter.privacy_request_audits.request_channel"];
+                    responded_at?: components["parameters"]["rowFilter.privacy_request_audits.responded_at"];
+                    response_nature?: components["parameters"]["rowFilter.privacy_request_audits.response_nature"];
+                    denial_basis?: components["parameters"]["rowFilter.privacy_request_audits.denial_basis"];
+                    denial_basis_cite?: components["parameters"]["rowFilter.privacy_request_audits.denial_basis_cite"];
+                    subject_hmac?: components["parameters"]["rowFilter.privacy_request_audits.subject_hmac"];
+                    pepper_kid?: components["parameters"]["rowFilter.privacy_request_audits.pepper_kid"];
+                    subject_user_id?: components["parameters"]["rowFilter.privacy_request_audits.subject_user_id"];
+                    created_at?: components["parameters"]["rowFilter.privacy_request_audits.created_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["privacy_request_audits"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_request_audits"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["privacy_request_audits"][];
+                        "text/csv": components["schemas"]["privacy_request_audits"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["privacy_request_audits"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_request_audits.id"];
+                    request_key?: components["parameters"]["rowFilter.privacy_request_audits.request_key"];
+                    event_type?: components["parameters"]["rowFilter.privacy_request_audits.event_type"];
+                    requested_at?: components["parameters"]["rowFilter.privacy_request_audits.requested_at"];
+                    request_nature?: components["parameters"]["rowFilter.privacy_request_audits.request_nature"];
+                    request_channel?: components["parameters"]["rowFilter.privacy_request_audits.request_channel"];
+                    responded_at?: components["parameters"]["rowFilter.privacy_request_audits.responded_at"];
+                    response_nature?: components["parameters"]["rowFilter.privacy_request_audits.response_nature"];
+                    denial_basis?: components["parameters"]["rowFilter.privacy_request_audits.denial_basis"];
+                    denial_basis_cite?: components["parameters"]["rowFilter.privacy_request_audits.denial_basis_cite"];
+                    subject_hmac?: components["parameters"]["rowFilter.privacy_request_audits.subject_hmac"];
+                    pepper_kid?: components["parameters"]["rowFilter.privacy_request_audits.pepper_kid"];
+                    subject_user_id?: components["parameters"]["rowFilter.privacy_request_audits.subject_user_id"];
+                    created_at?: components["parameters"]["rowFilter.privacy_request_audits.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_request_audits.id"];
+                    request_key?: components["parameters"]["rowFilter.privacy_request_audits.request_key"];
+                    event_type?: components["parameters"]["rowFilter.privacy_request_audits.event_type"];
+                    requested_at?: components["parameters"]["rowFilter.privacy_request_audits.requested_at"];
+                    request_nature?: components["parameters"]["rowFilter.privacy_request_audits.request_nature"];
+                    request_channel?: components["parameters"]["rowFilter.privacy_request_audits.request_channel"];
+                    responded_at?: components["parameters"]["rowFilter.privacy_request_audits.responded_at"];
+                    response_nature?: components["parameters"]["rowFilter.privacy_request_audits.response_nature"];
+                    denial_basis?: components["parameters"]["rowFilter.privacy_request_audits.denial_basis"];
+                    denial_basis_cite?: components["parameters"]["rowFilter.privacy_request_audits.denial_basis_cite"];
+                    subject_hmac?: components["parameters"]["rowFilter.privacy_request_audits.subject_hmac"];
+                    pepper_kid?: components["parameters"]["rowFilter.privacy_request_audits.pepper_kid"];
+                    subject_user_id?: components["parameters"]["rowFilter.privacy_request_audits.subject_user_id"];
+                    created_at?: components["parameters"]["rowFilter.privacy_request_audits.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["privacy_request_audits"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/role_permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    role_id?: components["parameters"]["rowFilter.role_permissions.role_id"];
+                    permission_id?: components["parameters"]["rowFilter.role_permissions.permission_id"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["role_permissions"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["role_permissions"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["role_permissions"][];
+                        "text/csv": components["schemas"]["role_permissions"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["role_permissions"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    role_id?: components["parameters"]["rowFilter.role_permissions.role_id"];
+                    permission_id?: components["parameters"]["rowFilter.role_permissions.permission_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    role_id?: components["parameters"]["rowFilter.role_permissions.role_id"];
+                    permission_id?: components["parameters"]["rowFilter.role_permissions.permission_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["role_permissions"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/user_roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    user_id?: components["parameters"]["rowFilter.user_roles.user_id"];
+                    role_id?: components["parameters"]["rowFilter.user_roles.role_id"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["user_roles"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["user_roles"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["user_roles"][];
+                        "text/csv": components["schemas"]["user_roles"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["user_roles"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    user_id?: components["parameters"]["rowFilter.user_roles.user_id"];
+                    role_id?: components["parameters"]["rowFilter.user_roles.role_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    user_id?: components["parameters"]["rowFilter.user_roles.user_id"];
+                    role_id?: components["parameters"]["rowFilter.user_roles.role_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["user_roles"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/company_profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.company_profile.id"];
+                    legal_name?: components["parameters"]["rowFilter.company_profile.legal_name"];
+                    display_name?: components["parameters"]["rowFilter.company_profile.display_name"];
+                    registration_number?: components["parameters"]["rowFilter.company_profile.registration_number"];
+                    website_url?: components["parameters"]["rowFilter.company_profile.website_url"];
+                    support_email?: components["parameters"]["rowFilter.company_profile.support_email"];
+                    privacy_contact_email?: components["parameters"]["rowFilter.company_profile.privacy_contact_email"];
+                    created_at?: components["parameters"]["rowFilter.company_profile.created_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["company_profile"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["company_profile"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["company_profile"][];
+                        "text/csv": components["schemas"]["company_profile"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["company_profile"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.company_profile.id"];
+                    legal_name?: components["parameters"]["rowFilter.company_profile.legal_name"];
+                    display_name?: components["parameters"]["rowFilter.company_profile.display_name"];
+                    registration_number?: components["parameters"]["rowFilter.company_profile.registration_number"];
+                    website_url?: components["parameters"]["rowFilter.company_profile.website_url"];
+                    support_email?: components["parameters"]["rowFilter.company_profile.support_email"];
+                    privacy_contact_email?: components["parameters"]["rowFilter.company_profile.privacy_contact_email"];
+                    created_at?: components["parameters"]["rowFilter.company_profile.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.company_profile.id"];
+                    legal_name?: components["parameters"]["rowFilter.company_profile.legal_name"];
+                    display_name?: components["parameters"]["rowFilter.company_profile.display_name"];
+                    registration_number?: components["parameters"]["rowFilter.company_profile.registration_number"];
+                    website_url?: components["parameters"]["rowFilter.company_profile.website_url"];
+                    support_email?: components["parameters"]["rowFilter.company_profile.support_email"];
+                    privacy_contact_email?: components["parameters"]["rowFilter.company_profile.privacy_contact_email"];
+                    created_at?: components["parameters"]["rowFilter.company_profile.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["company_profile"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    group_id?: components["parameters"]["rowFilter.customers.group_id"];
+                    id?: components["parameters"]["rowFilter.customers.id"];
+                    name?: components["parameters"]["rowFilter.customers.name"];
+                    internal_notes?: components["parameters"]["rowFilter.customers.internal_notes"];
+                    created_at?: components["parameters"]["rowFilter.customers.created_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["customers"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["customers"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["customers"][];
+                        "text/csv": components["schemas"]["customers"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["customers"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    group_id?: components["parameters"]["rowFilter.customers.group_id"];
+                    id?: components["parameters"]["rowFilter.customers.id"];
+                    name?: components["parameters"]["rowFilter.customers.name"];
+                    internal_notes?: components["parameters"]["rowFilter.customers.internal_notes"];
+                    created_at?: components["parameters"]["rowFilter.customers.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    group_id?: components["parameters"]["rowFilter.customers.group_id"];
+                    id?: components["parameters"]["rowFilter.customers.id"];
+                    name?: components["parameters"]["rowFilter.customers.name"];
+                    internal_notes?: components["parameters"]["rowFilter.customers.internal_notes"];
+                    created_at?: components["parameters"]["rowFilter.customers.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["customers"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/privacy_requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_requests.id"];
+                    request_key?: components["parameters"]["rowFilter.privacy_requests.request_key"];
+                    user_id?: components["parameters"]["rowFilter.privacy_requests.user_id"];
+                    request_nature?: components["parameters"]["rowFilter.privacy_requests.request_nature"];
+                    request_channel?: components["parameters"]["rowFilter.privacy_requests.request_channel"];
+                    requested_at?: components["parameters"]["rowFilter.privacy_requests.requested_at"];
+                    status?: components["parameters"]["rowFilter.privacy_requests.status"];
+                    closed_at?: components["parameters"]["rowFilter.privacy_requests.closed_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["privacy_requests"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_requests"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["privacy_requests"][];
+                        "text/csv": components["schemas"]["privacy_requests"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["privacy_requests"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_requests.id"];
+                    request_key?: components["parameters"]["rowFilter.privacy_requests.request_key"];
+                    user_id?: components["parameters"]["rowFilter.privacy_requests.user_id"];
+                    request_nature?: components["parameters"]["rowFilter.privacy_requests.request_nature"];
+                    request_channel?: components["parameters"]["rowFilter.privacy_requests.request_channel"];
+                    requested_at?: components["parameters"]["rowFilter.privacy_requests.requested_at"];
+                    status?: components["parameters"]["rowFilter.privacy_requests.status"];
+                    closed_at?: components["parameters"]["rowFilter.privacy_requests.closed_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_requests.id"];
+                    request_key?: components["parameters"]["rowFilter.privacy_requests.request_key"];
+                    user_id?: components["parameters"]["rowFilter.privacy_requests.user_id"];
+                    request_nature?: components["parameters"]["rowFilter.privacy_requests.request_nature"];
+                    request_channel?: components["parameters"]["rowFilter.privacy_requests.request_channel"];
+                    requested_at?: components["parameters"]["rowFilter.privacy_requests.requested_at"];
+                    status?: components["parameters"]["rowFilter.privacy_requests.status"];
+                    closed_at?: components["parameters"]["rowFilter.privacy_requests.closed_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["privacy_requests"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/email_messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.email_messages.id"];
+                    user_id?: components["parameters"]["rowFilter.email_messages.user_id"];
+                    template?: components["parameters"]["rowFilter.email_messages.template"];
+                    recipient?: components["parameters"]["rowFilter.email_messages.recipient"];
+                    subject?: components["parameters"]["rowFilter.email_messages.subject"];
+                    status?: components["parameters"]["rowFilter.email_messages.status"];
+                    provider_message_id?: components["parameters"]["rowFilter.email_messages.provider_message_id"];
+                    error?: components["parameters"]["rowFilter.email_messages.error"];
+                    body?: components["parameters"]["rowFilter.email_messages.body"];
+                    content_class?: components["parameters"]["rowFilter.email_messages.content_class"];
+                    created_at?: components["parameters"]["rowFilter.email_messages.created_at"];
+                    sent_at?: components["parameters"]["rowFilter.email_messages.sent_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["email_messages"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["email_messages"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["email_messages"][];
+                        "text/csv": components["schemas"]["email_messages"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["email_messages"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.email_messages.id"];
+                    user_id?: components["parameters"]["rowFilter.email_messages.user_id"];
+                    template?: components["parameters"]["rowFilter.email_messages.template"];
+                    recipient?: components["parameters"]["rowFilter.email_messages.recipient"];
+                    subject?: components["parameters"]["rowFilter.email_messages.subject"];
+                    status?: components["parameters"]["rowFilter.email_messages.status"];
+                    provider_message_id?: components["parameters"]["rowFilter.email_messages.provider_message_id"];
+                    error?: components["parameters"]["rowFilter.email_messages.error"];
+                    body?: components["parameters"]["rowFilter.email_messages.body"];
+                    content_class?: components["parameters"]["rowFilter.email_messages.content_class"];
+                    created_at?: components["parameters"]["rowFilter.email_messages.created_at"];
+                    sent_at?: components["parameters"]["rowFilter.email_messages.sent_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.email_messages.id"];
+                    user_id?: components["parameters"]["rowFilter.email_messages.user_id"];
+                    template?: components["parameters"]["rowFilter.email_messages.template"];
+                    recipient?: components["parameters"]["rowFilter.email_messages.recipient"];
+                    subject?: components["parameters"]["rowFilter.email_messages.subject"];
+                    status?: components["parameters"]["rowFilter.email_messages.status"];
+                    provider_message_id?: components["parameters"]["rowFilter.email_messages.provider_message_id"];
+                    error?: components["parameters"]["rowFilter.email_messages.error"];
+                    body?: components["parameters"]["rowFilter.email_messages.body"];
+                    content_class?: components["parameters"]["rowFilter.email_messages.content_class"];
+                    created_at?: components["parameters"]["rowFilter.email_messages.created_at"];
+                    sent_at?: components["parameters"]["rowFilter.email_messages.sent_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["email_messages"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/company_addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.company_addresses.id"];
+                    company_profile_id?: components["parameters"]["rowFilter.company_addresses.company_profile_id"];
+                    line1?: components["parameters"]["rowFilter.company_addresses.line1"];
+                    line2?: components["parameters"]["rowFilter.company_addresses.line2"];
+                    city?: components["parameters"]["rowFilter.company_addresses.city"];
+                    region_code?: components["parameters"]["rowFilter.company_addresses.region_code"];
+                    country_code?: components["parameters"]["rowFilter.company_addresses.country_code"];
+                    postal_code?: components["parameters"]["rowFilter.company_addresses.postal_code"];
+                    is_registered?: components["parameters"]["rowFilter.company_addresses.is_registered"];
+                    kind?: components["parameters"]["rowFilter.company_addresses.kind"];
+                    created_at?: components["parameters"]["rowFilter.company_addresses.created_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["company_addresses"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["company_addresses"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["company_addresses"][];
+                        "text/csv": components["schemas"]["company_addresses"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["company_addresses"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.company_addresses.id"];
+                    company_profile_id?: components["parameters"]["rowFilter.company_addresses.company_profile_id"];
+                    line1?: components["parameters"]["rowFilter.company_addresses.line1"];
+                    line2?: components["parameters"]["rowFilter.company_addresses.line2"];
+                    city?: components["parameters"]["rowFilter.company_addresses.city"];
+                    region_code?: components["parameters"]["rowFilter.company_addresses.region_code"];
+                    country_code?: components["parameters"]["rowFilter.company_addresses.country_code"];
+                    postal_code?: components["parameters"]["rowFilter.company_addresses.postal_code"];
+                    is_registered?: components["parameters"]["rowFilter.company_addresses.is_registered"];
+                    kind?: components["parameters"]["rowFilter.company_addresses.kind"];
+                    created_at?: components["parameters"]["rowFilter.company_addresses.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.company_addresses.id"];
+                    company_profile_id?: components["parameters"]["rowFilter.company_addresses.company_profile_id"];
+                    line1?: components["parameters"]["rowFilter.company_addresses.line1"];
+                    line2?: components["parameters"]["rowFilter.company_addresses.line2"];
+                    city?: components["parameters"]["rowFilter.company_addresses.city"];
+                    region_code?: components["parameters"]["rowFilter.company_addresses.region_code"];
+                    country_code?: components["parameters"]["rowFilter.company_addresses.country_code"];
+                    postal_code?: components["parameters"]["rowFilter.company_addresses.postal_code"];
+                    is_registered?: components["parameters"]["rowFilter.company_addresses.is_registered"];
+                    kind?: components["parameters"]["rowFilter.company_addresses.kind"];
+                    created_at?: components["parameters"]["rowFilter.company_addresses.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["company_addresses"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/refresh_tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.refresh_tokens.id"];
+                    user_id?: components["parameters"]["rowFilter.refresh_tokens.user_id"];
+                    jti?: components["parameters"]["rowFilter.refresh_tokens.jti"];
+                    token_hash?: components["parameters"]["rowFilter.refresh_tokens.token_hash"];
+                    created_at?: components["parameters"]["rowFilter.refresh_tokens.created_at"];
+                    expires_at?: components["parameters"]["rowFilter.refresh_tokens.expires_at"];
+                    revoked_at?: components["parameters"]["rowFilter.refresh_tokens.revoked_at"];
+                    rotated_to?: components["parameters"]["rowFilter.refresh_tokens.rotated_to"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["refresh_tokens"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["refresh_tokens"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["refresh_tokens"][];
+                        "text/csv": components["schemas"]["refresh_tokens"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["refresh_tokens"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.refresh_tokens.id"];
+                    user_id?: components["parameters"]["rowFilter.refresh_tokens.user_id"];
+                    jti?: components["parameters"]["rowFilter.refresh_tokens.jti"];
+                    token_hash?: components["parameters"]["rowFilter.refresh_tokens.token_hash"];
+                    created_at?: components["parameters"]["rowFilter.refresh_tokens.created_at"];
+                    expires_at?: components["parameters"]["rowFilter.refresh_tokens.expires_at"];
+                    revoked_at?: components["parameters"]["rowFilter.refresh_tokens.revoked_at"];
+                    rotated_to?: components["parameters"]["rowFilter.refresh_tokens.rotated_to"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.refresh_tokens.id"];
+                    user_id?: components["parameters"]["rowFilter.refresh_tokens.user_id"];
+                    jti?: components["parameters"]["rowFilter.refresh_tokens.jti"];
+                    token_hash?: components["parameters"]["rowFilter.refresh_tokens.token_hash"];
+                    created_at?: components["parameters"]["rowFilter.refresh_tokens.created_at"];
+                    expires_at?: components["parameters"]["rowFilter.refresh_tokens.expires_at"];
+                    revoked_at?: components["parameters"]["rowFilter.refresh_tokens.revoked_at"];
+                    rotated_to?: components["parameters"]["rowFilter.refresh_tokens.rotated_to"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["refresh_tokens"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.roles.id"];
+                    name?: components["parameters"]["rowFilter.roles.name"];
+                    parent_id?: components["parameters"]["rowFilter.roles.parent_id"];
+                    is_system_role?: components["parameters"]["rowFilter.roles.is_system_role"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["roles"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["roles"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["roles"][];
+                        "text/csv": components["schemas"]["roles"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["roles"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.roles.id"];
+                    name?: components["parameters"]["rowFilter.roles.name"];
+                    parent_id?: components["parameters"]["rowFilter.roles.parent_id"];
+                    is_system_role?: components["parameters"]["rowFilter.roles.is_system_role"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.roles.id"];
+                    name?: components["parameters"]["rowFilter.roles.name"];
+                    parent_id?: components["parameters"]["rowFilter.roles.parent_id"];
+                    is_system_role?: components["parameters"]["rowFilter.roles.is_system_role"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["roles"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    name?: components["parameters"]["rowFilter.actions.name"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["actions"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["actions"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["actions"][];
+                        "text/csv": components["schemas"]["actions"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["actions"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    name?: components["parameters"]["rowFilter.actions.name"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    name?: components["parameters"]["rowFilter.actions.name"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["actions"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/privacy_request_regulations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    request_id?: components["parameters"]["rowFilter.privacy_request_regulations.request_id"];
+                    regulation?: components["parameters"]["rowFilter.privacy_request_regulations.regulation"];
+                    sla_deadline?: components["parameters"]["rowFilter.privacy_request_regulations.sla_deadline"];
+                    extension_used?: components["parameters"]["rowFilter.privacy_request_regulations.extension_used"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["privacy_request_regulations"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_request_regulations"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["privacy_request_regulations"][];
+                        "text/csv": components["schemas"]["privacy_request_regulations"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["privacy_request_regulations"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    request_id?: components["parameters"]["rowFilter.privacy_request_regulations.request_id"];
+                    regulation?: components["parameters"]["rowFilter.privacy_request_regulations.regulation"];
+                    sla_deadline?: components["parameters"]["rowFilter.privacy_request_regulations.sla_deadline"];
+                    extension_used?: components["parameters"]["rowFilter.privacy_request_regulations.extension_used"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    request_id?: components["parameters"]["rowFilter.privacy_request_regulations.request_id"];
+                    regulation?: components["parameters"]["rowFilter.privacy_request_regulations.regulation"];
+                    sla_deadline?: components["parameters"]["rowFilter.privacy_request_regulations.sla_deadline"];
+                    extension_used?: components["parameters"]["rowFilter.privacy_request_regulations.extension_used"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["privacy_request_regulations"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.groups.id"];
+                    parent_id?: components["parameters"]["rowFilter.groups.parent_id"];
+                    name?: components["parameters"]["rowFilter.groups.name"];
+                    is_system_group?: components["parameters"]["rowFilter.groups.is_system_group"];
+                    created_at?: components["parameters"]["rowFilter.groups.created_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["groups"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["groups"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["groups"][];
+                        "text/csv": components["schemas"]["groups"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["groups"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.groups.id"];
+                    parent_id?: components["parameters"]["rowFilter.groups.parent_id"];
+                    name?: components["parameters"]["rowFilter.groups.name"];
+                    is_system_group?: components["parameters"]["rowFilter.groups.is_system_group"];
+                    created_at?: components["parameters"]["rowFilter.groups.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.groups.id"];
+                    parent_id?: components["parameters"]["rowFilter.groups.parent_id"];
+                    name?: components["parameters"]["rowFilter.groups.name"];
+                    is_system_group?: components["parameters"]["rowFilter.groups.is_system_group"];
+                    created_at?: components["parameters"]["rowFilter.groups.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["groups"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/privacy_purge_queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_purge_queue.id"];
+                    target_kind?: components["parameters"]["rowFilter.privacy_purge_queue.target_kind"];
+                    target_id?: components["parameters"]["rowFilter.privacy_purge_queue.target_id"];
+                    target_ref?: components["parameters"]["rowFilter.privacy_purge_queue.target_ref"];
+                    reason?: components["parameters"]["rowFilter.privacy_purge_queue.reason"];
+                    scheduled_for?: components["parameters"]["rowFilter.privacy_purge_queue.scheduled_for"];
+                    status?: components["parameters"]["rowFilter.privacy_purge_queue.status"];
+                    attempt?: components["parameters"]["rowFilter.privacy_purge_queue.attempt"];
+                    claimed_at?: components["parameters"]["rowFilter.privacy_purge_queue.claimed_at"];
+                    claimed_by?: components["parameters"]["rowFilter.privacy_purge_queue.claimed_by"];
+                    completed_at?: components["parameters"]["rowFilter.privacy_purge_queue.completed_at"];
+                    rows_deleted?: components["parameters"]["rowFilter.privacy_purge_queue.rows_deleted"];
+                    error?: components["parameters"]["rowFilter.privacy_purge_queue.error"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["privacy_purge_queue"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_purge_queue"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["privacy_purge_queue"][];
+                        "text/csv": components["schemas"]["privacy_purge_queue"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["privacy_purge_queue"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_purge_queue.id"];
+                    target_kind?: components["parameters"]["rowFilter.privacy_purge_queue.target_kind"];
+                    target_id?: components["parameters"]["rowFilter.privacy_purge_queue.target_id"];
+                    target_ref?: components["parameters"]["rowFilter.privacy_purge_queue.target_ref"];
+                    reason?: components["parameters"]["rowFilter.privacy_purge_queue.reason"];
+                    scheduled_for?: components["parameters"]["rowFilter.privacy_purge_queue.scheduled_for"];
+                    status?: components["parameters"]["rowFilter.privacy_purge_queue.status"];
+                    attempt?: components["parameters"]["rowFilter.privacy_purge_queue.attempt"];
+                    claimed_at?: components["parameters"]["rowFilter.privacy_purge_queue.claimed_at"];
+                    claimed_by?: components["parameters"]["rowFilter.privacy_purge_queue.claimed_by"];
+                    completed_at?: components["parameters"]["rowFilter.privacy_purge_queue.completed_at"];
+                    rows_deleted?: components["parameters"]["rowFilter.privacy_purge_queue.rows_deleted"];
+                    error?: components["parameters"]["rowFilter.privacy_purge_queue.error"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.privacy_purge_queue.id"];
+                    target_kind?: components["parameters"]["rowFilter.privacy_purge_queue.target_kind"];
+                    target_id?: components["parameters"]["rowFilter.privacy_purge_queue.target_id"];
+                    target_ref?: components["parameters"]["rowFilter.privacy_purge_queue.target_ref"];
+                    reason?: components["parameters"]["rowFilter.privacy_purge_queue.reason"];
+                    scheduled_for?: components["parameters"]["rowFilter.privacy_purge_queue.scheduled_for"];
+                    status?: components["parameters"]["rowFilter.privacy_purge_queue.status"];
+                    attempt?: components["parameters"]["rowFilter.privacy_purge_queue.attempt"];
+                    claimed_at?: components["parameters"]["rowFilter.privacy_purge_queue.claimed_at"];
+                    claimed_by?: components["parameters"]["rowFilter.privacy_purge_queue.claimed_by"];
+                    completed_at?: components["parameters"]["rowFilter.privacy_purge_queue.completed_at"];
+                    rows_deleted?: components["parameters"]["rowFilter.privacy_purge_queue.rows_deleted"];
+                    error?: components["parameters"]["rowFilter.privacy_purge_queue.error"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["privacy_purge_queue"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/user_groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    user_id?: components["parameters"]["rowFilter.user_groups.user_id"];
+                    group_id?: components["parameters"]["rowFilter.user_groups.group_id"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["user_groups"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["user_groups"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["user_groups"][];
+                        "text/csv": components["schemas"]["user_groups"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["user_groups"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    user_id?: components["parameters"]["rowFilter.user_groups.user_id"];
+                    group_id?: components["parameters"]["rowFilter.user_groups.group_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    user_id?: components["parameters"]["rowFilter.user_groups.user_id"];
+                    group_id?: components["parameters"]["rowFilter.user_groups.group_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["user_groups"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    group_id?: components["parameters"]["rowFilter.projects.group_id"];
+                    id?: components["parameters"]["rowFilter.projects.id"];
+                    name?: components["parameters"]["rowFilter.projects.name"];
+                    budget_cents?: components["parameters"]["rowFilter.projects.budget_cents"];
+                    internal_notes?: components["parameters"]["rowFilter.projects.internal_notes"];
+                    created_at?: components["parameters"]["rowFilter.projects.created_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["projects"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["projects"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["projects"][];
+                        "text/csv": components["schemas"]["projects"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["projects"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    group_id?: components["parameters"]["rowFilter.projects.group_id"];
+                    id?: components["parameters"]["rowFilter.projects.id"];
+                    name?: components["parameters"]["rowFilter.projects.name"];
+                    budget_cents?: components["parameters"]["rowFilter.projects.budget_cents"];
+                    internal_notes?: components["parameters"]["rowFilter.projects.internal_notes"];
+                    created_at?: components["parameters"]["rowFilter.projects.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    group_id?: components["parameters"]["rowFilter.projects.group_id"];
+                    id?: components["parameters"]["rowFilter.projects.id"];
+                    name?: components["parameters"]["rowFilter.projects.name"];
+                    budget_cents?: components["parameters"]["rowFilter.projects.budget_cents"];
+                    internal_notes?: components["parameters"]["rowFilter.projects.internal_notes"];
+                    created_at?: components["parameters"]["rowFilter.projects.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["projects"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.permissions.id"];
+                    resource?: components["parameters"]["rowFilter.permissions.resource"];
+                    action_id?: components["parameters"]["rowFilter.permissions.action_id"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["permissions"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["permissions"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["permissions"][];
+                        "text/csv": components["schemas"]["permissions"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["permissions"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.permissions.id"];
+                    resource?: components["parameters"]["rowFilter.permissions.resource"];
+                    action_id?: components["parameters"]["rowFilter.permissions.action_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.permissions.id"];
+                    resource?: components["parameters"]["rowFilter.permissions.resource"];
+                    action_id?: components["parameters"]["rowFilter.permissions.action_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["permissions"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/migrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    name?: components["parameters"]["rowFilter.migrations.name"];
+                    applied_at?: components["parameters"]["rowFilter.migrations.applied_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["migrations"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["migrations"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["migrations"][];
+                        "text/csv": components["schemas"]["migrations"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["migrations"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    name?: components["parameters"]["rowFilter.migrations.name"];
+                    applied_at?: components["parameters"]["rowFilter.migrations.applied_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    name?: components["parameters"]["rowFilter.migrations.name"];
+                    applied_at?: components["parameters"]["rowFilter.migrations.applied_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["migrations"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/login_attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.login_attempts.id"];
+                    username?: components["parameters"]["rowFilter.login_attempts.username"];
+                    ip?: components["parameters"]["rowFilter.login_attempts.ip"];
+                    status?: components["parameters"]["rowFilter.login_attempts.status"];
+                    created_at?: components["parameters"]["rowFilter.login_attempts.created_at"];
+                    ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["login_attempts"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["login_attempts"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["login_attempts"][];
+                        "text/csv": components["schemas"]["login_attempts"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["login_attempts"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.login_attempts.id"];
+                    username?: components["parameters"]["rowFilter.login_attempts.username"];
+                    ip?: components["parameters"]["rowFilter.login_attempts.ip"];
+                    status?: components["parameters"]["rowFilter.login_attempts.status"];
+                    created_at?: components["parameters"]["rowFilter.login_attempts.created_at"];
+                    ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.login_attempts.id"];
+                    username?: components["parameters"]["rowFilter.login_attempts.username"];
+                    ip?: components["parameters"]["rowFilter.login_attempts.ip"];
+                    status?: components["parameters"]["rowFilter.login_attempts.status"];
+                    created_at?: components["parameters"]["rowFilter.login_attempts.created_at"];
+                    ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["login_attempts"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/rpc/ccpa_applicable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferParams"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                    "application/vnd.pgrst.object+json;nulls=stripped": Record<string, never>;
+                    "application/vnd.pgrst.object+json": Record<string, never>;
+                    "text/csv": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rpc/has_permission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    who: string;
+                    resource: string;
+                    action: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferParams"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: text */
+                        action: string;
+                        /** Format: text */
+                        resource: string;
+                        /** Format: uuid */
+                        who: string;
+                    };
+                    "application/vnd.pgrst.object+json;nulls=stripped": {
+                        /** Format: text */
+                        action: string;
+                        /** Format: text */
+                        resource: string;
+                        /** Format: uuid */
+                        who: string;
+                    };
+                    "application/vnd.pgrst.object+json": {
+                        /** Format: text */
+                        action: string;
+                        /** Format: text */
+                        resource: string;
+                        /** Format: uuid */
+                        who: string;
+                    };
+                    "text/csv": {
+                        /** Format: text */
+                        action: string;
+                        /** Format: text */
+                        resource: string;
+                        /** Format: uuid */
+                        who: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        users: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            username: string;
+            /** Format: text */
+            email: string;
+            /** Format: text */
+            password_hash: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /** Format: timestamp with time zone */
+            deleted_at?: string;
+            /** Format: text */
+            deletion_reason?: string;
+            /** Format: boolean */
+            email_anonymized?: boolean;
+            /** Format: text */
+            country_code?: string;
+            /** Format: text */
+            region_code?: string;
+            /** Format: text */
+            city?: string;
+            /** Format: text */
+            geo_source?: string;
+            /** Format: int32 */
+            geo_accuracy_km?: number;
+            /** Format: timestamp with time zone */
+            geo_updated_at?: string;
+        };
+        privacy_request_audits: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: uuid */
+            request_key: string;
+            /** Format: text */
+            event_type: string;
+            /** Format: timestamp with time zone */
+            requested_at: string;
+            /** Format: text */
+            request_nature: string;
+            /** Format: text */
+            request_channel: string;
+            /** Format: timestamp with time zone */
+            responded_at?: string;
+            /** Format: text */
+            response_nature?: string;
+            /** Format: text */
+            denial_basis?: string;
+            /** Format: text */
+            denial_basis_cite?: string;
+            /** Format: bytea */
+            subject_hmac: string;
+            /** Format: text */
+            pepper_kid: string;
+            /** Format: uuid */
+            subject_user_id?: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+        };
+        role_permissions: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `roles.id`.<fk table='roles' column='id'/>
+             */
+            role_id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `permissions.id`.<fk table='permissions' column='id'/>
+             */
+            permission_id: string;
+        };
+        user_roles: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `roles.id`.<fk table='roles' column='id'/>
+             */
+            role_id: string;
+        };
+        company_profile: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            legal_name: string;
+            /** Format: text */
+            display_name: string;
+            /** Format: text */
+            registration_number?: string;
+            /** Format: text */
+            website_url?: string;
+            /** Format: text */
+            support_email?: string;
+            /** Format: text */
+            privacy_contact_email?: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+        };
+        customers: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `groups.id`.<fk table='groups' column='id'/>
+             */
+            group_id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            name: string;
+            /** Format: text */
+            internal_notes?: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+        };
+        privacy_requests: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @default uuidv7()
+             */
+            request_key: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id: string;
+            /** Format: text */
+            request_nature: string;
+            /** Format: text */
+            request_channel: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            requested_at: string;
+            /**
+             * Format: text
+             * @default open
+             */
+            status: string;
+            /** Format: timestamp with time zone */
+            closed_at?: string;
+        };
+        email_messages: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id: string;
+            /** Format: text */
+            template: string;
+            /** Format: text */
+            recipient: string;
+            /** Format: text */
+            subject: string;
+            /** Format: text */
+            status: string;
+            /** Format: text */
+            provider_message_id?: string;
+            /** Format: text */
+            error?: string;
+            /** Format: text */
+            body?: string;
+            /** Format: text */
+            content_class: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /** Format: timestamp with time zone */
+            sent_at?: string;
+        };
+        company_addresses: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `company_profile.id`.<fk table='company_profile' column='id'/>
+             */
+            company_profile_id: string;
+            /** Format: text */
+            line1: string;
+            /** Format: text */
+            line2?: string;
+            /** Format: text */
+            city: string;
+            /** Format: text */
+            region_code?: string;
+            /** Format: text */
+            country_code: string;
+            /** Format: text */
+            postal_code?: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_registered: boolean;
+            /** Format: text */
+            kind: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+        };
+        refresh_tokens: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id: string;
+            /**
+             * Format: uuid
+             * @default uuidv7()
+             */
+            jti: string;
+            /** Format: text */
+            token_hash: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /** Format: timestamp with time zone */
+            expires_at: string;
+            /** Format: timestamp with time zone */
+            revoked_at?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `refresh_tokens.id`.<fk table='refresh_tokens' column='id'/>
+             */
+            rotated_to?: string;
+        };
+        roles: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `roles.id`.<fk table='roles' column='id'/>
+             */
+            parent_id?: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_system_role: boolean;
+        };
+        actions: {
+            /**
+             * Format: text
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             */
+            name: string;
+        };
+        privacy_request_regulations: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `privacy_requests.id`.<fk table='privacy_requests' column='id'/>
+             */
+            request_id: string;
+            /**
+             * Format: text
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             */
+            regulation: string;
+            /** Format: timestamp with time zone */
+            sla_deadline: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            extension_used: boolean;
+        };
+        groups: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `groups.id`.<fk table='groups' column='id'/>
+             */
+            parent_id?: string;
+            /** Format: text */
+            name: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_system_group: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+        };
+        privacy_purge_queue: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            target_kind: string;
+            /** Format: uuid */
+            target_id?: string;
+            /** Format: text */
+            target_ref?: string;
+            /** Format: text */
+            reason: string;
+            /** Format: timestamp with time zone */
+            scheduled_for: string;
+            /**
+             * Format: text
+             * @default pending
+             */
+            status: string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            attempt: number;
+            /** Format: timestamp with time zone */
+            claimed_at?: string;
+            /** Format: text */
+            claimed_by?: string;
+            /** Format: timestamp with time zone */
+            completed_at?: string;
+            /** Format: int32 */
+            rows_deleted?: number;
+            /** Format: text */
+            error?: string;
+        };
+        user_groups: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `groups.id`.<fk table='groups' column='id'/>
+             */
+            group_id: string;
+        };
+        projects: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `groups.id`.<fk table='groups' column='id'/>
+             */
+            group_id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            name: string;
+            /**
+             * Format: int64
+             * @default 0
+             */
+            budget_cents: number;
+            /** Format: text */
+            internal_notes?: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+        };
+        permissions: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            resource: string;
+            /**
+             * Format: text
+             * @description Note:
+             *     This is a Foreign Key to `actions.name`.<fk table='actions' column='name'/>
+             */
+            action_id: string;
+        };
+        migrations: {
+            /**
+             * Format: text
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             */
+            name: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            applied_at: string;
+        };
+        login_attempts: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            username: string;
+            /** Format: text */
+            ip?: string;
+            /** Format: text */
+            status: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /** Format: text */
+            ip_normalized?: string;
+            /** Format: text */
+            ip_subnet?: string;
+        };
+    };
     responses: never;
-    parameters: never;
-    requestBodies: never;
+    parameters: {
+        /** @description Preference */
+        preferParams: string;
+        /** @description Preference */
+        preferReturn: "return=representation" | "return=minimal" | "return=none";
+        /** @description Preference */
+        preferCount: "count=none";
+        /** @description Preference */
+        preferPost: "return=representation" | "return=minimal" | "return=none" | "resolution=ignore-duplicates" | "resolution=merge-duplicates";
+        /** @description Filtering Columns */
+        select: string;
+        /** @description On Conflict */
+        on_conflict: string;
+        /** @description Ordering */
+        order: string;
+        /** @description Limiting and Pagination */
+        range: string;
+        /** @description Limiting and Pagination */
+        rangeUnit: string;
+        /** @description Limiting and Pagination */
+        offset: string;
+        /** @description Limiting and Pagination */
+        limit: string;
+        "rowFilter.users.id": string;
+        "rowFilter.users.username": string;
+        "rowFilter.users.email": string;
+        "rowFilter.users.password_hash": string;
+        "rowFilter.users.created_at": string;
+        "rowFilter.users.deleted_at": string;
+        "rowFilter.users.deletion_reason": string;
+        "rowFilter.users.email_anonymized": string;
+        "rowFilter.users.country_code": string;
+        "rowFilter.users.region_code": string;
+        "rowFilter.users.city": string;
+        "rowFilter.users.geo_source": string;
+        "rowFilter.users.geo_accuracy_km": string;
+        "rowFilter.users.geo_updated_at": string;
+        "rowFilter.privacy_request_audits.id": string;
+        "rowFilter.privacy_request_audits.request_key": string;
+        "rowFilter.privacy_request_audits.event_type": string;
+        "rowFilter.privacy_request_audits.requested_at": string;
+        "rowFilter.privacy_request_audits.request_nature": string;
+        "rowFilter.privacy_request_audits.request_channel": string;
+        "rowFilter.privacy_request_audits.responded_at": string;
+        "rowFilter.privacy_request_audits.response_nature": string;
+        "rowFilter.privacy_request_audits.denial_basis": string;
+        "rowFilter.privacy_request_audits.denial_basis_cite": string;
+        "rowFilter.privacy_request_audits.subject_hmac": string;
+        "rowFilter.privacy_request_audits.pepper_kid": string;
+        "rowFilter.privacy_request_audits.subject_user_id": string;
+        "rowFilter.privacy_request_audits.created_at": string;
+        "rowFilter.role_permissions.role_id": string;
+        "rowFilter.role_permissions.permission_id": string;
+        "rowFilter.user_roles.user_id": string;
+        "rowFilter.user_roles.role_id": string;
+        "rowFilter.company_profile.id": string;
+        "rowFilter.company_profile.legal_name": string;
+        "rowFilter.company_profile.display_name": string;
+        "rowFilter.company_profile.registration_number": string;
+        "rowFilter.company_profile.website_url": string;
+        "rowFilter.company_profile.support_email": string;
+        "rowFilter.company_profile.privacy_contact_email": string;
+        "rowFilter.company_profile.created_at": string;
+        "rowFilter.customers.group_id": string;
+        "rowFilter.customers.id": string;
+        "rowFilter.customers.name": string;
+        "rowFilter.customers.internal_notes": string;
+        "rowFilter.customers.created_at": string;
+        "rowFilter.privacy_requests.id": string;
+        "rowFilter.privacy_requests.request_key": string;
+        "rowFilter.privacy_requests.user_id": string;
+        "rowFilter.privacy_requests.request_nature": string;
+        "rowFilter.privacy_requests.request_channel": string;
+        "rowFilter.privacy_requests.requested_at": string;
+        "rowFilter.privacy_requests.status": string;
+        "rowFilter.privacy_requests.closed_at": string;
+        "rowFilter.email_messages.id": string;
+        "rowFilter.email_messages.user_id": string;
+        "rowFilter.email_messages.template": string;
+        "rowFilter.email_messages.recipient": string;
+        "rowFilter.email_messages.subject": string;
+        "rowFilter.email_messages.status": string;
+        "rowFilter.email_messages.provider_message_id": string;
+        "rowFilter.email_messages.error": string;
+        "rowFilter.email_messages.body": string;
+        "rowFilter.email_messages.content_class": string;
+        "rowFilter.email_messages.created_at": string;
+        "rowFilter.email_messages.sent_at": string;
+        "rowFilter.company_addresses.id": string;
+        "rowFilter.company_addresses.company_profile_id": string;
+        "rowFilter.company_addresses.line1": string;
+        "rowFilter.company_addresses.line2": string;
+        "rowFilter.company_addresses.city": string;
+        "rowFilter.company_addresses.region_code": string;
+        "rowFilter.company_addresses.country_code": string;
+        "rowFilter.company_addresses.postal_code": string;
+        "rowFilter.company_addresses.is_registered": string;
+        "rowFilter.company_addresses.kind": string;
+        "rowFilter.company_addresses.created_at": string;
+        "rowFilter.refresh_tokens.id": string;
+        "rowFilter.refresh_tokens.user_id": string;
+        "rowFilter.refresh_tokens.jti": string;
+        "rowFilter.refresh_tokens.token_hash": string;
+        "rowFilter.refresh_tokens.created_at": string;
+        "rowFilter.refresh_tokens.expires_at": string;
+        "rowFilter.refresh_tokens.revoked_at": string;
+        "rowFilter.refresh_tokens.rotated_to": string;
+        "rowFilter.roles.id": string;
+        "rowFilter.roles.name": string;
+        "rowFilter.roles.parent_id": string;
+        "rowFilter.roles.is_system_role": string;
+        "rowFilter.actions.name": string;
+        "rowFilter.privacy_request_regulations.request_id": string;
+        "rowFilter.privacy_request_regulations.regulation": string;
+        "rowFilter.privacy_request_regulations.sla_deadline": string;
+        "rowFilter.privacy_request_regulations.extension_used": string;
+        "rowFilter.groups.id": string;
+        "rowFilter.groups.parent_id": string;
+        "rowFilter.groups.name": string;
+        "rowFilter.groups.is_system_group": string;
+        "rowFilter.groups.created_at": string;
+        "rowFilter.privacy_purge_queue.id": string;
+        "rowFilter.privacy_purge_queue.target_kind": string;
+        "rowFilter.privacy_purge_queue.target_id": string;
+        "rowFilter.privacy_purge_queue.target_ref": string;
+        "rowFilter.privacy_purge_queue.reason": string;
+        "rowFilter.privacy_purge_queue.scheduled_for": string;
+        "rowFilter.privacy_purge_queue.status": string;
+        "rowFilter.privacy_purge_queue.attempt": string;
+        "rowFilter.privacy_purge_queue.claimed_at": string;
+        "rowFilter.privacy_purge_queue.claimed_by": string;
+        "rowFilter.privacy_purge_queue.completed_at": string;
+        "rowFilter.privacy_purge_queue.rows_deleted": string;
+        "rowFilter.privacy_purge_queue.error": string;
+        "rowFilter.user_groups.user_id": string;
+        "rowFilter.user_groups.group_id": string;
+        "rowFilter.projects.group_id": string;
+        "rowFilter.projects.id": string;
+        "rowFilter.projects.name": string;
+        "rowFilter.projects.budget_cents": string;
+        "rowFilter.projects.internal_notes": string;
+        "rowFilter.projects.created_at": string;
+        "rowFilter.permissions.id": string;
+        "rowFilter.permissions.resource": string;
+        "rowFilter.permissions.action_id": string;
+        "rowFilter.migrations.name": string;
+        "rowFilter.migrations.applied_at": string;
+        "rowFilter.login_attempts.id": string;
+        "rowFilter.login_attempts.username": string;
+        "rowFilter.login_attempts.ip": string;
+        "rowFilter.login_attempts.status": string;
+        "rowFilter.login_attempts.created_at": string;
+        "rowFilter.login_attempts.ip_normalized": string;
+        "rowFilter.login_attempts.ip_subnet": string;
+    };
+    requestBodies: {
+        /** @description login_attempts */
+        login_attempts: {
+            content: {
+                "application/json": components["schemas"]["login_attempts"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["login_attempts"];
+                "application/vnd.pgrst.object+json": components["schemas"]["login_attempts"];
+                "text/csv": components["schemas"]["login_attempts"];
+            };
+        };
+        /** @description customers */
+        customers: {
+            content: {
+                "application/json": components["schemas"]["customers"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["customers"];
+                "application/vnd.pgrst.object+json": components["schemas"]["customers"];
+                "text/csv": components["schemas"]["customers"];
+            };
+        };
+        /** @description privacy_request_regulations */
+        privacy_request_regulations: {
+            content: {
+                "application/json": components["schemas"]["privacy_request_regulations"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_request_regulations"];
+                "application/vnd.pgrst.object+json": components["schemas"]["privacy_request_regulations"];
+                "text/csv": components["schemas"]["privacy_request_regulations"];
+            };
+        };
+        /** @description projects */
+        projects: {
+            content: {
+                "application/json": components["schemas"]["projects"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["projects"];
+                "application/vnd.pgrst.object+json": components["schemas"]["projects"];
+                "text/csv": components["schemas"]["projects"];
+            };
+        };
+        /** @description roles */
+        roles: {
+            content: {
+                "application/json": components["schemas"]["roles"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["roles"];
+                "application/vnd.pgrst.object+json": components["schemas"]["roles"];
+                "text/csv": components["schemas"]["roles"];
+            };
+        };
+        /** @description users */
+        users: {
+            content: {
+                "application/json": components["schemas"]["users"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["users"];
+                "application/vnd.pgrst.object+json": components["schemas"]["users"];
+                "text/csv": components["schemas"]["users"];
+            };
+        };
+        /** @description user_roles */
+        user_roles: {
+            content: {
+                "application/json": components["schemas"]["user_roles"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["user_roles"];
+                "application/vnd.pgrst.object+json": components["schemas"]["user_roles"];
+                "text/csv": components["schemas"]["user_roles"];
+            };
+        };
+        /** @description privacy_requests */
+        privacy_requests: {
+            content: {
+                "application/json": components["schemas"]["privacy_requests"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_requests"];
+                "application/vnd.pgrst.object+json": components["schemas"]["privacy_requests"];
+                "text/csv": components["schemas"]["privacy_requests"];
+            };
+        };
+        /** @description privacy_request_audits */
+        privacy_request_audits: {
+            content: {
+                "application/json": components["schemas"]["privacy_request_audits"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_request_audits"];
+                "application/vnd.pgrst.object+json": components["schemas"]["privacy_request_audits"];
+                "text/csv": components["schemas"]["privacy_request_audits"];
+            };
+        };
+        /** @description role_permissions */
+        role_permissions: {
+            content: {
+                "application/json": components["schemas"]["role_permissions"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["role_permissions"];
+                "application/vnd.pgrst.object+json": components["schemas"]["role_permissions"];
+                "text/csv": components["schemas"]["role_permissions"];
+            };
+        };
+        /** @description company_profile */
+        company_profile: {
+            content: {
+                "application/json": components["schemas"]["company_profile"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["company_profile"];
+                "application/vnd.pgrst.object+json": components["schemas"]["company_profile"];
+                "text/csv": components["schemas"]["company_profile"];
+            };
+        };
+        /** @description email_messages */
+        email_messages: {
+            content: {
+                "application/json": components["schemas"]["email_messages"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["email_messages"];
+                "application/vnd.pgrst.object+json": components["schemas"]["email_messages"];
+                "text/csv": components["schemas"]["email_messages"];
+            };
+        };
+        /** @description company_addresses */
+        company_addresses: {
+            content: {
+                "application/json": components["schemas"]["company_addresses"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["company_addresses"];
+                "application/vnd.pgrst.object+json": components["schemas"]["company_addresses"];
+                "text/csv": components["schemas"]["company_addresses"];
+            };
+        };
+        /** @description refresh_tokens */
+        refresh_tokens: {
+            content: {
+                "application/json": components["schemas"]["refresh_tokens"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["refresh_tokens"];
+                "application/vnd.pgrst.object+json": components["schemas"]["refresh_tokens"];
+                "text/csv": components["schemas"]["refresh_tokens"];
+            };
+        };
+        /** @description actions */
+        actions: {
+            content: {
+                "application/json": components["schemas"]["actions"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["actions"];
+                "application/vnd.pgrst.object+json": components["schemas"]["actions"];
+                "text/csv": components["schemas"]["actions"];
+            };
+        };
+        /** @description groups */
+        groups: {
+            content: {
+                "application/json": components["schemas"]["groups"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["groups"];
+                "application/vnd.pgrst.object+json": components["schemas"]["groups"];
+                "text/csv": components["schemas"]["groups"];
+            };
+        };
+        /** @description privacy_purge_queue */
+        privacy_purge_queue: {
+            content: {
+                "application/json": components["schemas"]["privacy_purge_queue"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_purge_queue"];
+                "application/vnd.pgrst.object+json": components["schemas"]["privacy_purge_queue"];
+                "text/csv": components["schemas"]["privacy_purge_queue"];
+            };
+        };
+        /** @description user_groups */
+        user_groups: {
+            content: {
+                "application/json": components["schemas"]["user_groups"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["user_groups"];
+                "application/vnd.pgrst.object+json": components["schemas"]["user_groups"];
+                "text/csv": components["schemas"]["user_groups"];
+            };
+        };
+        /** @description permissions */
+        permissions: {
+            content: {
+                "application/json": components["schemas"]["permissions"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["permissions"];
+                "application/vnd.pgrst.object+json": components["schemas"]["permissions"];
+                "text/csv": components["schemas"]["permissions"];
+            };
+        };
+        /** @description migrations */
+        migrations: {
+            content: {
+                "application/json": components["schemas"]["migrations"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["migrations"];
+                "application/vnd.pgrst.object+json": components["schemas"]["migrations"];
+                "text/csv": components["schemas"]["migrations"];
+            };
+        };
+    };
     headers: never;
     pathItems: never;
 }

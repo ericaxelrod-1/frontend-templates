@@ -1,10 +1,6434 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.0.0",
   "info": {
-    "title": "angular_v2",
-    "description": "PLACEHOLDER — a committed stand-in for the contract PostgREST generates from the live database. It has no paths because the template has no tables yet; the baseline migration lands in P1-N2. The real file is produced by the chain documented in README.md: PostgREST serves Swagger 2.0 at GET /, swagger2openapi converts it to OpenAPI 3.0, and that output replaces this file. The Angular types are generated from it with `npm run generate:client` in frontend/.",
-    "version": "0.0.0"
+    "title": "angular_v2 API",
+    "version": "1.0.0",
+    "description": "The CRUD surface served by PostgREST over PostgreSQL, generated from the live schema and committed (README.md, ADR-0003/ADR-0004). PostgREST serves Swagger 2.0 at GET /; swagger2openapi converts it to OpenAPI 3.0; `npm run generate:client` in frontend/ generates the Angular types from this file. Do not hand-edit — regenerate. Only relations in db-schemas = \"public\" appear here: the row-scoping internals live in a second PostgreSQL schema outside it, so they cannot be addressed at all. openapi-mode = \"ignore-privileges\" keeps this contract role-independent, which also means it advertises every relation in \"public\" whether or not a serving role is granted it — including the \"migrations\" bookkeeping table, which no serving role can reach. Restrict a table with GRANT, not by omission here."
   },
-  "paths": {},
-  "components": {}
+  "paths": {
+    "/": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "OpenAPI description (this document)",
+        "tags": [
+          "Introspection"
+        ]
+      }
+    },
+    "/users": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.users.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.username"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.password_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.deleted_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.deletion_reason"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.email_anonymized"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.country_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.region_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.city"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_source"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_accuracy_km"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_updated_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/users"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/users"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/users"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/users"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/users"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.users.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.username"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.password_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.deleted_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.deletion_reason"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.email_anonymized"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.country_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.region_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.city"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_source"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_accuracy_km"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_updated_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.users.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.username"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.password_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.deleted_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.deletion_reason"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.email_anonymized"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.country_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.region_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.city"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_source"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_accuracy_km"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.geo_updated_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/users"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/privacy_request_audits": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_key"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.event_type"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.requested_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_channel"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.responded_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.response_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.denial_basis"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.denial_basis_cite"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.subject_hmac"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.pepper_kid"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.subject_user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_request_audits"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_request_audits"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_request_audits"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_request_audits"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "privacy_request_audits"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/privacy_request_audits"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "privacy_request_audits"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_key"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.event_type"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.requested_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_channel"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.responded_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.response_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.denial_basis"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.denial_basis_cite"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.subject_hmac"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.pepper_kid"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.subject_user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "privacy_request_audits"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_key"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.event_type"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.requested_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.request_channel"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.responded_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.response_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.denial_basis"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.denial_basis_cite"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.subject_hmac"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.pepper_kid"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.subject_user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_audits.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/privacy_request_audits"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "privacy_request_audits"
+        ]
+      }
+    },
+    "/role_permissions": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.role_permissions.role_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.role_permissions.permission_id"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/role_permissions"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/role_permissions"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/role_permissions"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/role_permissions"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "role_permissions"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/role_permissions"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "role_permissions"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.role_permissions.role_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.role_permissions.permission_id"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "role_permissions"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.role_permissions.role_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.role_permissions.permission_id"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/role_permissions"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "role_permissions"
+        ]
+      }
+    },
+    "/user_roles": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.user_roles.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.user_roles.role_id"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/user_roles"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/user_roles"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/user_roles"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/user_roles"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "user_roles"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/user_roles"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "user_roles"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.user_roles.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.user_roles.role_id"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "user_roles"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.user_roles.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.user_roles.role_id"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/user_roles"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "user_roles"
+        ]
+      }
+    },
+    "/company_profile": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.legal_name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.display_name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.registration_number"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.website_url"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.support_email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.privacy_contact_email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/company_profile"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/company_profile"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/company_profile"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/company_profile"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "company_profile"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/company_profile"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "company_profile"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.legal_name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.display_name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.registration_number"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.website_url"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.support_email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.privacy_contact_email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "company_profile"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.legal_name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.display_name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.registration_number"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.website_url"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.support_email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.privacy_contact_email"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_profile.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/company_profile"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "company_profile"
+        ]
+      }
+    },
+    "/customers": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.internal_notes"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/customers"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/customers"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/customers"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/customers"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "customers"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/customers"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "customers"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.internal_notes"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "customers"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.internal_notes"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.customers.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/customers"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/privacy_requests": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_key"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_channel"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.requested_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.closed_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_requests"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_requests"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_requests"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_requests"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "privacy_requests"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/privacy_requests"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "privacy_requests"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_key"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_channel"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.requested_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.closed_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "privacy_requests"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_key"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_nature"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.request_channel"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.requested_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_requests.closed_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/privacy_requests"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "privacy_requests"
+        ]
+      }
+    },
+    "/email_messages": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.template"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.recipient"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.subject"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.provider_message_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.error"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.body"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.content_class"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.sent_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/email_messages"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/email_messages"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/email_messages"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/email_messages"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "email_messages"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/email_messages"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "email_messages"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.template"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.recipient"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.subject"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.provider_message_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.error"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.body"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.content_class"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.sent_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "email_messages"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.template"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.recipient"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.subject"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.provider_message_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.error"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.body"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.content_class"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.email_messages.sent_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/email_messages"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "email_messages"
+        ]
+      }
+    },
+    "/company_addresses": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.company_profile_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.line1"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.line2"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.city"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.region_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.country_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.postal_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.is_registered"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.kind"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/company_addresses"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/company_addresses"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/company_addresses"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/company_addresses"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "company_addresses"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/company_addresses"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "company_addresses"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.company_profile_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.line1"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.line2"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.city"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.region_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.country_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.postal_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.is_registered"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.kind"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "company_addresses"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.company_profile_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.line1"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.line2"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.city"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.region_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.country_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.postal_code"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.is_registered"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.kind"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.company_addresses.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/company_addresses"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "company_addresses"
+        ]
+      }
+    },
+    "/refresh_tokens": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.jti"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.token_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.expires_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.revoked_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.rotated_to"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/refresh_tokens"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/refresh_tokens"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/refresh_tokens"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/refresh_tokens"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "refresh_tokens"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/refresh_tokens"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "refresh_tokens"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.jti"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.token_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.expires_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.revoked_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.rotated_to"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "refresh_tokens"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.jti"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.token_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.expires_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.revoked_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.refresh_tokens.rotated_to"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/refresh_tokens"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "refresh_tokens"
+        ]
+      }
+    },
+    "/roles": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.parent_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.is_system_role"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/roles"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/roles"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/roles"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/roles"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "roles"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/roles"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "roles"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.parent_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.is_system_role"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "roles"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.parent_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.roles.is_system_role"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/roles"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "roles"
+        ]
+      }
+    },
+    "/actions": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.actions.name"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/actions"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/actions"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/actions"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/actions"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "actions"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/actions"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "actions"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.actions.name"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "actions"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.actions.name"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/actions"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "actions"
+        ]
+      }
+    },
+    "/privacy_request_regulations": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.request_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.regulation"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.sla_deadline"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.extension_used"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_request_regulations"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_request_regulations"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_request_regulations"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_request_regulations"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "privacy_request_regulations"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/privacy_request_regulations"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "privacy_request_regulations"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.request_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.regulation"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.sla_deadline"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.extension_used"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "privacy_request_regulations"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.request_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.regulation"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.sla_deadline"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_request_regulations.extension_used"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/privacy_request_regulations"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "privacy_request_regulations"
+        ]
+      }
+    },
+    "/groups": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.parent_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.is_system_group"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/groups"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/groups"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/groups"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/groups"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "groups"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/groups"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "groups"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.parent_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.is_system_group"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "groups"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.parent_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.is_system_group"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.groups.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/groups"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "groups"
+        ]
+      }
+    },
+    "/privacy_purge_queue": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_kind"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_ref"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.reason"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.scheduled_for"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.attempt"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.claimed_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.claimed_by"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.completed_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.rows_deleted"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.error"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_purge_queue"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_purge_queue"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_purge_queue"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/privacy_purge_queue"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "privacy_purge_queue"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/privacy_purge_queue"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "privacy_purge_queue"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_kind"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_ref"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.reason"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.scheduled_for"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.attempt"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.claimed_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.claimed_by"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.completed_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.rows_deleted"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.error"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "privacy_purge_queue"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_kind"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.target_ref"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.reason"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.scheduled_for"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.attempt"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.claimed_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.claimed_by"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.completed_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.rows_deleted"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.privacy_purge_queue.error"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/privacy_purge_queue"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "privacy_purge_queue"
+        ]
+      }
+    },
+    "/user_groups": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.user_groups.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.user_groups.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/user_groups"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/user_groups"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/user_groups"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/user_groups"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "user_groups"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/user_groups"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "user_groups"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.user_groups.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.user_groups.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "user_groups"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.user_groups.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.user_groups.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/user_groups"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "user_groups"
+        ]
+      }
+    },
+    "/projects": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.budget_cents"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.internal_notes"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/projects"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/projects"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/projects"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/projects"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/projects"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.budget_cents"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.internal_notes"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.group_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.budget_cents"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.internal_notes"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.projects.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/projects"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/permissions": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.resource"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.action_id"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/permissions"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/permissions"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/permissions"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/permissions"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "permissions"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/permissions"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "permissions"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.resource"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.action_id"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "permissions"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.resource"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.permissions.action_id"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/permissions"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "permissions"
+        ]
+      }
+    },
+    "/migrations": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.migrations.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.migrations.applied_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/migrations"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/migrations"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/migrations"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/migrations"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "migrations"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/migrations"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "migrations"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.migrations.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.migrations.applied_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "migrations"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.migrations.name"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.migrations.applied_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/migrations"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "migrations"
+        ]
+      }
+    },
+    "/login_attempts": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.username"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip_normalized"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip_subnet"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/login_attempts"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/login_attempts"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/login_attempts"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/login_attempts"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "login_attempts"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/login_attempts"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "login_attempts"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.username"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip_normalized"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip_subnet"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "login_attempts"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.username"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.status"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip_normalized"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.ip_subnet"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/login_attempts"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "login_attempts"
+        ]
+      }
+    },
+    "/rpc/ccpa_applicable": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "(rpc) ccpa_applicable"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/preferParams"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            },
+            "application/vnd.pgrst.object+json;nulls=stripped": {
+              "schema": {
+                "type": "object"
+              }
+            },
+            "application/vnd.pgrst.object+json": {
+              "schema": {
+                "type": "object"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "(rpc) ccpa_applicable"
+        ]
+      }
+    },
+    "/rpc/has_permission": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "who",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "text"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "text"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "(rpc) has_permission"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/preferParams"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "action": {
+                    "format": "text",
+                    "type": "string"
+                  },
+                  "resource": {
+                    "format": "text",
+                    "type": "string"
+                  },
+                  "who": {
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "who",
+                  "resource",
+                  "action"
+                ],
+                "type": "object"
+              }
+            },
+            "application/vnd.pgrst.object+json;nulls=stripped": {
+              "schema": {
+                "properties": {
+                  "action": {
+                    "format": "text",
+                    "type": "string"
+                  },
+                  "resource": {
+                    "format": "text",
+                    "type": "string"
+                  },
+                  "who": {
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "who",
+                  "resource",
+                  "action"
+                ],
+                "type": "object"
+              }
+            },
+            "application/vnd.pgrst.object+json": {
+              "schema": {
+                "properties": {
+                  "action": {
+                    "format": "text",
+                    "type": "string"
+                  },
+                  "resource": {
+                    "format": "text",
+                    "type": "string"
+                  },
+                  "who": {
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "who",
+                  "resource",
+                  "action"
+                ],
+                "type": "object"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "properties": {
+                  "action": {
+                    "format": "text",
+                    "type": "string"
+                  },
+                  "resource": {
+                    "format": "text",
+                    "type": "string"
+                  },
+                  "who": {
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "who",
+                  "resource",
+                  "action"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "(rpc) has_permission"
+        ]
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "PostgREST Documentation",
+    "url": "https://postgrest.org/en/v16/references/api.html"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:3001"
+    }
+  ],
+  "components": {
+    "parameters": {
+      "preferParams": {
+        "name": "Prefer",
+        "description": "Preference",
+        "required": false,
+        "in": "header",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "preferReturn": {
+        "name": "Prefer",
+        "description": "Preference",
+        "required": false,
+        "in": "header",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "return=representation",
+            "return=minimal",
+            "return=none"
+          ]
+        }
+      },
+      "preferCount": {
+        "name": "Prefer",
+        "description": "Preference",
+        "required": false,
+        "in": "header",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "count=none"
+          ]
+        }
+      },
+      "preferPost": {
+        "name": "Prefer",
+        "description": "Preference",
+        "required": false,
+        "in": "header",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "return=representation",
+            "return=minimal",
+            "return=none",
+            "resolution=ignore-duplicates",
+            "resolution=merge-duplicates"
+          ]
+        }
+      },
+      "select": {
+        "name": "select",
+        "description": "Filtering Columns",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "on_conflict": {
+        "name": "on_conflict",
+        "description": "On Conflict",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "order": {
+        "name": "order",
+        "description": "Ordering",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "range": {
+        "name": "Range",
+        "description": "Limiting and Pagination",
+        "required": false,
+        "in": "header",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rangeUnit": {
+        "name": "Range-Unit",
+        "description": "Limiting and Pagination",
+        "required": false,
+        "in": "header",
+        "schema": {
+          "type": "string",
+          "default": "items"
+        }
+      },
+      "offset": {
+        "name": "offset",
+        "description": "Limiting and Pagination",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "limit": {
+        "name": "limit",
+        "description": "Limiting and Pagination",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.username": {
+        "name": "username",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.email": {
+        "name": "email",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.password_hash": {
+        "name": "password_hash",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.deleted_at": {
+        "name": "deleted_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.deletion_reason": {
+        "name": "deletion_reason",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.email_anonymized": {
+        "name": "email_anonymized",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.country_code": {
+        "name": "country_code",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.region_code": {
+        "name": "region_code",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.city": {
+        "name": "city",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.geo_source": {
+        "name": "geo_source",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.geo_accuracy_km": {
+        "name": "geo_accuracy_km",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.geo_updated_at": {
+        "name": "geo_updated_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.request_key": {
+        "name": "request_key",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.event_type": {
+        "name": "event_type",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.requested_at": {
+        "name": "requested_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.request_nature": {
+        "name": "request_nature",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.request_channel": {
+        "name": "request_channel",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.responded_at": {
+        "name": "responded_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.response_nature": {
+        "name": "response_nature",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.denial_basis": {
+        "name": "denial_basis",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.denial_basis_cite": {
+        "name": "denial_basis_cite",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.subject_hmac": {
+        "name": "subject_hmac",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.pepper_kid": {
+        "name": "pepper_kid",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.subject_user_id": {
+        "name": "subject_user_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_audits.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.role_permissions.role_id": {
+        "name": "role_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.role_permissions.permission_id": {
+        "name": "permission_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.user_roles.user_id": {
+        "name": "user_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.user_roles.role_id": {
+        "name": "role_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_profile.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_profile.legal_name": {
+        "name": "legal_name",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_profile.display_name": {
+        "name": "display_name",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_profile.registration_number": {
+        "name": "registration_number",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_profile.website_url": {
+        "name": "website_url",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_profile.support_email": {
+        "name": "support_email",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_profile.privacy_contact_email": {
+        "name": "privacy_contact_email",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_profile.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.customers.group_id": {
+        "name": "group_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.customers.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.customers.name": {
+        "name": "name",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.customers.internal_notes": {
+        "name": "internal_notes",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.customers.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_requests.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_requests.request_key": {
+        "name": "request_key",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_requests.user_id": {
+        "name": "user_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_requests.request_nature": {
+        "name": "request_nature",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_requests.request_channel": {
+        "name": "request_channel",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_requests.requested_at": {
+        "name": "requested_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_requests.status": {
+        "name": "status",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_requests.closed_at": {
+        "name": "closed_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.user_id": {
+        "name": "user_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.template": {
+        "name": "template",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.recipient": {
+        "name": "recipient",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.subject": {
+        "name": "subject",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.status": {
+        "name": "status",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.provider_message_id": {
+        "name": "provider_message_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.error": {
+        "name": "error",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.body": {
+        "name": "body",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.content_class": {
+        "name": "content_class",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.email_messages.sent_at": {
+        "name": "sent_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.company_profile_id": {
+        "name": "company_profile_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.line1": {
+        "name": "line1",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.line2": {
+        "name": "line2",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.city": {
+        "name": "city",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.region_code": {
+        "name": "region_code",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.country_code": {
+        "name": "country_code",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.postal_code": {
+        "name": "postal_code",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.is_registered": {
+        "name": "is_registered",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.kind": {
+        "name": "kind",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.company_addresses.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.refresh_tokens.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.refresh_tokens.user_id": {
+        "name": "user_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.refresh_tokens.jti": {
+        "name": "jti",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.refresh_tokens.token_hash": {
+        "name": "token_hash",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.refresh_tokens.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.refresh_tokens.expires_at": {
+        "name": "expires_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.refresh_tokens.revoked_at": {
+        "name": "revoked_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.refresh_tokens.rotated_to": {
+        "name": "rotated_to",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.roles.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.roles.name": {
+        "name": "name",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.roles.parent_id": {
+        "name": "parent_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.roles.is_system_role": {
+        "name": "is_system_role",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.actions.name": {
+        "name": "name",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_regulations.request_id": {
+        "name": "request_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_regulations.regulation": {
+        "name": "regulation",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_regulations.sla_deadline": {
+        "name": "sla_deadline",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_request_regulations.extension_used": {
+        "name": "extension_used",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.groups.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.groups.parent_id": {
+        "name": "parent_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.groups.name": {
+        "name": "name",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.groups.is_system_group": {
+        "name": "is_system_group",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.groups.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.target_kind": {
+        "name": "target_kind",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.target_id": {
+        "name": "target_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.target_ref": {
+        "name": "target_ref",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.reason": {
+        "name": "reason",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.scheduled_for": {
+        "name": "scheduled_for",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.status": {
+        "name": "status",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.attempt": {
+        "name": "attempt",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.claimed_at": {
+        "name": "claimed_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.claimed_by": {
+        "name": "claimed_by",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.completed_at": {
+        "name": "completed_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.rows_deleted": {
+        "name": "rows_deleted",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.privacy_purge_queue.error": {
+        "name": "error",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.user_groups.user_id": {
+        "name": "user_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.user_groups.group_id": {
+        "name": "group_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.projects.group_id": {
+        "name": "group_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.projects.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.projects.name": {
+        "name": "name",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.projects.budget_cents": {
+        "name": "budget_cents",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.projects.internal_notes": {
+        "name": "internal_notes",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.projects.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.permissions.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.permissions.resource": {
+        "name": "resource",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.permissions.action_id": {
+        "name": "action_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.migrations.name": {
+        "name": "name",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.migrations.applied_at": {
+        "name": "applied_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.login_attempts.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.login_attempts.username": {
+        "name": "username",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.login_attempts.ip": {
+        "name": "ip",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.login_attempts.status": {
+        "name": "status",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.login_attempts.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.login_attempts.ip_normalized": {
+        "name": "ip_normalized",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.login_attempts.ip_subnet": {
+        "name": "ip_subnet",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "requestBodies": {
+      "login_attempts": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/login_attempts"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/login_attempts"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/login_attempts"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/login_attempts"
+            }
+          }
+        },
+        "description": "login_attempts"
+      },
+      "customers": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/customers"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/customers"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/customers"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/customers"
+            }
+          }
+        },
+        "description": "customers"
+      },
+      "privacy_request_regulations": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_request_regulations"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_request_regulations"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_request_regulations"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_request_regulations"
+            }
+          }
+        },
+        "description": "privacy_request_regulations"
+      },
+      "projects": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/projects"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/projects"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/projects"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/projects"
+            }
+          }
+        },
+        "description": "projects"
+      },
+      "roles": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/roles"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/roles"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/roles"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/roles"
+            }
+          }
+        },
+        "description": "roles"
+      },
+      "users": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/users"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/users"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/users"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/users"
+            }
+          }
+        },
+        "description": "users"
+      },
+      "user_roles": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/user_roles"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/user_roles"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/user_roles"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/user_roles"
+            }
+          }
+        },
+        "description": "user_roles"
+      },
+      "privacy_requests": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_requests"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_requests"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_requests"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_requests"
+            }
+          }
+        },
+        "description": "privacy_requests"
+      },
+      "privacy_request_audits": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_request_audits"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_request_audits"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_request_audits"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_request_audits"
+            }
+          }
+        },
+        "description": "privacy_request_audits"
+      },
+      "role_permissions": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/role_permissions"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/role_permissions"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/role_permissions"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/role_permissions"
+            }
+          }
+        },
+        "description": "role_permissions"
+      },
+      "company_profile": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/company_profile"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/company_profile"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/company_profile"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/company_profile"
+            }
+          }
+        },
+        "description": "company_profile"
+      },
+      "email_messages": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/email_messages"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/email_messages"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/email_messages"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/email_messages"
+            }
+          }
+        },
+        "description": "email_messages"
+      },
+      "company_addresses": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/company_addresses"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/company_addresses"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/company_addresses"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/company_addresses"
+            }
+          }
+        },
+        "description": "company_addresses"
+      },
+      "refresh_tokens": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/refresh_tokens"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/refresh_tokens"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/refresh_tokens"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/refresh_tokens"
+            }
+          }
+        },
+        "description": "refresh_tokens"
+      },
+      "actions": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/actions"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/actions"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/actions"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/actions"
+            }
+          }
+        },
+        "description": "actions"
+      },
+      "groups": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/groups"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/groups"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/groups"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/groups"
+            }
+          }
+        },
+        "description": "groups"
+      },
+      "privacy_purge_queue": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_purge_queue"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_purge_queue"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_purge_queue"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/privacy_purge_queue"
+            }
+          }
+        },
+        "description": "privacy_purge_queue"
+      },
+      "user_groups": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/user_groups"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/user_groups"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/user_groups"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/user_groups"
+            }
+          }
+        },
+        "description": "user_groups"
+      },
+      "permissions": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/permissions"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/permissions"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/permissions"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/permissions"
+            }
+          }
+        },
+        "description": "permissions"
+      },
+      "migrations": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/migrations"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/migrations"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/migrations"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/migrations"
+            }
+          }
+        },
+        "description": "migrations"
+      }
+    },
+    "schemas": {
+      "users": {
+        "required": [
+          "id",
+          "username",
+          "email",
+          "password_hash",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "username": {
+            "format": "text",
+            "type": "string"
+          },
+          "email": {
+            "format": "text",
+            "type": "string"
+          },
+          "password_hash": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "deleted_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "deletion_reason": {
+            "format": "text",
+            "type": "string"
+          },
+          "email_anonymized": {
+            "format": "boolean",
+            "type": "boolean"
+          },
+          "country_code": {
+            "format": "text",
+            "type": "string"
+          },
+          "region_code": {
+            "format": "text",
+            "type": "string"
+          },
+          "city": {
+            "format": "text",
+            "type": "string"
+          },
+          "geo_source": {
+            "format": "text",
+            "type": "string"
+          },
+          "geo_accuracy_km": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "geo_updated_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "privacy_request_audits": {
+        "required": [
+          "id",
+          "request_key",
+          "event_type",
+          "requested_at",
+          "request_nature",
+          "request_channel",
+          "subject_hmac",
+          "pepper_kid",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "request_key": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "event_type": {
+            "format": "text",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "request_nature": {
+            "format": "text",
+            "type": "string"
+          },
+          "request_channel": {
+            "format": "text",
+            "type": "string"
+          },
+          "responded_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "response_nature": {
+            "format": "text",
+            "type": "string"
+          },
+          "denial_basis": {
+            "format": "text",
+            "type": "string"
+          },
+          "denial_basis_cite": {
+            "format": "text",
+            "type": "string"
+          },
+          "subject_hmac": {
+            "format": "bytea",
+            "type": "string"
+          },
+          "pepper_kid": {
+            "format": "text",
+            "type": "string"
+          },
+          "subject_user_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "role_permissions": {
+        "required": [
+          "role_id",
+          "permission_id"
+        ],
+        "properties": {
+          "role_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `roles.id`.<fk table='roles' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "permission_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `permissions.id`.<fk table='permissions' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "user_roles": {
+        "required": [
+          "user_id",
+          "role_id"
+        ],
+        "properties": {
+          "user_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "role_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `roles.id`.<fk table='roles' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "company_profile": {
+        "required": [
+          "id",
+          "legal_name",
+          "display_name",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "legal_name": {
+            "format": "text",
+            "type": "string"
+          },
+          "display_name": {
+            "format": "text",
+            "type": "string"
+          },
+          "registration_number": {
+            "format": "text",
+            "type": "string"
+          },
+          "website_url": {
+            "format": "text",
+            "type": "string"
+          },
+          "support_email": {
+            "format": "text",
+            "type": "string"
+          },
+          "privacy_contact_email": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "customers": {
+        "required": [
+          "group_id",
+          "id",
+          "name",
+          "created_at"
+        ],
+        "properties": {
+          "group_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `groups.id`.<fk table='groups' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "format": "text",
+            "type": "string"
+          },
+          "internal_notes": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "privacy_requests": {
+        "required": [
+          "id",
+          "request_key",
+          "user_id",
+          "request_nature",
+          "request_channel",
+          "requested_at",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "request_key": {
+            "default": "uuidv7()",
+            "format": "uuid",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "request_nature": {
+            "format": "text",
+            "type": "string"
+          },
+          "request_channel": {
+            "format": "text",
+            "type": "string"
+          },
+          "requested_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "status": {
+            "default": "open",
+            "format": "text",
+            "type": "string"
+          },
+          "closed_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "email_messages": {
+        "required": [
+          "id",
+          "user_id",
+          "template",
+          "recipient",
+          "subject",
+          "status",
+          "content_class",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "template": {
+            "format": "text",
+            "type": "string"
+          },
+          "recipient": {
+            "format": "text",
+            "type": "string"
+          },
+          "subject": {
+            "format": "text",
+            "type": "string"
+          },
+          "status": {
+            "format": "text",
+            "type": "string"
+          },
+          "provider_message_id": {
+            "format": "text",
+            "type": "string"
+          },
+          "error": {
+            "format": "text",
+            "type": "string"
+          },
+          "body": {
+            "format": "text",
+            "type": "string"
+          },
+          "content_class": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "sent_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "company_addresses": {
+        "required": [
+          "id",
+          "company_profile_id",
+          "line1",
+          "city",
+          "country_code",
+          "is_registered",
+          "kind",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "company_profile_id": {
+            "description": "Note:\nThis is a Foreign Key to `company_profile.id`.<fk table='company_profile' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "line1": {
+            "format": "text",
+            "type": "string"
+          },
+          "line2": {
+            "format": "text",
+            "type": "string"
+          },
+          "city": {
+            "format": "text",
+            "type": "string"
+          },
+          "region_code": {
+            "format": "text",
+            "type": "string"
+          },
+          "country_code": {
+            "format": "text",
+            "type": "string"
+          },
+          "postal_code": {
+            "format": "text",
+            "type": "string"
+          },
+          "is_registered": {
+            "default": false,
+            "format": "boolean",
+            "type": "boolean"
+          },
+          "kind": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "refresh_tokens": {
+        "required": [
+          "id",
+          "user_id",
+          "jti",
+          "token_hash",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "jti": {
+            "default": "uuidv7()",
+            "format": "uuid",
+            "type": "string"
+          },
+          "token_hash": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "revoked_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "rotated_to": {
+            "description": "Note:\nThis is a Foreign Key to `refresh_tokens.id`.<fk table='refresh_tokens' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "roles": {
+        "required": [
+          "id",
+          "name",
+          "is_system_role"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "format": "text",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "Note:\nThis is a Foreign Key to `roles.id`.<fk table='roles' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "is_system_role": {
+            "default": false,
+            "format": "boolean",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "actions": {
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "text",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "privacy_request_regulations": {
+        "required": [
+          "request_id",
+          "regulation",
+          "sla_deadline",
+          "extension_used"
+        ],
+        "properties": {
+          "request_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `privacy_requests.id`.<fk table='privacy_requests' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "regulation": {
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "text",
+            "type": "string"
+          },
+          "sla_deadline": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "extension_used": {
+            "default": false,
+            "format": "boolean",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "groups": {
+        "required": [
+          "id",
+          "name",
+          "is_system_group",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "Note:\nThis is a Foreign Key to `groups.id`.<fk table='groups' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "format": "text",
+            "type": "string"
+          },
+          "is_system_group": {
+            "default": false,
+            "format": "boolean",
+            "type": "boolean"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "privacy_purge_queue": {
+        "required": [
+          "id",
+          "target_kind",
+          "reason",
+          "scheduled_for",
+          "status",
+          "attempt"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "target_kind": {
+            "format": "text",
+            "type": "string"
+          },
+          "target_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "target_ref": {
+            "format": "text",
+            "type": "string"
+          },
+          "reason": {
+            "format": "text",
+            "type": "string"
+          },
+          "scheduled_for": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "status": {
+            "default": "pending",
+            "format": "text",
+            "type": "string"
+          },
+          "attempt": {
+            "default": 0,
+            "format": "int32",
+            "type": "integer"
+          },
+          "claimed_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "claimed_by": {
+            "format": "text",
+            "type": "string"
+          },
+          "completed_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "rows_deleted": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "error": {
+            "format": "text",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "user_groups": {
+        "required": [
+          "user_id",
+          "group_id"
+        ],
+        "properties": {
+          "user_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "group_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `groups.id`.<fk table='groups' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "projects": {
+        "required": [
+          "group_id",
+          "id",
+          "name",
+          "budget_cents",
+          "created_at"
+        ],
+        "properties": {
+          "group_id": {
+            "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `groups.id`.<fk table='groups' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "format": "text",
+            "type": "string"
+          },
+          "budget_cents": {
+            "default": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "internal_notes": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "permissions": {
+        "required": [
+          "id",
+          "resource",
+          "action_id"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "resource": {
+            "format": "text",
+            "type": "string"
+          },
+          "action_id": {
+            "description": "Note:\nThis is a Foreign Key to `actions.name`.<fk table='actions' column='name'/>",
+            "format": "text",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "migrations": {
+        "required": [
+          "name",
+          "applied_at"
+        ],
+        "properties": {
+          "name": {
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "text",
+            "type": "string"
+          },
+          "applied_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "login_attempts": {
+        "required": [
+          "id",
+          "username",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "username": {
+            "format": "text",
+            "type": "string"
+          },
+          "ip": {
+            "format": "text",
+            "type": "string"
+          },
+          "status": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "ip_normalized": {
+            "format": "text",
+            "type": "string"
+          },
+          "ip_subnet": {
+            "format": "text",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  }
 }
