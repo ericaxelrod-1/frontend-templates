@@ -115,7 +115,17 @@ backend/
 │   │   ├── environment.ts     every key read once, problems reported together
 │   │   └── load-env-file.ts   the mode → env-file resolution, one loader
 │   ├── auth/              JWT issuance, refresh rotation, login orchestration
-│   └── email/             transactional email — see below
+│   ├── email/             transactional email — see below
+│   ├── breaker/           the app-level circuit breaker — see ADR-0027
+│   │   ├── breaker-meter.ts   breaker.meter — the measurement, its own interval
+│   │   ├── breaker-gate.ts    breaker.gate — the decision; the only AbortController
+│   │   ├── breaker-state.ts   the state machine, pure
+│   │   ├── breaker.interceptor.ts  the APP_INTERCEPTOR: GATE for thin-app routes
+│   │   └── dispatch-token.ts  service.method, the one vocabulary §9B.1 shares
+│   └── purge/             the retention sweeper — see docs/rebase.md §9A
+│       ├── purge-sweeper.service.ts  purge.sweeper — claims, deletes, marks done
+│       ├── purge-claim.ts           the four SQL statements, one text per operation
+│       └── purge-executor.ts        the closed reason dispatch; the one executor
 ├── database/
 │   ├── migrations/        ONE directory, ONE table, plain SQL
 │   ├── bootstrap/         role creation, once, as a superuser
@@ -125,9 +135,21 @@ backend/
 ```
 
 Later W11 slices add `security/` (rate limiting, IP reputation, pattern
-detection, cron), `captcha/` (the previous self-rolled challenge, which was
-correct and is kept) and `privacy/` (export, delete workflows). They are named
-here so the shape is predictable; nothing in the tree pretends they exist.
+detection, cron) and `captcha/` (the previous self-rolled challenge, which was
+correct and is kept). They are named here so the shape is predictable; nothing in
+the tree pretends they exist.
+
+**There is no `src/privacy/`, and that is the design rather than a gap.** The
+privacy/DSAR feature (`docs/rebase.md` §9, ADR-0029, ADR-0030) is **migrations and
+nothing else**: `0009`–`0014` create `privacy_requests`,
+`privacy_request_regulations`, `privacy_request_audits`, `privacy_purge_queue`, the
+`users` anonymisation and geo columns, the company profile, and the RLS policies and
+grants that carry them. Every table is CRUD over rows, so PostgREST serves it and
+PostgREST is the API layer (§B1/ADR-0004). **No application path writes any of them
+yet** — there is no erasure route, no cancel route and no enqueue — which is
+recorded as an open gap in `docs/rebase.md` §9.8.4 and §9A.8.1 rather than papered
+over. `src/breaker/` and `src/purge/` exist for the opposite reason: a schedule, an
+algorithm and a set of transactions are what PostgREST cannot do.
 
 **TypeORM, Passport and `@nestjs/swagger` are not dependencies.** That removes
 `entityManager.query()` and `createQueryBuilder()` from application code

@@ -82,7 +82,28 @@ describe('every shipped migration has a down script the runner can execute', () 
   const names = upMigrationNames();
 
   it('finds the migrations to check, so an empty directory is not a pass', () => {
-    expect(names).toEqual([
+    // Properties of the list, NOT the list itself. An earlier version of this
+    // assertion hardcoded every shipped filename, which meant adding a migration
+    // required editing the test — so the fifth and sixth landed as red here before
+    // anything checked their down scripts, and the failure was reported as a
+    // broken test rather than a missing one. A gate that must be hand-edited on
+    // every addition gets skipped, and a skipped gate is not a gate.
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) {
+      expect(name).toMatch(/^\d{4,}_[a-z0-9_]+\.sql$/);
+    }
+    // Numbers are contiguous and unique: `0010_x.sql` beside `0012_y.sql` means a
+    // migration was renamed away, and the ledger ordering is then not the file order.
+    const numbers = names.map((name) => Number.parseInt(name.slice(0, 4), 10));
+    const first = numbers[0] ?? 0;
+    expect(new Set(numbers).size).toBe(numbers.length);
+    expect(numbers).toEqual(numbers.map((_, index) => first + index));
+  });
+
+  it('still carries the migrations whose down scripts were each written by hand', () => {
+    // A floor, not a duplicate. These eight are shipped history and a down script
+    // that stops existing is a silent rollback regression, not a new file.
+    const baseline = [
       '0001_rls_foundation.sql',
       '0002_refresh_tokens.sql',
       '0003_login_attempt_ip_keys.sql',
@@ -91,7 +112,10 @@ describe('every shipped migration has a down script the runner can execute', () 
       '0006_uuidv7.sql',
       '0007_resource_ceilings.sql',
       '0008_user_identity.sql',
-    ]);
+    ];
+    for (const name of baseline) {
+      expect(names).toContain(name);
+    }
   });
 
   it('resolves each down script to the sibling file, not a section of the up file', () => {

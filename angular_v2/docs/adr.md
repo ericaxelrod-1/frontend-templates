@@ -36,6 +36,11 @@ Status key: **Accepted** — settled, to be implemented as written.
 | [0023](#adr-0023) | **Two orthogonal authorization axes** — scope in RLS, capability in OLS | Accepted (row scope, hierarchy and the capability resolver all revised after testing) |
 | [0024](#adr-0024) | **One email provider, mode-driven transport**, handlebars, and templates that must reach `dist/` | Accepted |
 | [0025](#adr-0025) | **`email_messages` is the FOURTH scoping category — "derived"**; scope resolves through the recipient user's memberships | Accepted |
+| [0026](#adr-0026) | Every key is UUIDv7, and the server floor moves to PostgreSQL 18 | Accepted |
+| [0027](#adr-0027) | **The app-level circuit breaker trips on memory alone**; disk is measured and reported and never a trip input | Accepted (shipped; the record `0007` forward-references) |
+| [0028](#adr-0028) | **`ccpa_applicable()` is address-triggered and deliberately over-applies**, with no config flag | Accepted (shipped) |
+| [0029](#adr-0029) | **Three privacy/DSAR tables, three scoping categories**, and a working copy that may be cascade-deleted | Accepted (shipped) |
+| [0030](#adr-0030) | **`privacy_request_audits` carries no FK to `users`**, and append-only is enforced by the absence of grants | Accepted (shipped; the subject half of the append gate corrected by `0014`) |
 
 ---
 
@@ -2956,6 +2961,7 @@ stored by default.**
 
 ---
 
+<a id="adr-0026"></a>
 ## ADR-0026: Every key is UUIDv7, and the server floor moves to PostgreSQL 18
 
 ### The decision
@@ -3080,3 +3086,522 @@ source carries no `gen_random_uuid`.
 
 Proven able to fail: reverting one line of `0006` to `gen_random_uuid()` turns two
 of its assertions red and names `users.id`.
+
+---
+
+<a id="adr-0027"></a>
+## ADR-0027: The application-level circuit breaker trips on memory alone
+
+**Status:** Accepted, and **shipped**.
+`backend/src/breaker/` implements it and `backend/test/unit/breaker/` (seven
+specs) proves it; `backend/database/migrations/0007_resource_ceilings.sql`
+forward-references this record and is the layer that cannot be forgotten by a Nest
+interceptor.
+
+**Context.** `0007_resource_ceilings.sql:6-12` justified putting three PostgreSQL
+session ceilings in a migration by claiming there was deliberately no application
+gate, on two grounds: PostgREST serves the CRUD surface from a **separate process**,
+and *"an application-level gate would cover four auth routes, report itself
+Healthy, and gate nothing anyone could attack."* The first ground is load-bearing
+and remains true. The second was written against a snapshot and is false as a
+general finding — the thin app now has three background jobs whose whole job is to
+be refused, plus a purge that is an unbounded `DELETE`. This record is the half of
+`0007`'s comment that is right; the amended comment is still outstanding and is
+recorded as such in `docs/rebase.md` W73.
+
+### The decision
+
+**Memory is the only trip input. Disk is measured, reported, and can never refuse
+anything.**
+
+The breaker's state machine is `closed → open → half_open → closed | open` because
+there is exactly one signal. The health surface carries three *independent*
+branches — `memory` against `GREEN`/`YELLOW`/`RED`, `disk` as two numbers, and
+`breaker` as counts — and **no aggregate `status` field**, and
+`test/unit/breaker/breaker-health.spec.ts` asserts that key set by name so adding
+one back is a red test rather than a code-review opinion.
+
+### Why one signal and not two
+
+There is no correct function from N independent booleans to a three-state enum.
+*"Refuse everything that allocates"* and *"refuse nothing"* are different verdicts
+about different resources, and any aggregate forces one of them to lie. The
+reference implementation this design came from collapsed exactly that way: it
+classified on the **disk** percentage alone, and memory — measured and shipped —
+never affected enforcement, so a completely saturated process reported `NORMAL`.
+
+Disk stays measured because an operator looking at a green memory line beside a
+red disk line has learned something real, and `bavail` rather than `bfree`, because
+`bfree` counts blocks reserved for root this process may not use.
+
+### Why disk could not be a trip input even if we wanted it to
+
+- The app cleans up its own logs and its own temp files. Everything else on the
+  volume belongs to the OS, to Postgres or to the operator, and the remedy is a
+  human with `df -h`.
+- A disk trip converts a condition with an obvious manual remedy into an automated
+  refusal that **hides the condition while it is still true**, with a message that
+  mentions no filesystem.
+- The trip the app can actually make is *"stop allocating"*, and the only lever an
+  application holds over memory is not starting new work. A disk trip asks the app
+  to refuse work it was never the right party to refuse, using a lever it does not
+  hold.
+
+### What the trip set did not have to include, and why
+
+**The database's own protection is below both runtimes, not above them.**
+`0007_resource_ceilings.sql` sets `statement_timeout`, `lock_timeout` and
+`idle_in_transaction_session_timeout` with `ALTER DATABASE` — database-scoped,
+because every connection logs in as `pgrst_authenticator` and then `SET ROLE`s, so
+`ALTER ROLE` would be a setting applied to nothing. Those cannot be forgotten by an
+interceptor, which is the property the breaker cannot claim for itself. **The
+breaker does not protect Postgres and nothing in this repository may be described as
+doing so.**
+
+### The cold-start correction, which this record exists partly to preserve
+
+The design's own staleness rule — *a reading older than `2 × BREAKER_POLL_SECONDS`
+is unmeasured, and unmeasured fails stopped* — applied exactly as written **refused
+every non-protected dispatch with `202` for the first thirty seconds of every
+process's life**, and turned a committed, previously-green e2e test red.
+
+`sample === null` is now its own condition, distinct from `stale`, and it is
+**admitted**; the dead-instrument refusal lives on a sample that *exists* and has
+aged. The first reading is taken in `onApplicationBootstrap` before the interval is
+registered, so "never measured" is a state before an app can serve an HTTP request.
+
+**The general rule, which is the part to carry to the next control: a fail-closed
+rule needs an explicit statement about the state it does not cover.** "No reading is
+stale" and "no reading is healthy" are different sentences, and collapsing them
+produces a control that fails **stopped** on a healthy machine that has not finished
+starting. ADR-0023 already records the mirror image — a failed measurement reported
+as a healthy one.
+
+### What was rejected
+
+- **A second trip signal (`db_pool_waiting`, load average).** Pool saturation is a
+  *consequence* of the app doing too much, and the response is the same response, so
+  it adds a threshold to configure without adding a decision to make.
+- **A health DTO with an aggregate `status`.** Refused for the enum reason above,
+  and refused mechanically.
+- **`@Cron` for either job.** `@Cron` binds during `OnModuleInit`, which Nest runs
+  before `OnApplicationBootstrap`, so a meter registered that way can take its first
+  reading before the configuration has been asserted. Both jobs register a plain
+  `unref()`ed `setInterval` in `onApplicationBootstrap` and hand the handle to
+  `SchedulerRegistry`. **`@nestjs/schedule` is a dependency** — v12, not v6, which
+  peers on Nest 10/11 while this tree is Nest 12 — and `docs/rebase.md` §9A.3 and
+  §9B.8 both said not to add it. The plan's *argument* (ordering) was right and its
+  *conclusion* (the library) was wrong; both are recorded there.
+- **The breaker as a guard.** Refused: a capacity verdict ahead of authentication
+  hands an unauthenticated prober the reconnaissance that makes a follow-up attack
+  cheaper. An information disclosure to anonymous callers is worse than an un-gated
+  flood a reverse proxy could absorb.
+- **A per-service "is this abortable" flag.** STOP is a contract: a site is
+  stoppable because it takes an `AbortSignal` and its acceptance test is *"aborting
+  leaves no partial state"*. A flag makes that a deployment-time opinion; a contract
+  makes it a fact with a test attached.
+
+### The gap this record leaves open
+
+**`KNOWN_DISPATCH_TOKENS` is not a route census and nothing enforces that it is.**
+`dispatchTokenForRoute()` returns `undefined` for a route this build cannot name,
+and no code path walks the mounted routes — so **a new route is silently
+sheddable**. The boot-time check that does exist runs the other way: an entry in
+`BREAKER_PROTECTED` naming no known token is refused, which catches a typo in the
+protection list and cannot catch a route that was never listed.
+
+The obvious gate is a boot-time route walk, and it is not built because
+`test/e2e/email.e2e-spec.ts` mounts `EmailProbeController` into `AppModule` — by the
+same construction, a dispatch site. The only two ways to make such a gate pass are
+adding the fixture's routes to `BREAKER_PROTECTED` (which hides the defect rather
+than closing it) or exempting test environments (a `NODE_ENV` branch around a
+security control). Both are refused. Recorded as a review item; the file says so.
+
+---
+
+<a id="adr-0028"></a>
+## ADR-0028: `ccpa_applicable()` is address-triggered, deliberately over-applies, and has no config flag
+
+**Status:** Accepted, and **shipped**.
+`backend/database/migrations/0013_company_profile.sql` implements it and
+`backend/test/rls/geo-profile.spec.ts` proves it, asserting the constraint, the
+function and the two together.
+
+**Context.** A template that ships a statutory predicate needs to answer *"is the
+CCPA reached?"* somewhere. The obvious design is a configuration flag: an operator
+answers the question once, in `.env`. That design is refused here, and the refusal
+is the decision.
+
+### The decision
+
+```sql
+CREATE FUNCTION public.ccpa_applicable() RETURNS boolean … AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.company_addresses a
+     WHERE a.region_code = 'CA' AND a.country_code = 'US')
+$$;
+```
+
+**It answers `true` when the company holds an address in California, and it does
+not care whether the company is a covered business.** There is deliberately **no**
+`CCPA_COVERED_BUSINESS` flag anywhere in this repository.
+
+### Why over-application is the correct direction
+
+The statutory test is not about the address. CCPA §1798.140 covers a "business" —
+one meeting revenue, consumer-count and data-selling thresholds, none of which is
+about where its office is. A California address on a company with $200k of revenue
+and eleven employees is not a covered business, and this function answers `true`
+for it. The asymmetry decides it:
+
+| | Cost | Visible to |
+|---|---|---|
+| **Over-apply** | An operator receives a CCPA-flavoured data-subject request, reads the thresholds, and replies that the business is not covered. An afternoon, once. | a human, who can make that decision |
+| **Under-apply** | Statutory damages. | **nobody** — no request arrives that could have revealed it, and the regulator finds it |
+
+Under-application is the failure mode with no signal. There is a second-order
+reason worth more than the first: **over-applying builds the muscle memory.** A
+team that has handled the request once knows what it takes; the day the thresholds
+*are* met, the machinery is already running. A team that has never run it is
+discovering a statutory deadline under one.
+
+### Why there is no config flag
+
+A flag would be a hand-maintained value answering a question **that is not ours to
+answer from this repository.** The threshold data lives in Stripe, QuickBooks or an
+ERP; it changes four times a year; whoever set the flag last is gone. And the
+failure is undetectable: `ccpa_applicable()` returns `false`, the notice does not
+render, and **no test fails** — a statutory determination has become an operator
+preference with no signal. No configuration can talk us out of getting this wrong in
+the direction that matters, so nothing here tries.
+
+**When the threshold test does land, it is not a boolean on this table.** It is a
+decision made from a system of record that holds the numbers, recorded with a date
+and a reason, so that *"why did we think we were covered on the 3rd of March"* has
+an answer. That is a different table with a different owner, and pretending a
+column here is that table is how it gets done wrong quietly.
+
+### Why `company_addresses` is a child table
+
+Because "several" must be representable for the predicate to be correct. A single
+`region_code` column on `company_profile` would force a choice between recording
+one address honestly and recording all of them falsely: a company with an office in
+California and a head office in Delaware has to write down one of them, and
+whichever it writes down is a claim about the whole company that is not true. The
+child table makes *"any one of these is in California"* a question the schema can
+answer, and `EXISTS` is therefore correct where `country_code = (SELECT …)` on a
+single profile row would not be.
+
+### Two consequences a reader must know
+
+- **`= 'CA'` is an exact comparison, not `upper(...) = 'CA'`.** The `CHECK`
+  constraints make the stored form canonical, so the exact form is sound, and
+  `upper(btrim(...))` would hide a data-quality bug rather than surface it: the same
+  `'ca'` would then work here and break every other query written against the
+  column. The dependency is real and the suite asserts the constraint, the function
+  and the two together so it fails loudly rather than silently under-applying.
+- **This function does not answer GDPR.** Art. 3(2) reaches a controller outside
+  the Union that **offers goods or services to persons in the Union**, and no
+  predicate over `company_addresses` can detect it — there is no row to find. That
+  closes through the **user's own declaration**: `users.region_code` and
+  `users.geo_source` (`0012_user_geo.sql`) record where the person is, and the
+  assessment is made from that row. Stated here because the failure mode of a
+  compliance table is somebody later reading `ccpa_applicable()` and concluding
+  that geographic scope is solved here. It is not.
+
+### Why the function is anonymous-reachable
+
+A contact address and a company name are printed on a letterhead, and the
+disclosure is owed to anybody **including someone who is not signed in** — a `401`
+on a public privacy-policy page is not a security control, it is a denial of the
+disclosure itself. An anon-reachable `SECURITY DEFINER` function is normally a red
+flag in this schema (`0001` measured 63 unauthenticated probes recovering an
+administrator's whole permission set through one). It is safe here for a specific
+reason: the function takes **no argument**, reads **no caller identity**, and its
+answer is a function of table content that is public anyway. There is no `who` to
+launder an identity through, no GUC to set, and no grant to reach past. **It is a
+predicate over two columns.**
+
+### One subtle dependency that fails in a way nobody would look for
+
+`ccpa_applicable()` is `SECURITY DEFINER`, so `current_user` inside its body is the
+**function owner**, never `app_admin`, whoever called it — and both tables are
+`FORCE ROW LEVEL SECURITY`, which binds the owner to their policies. The read
+policy is therefore `USING (true)`. **Had it been written
+`current_user = 'app_admin'` — the shape every other table in this schema uses —
+this function would return `false` for everyone, with no error, on every
+deployment, and the privacy notice would never render.** Same failure ADR-0023
+records for a definer function that reads `current_user` instead of its argument.
+The two statements are one decision: if a future migration narrows the read policy
+on either table, this function must be re-read in the same change.
+
+---
+
+<a id="adr-0029"></a>
+## ADR-0029: Three privacy/DSAR tables, three scoping categories, and a working copy that may be cascade-deleted
+
+**Status:** Accepted, and **shipped**.
+`backend/database/migrations/0010_privacy_requests.sql` implements it;
+`backend/test/rls/privacy-requests.spec.ts` proves it and is a gating step of
+`npm run verify`.
+
+**Context.** `docs/rebase.md` §9 ported the legacy privacy module and rejected most
+of it — its soft delete, its unwired `AbortController`, its audit table that no
+migration created, its jurisdiction list hardcoded as an array literal. What
+survived was a request, its clocks, and a compliance record. Getting those three
+into this schema is mostly ADR-0025 and ADR-0023 applied to a new subject; the parts
+that were genuinely decided here are recorded below.
+
+### The three tables and their categories
+
+| Table | Category | Primary key | Why that category |
+|---|---|---|---|
+| `privacy_requests` | **DERIVED** | simple `(id)` | its scope is the **subject's** membership |
+| `privacy_request_regulations` | **DERIVED** | `(request_id, regulation)` | visible exactly when its request is |
+| `privacy_request_audits` | **unscoped** | simple `(id)` | global *record-keeping*, not tenant data |
+
+**`privacy_requests` has no `group_id`**, for ADR-0025's two reasons, both of which
+apply verbatim: a user may hold several groups (one column means duplicating a
+request per group, after which *"which groups is this request in?"* is ambiguous),
+and a data-subject request names **no group at all** — inventing one puts the row
+in a scope nobody chose.
+
+**Its one foreign key leaves the derived set**, which ADR-0023's rule permits only
+at a table members cannot write to, and `app_member` holds no write verb on `users`
+at all. `user_id uuid NOT NULL REFERENCES public.users (id) ON DELETE CASCADE`.
+The residual is the usual one and it is recorded in the migration: FK checks bypass
+RLS and fail **open**, so this is an existence oracle over `users.id` (`23503`
+versus success). Accepted, bounded by a 122-bit database-generated key, asserted.
+
+**`ON DELETE CASCADE` and not `NO ACTION`, because of the erasure.** Both
+alternatives forbid the orphan by *refusing the delete*, which moves the guarantee
+into a two-statement ordering contract that exists only in code nobody has written
+yet. `CASCADE` makes the outcome a property of the schema rather than a property of
+a future caller.
+
+### The regulations table exists because the clocks are independent
+
+GDPR Art. 12(3) and CCPA §1798.130(a)(2) run on independent deadlines. One person
+can be under both, on different dates, with one extension granted and the other not.
+A single `regulation text` column on the request can hold exactly one of them and
+therefore cannot express the case that matters.
+
+**Dedup is the primary key.** `PRIMARY KEY (request_id, regulation)` means a user
+who picks CCPA when CCPA is already there writes a colliding row, dropped by
+`ON CONFLICT (request_id, regulation) DO NOTHING`. There is no *"does this
+regulation already exist"* branch to get wrong and no second spelling of it in the
+application. `extension_used` is `NOT NULL DEFAULT false` and not nullable: a
+nullable flag has three states, and *"we do not know whether we extended this"* is
+a state an auditor reads as *"we did not"*.
+
+### The read policy needed two branches, and capability cannot be the discriminator
+
+`privacy_request:read` is conferred on `member`, `manager` and `admin` — a subject
+who cannot read their own request cannot exercise the right they are exercising.
+**And `has_permission()` walks *up* `roles.parent_id`**, so a member resolves the
+ancestor set `{member, manager, admin}` and holds **every** row `admin` holds.
+Capability is therefore the *gate* and can never be the *filter*.
+
+The shipped predicate puts both axes in one uncorrelated subquery, with the subject
+branch inside the union so it survives the `current_user` test:
+
+```sql
+CREATE POLICY privacy_request_read ON public.privacy_requests FOR SELECT USING (
+  privacy_requests.user_id IN (
+    SELECT v.user_id FROM (
+      SELECT authz.actor() AS user_id
+      UNION
+      SELECT u.user_id FROM authz.visible_user_ids() AS u (user_id)
+    ) AS v
+     WHERE authz.can_read_privacy_request()
+       AND (v.user_id = authz.actor() OR current_user = 'app_admin')));
+```
+
+Everything lives **inside** the subquery, which is what buys one capability
+resolution per statement: a `STABLE` function beside the `IN` is still evaluated
+once per candidate row. Measured on this policy at 1,205 rows: `loops = 1`, and
+**one** call each to `can_read_privacy_request()` and `visible_user_ids()`, against
+ADR-0025's recorded 3,300-versus-1.
+
+`privacy_request_create` is self-service (`user_id = authz.actor()`), and
+`privacy_request_update` carries a `WITH CHECK` that confines a member to
+`status IN ('open','withdrawn')`. **A member who could take their own row to
+`fulfilled` would manufacture a compliance claim**, and nothing else in the schema
+would notice.
+
+### `delete` is absent, and it is the load-bearing omission
+
+CPRA §1798.105(c)(2) and 11 CCR §7101(a) require the record of a consumer request
+to be **retained** for at least 24 months. A `delete` capability on the request
+table would be a capability to erase a compliance obligation — and it would be the
+**first** such capability anybody reaches for, because deleting the thing the user
+asked you to do is the most intuitive response to a user asking to be forgotten.
+
+**So `privacy_requests` is the working copy and `privacy_request_audits` is the
+record.** The working copy is allowed to be cascade-deleted with its subject. The
+row count asserted from `permissions` is `read`/`create`/`update` and **no
+`delete`**, and `DELETE` is withheld from every serving role including `app_admin`.
+
+### What was rejected
+
+- **A `regulation text` column on the request.** §9.4's own text names the reason it
+  cannot work (independent clocks) and then does not name a shape. Naming the
+  problem without designing for it hands the design to whoever writes the DDL.
+- **A fourth table for the SLA ladder** with an accumulated pause. `accrued_paused_time`
+  is a column that exists for a pause/resume feature nobody implemented, and a
+  deadline `CHECK` would make a row expire by sitting still.
+- **Reusing `user:read` or `privacy:read`.** ADR-0023: reusing a permission makes
+  the grant invisible, because widening it for an unrelated reason silently widens
+  request visibility and nobody reading that diff would know.
+- **An `authz.erase_subject()` in this design** (planned as W42). See
+  `0009_anonymisation.sql` and `docs/rebase.md` §9.8.3: the obvious implementation
+  is *impossible* here, because a read of `users` from inside `has_permission()`
+  re-enters its own policy and PostgreSQL raises
+  `infinite recursion detected in policy for relation "users"` — a hard failure on
+  every call, for every caller. The shipped choke point is a write-time trigger over
+  the row set the two axes already resolve from, and **a referential action fires
+  on `DELETE` while anonymisation is an `UPDATE`, so the `ON DELETE CASCADE` from
+  `0008` never runs.**
+
+---
+
+<a id="adr-0030"></a>
+## ADR-0030: `privacy_request_audits` carries no foreign key to `users`, and append-only is enforced by the absence of grants
+
+**Status:** Accepted, and **shipped** — with the subject half of the append gate
+corrected by `0014_privacy_request_audit_subject_gate.sql`.
+
+**Context.** This is the table that has to survive everything else, and it is the
+only table in the schema where *mutation* rather than *deletion* is the threat.
+
+### No foreign key to `users`, and no foreign key to `privacy_requests`
+
+**Both referential actions fail, for different reasons, and both fail silently in
+the design sense.**
+
+- **`ON DELETE CASCADE` would erase the compliance record.** The user's row is
+  deleted by the erasure and by the purge. The record of what was asked, when, and
+  what was answered is the only evidence that the request was honoured — deleting
+  it converts compliance from an obligation into an unverifiable claim.
+- **`ON DELETE SET NULL` is worse, because it does not work at all.** `SET NULL`
+  performs an `UPDATE`, and **no serving role holds `UPDATE` on this table** — that
+  is the append-only property below. So `DELETE FROM privacy_requests` would raise
+  **`23503`** and block deletion for the whole 24-month retention window: the one
+  operation the feature exists to perform would be the one thing it could not do.
+
+So the row carries **`request_key`** — a second uuid on `privacy_requests`, minted
+by the column default, which is *not* the primary key — as the correlation id.
+**`request_key` is the join that survives the join being impossible.** It is not an
+FK to `privacy_requests` either, for the same reason: those rows are deleted by the
+erasure, by the purge and by housekeeping, and the record has to outlive them.
+
+### Subject identity is a keyed digest, never the id
+
+`subject_hmac bytea NOT NULL` is the HMAC of the subject's user id under a pepper
+named by `pepper_kid`. That is what lets an auditor answer *"were all requests from
+this subject answered?"* **after the subject's row is gone**, without retaining a
+link to a person who asked to be forgotten — which is the tension the two retention
+obligations create, and the reason the id is not a column on the record.
+
+`pepper_kid` is on the row rather than in configuration alone because **a pepper
+that rotates makes every historical row unverifiable** unless the reader can tell
+*which* pepper signed it. A single global "current pepper" is exactly the answer
+that stops existing the first time it rotates.
+
+`subject_user_id` is a **nullable** convenience column for the window in which the
+row still exists, and it is nullable on purpose: an audit row that must be written
+**before** the subject's `users` row is gone cannot be a constraint on a row that
+follows it.
+
+### Append-only is a mechanism here, not a nicety — because a `CHECK` only fires on `INSERT`
+
+**This is the whole reason.** The table's §7101(b) completeness requirements —
+`responded` implies a response time and a response nature, a denial implies a
+statutory basis, a response cannot predate its request — are `CHECK` constraints.
+And a `CHECK` is evaluated **only on `INSERT`**.
+
+That is fine for an immutable row and catastrophic for a mutable one: a row could
+satisfy every constraint at the moment it is written and be **emptied afterwards** by
+an `UPDATE`, at which point nothing re-evaluates anything and the constraint that
+was supposed to be the guarantee has already done its only job. **There is no way to
+write a constraint that survives a mutation of the row it constrains.**
+
+So append-only is the only shape in which those constraints mean anything, and it is
+enforced by the **absence of grants**: `REVOKE ALL … FROM PUBLIC, app_anon,
+app_member, app_admin` and then `GRANT SELECT TO app_admin` and nothing else. **No
+serving role holds `INSERT`, `UPDATE`, `DELETE` or `TRUNCATE` — `app_admin`
+included**, which is the half that is actually load-bearing, because `app_admin`
+holds the full verb set on every other table in this schema. `TRUNCATE` does not fire
+a row trigger, so it is closed by the grant alone and asserted **per role** rather
+than left in a comment.
+
+**Both halves are there on purpose:** there is no write *policy* and there is no
+write *grant*. Either alone would do; a single forgotten word in one of them would
+be invisible.
+
+### Why the six §7101(b) fields are repeated on every row
+
+The obvious design is a header row carrying the intake facts and detail rows
+carrying only the response. It is wrong, because **a compliance record is read row
+by row**: a record whose intake facts live on a sibling row is incomplete the moment
+that sibling is not in the extract, and *"not in the extract"* is every export,
+every pagination page and every single-row query.
+
+So each row independently satisfies §7101(b). **The repetition is the mechanism, not
+a duplicated fact that can drift**: the response row repeats the intake fields of
+the *same* request, and the single write function that appends it is the only
+writer, so the two copies are written by one caller in one transaction or not at
+all.
+
+### One write function, and what only it can enforce
+
+`authz.append_privacy_request_audit()` is `SECURITY DEFINER`, in `authz` (outside
+`db-schemas`, so PostgREST cannot address it from `/rpc/` either), granted to
+`app_member` and `app_admin` and **not** to `app_anon`. It enforces the two things
+no `CHECK` can see:
+
+1. **WHO the record is about.** A member may file for themselves and not for a
+   colleague. `0010` checked the `privacy_request:update` **capability alone** —
+   which that capability does not distinguish, because `0010` confers it on all
+   three tiers and the resolver inherits upward. A member could therefore append a
+   record naming a colleague, **and** append a `responded`/`fulfilled` event, i.e.
+   certify that their own statutory obligation had been discharged.
+2. **WHICH events are an operator's to write.** `received` is the subject's own act;
+   everything past intake is the business answering a request *about* somebody.
+
+`0014` fixes both, as a **new migration** rather than an edit of an applied one.
+Its body reads the `role` GUC through `authz.serving_role()` rather than
+`current_user`, because **inside a `SECURITY DEFINER` function `current_user`
+rebinds to the OWNER** — measured on this cluster:
+
+```
+SET ROLE app_anon   -> current_user=app | current_setting(role)=app_anon
+SET ROLE app_member -> current_user=app | current_setting(role)=app_member
+SET ROLE app_admin  -> current_user=app | current_setting(role)=app_admin
+```
+
+A body testing `current_user = 'app_admin'` answers `false` for **every** caller
+including `app_admin`, so the obvious translation would have refused every operator
+event in the deployment — **with no error anywhere, because a denial and a success
+are both a returned row count.** The `role` GUC is not caller-writable in the
+`request.jwt.claims` sense ADR-0023 §F1 is about: `SET ROLE x` succeeds only for a
+principal that is a member of `x`, so it is bound by the same escalation `GRANT` in
+`database/bootstrap/001_roles.sql` that every `current_user = 'app_admin'` branch in
+this schema already depends on.
+
+**And the predicate is deliberately NOT shared with the policy as a helper**, which
+is the surprising part and is worth recording because the right instinct produced a
+measurably worse design. One `UPDATE` over 1,200 rows as `app_member`, from
+`pg_stat_user_functions`:
+
+```
+can_update_privacy_request | 1200 calls
+has_permission             | 1202 calls
+actor                      | 2416 calls
+```
+
+`privacy_request_update`'s `USING` has no uncorrelated subquery, so there is nothing
+for a shared `STABLE` helper to hide inside and be hoisted past — pointing the policy
+at one would have **added** a second per-row resolution to save one `OR`. The
+accepted drift runs the other way: the policy stays as `0010` shipped it, the
+function is the copy changed to match, and the comment is written on both sides.

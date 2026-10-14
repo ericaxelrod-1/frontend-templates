@@ -202,6 +202,44 @@ Do not add a rule and then leave existing violations in place — fix them or
 scope the rule to new code deliberately. `backend/test/unit/eslint-baseline.spec.ts`
 asserts every rule in this list is actually active, and fails if one cannot be.
 
+### Scoped structural rules, and why they are not in the list above
+
+The baseline above is **cross-project** — every rule in it must be active in both
+`backend/` and `frontend/`, which is exactly what
+`test/unit/eslint-baseline.spec.ts` can check by reading two config files. A rule
+that only makes sense in one project has no business in that list, and putting it
+there would create a claim no test verifies.
+
+Two live in `backend/eslint.config.js` as `no-restricted-syntax` selectors, each
+proven able to fail and each a red `npm run lint` on the offending line:
+
+- **`AbortController` is owned by `BreakerGate` and nowhere else.** A controller
+  that is constructed and never passed to its consumer is not a timeout, it is a
+  comment: it produces the complete appearance of a recoverable abort and none of
+  the behaviour, it survives review because the surrounding code is correct, and
+  no test stays green against it. A stoppable service takes the `AbortSignal` off
+  the dispatch lease the gate hands it, which makes the defect unrepresentable
+  rather than merely untested.
+- **`Date.now()` is banned in `src/breaker/breaker-state.ts` only — "the clock is
+  a value, never a call".** Every entry point into the breaker state machine takes
+  `nowMs: number`, which is what lets the suite drive the machine from a fake
+  clock and what makes the cold-start assertions deterministic. A `Date.now()`
+  default in that file silently reinstates the host clock at exactly the decision
+  the cold-start correction is about — whether a dispatch arriving 300 ms after
+  boot is admitted. Everywhere else in `src/` calling the clock is correct: the
+  meter and the gate take a real reading at the top of a tick, and the sweeper's
+  `tick(nowMs = Date.now())` is the boundary that converts a real clock into the
+  value the state machine then consumes. **The rule is scoped to the file where
+  the invariant lives, because that is the only scope in which it is not noise.**
+
+Two warnings about writing one of these. **A later flat-config object REPLACES
+`no-restricted-syntax` for the files it matches**, so a narrower block that lists
+only its own selector silently drops every earlier one from those files — the
+`breaker-state.ts` block therefore lists both, from one imported constant so there
+is a single copy of each rule and each message. And **a scoped rule that has never
+fired proves nothing**: before landing one, add the violation, watch the lint go
+red, and revert.
+
 ---
 
 # BACKEND RULES

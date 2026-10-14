@@ -446,7 +446,45 @@ async function seed(): Promise<number> {
         ('group', 'create'), ('group', 'read'), ('group', 'update'), ('group', 'delete'),
         ('project', 'create'), ('project', 'read'), ('project', 'update'), ('project', 'delete'),
         ('customer', 'create'), ('customer', 'read'), ('customer', 'update'), ('customer', 'delete'),
-        ('email', 'read')
+        ('email', 'read'),
+        -- The privacy/DSAR capabilities (migrations 0009-0011 own the matching
+        -- copies of these rows; both statements are ON CONFLICT DO NOTHING, so
+        -- whichever runs second is a no-op and a fresh provision and a
+        -- migrated-then-seeded one end up identical).
+        --
+        -- 'privacy_request:delete' is ABSENT and deliberately so: CPRA
+        -- 1798.105(c)(2) and 11 CCR 7101(a) require the record of a consumer
+        -- request to be RETAINED for at least 24 months, and a 'delete' verb on
+        -- the request resource would be a capability to erase a compliance
+        -- obligation. It is also the first such capability anybody would reach
+        -- for, because deleting the thing a user asked for is the most
+        -- intuitive response to a user asking to be forgotten.
+        --
+        -- 'privacy_purge:create' and 'privacy_purge:delete' are absent for the
+        -- opposite reason: enqueueing and deleting a purge row have no human
+        -- path, and the control is structural rather than documentary - no
+        -- serving role holds INSERT or DELETE on 'privacy_purge_queue', so these
+        -- two rows could be granted to every role and still be unusable.
+        ('privacy_request', 'create'), ('privacy_request', 'read'), ('privacy_request', 'update'),
+        ('privacy_request_audit', 'read'),
+        ('privacy_purge', 'read'), ('privacy_purge', 'update'),
+        -- Company profile and addresses (migrations 0012-0013). The TABLE grants
+        -- are what actually admit these: app_anon, app_member and app_admin all
+        -- hold SELECT, because ccpa_applicable() reads the address list and a
+        -- privacy policy owed to a signed-OUT visitor cannot be behind a login.
+        --
+        -- These rows exist to DESCRIBE the capability, not to admit the read. Two
+        -- reasons they must never become the enforcement point for the public
+        -- read: a page that answers 401 to an anonymous visitor because it checked
+        -- a permission first is denying the very disclosure CCPA 1798.100(d) and
+        -- GDPR 13/14 require, and 'company_profile:read' would then be a name that
+        -- means two different things at once.
+        --
+        -- No role grant line is needed and none is written: 'admin' receives every
+        -- permission row through the existing blanket grant, so manager and member
+        -- hold none of these.
+        ('company_profile', 'read'), ('company_profile', 'update'),
+        ('company_addresses', 'read'), ('company_addresses', 'update')
       ON CONFLICT (resource, action_id) DO NOTHING
     `,
     );
@@ -495,18 +533,28 @@ async function seed(): Promise<number> {
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT $1, p.id
       FROM permissions p
-      WHERE p.resource IN ('user', 'role', 'permission', 'group')
-        AND p.action_id = 'read'
-        OR p.resource IN ('project', 'customer')
-        AND p.action_id IN ('read', 'update')
-        OR p.resource = 'email'
-        AND p.action_id = 'read'
+      WHERE (p.resource IN ('user', 'role', 'permission', 'group')
+        AND p.action_id = 'read')
+        OR (p.resource IN ('project', 'customer')
+        AND p.action_id IN ('read', 'update'))
+        OR (p.resource = 'email'
+        AND p.action_id = 'read')
+        -- A manager runs a privacy case: they open one, they answer one, and
+        -- they read the cases in their scope. NOT 'privacy_request_audit:read'
+        -- and NOT 'privacy_purge:*' - the denial basis is compliance-review
+        -- material and the purge queue is the admin surface, and neither is a
+        -- manager's. The parentheses are not decoration: 'AND' binds tighter
+        -- than 'OR', so an unparenthesised list reads as one predicate and
+        -- silently widens with every clause appended to it.
+        OR (p.resource = 'privacy_request'
+        AND p.action_id IN ('create', 'read', 'update'))
       ON CONFLICT DO NOTHING
     `,
       [managerRole],
     );
 
-    // Member role = read on tenant rows only. NOT `email:read`: a member holds no
+    // Member role = read on tenant rows, plus the member's own privacy requests.
+    // NOT `email:read`: a member holds no
     // capability over other people's correspondence, and the point of granting it
     // to manager and not to member is that the grant-subset trigger and the policy
     // both have to be told about it separately. Named here because a reader who
@@ -518,8 +566,18 @@ async function seed(): Promise<number> {
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT $1, p.id
       FROM permissions p
-      WHERE p.resource IN ('project', 'customer')
-        AND p.action_id = 'read'
+      WHERE (p.resource IN ('project', 'customer')
+        AND p.action_id = 'read')
+        -- 'privacy_request' IS the member's and it is not 'email:read'
+        -- 's neighbour by accident. A mail history is another person's
+        -- correspondence; a data-subject request is the subject's own legal act,
+        -- and a subject who cannot read their own request cannot exercise the
+        -- right they are exercising. All THREE verbs: 'create' to file one,
+        -- 'read' to see it, 'update' to WITHDRAW it - and the update policy
+        -- restricts what a member may reach with that third one to 'withdrawn',
+        -- so a member can stop their own request and cannot mark it fulfilled.
+        OR (p.resource = 'privacy_request'
+        AND p.action_id IN ('create', 'read', 'update'))
       ON CONFLICT DO NOTHING
     `,
       [memberRole],
