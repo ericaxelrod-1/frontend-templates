@@ -43,6 +43,35 @@ export type PurgeClaim = {
  * The caller must already be inside a transaction; a claim outside one would
  * commit the moment the implicit transaction ended and reintroduced the stranded
  * window this exists to remove.
+ *
+ * =============================================================================
+ * OPEN DEFECT, MEASURED 2026-10-14 — THIS STATEMENT MATCHES ZERO ROWS IN
+ * PRODUCTION, BECAUSE OF THE SELECT POLICY ON THIS TABLE
+ * =============================================================================
+ * `PurgeSweeper.sweepOne()` opens its transaction, runs `SET LOCAL ROLE app_admin`
+ * and calls this statement with **no `request.jwt.claims` in scope**. The sub-select
+ * below is a plain `SELECT` against `privacy_purge_queue`, so `privacy_purge_read`
+ * — which is `authz.can_read_privacy_purge()` ALONE, with no `current_user`
+ * shortcut, by the deliberate decision recorded at `0011:383-388` — governs it.
+ * `authz.actor()` is NULL inside the sweeper, so `has_permission(NULL, …)` is false
+ * and the sub-select is empty. Measured on a provisioned database:
+ *
+ *     claimless                             →  UPDATE 0   (0 due rows visible)
+ *     with an `admin`-role holder's `sub`   →  UPDATE 1
+ *
+ * So the sweeper drains nothing, for reasons that have nothing to do with the
+ * statement's own correctness. It is recorded here, at the statement, rather than
+ * fixed by this change because every fix is a decision this change does not own:
+ * a `current_user = 'app_admin'` branch on `privacy_purge_read` contradicts the
+ * shipped, tested rule that capability is resolved from ROLE ROWS and never from
+ * the database role (`privacy-purge-queue.spec.ts` asserts an admin WITHOUT
+ * `privacy_purge:read` reads ZERO rows, and would have to be weakened to
+ * accommodate it), and giving the retention job a caller identity is an
+ * identity-model decision about what the sweeper IS.
+ *
+ * `test/rls/user-purge-end-to-end.spec.ts` sets a claims document for exactly this
+ * reason and says so at the call site.
+ * =============================================================================
  */
 export const CLAIM_DUE_PURGE_SQL = `
 UPDATE privacy_purge_queue AS q

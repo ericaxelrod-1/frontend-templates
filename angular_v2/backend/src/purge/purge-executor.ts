@@ -37,6 +37,26 @@ export const PURGE_EXECUTOR = 'PURGE_EXECUTOR';
  * place, and it is **not** a stand-in: the only implementation is
  * `SqlPurgeExecutor`, registered once, and there is no factory that could be
  * swapped for a fake outside a test file.
+ *
+ * ## `rows_deleted` COUNTS THE TARGET ROWS, NOT THE CASCADED CHILDREN
+ *
+ * The count is what `DELETE FROM users WHERE id = $1` removed — one row for a
+ * user target. It is **not** the total across the user and every table that
+ * cascades with it, and the gap is deliberate rather than an oversight:
+ *
+ *   - The executor runs as `app_admin`, which holds no `DELETE` on
+ *     `email_messages` or `refresh_tokens` and — `email_messages` being FORCE
+ *     RLS'd with no `FOR UPDATE`/`FOR DELETE` policy — cannot even COUNT them:
+ *     `email_read_scope` needs `authz.actor()`, which is NULL in the sweeper's
+ *     claimless session. Measured as `app_admin`: `DELETE …` → `permission denied
+ *     for table`; `UPDATE …` → `UPDATE 0`; `SELECT count(*)` → `0`.
+ *   - So any wider total the executor returned would be a number it could not
+ *     recompute and an operator could not check, which is §2.3's success-shaped
+ *     value for work nobody can account for.
+ *
+ * Which tables follow the user out is a property of the SCHEMA, recorded table by
+ * table in `database/migrations/0015_purge_user_cascade.sql`, and asserted by
+ * row COUNT in `test/rls/user-purge-end-to-end.spec.ts` in both directions.
  */
 export type PurgeExecutor = {
   /**
@@ -67,6 +87,27 @@ export type PurgeExecutor = {
  * and that is load-bearing rather than incidental — the queue row must outlive its
  * target, so an FK would either block the delete or cascade the queue row away
  * with it, destroying the record that a purge was scheduled.
+ *
+ * ### THE DELETE IS ONLY ABLE TO COMPLETE BECAUSE `0015` MADE IT ABLE TO COMPLETE
+ *
+ * Until `database/migrations/0015_purge_user_cascade.sql` this statement raised
+ * `23503` for **every** user who had ever authenticated, because
+ * `refresh_tokens.user_id` and `email_messages.user_id` were `NO ACTION`. The
+ * sweeper reported `failed` correctly and could never report success, which reads
+ * as a working mechanism to anyone who does not try a real user.
+ *
+ * It is stated here because the next reader of this file has to know that the one
+ * line below is load-bearing on the SCHEMA, not on this code: reverting `0015`
+ * silently disables every purge in the deployment, and no error at this level will
+ * say so — the statement is still perfectly valid SQL. The end-to-end proof is
+ * `test/rls/user-purge-end-to-end.spec.ts`, which purges a user carrying
+ * `refresh_tokens`, `email_messages`, `user_roles`, `user_groups` and a
+ * `privacy_requests` row, and asserts on row counts in both directions.
+ *
+ * The cascade's own semantics — which role's privileges govern it, why it is the
+ * only available mechanism rather than the convenient one, and what `email_messages`
+ * is and is not — are in `0015`. They are not restated here because two copies of
+ * one argument drift (`AGENTS.md` §2.4).
  *
  * The other three reasons named in `docs/rebase.md` §9A.2 have **no executor here,
  * and this build says so loudly instead of pretending**:
