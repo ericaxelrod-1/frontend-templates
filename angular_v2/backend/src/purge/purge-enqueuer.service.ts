@@ -4,8 +4,8 @@ import type { PoolClient } from 'pg';
 import { BreakerGate } from '../breaker/breaker-gate.js';
 import { PURGE_ENQUEUER } from '../breaker/dispatch-token.js';
 import { writtenRows } from './purge-claim.js';
-import type { DueTombstone, EnqueueSummary } from './purge-enqueue.js';
-import { ENQUEUE_INACTIVE_PURGES_SQL, SELECT_DUE_TOMBSTONES_SQL } from './purge-enqueue.js';
+import type { DuePurge, EnqueueSummary } from './purge-enqueue.js';
+import { ENQUEUE_INACTIVE_PURGES_SQL, SELECT_DUE_PURGES_SQL, splitByPopulation } from './purge-enqueue.js';
 import { PURGE_POOL } from './purge-sweeper.service.js';
 import type { PurgeConnectionSource } from './purge-sweeper.service.js';
 import { RETENTION_ENV } from './retention-environment.js';
@@ -50,22 +50,38 @@ export const RETENTION_ENQUEUE_INTERVAL_SECONDS = 3600;
  *
  * ## What is enqueued, and what still is not
  *
- * The scan reads `users.deleted_at` — **tombstones only**. §9A.6's second anchor,
- * the dormant *live* account on `users.last_activity_at`, is not in the schema at
- * any point, so **this job does not purge an account that has merely gone quiet**.
- * It purges the row an erasure left behind, once it has aged past
- * `RETENTION_TOMBSTONE_DAYS`. Every row carries `reason = 'inactivity_purge'`
- * because §9A.1 makes anonymisation a STATUS rather than a second population, and
- * one reason code with one candidate query is worth more than an accurate label on
- * an admin list nobody has built.
+ * The scan reads TWO columns and covers TWO populations, which is what §9A.6's
+ * second anchor asks for and what `0017` shipped:
  *
- * ## The window is required, and it is checked before this job can run
+ *   * `users.deleted_at` — a **tombstone**: a row an erasure already anonymised,
+ *     aged from the moment the erasure happened, and written as
+ *     `inactivity_purge`.
+ *   * `users.last_activity_at` — a **live account** whose last OBSERVED activity
+ *     is old, and **never soft-deleted**, so the two populations cannot overlap
+ *     in one sweep. Written as `inactive_account_purge`, a distinct code, because
+ *     the operator's requirement is one filterable list and a shared code would
+ *     make the two indistinguishable in it.
  *
- * `RETENTION_TOMBSTONE_DAYS` is read and bounded at module-evaluation time
- * (`retention-environment.ts`, wired in `purge.module.ts`), so a process whose
- * window is missing or nonsensical **refuses to boot** rather than booting a
+ * **A third population is deliberately absent, and its absence is the design:**
+ * an account whose `last_activity_at` IS NULL. That is "never observed", not
+ * "dormant", and `0017` §1 refuses to destroy an account on the strength of a
+ * measurement that was never taken. The cost is stated there too: an account
+ * created before `0017` and never authenticated again is retained forever, which
+ * is the recoverable error.
+ *
+ * **This is not the erasure path.** A privacy deletion request has no
+ * implementation in this tree; this job ages accounts that were never asked to
+ * leave. Wiring a legal request to an unattended hourly scan would be the opposite
+ * of the separation `0011` exists to keep.
+ *
+ * ## The two windows are required, and they are checked before this job can run
+ *
+ * `RETENTION_TOMBSTONE_DAYS` and `RETENTION_INACTIVE_ACCOUNT_DAYS` are read and
+ * bounded at module-evaluation time (`retention-environment.ts`, wired in
+ * `purge.module.ts`), so a process whose windows are missing, or below their
+ * floors — 1825 days and 1095 — **refuses to boot** rather than booting a
  * retention job with a window it invented. There is no default anywhere on this
- * path: not here, not in the SQL, not in the function.
+ * path: not here, not in the SQL, not in the functions.
  *
  * ## The gate: named, sheddable, stoppable
  *
@@ -143,7 +159,8 @@ export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
     // job, one name, and `onModuleDestroy` can find the entry it registered.
     this.scheduler.addInterval(PURGE_ENQUEUER, timer);
     this.logger.log(
-      `purge.enqueuer sweeps every ${RETENTION_ENQUEUE_INTERVAL_SECONDS}s for tombstones older than ${String(this.env.tombstoneDays)} day(s)`,
+      `purge.enqueuer sweeps every ${RETENTION_ENQUEUE_INTERVAL_SECONDS}s for tombstones older than ` +
+        `${String(this.env.tombstoneDays)} day(s) and accounts unobserved for ${String(this.env.inactiveAccountDays)} day(s)`,
     );
   }
 
@@ -203,13 +220,13 @@ export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
       if (summary.outcome === 'aborted') {
         lease.release('aborted');
         this.logger.warn(
-          `purge.enqueuer stopped mid-sweep after scanning ${String(summary.scanned)} due tombstone(s): the transaction was rolled back and the queue is unchanged`,
+          `purge.enqueuer stopped mid-sweep after scanning ${String(summary.scanned)} due row(s): the transaction was rolled back and the queue is unchanged`,
         );
         return summary;
       }
       lease.release(summary.enqueued > 0 ? 'succeeded' : 'completed');
       this.logger.log(
-        `purge.enqueuer scanned ${String(summary.scanned)} due tombstone(s) and enqueued ${String(summary.enqueued)}`,
+        `purge.enqueuer scanned ${String(summary.scanned)} due row(s) and enqueued ${String(summary.enqueued)}`,
       );
       return summary;
     } catch (error) {
@@ -221,14 +238,14 @@ export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
   /**
    * Scan and enqueue, in ONE transaction.
    *
-   * `SET LOCAL ROLE app_admin` is the escalation boundary the sweeper already
-   * uses, and here it is doing the half that cannot be done any other way: it is
-   * the identity for which `users_read_scope` keeps the admin branch, so the scan
-* can see tombstones at all (`0009:214-226`). It is also the only principal with
- * `EXECUTE` on either of the two functions this job calls — `app_anon` and
- * `app_member` are deliberately absent (`0016`). Claims alone cannot buy either,
- * because the admin branch of a policy discriminates on `current_user` and never
- * on a token field (`AGENTS.md` §B2).
+   * `SET LOCAL ROLE app_admin` is the escalation boundary the sweeper already uses,
+   * and here it is doing the half that cannot be done any other way: it is the
+   * identity for which `users_read_scope` keeps the admin branch, so the scan can see
+   * every population at all (`0009:214-226`). It is also the only principal with
+   * `EXECUTE` on any of the three functions this job calls — `app_anon` and
+   * `app_member` are deliberately absent (`0016`, `0017` §7). Claims alone cannot buy
+   * either, because the admin branch of a policy discriminates on `current_user` and
+   * never on a token field (`AGENTS.md` §B2).
    *
    * **No claims document is set here**, and none is anywhere in this tree. The one
    * identity this job could have invented for itself — `request.jwt.claims` — is a
@@ -236,9 +253,10 @@ export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
    * architectural: no request-reachable SQL path may write it. A retention job
    * that wrote its own would be that path, standing.
    *
-   * The window is BOUND, never interpolated. `$1` reaches `now() - make_interval(days
-   * => $1::integer)` as a parameter, so the value cannot become syntax and cannot
-   * be absent.
+   * **Both windows are BOUND, never interpolated.** `$1` and `$2` reach the two
+   * `retention_due_*()` functions as parameters, so neither value can become
+   * syntax and neither can be absent — and each function refuses a value below
+   * its own floor with `22023`, naming its own argument.
    *
    * ## The abort is honoured at TWO points, and why that is not belt-and-braces
    *
@@ -273,20 +291,35 @@ export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
       await client.query('BEGIN');
       await client.query('SET LOCAL ROLE app_admin');
 
-      const due = await client.query<DueTombstone>(SELECT_DUE_TOMBSTONES_SQL, [this.env.tombstoneDays]);
-      const targetIds = due.rows.map((row) => row.user_id);
+      const due = await client.query<DuePurge>(SELECT_DUE_PURGES_SQL, [
+        this.env.tombstoneDays,
+        this.env.inactiveAccountDays,
+      ]);
+      const populations = splitByPopulation(due.rows);
+      const targetCount = populations.tombstoneIds.length + populations.inactiveAccountIds.length;
       if (stopped()) {
         await client.query('ROLLBACK');
         settled = true;
-        return { scanned: targetIds.length, enqueued: 0, outcome: 'aborted' };
+        return { scanned: targetCount, enqueued: 0, outcome: 'aborted' };
       }
-      if (targetIds.length === 0) {
+      if (targetCount === 0) {
         await client.query('COMMIT');
         settled = true;
         return { scanned: 0, enqueued: 0, outcome: 'nothing_due' };
       }
 
-      const enqueued = writtenRows(await client.query(ENQUEUE_INACTIVE_PURGES_SQL, [targetIds]));
+      // Both arrays go to the same statement, and the REASON is not one of the
+      // parameters: `authz.enqueue_inactive_purges` names `inactivity_purge` for the
+      // first array and `inactive_account_purge` for the second in its own body, so
+      // a caller cannot file a live account under the tombstone code. The empty array
+      // is legitimate — one population can have nothing due while the other has
+      // something — and `NULL` is not, which is why this is `[]` and never undefined.
+      const enqueued = writtenRows(
+        await client.query(ENQUEUE_INACTIVE_PURGES_SQL, [
+          populations.tombstoneIds,
+          populations.inactiveAccountIds,
+        ]),
+      );
       if (stopped()) {
         // The rows are written and uncommitted. Rolling back is what makes the
         // stop real: without it the summary below would say `aborted` over a queue
@@ -294,11 +327,11 @@ export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
         // most literal form.
         await client.query('ROLLBACK');
         settled = true;
-        return { scanned: targetIds.length, enqueued: 0, outcome: 'aborted' };
+        return { scanned: targetCount, enqueued: 0, outcome: 'aborted' };
       }
       await client.query('COMMIT');
       settled = true;
-      return { scanned: targetIds.length, enqueued, outcome: 'enqueued' };
+      return { scanned: targetCount, enqueued, outcome: 'enqueued' };
     } catch (error) {
       if (!settled) {
         await client.query('ROLLBACK').catch(() => undefined);

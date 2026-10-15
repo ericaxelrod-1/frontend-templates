@@ -62,6 +62,8 @@ export interface paths {
                     geo_source?: components["parameters"]["rowFilter.users.geo_source"];
                     geo_accuracy_km?: components["parameters"]["rowFilter.users.geo_accuracy_km"];
                     geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
+                    /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
+                    last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                     /** @description Filtering Columns */
                     select?: components["parameters"]["select"];
                     /** @description Ordering */
@@ -147,6 +149,8 @@ export interface paths {
                     geo_source?: components["parameters"]["rowFilter.users.geo_source"];
                     geo_accuracy_km?: components["parameters"]["rowFilter.users.geo_accuracy_km"];
                     geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
+                    /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
+                    last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                 };
                 header?: {
                     /** @description Preference */
@@ -185,6 +189,8 @@ export interface paths {
                     geo_source?: components["parameters"]["rowFilter.users.geo_source"];
                     geo_accuracy_km?: components["parameters"]["rowFilter.users.geo_accuracy_km"];
                     geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
+                    /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
+                    last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                 };
                 header?: {
                     /** @description Preference */
@@ -3144,6 +3150,11 @@ export interface components {
             geo_accuracy_km?: number;
             /** Format: timestamp with time zone */
             geo_updated_at?: string;
+            /**
+             * Format: timestamp with time zone
+             * @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant.
+             */
+            last_activity_at?: string;
         };
         privacy_request_audits: {
             /**
@@ -3673,6 +3684,8 @@ export interface components {
         "rowFilter.users.geo_source": string;
         "rowFilter.users.geo_accuracy_km": string;
         "rowFilter.users.geo_updated_at": string;
+        /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
+        "rowFilter.users.last_activity_at": string;
         "rowFilter.privacy_request_audits.id": string;
         "rowFilter.privacy_request_audits.request_key": string;
         "rowFilter.privacy_request_audits.event_type": string;

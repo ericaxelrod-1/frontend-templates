@@ -38,7 +38,7 @@ import type { ScriptedPool, TripHarness } from '../../support/breaker-harness.js
  */
 
 /** The window is a decision; this suite asserts scheduling, not its value. */
-const ENV: RetentionEnvironment = { tombstoneDays: 1825 };
+const ENV: RetentionEnvironment = { tombstoneDays: 1825, inactiveAccountDays: 1095 };
 
 const USER_A = '00000000-0000-0000-0000-0000000000a1';
 const USER_B = '00000000-0000-0000-0000-0000000000a2';
@@ -48,11 +48,28 @@ type Answer = { readonly when: (statement: string) => boolean; readonly results:
 const SCAN = 'authz.retention_due_tombstones';
 const ENQUEUE = 'authz.enqueue_inactive_purges';
 
-/** Two due tombstones, and an enqueue that writes both. */
+/**
+ * TWO due tombstones, and an enqueue that writes both.
+ *
+ * The rows carry the reason the DATABASE returned, because that is what
+ * `splitByPopulation()` sorts on: a scripted row with no `reason` is a due row the
+ * application cannot classify, and it raises rather than guessing. `USER_B` is a
+ * dormant LIVE account under the other code, so the fixture covers both arrays the
+ * enqueue takes and the sweep's `scanned` counts across populations rather than
+ * within one.
+ */
 const TWO_DUE: readonly Answer[] = [
   {
     when: (statement) => statement.includes(SCAN),
-    results: [{ rows: [{ user_id: USER_A }, { user_id: USER_B }], rowCount: 2 }],
+    results: [
+      {
+        rows: [
+          { user_id: USER_A, reason: 'inactivity_purge' },
+          { user_id: USER_B, reason: 'inactive_account_purge' },
+        ],
+        rowCount: 2,
+      },
+    ],
   },
   {
     when: (statement) => statement.includes(ENQUEUE),

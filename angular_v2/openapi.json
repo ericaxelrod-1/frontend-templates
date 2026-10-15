@@ -65,6 +65,9 @@
             "$ref": "#/components/parameters/rowFilter.users.geo_updated_at"
           },
           {
+            "$ref": "#/components/parameters/rowFilter.users.last_activity_at"
+          },
+          {
             "$ref": "#/components/parameters/select"
           },
           {
@@ -198,6 +201,9 @@
             "$ref": "#/components/parameters/rowFilter.users.geo_updated_at"
           },
           {
+            "$ref": "#/components/parameters/rowFilter.users.last_activity_at"
+          },
+          {
             "$ref": "#/components/parameters/preferReturn"
           }
         ],
@@ -253,6 +259,9 @@
           },
           {
             "$ref": "#/components/parameters/rowFilter.users.geo_updated_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.last_activity_at"
           },
           {
             "$ref": "#/components/parameters/preferReturn"
@@ -4166,6 +4175,15 @@
           "type": "string"
         }
       },
+      "rowFilter.users.last_activity_at": {
+        "name": "last_activity_at",
+        "description": "When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant.",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
       "rowFilter.privacy_request_audits.id": {
         "name": "id",
         "required": false,
@@ -5671,6 +5689,11 @@
             "type": "integer"
           },
           "geo_updated_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "last_activity_at": {
+            "description": "When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant.",
             "format": "timestamp with time zone",
             "type": "string"
           }

@@ -1,5 +1,5 @@
 /**
- * The `RETENTION_*` window, read once and asserted at boot.
+ * The `RETENTION_*` windows, read once and asserted at boot.
  *
  * ## Why this is a decision and not a scheduling fact, which is why it has no default
  *
@@ -9,12 +9,12 @@
  * that decides whether the process stops working, and every key that decides
  * whether personal data is destroyed, is required and has none.
  *
- * `RETENTION_TOMBSTONE_DAYS` is the second kind and not the first, and the reason
- * is not tidiness. This value is the predicate in `authz.retention_due_tombstones()`
- * that decides which users' rows are permanently deleted. A default nobody chose
+ * Each key here is the predicate in an `authz.retention_due_*()` function that
+ * decides which users' rows are permanently deleted. A default nobody chose
  * silently applies — `0011` records the whole harm of a retention policy that is
- * published and not enforced, in GDPR Art. 5(1)(e) and CPRA §1798.100(a)(3) terms:
- * an operator reads the configured window, and the code deletes on another one.
+ * published and not enforced, in GDPR Art. 5(1)(e) and CPRA §1798.100(a)(3)
+ * terms: an operator reads the configured window, and the code deletes on
+ * another one.
  *
  * **So there is no fallback here, in any mode, and a missing key aborts the boot.**
  * That is the same treatment `JWT_SECRET` gets (§2.3), for the same reason: a
@@ -29,6 +29,25 @@
  * decision, one loader, one name for the namespace — and a forker reading
  * `BREAKER_MEMORY_GREEN` is not left looking for the retention window two files
  * away.
+ *
+ * ## Two keys, because the two populations have genuinely different clocks
+ *
+ * `RETENTION_TOMBSTONE_DAYS` ages a **tombstone**: a row whose erasure has
+ * already been recorded, where the person is gone. `RETENTION_INACTIVE_ACCOUNT_DAYS`
+ * ages a **live account** whose last OBSERVED activity is old. They are not one
+ * window because they answer different questions and carry different stakes:
+ *
+ *   * a tombstone's clock starts at the erasure, and §9A.6's first anchor exists
+ *     because a clock that restarts on every touch is retention that never
+ *     expires;
+ *   * a live account's clock starts at its last observation, and destroying one
+ *     destroys a working account — so its floor is stated separately rather than
+ *     inherited from the tombstone's.
+ *
+ * One key for both would be a single number deciding two unrelated questions,
+ * which is the shape of a knob nobody can reason about: lowering it for the
+ * tombstone population would silently accelerate the destruction of live
+ * accounts, and no operator reading the key name could tell that had happened.
  */
 export type RetentionEnvironment = {
   /**
@@ -36,10 +55,19 @@ export type RetentionEnvironment = {
    * their row for deletion. Days, and it is required.
    */
   readonly tombstoneDays: number;
+  /**
+   * How long a LIVE account may go with no observed activity before the retention
+   * scan will enqueue their row for deletion. Days, and it is required.
+   *
+   * Only accounts with a recorded `users.last_activity_at` are considered at all
+   * (`0017` §1): an account whose activity was never observed is not dormant, it
+   * is unmeasured, and it is not eligible for destruction.
+   */
+  readonly inactiveAccountDays: number;
 };
 
 /**
- * The DI token for the validated window.
+ * The DI token for the validated windows.
  *
  * A `RetentionEnvironment` is a plain object, so it cannot be its own injection
  * token; the token and the value are created together in `purge.module.ts`, so
@@ -48,23 +76,51 @@ export type RetentionEnvironment = {
 export const RETENTION_ENV = 'RETENTION_ENVIRONMENT';
 
 /**
- * THE BOUNDS, and they are the same two numbers the database enforces.
+ * THE BOUNDS, and they are the same four numbers the database enforces.
  *
- * `authz.retention_due_tombstones()` refuses anything outside 1..36500 with
- * `22023`, and this loader refuses the same range before the process can reach it.
- * Two copies of one bound would be two answers to "is 0 valid" (§2.4), so the
- * numbers are stated here and repeated there deliberately: the application refuses
- * a misconfiguration at boot, and the function refuses a malformed call from
- * anywhere else — which is a different caller with a different reason to lie.
+ * `authz.retention_due_tombstones()` refuses anything outside 1825..36500 with
+ * `22023` and `authz.retention_due_accounts()` refuses anything outside
+ * 1095..36500, and this loader refuses the same two ranges before the process can
+ * reach either. Two copies of one bound would be two answers to "is 1 valid"
+ * (§2.4), so the numbers are stated here and repeated there deliberately: the
+ * application refuses a misconfiguration at boot, and the function refuses a
+ * malformed call from anywhere else — which is a different caller with a
+ * different reason to lie. **A boot check covers one process; the function is
+ * reachable by anything granted `EXECUTE`.**
  *
- *   0       every tombstone that has ever existed is due for deletion on the next
- *           sweep. Not a slow purge — an immediate one, discovered later.
- *   36500   a century. Past this point the value is not a retention policy anybody
- *           reads as one, and the number is far more likely to be a units mistake
- *           (milliseconds, seconds) than a decision.
+ * ## 1825 — five years, for tombstones, and the floor is the point
+ *
+ * This number was `1` until `0017`. `0016` bounded the key at `1..36500`, which
+ * caught `0` and `-1` and let `1` through — and `1` is the single most damaging
+ * value in the range: **set `RETENTION_TOMBSTONE_DAYS=1` and every tombstone in
+ * the repository is hard-destroyed on the next sweep.** That is the failure
+ * `0011:222-228` names: the template publishes a five-year retention policy and
+ * a misconfiguration destroys on another one. A lower bound of 1 is a bound on
+ * syntax, not on harm.
+ *
+ * `docs/rebase.md` §9A.4 tabulated this row as *1825 days, a floor* and §9A.6
+ * records the decision (2026-10-12); the floor is now the number in force.
+ *
+ * ## 1095 — three years, for live accounts, and why it is not 1825
+ *
+ * A dormant account is a person who is merely quiet, and no law sets their
+ * window; three years is the shortest defensible one for destroying a working
+ * account. It is lower than the tombstone floor because the two populations carry
+ * different evidence — a tombstone is a recorded erasure and `0011`'s compliance
+ * argument requires its record to survive, while a live account has asserted
+ * nothing about itself and is judged on inactivity alone. Stated separately rather
+ * than inherited, so the two numbers cannot be changed as one.
+ *
+ * ## 36500 — a century, for both
+ *
+ * Past this point the value is not a retention policy anybody reads as one, and
+ * the number is far more likely to be a units mistake (milliseconds, seconds)
+ * than a decision.
  */
-export const MINIMUM_TOMBSTONE_DAYS = 1;
+export const MINIMUM_TOMBSTONE_DAYS = 1825;
 export const MAXIMUM_TOMBSTONE_DAYS = 36500;
+export const MINIMUM_INACTIVE_ACCOUNT_DAYS = 1095;
+export const MAXIMUM_INACTIVE_ACCOUNT_DAYS = 36500;
 
 export class RetentionEnvironmentError extends Error {
   readonly problems: readonly string[];
@@ -79,6 +135,57 @@ export class RetentionEnvironmentError extends Error {
   }
 }
 
+/** What each key decides, so the refusal message says what the number was for. */
+type RetentionKey = {
+  readonly key: string;
+  readonly minimum: number;
+  readonly maximum: number;
+  readonly subject: string;
+  /** True when the floor is a floor (an error) rather than a syntax bound. */
+  readonly floor: string;
+};
+
+const RETENTION_KEYS: readonly RetentionKey[] = [
+  {
+    key: 'RETENTION_TOMBSTONE_DAYS',
+    minimum: MINIMUM_TOMBSTONE_DAYS,
+    maximum: MAXIMUM_TOMBSTONE_DAYS,
+    subject: 'a soft-deleted user — a tombstone whose erasure is already recorded',
+    floor:
+      'below the floor it is not the five-year retention policy this template publishes, and a ' +
+      'window of 1 hard-destroys every tombstone in the repository on the next sweep',
+  },
+  {
+    key: 'RETENTION_INACTIVE_ACCOUNT_DAYS',
+    minimum: MINIMUM_INACTIVE_ACCOUNT_DAYS,
+    maximum: MAXIMUM_INACTIVE_ACCOUNT_DAYS,
+    subject: 'a live account whose last observed activity is older than the window',
+    floor:
+      'below the floor it is not a three-year window, and a window of 1 would hard-destroy ' +
+      "every account with an observed login within three years of now() on the next sweep",
+  },
+] as const;
+
+/**
+ * The specification for a key, looked up by its own name.
+ *
+ * A missing name is a programming error in this file rather than a configuration
+ * the operator could cause, and it throws rather than returning `undefined`: an
+ * undefined specification would reach `readRequiredDays` and be dereferenced there,
+ * which is a `TypeError` three frames from the mistake.
+ */
+function byKey(key: string): RetentionKey {
+  const specification = RETENTION_KEYS.find((candidate) => candidate.key === key);
+  if (specification === undefined) {
+    throw new Error(
+      `retention-environment.ts: no specification is declared for ${key}. Every key this loader ` +
+        'validates must have a floor, a ceiling and a subject — a key validated without them is a key ' +
+        'nobody can reason about.',
+    );
+  }
+  return specification;
+}
+
 /**
  * One required integer, and no fallback.
  *
@@ -86,17 +193,24 @@ export class RetentionEnvironmentError extends Error {
  * exported, and importing it would put a retention decision behind a breaker
  * loader's name. The shape is the same one line of validation either way, and the
  * duplication is two dozen lines rather than a rule.
+ *
+ * **The refusal names the key, the value received and the floor**, because a boot
+ * failure that names none of the three is a boot failure an operator cannot act
+ * on: the difference between "RETENTION_TOMBSTONE_DAYS=30" and "RETENTION_TOMBSTONE_DAYS=1825"
+ * is the difference between deleting every tombstone in the repository and the
+ * policy this template documents.
  */
 function readRequiredDays(
   source: Readonly<Record<string, unknown>>,
+  specification: RetentionKey,
   problems: string[],
 ): number | undefined {
-  const key = 'RETENTION_TOMBSTONE_DAYS';
+  const { key } = specification;
   const raw = source[key];
 
   if (raw === undefined || raw === null || raw === '') {
     problems.push(
-      `${key} is required but was not set. It is the window after which a soft-deleted user's row is ` +
+      `${key} is required but was not set. It is the window after which ${specification.subject} is ` +
         'purged, it destroys personal data, and no default may be substituted for a decision nobody made.',
     );
     return undefined;
@@ -114,12 +228,10 @@ function readRequiredDays(
     return undefined;
   }
   const value = Number.parseInt(text, 10);
-  if (value < MINIMUM_TOMBSTONE_DAYS || value > MAXIMUM_TOMBSTONE_DAYS) {
+  if (value < specification.minimum || value > specification.maximum) {
     problems.push(
-      `${key} must be between ${MINIMUM_TOMBSTONE_DAYS} and ${MAXIMUM_TOMBSTONE_DAYS} days, received ${value}` +
-        (value === 0
-          ? '. Zero would make every tombstone that has ever existed due for deletion on the next sweep.'
-          : ''),
+      `${key} must be between ${String(specification.minimum)} and ${String(specification.maximum)} days, ` +
+        `received ${String(value)} — ${specification.floor}.`,
     );
     return undefined;
   }
@@ -128,9 +240,22 @@ function readRequiredDays(
 
 export function loadRetentionEnvironment(source: Readonly<Record<string, unknown>>): RetentionEnvironment {
   const problems: string[] = [];
-  const tombstoneDays = readRequiredDays(source, problems);
-  if (tombstoneDays === undefined) {
+  const read = (specification: RetentionKey): number | undefined =>
+    readRequiredDays(source, specification, problems);
+
+  // Read by name rather than by index into `RETENTION_KEYS`, because a tuple index
+  // here is an anonymous coupling: adding a third key silently leaves the third one
+  // unread and the loader accepts a source that never supplied it. Two named reads
+  // and two named returns is the whole of the enforcement, and it is what makes
+  // "required in every mode" a property this function can actually have.
+  const tombstoneDays = read(byKey('RETENTION_TOMBSTONE_DAYS'));
+  const inactiveAccountDays = read(byKey('RETENTION_INACTIVE_ACCOUNT_DAYS'));
+
+  // Both are checked before either is acted on, and both problems are reported in
+  // one error — a boot that names only the first of two bad keys sends the
+  // operator round the loop a second time to discover the second.
+  if (tombstoneDays === undefined || inactiveAccountDays === undefined) {
     throw new RetentionEnvironmentError(problems);
   }
-  return { tombstoneDays };
+  return { tombstoneDays, inactiveAccountDays };
 }

@@ -215,6 +215,48 @@ async function mintChain(depth: number): Promise<TokenPair[]> {
   return chain;
 }
 
+/**
+ * The account's `last_activity_at`, as epoch milliseconds, or `null`.
+ *
+ * `pg` returns `timestamptz` as a `Date`, and `Object.is` is never true for two
+ * distinct `Date` objects — so every comparison of a timestamp in this file goes
+ * through `getTime()`. Comparing the objects themselves would report a difference
+ * where there is none, which is a test that fails for a reason nobody can act on.
+ */
+async function lastActivityAt(userId: string): Promise<number | null> {
+  return withAdminClient(async (client) => {
+    const result = await client.query<{ last_activity_at: Date | null }>(
+      'SELECT last_activity_at FROM users WHERE id = $1',
+      [userId],
+    );
+    return result.rows[0]?.last_activity_at?.getTime() ?? null;
+  });
+}
+
+/** The seeded admin's id, read through the boundary rather than assumed. */
+async function adminId(): Promise<string> {
+  return withAdminClient(async (client) => {
+    const result = await client.query<{ id: string }>("SELECT id FROM users WHERE username = 'admin'");
+    const id = result.rows[0]?.id;
+    if (id === undefined) {
+      throw new Error('the seed did not create the admin account this suite reads back');
+    }
+    return id;
+  });
+}
+
+/**
+ * Pins the column to a known-distant value, so a following assertion compares
+ * against a real "before" rather than against whatever an earlier case left.
+ */
+async function pinActivityTo(userId: string, value: string): Promise<void> {
+  await withAdminClient(async (client) => {
+    await client.query('UPDATE users SET last_activity_at = $2 WHERE id = $1', [userId, value]);
+  });
+}
+
+const DORMANT = '2000-01-01T00:00:00.000Z';
+
 describe('refresh rotation and logout', () => {
   it('a valid refresh rotates the pair: new distinct tokens, old row revoked and linked to the new row', async () => {
     const first = (await login({ username: 'admin', password: SEED_PASSWORD })).json<TokenPair>();
@@ -352,5 +394,72 @@ describe('refresh rotation and logout', () => {
     expect(validLogoutAgain.body).toBe('');
     expect(garbageLogout.statusCode).toBe(204);
     expect(garbageLogout.body).toBe('');
+  });
+
+  it('a REFRESH stamps last_activity_at, which is the only observation a read-only PostgREST client produces', async () => {
+    // **The producer that carries the whole feature.** `src/auth/last-activity.ts`
+    // defines activity as re-authentication, and says plainly that a user who only
+    // READS through PostgREST is invisible to it. A refresh is what makes that gap
+    // a lag of one access-token lifetime instead of unbounded — so if THIS call
+    // stopped recording, the population the dormant-account purge exists for would
+    // silently look dormant while it was in use, and the account-scan tests in
+    // `test/rls` would stay green because they drive the SQL directly.
+    const user = await adminId();
+    const first = (await login({ username: 'admin', password: SEED_PASSWORD })).json<TokenPair>();
+    // Pinned AFTER the login, so the assertion is about the refresh and not about a
+    // stamp the login left one statement earlier.
+    await pinActivityTo(user, DORMANT);
+
+    const before = Date.now();
+    expect((await refresh({ refreshToken: first.refreshToken })).statusCode).toBe(200);
+
+    const stamped = await lastActivityAt(user);
+    expect(stamped, 'a refresh did not stamp last_activity_at').not.toBeNull();
+    expect(stamped, 'the refresh left the pinned value, so nothing moved it').toBeGreaterThan(new Date(DORMANT).getTime());
+    expect(stamped ?? 0).toBeGreaterThanOrEqual(before - 2_000);
+    expect(stamped ?? 0).toBeLessThanOrEqual(Date.now() + 2_000);
+  });
+
+  it('a REFUSED refresh stamps nothing, so a replay attack cannot keep a dormant account alive', async () => {
+    const user = await adminId();
+    const first = (await login({ username: 'admin', password: SEED_PASSWORD })).json<TokenPair>();
+    expect((await refresh({ refreshToken: first.refreshToken })).statusCode).toBe(200);
+    await pinActivityTo(user, DORMANT);
+
+    const replay = await refresh({ refreshToken: first.refreshToken });
+    expect(replay.statusCode).toBe(401);
+
+    // This is the half that makes the producer a measurement of AUTHENTICATED
+    // activity: an unauthenticated attempt must never move the clock, or hammering
+    // a dormant account's refresh token would keep it permanently out of the purge.
+    expect(
+      await lastActivityAt(user),
+      'a REFUSED refresh stamped last_activity_at — an attacker could keep a dormant account alive forever',
+    ).toBe(new Date(DORMANT).getTime());
+  });
+
+  it('a logout stamps last_activity_at, and a garbage logout stamps nothing', async () => {
+    // The LAST event an account produces is the one that starts its dormant clock,
+    // so an account that logs out and never returns is exactly the account this
+    // feature is for. The garbage half is the same control as above: an
+    // unauthenticated caller must not be able to write the column at all.
+    const user = await adminId();
+    const session = (await login({ username: 'admin', password: SEED_PASSWORD })).json<TokenPair>();
+
+    await pinActivityTo(user, DORMANT);
+    const before = Date.now();
+    expect((await logout({ refreshToken: session.refreshToken })).statusCode).toBe(204);
+
+    const stamped = await lastActivityAt(user);
+    expect(stamped, 'a logout did not stamp last_activity_at').not.toBeNull();
+    expect(stamped ?? 0).toBeGreaterThanOrEqual(before - 2_000);
+    expect(stamped ?? 0).toBeLessThanOrEqual(Date.now() + 2_000);
+
+    // Garbage: no row, so no user, so no write.
+    await pinActivityTo(user, DORMANT);
+    expect((await logout({ refreshToken: 'garbage-token-with-no-row' })).statusCode).toBe(204);
+    expect(await lastActivityAt(user), 'a logout for a token with no row stamped last_activity_at').toBe(
+      new Date(DORMANT).getTime(),
+    );
   });
 });

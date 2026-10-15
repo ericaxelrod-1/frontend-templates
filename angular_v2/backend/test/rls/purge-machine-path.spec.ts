@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ENQUEUE_INACTIVE_PURGES_SQL, SELECT_DUE_TOMBSTONES_SQL } from '../../src/purge/purge-enqueue.js';
+import { ENQUEUE_INACTIVE_PURGES_SQL, SELECT_DUE_PURGES_SQL } from '../../src/purge/purge-enqueue.js';
 import { restoreAuthenticatorPassword } from '../support/cluster.js';
 import { databaseConfig, loadTestEnvironment } from '../support/database.js';
 import { BACKEND_ROOT } from '../support/paths.js';
@@ -75,8 +75,18 @@ const PROOF_DB = 'purge_machine_path_proof';
 const BOOTSTRAP_SQL = join(BACKEND_ROOT, 'database', 'bootstrap', '001_roles.sql');
 const MIGRATIONS_DIR = join(BACKEND_ROOT, 'database', 'migrations');
 
-/** The window the fixture is built around, in days. */
-const WINDOW_DAYS = 30;
+/**
+ * The two windows the fixture is built around, in days.
+ *
+ * **These are the shipped FLOORS, not convenient numbers.** Until `0017` the
+ * tombstone window was validated as `1..36500` and this file used `30`; the scan
+ * now refuses anything below 1825, so a fixture that still asked for 30 would be
+ * testing a refusal rather than a scan — and the assertions below would pass for
+ * entirely the wrong reason. Raising the fixture to the floor is what keeps them
+ * about the window rather than about the guard.
+ */
+const TOMBSTONE_WINDOW_DAYS = 1825;
+const ACCOUNT_WINDOW_DAYS = 1095;
 
 /** The ownership key this file speaks as. */
 const SWEEPER_INSTANCE = 'sweeper-machine-path-0001';
@@ -93,20 +103,39 @@ function migrationFiles(): readonly string[] {
 // =============================================================================
 
 /**
- * Three users, because "does not enqueue one that is not yet due" needs a bystander.
+ * Seven users, because "does not enqueue one that is not yet due" needs bystanders
+ * — and `0017` gave the scan a second population, so "not yet due" now has three
+ * shapes rather than one.
  *
- * `due` is a tombstone older than the window; `fresh` is a tombstone younger than it —
- * and it is a TOMBSTONE, not a live account, so the assertion is about the window
- * rather than about `deleted_at IS NULL`, which the scan's first conjunct already
- * handles and which a live account would prove instead. `live` is the third
- * population, so "the scan found exactly one user" is a claim about a set rather than
- * about a single row.
+ * `due` is a tombstone older than the window; `fresh` is a tombstone younger than
+ * it — and it is a TOMBSTONE, not a live account, so the assertion is about the
+ * window rather than about `deleted_at IS NULL`, which the scan's first conjunct
+ * already handles and which a live account would prove instead. `live` is the third
+ * population, so "the scan found exactly one user" is a claim about a set rather
+ * than about a single row.
+ *
+ * The last three are `0017`'s:
+ *
+ *   `dormant`   — a LIVE account whose last observed activity is older than the
+ *                 account window. The positive control for the second population:
+ *                 **an account with observed activity, past the window, IS
+ *                 enqueued.** Without it, every test below passes against a scan
+ *                 that finds nothing at all, which is exactly the shape a
+ *                 "NULL treated as never measured" bug takes.
+ *   `recent`    — a LIVE account observed five days ago. Inside the window.
+ *   `unobserved`— a LIVE account whose `last_activity_at` IS NULL, standing for
+ *                 every account that existed before `0017` and has never
+ *                 authenticated since. It must NOT be enqueued, ever, and the
+ *                 reason is the safety property of the whole feature.
  */
 const IDS = {
   users: {
     due: 'e1000000-0000-0000-0000-000000000001',
     fresh: 'e1000000-0000-0000-0000-000000000002',
     live: 'e1000000-0000-0000-0000-000000000003',
+    dormant: 'e1000000-0000-0000-0000-000000000004',
+    recent: 'e1000000-0000-0000-0000-000000000005',
+    unobserved: 'e1000000-0000-0000-0000-000000000006',
   },
   /** A queue target that is enqueued directly, for the claim tests. */
   queued: 'e1000000-0000-0000-0000-000000000010',
@@ -358,6 +387,9 @@ beforeAll(() => {
     [IDS.users.due, 'mp-due'],
     [IDS.users.fresh, 'mp-fresh'],
     [IDS.users.live, 'mp-live'],
+    [IDS.users.dormant, 'mp-dormant'],
+    [IDS.users.recent, 'mp-recent'],
+    [IDS.users.unobserved, 'mp-unobserved'],
     [IDS.queued, 'mp-queued'],
   ] as const) {
     superuserExec(
@@ -368,16 +400,26 @@ beforeAll(() => {
 
   // Two tombstones, one on each side of the window, and one live account.
   //
-  // `100 days` and `5 days` rather than "older/newer than the window": a fixture that
-  // used the same number the code does would pass even if the comparison were
+  // `2000 days` and `5 days` rather than "older/newer than the window": a fixture
+  // that used the same number the code does would pass even if the comparison were
   // inverted, and the whole point of the assertion is which side of the window each
-  // row falls on. WINDOW_DAYS is 30.
+  // row falls on. TOMBSTONE_WINDOW_DAYS is 1825.
   superuserExec(
-    `UPDATE users SET deleted_at = now() - interval '100 days', deletion_reason = 'inactive' WHERE id = '${IDS.users.due}';`,
+    `UPDATE users SET deleted_at = now() - interval '2000 days', deletion_reason = 'inactive' WHERE id = '${IDS.users.due}';`,
   );
   superuserExec(
     `UPDATE users SET deleted_at = now() - interval '5 days', deletion_reason = 'inactive' WHERE id = '${IDS.users.fresh}';`,
   );
+
+  // `0017`'s second population, built on the same two-sided fixture.
+  //
+  // `dormant` and `recent` are both LIVE and both have an OBSERVED activity; they
+  // differ only in which side of ACCOUNT_WINDOW_DAYS (1095) they fall on. `unobserved`
+  // is left NULL on purpose — writing `created_at` there would be the backfill
+  // `0017` §1 refuses, and it is the single most destructive thing a reader of this
+  // file could "fix" it by doing.
+  superuserExec(`UPDATE users SET last_activity_at = now() - interval '2000 days' WHERE id = '${IDS.users.dormant}';`);
+  superuserExec(`UPDATE users SET last_activity_at = now() - interval '5 days' WHERE id = '${IDS.users.recent}';`);
 }, TIMEOUT);
 
 // Determinism, not hygiene: the claim takes the globally earliest DUE row, so a row
@@ -582,18 +624,20 @@ describe('the enqueue scan · the queue is not filled by an empty table', () => 
       // The scan, on its own, as a row count and an identity — not "it did not
       // throw", which is what a scan that found nothing also looks like.
       const scan = mustRun('app_admin', [
-        `SELECT coalesce(array_agg(t.user_id)::text, '<none>') FROM authz.retention_due_tombstones(${String(WINDOW_DAYS)}) AS t`,
+        `SELECT coalesce(array_agg(t.user_id)::text, '<none>') FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t`,
       ]);
       expect(scan).toHaveLength(1);
       expect(scan[0]).toBe(`{${IDS.users.due}}`);
 
       // Now the pipeline, as ONE statement: the enqueue takes the scan's own output,
       // so a scan that returned the fresh tombstone would enqueue two rows and the
-      // count below would be 2. (Over `pg` the application performs the same two
-      // steps with the scan's ids bound as a parameter, and skips the enqueue
-      // entirely when the scan is empty.)
+      // count below would be 2. (Over `pg` the application performs the same step
+      // with the scan's ids bound as a parameter, and skips the enqueue entirely when
+      // the scan is empty.) The second argument is an EMPTY account array: this
+      // assertion is about the tombstone population, and `0017`'s own block asserts
+      // what happens when a live account is due in the same sweep.
       const enqueued = mustRun('app_admin', [
-        `SELECT authz.enqueue_inactive_purges(ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones(${String(WINDOW_DAYS)}) AS t))`,
+        `SELECT authz.enqueue_inactive_purges(ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t), ARRAY[]::uuid[])`,
       ]);
       expect(enqueued).toEqual(['1']);
 
@@ -608,6 +652,7 @@ describe('the enqueue scan · the queue is not filled by an empty table', () => 
         superuserRows<{ tombstones: number }>(
           `SELECT count(*)::int AS tombstones FROM users WHERE deleted_at IS NOT NULL`,
         )[0]?.tombstones,
+        'the fixture no longer has exactly the two tombstones these assertions are about',
       ).toBe(2);
     },
     TIMEOUT,
@@ -620,7 +665,7 @@ describe('the enqueue scan · the queue is not filled by an empty table', () => 
       // NOTHING`: without it, a scan that runs twice queues every tombstone twice, the
       // second attempt deletes nothing, writes `rows_deleted = 0`, and the admin view
       // reads that as a successful purge.
-      const statement = `SELECT authz.enqueue_inactive_purges(ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones(${String(WINDOW_DAYS)}) AS t))`;
+      const statement = `SELECT authz.enqueue_inactive_purges(ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t), ARRAY[]::uuid[])`;
 
       expect(mustRun('app_admin', [statement])).toEqual(['1']);
       expect(queueContents()).toHaveLength(1);
@@ -640,35 +685,60 @@ describe('the enqueue scan · the queue is not filled by an empty table', () => 
       // Both constants are IMPORTED from `src/purge/purge-enqueue.ts`, never retyped,
       // so a renamed column or a moved function cannot be "proved compatible" against
       // a stale copy of the application's own SQL.
-      const scan = mustRun('app_admin', [bind(SELECT_DUE_TOMBSTONES_SQL, [String(WINDOW_DAYS)])]);
-      expect(scan).toHaveLength(1);
+      //
+      // The scan constant now covers BOTH populations, so it binds BOTH windows, and
+      // the enqueue constant takes one array per population for the same reason. A
+      // `bind()` that did not match the placeholders would throw rather than pass, so
+      // this also proves the argument counts have not drifted from the statements.
+      const scan = mustRun('app_admin', [
+        bind(SELECT_DUE_PURGES_SQL, [String(TOMBSTONE_WINDOW_DAYS), String(ACCOUNT_WINDOW_DAYS)]),
+      ]);
+      // TWO rows, one per population — the shipped statement covers both anchors, so
+      // asserting a single row here would be asserting that `0017`'s second population
+      // is not wired in.
+      expect(scan).toHaveLength(2);
       expect(scan[0]).toContain(IDS.users.due);
+      expect(scan[0]).toContain('inactivity_purge');
+      expect(scan[1], 'the dormant live account was not returned by the shipped scan').toContain(IDS.users.dormant);
+      expect(scan[1]).toContain('inactive_account_purge');
       expect(scan[0], 'the fresh tombstone was returned by the scan').not.toContain(IDS.users.fresh);
+      expect(scan[1], 'the recently-observed account was returned by the scan').not.toContain(IDS.users.recent);
+      expect(
+        scan.join('|'),
+        'an account whose activity was never observed was returned by the scan',
+      ).not.toContain(IDS.users.unobserved);
 
-      const enqueued = mustRun('app_admin', [bind(ENQUEUE_INACTIVE_PURGES_SQL, [`{${IDS.users.due}}`])]);
+      const enqueued = mustRun('app_admin', [bind(ENQUEUE_INACTIVE_PURGES_SQL, [`{${IDS.users.due}}`, '{}'])]);
       expect(enqueued).toEqual(['1']);
 
       expect(queueContents()).toEqual([{ target_id: IDS.users.due, reason: 'inactivity_purge', status: 'pending' }]);
 
-      // And the window reaches the statement as a BOUND value, never as text: a
+      // And both windows reach the statement as BOUND values, never as text: a
       // statement built by interpolation would take whatever the caller passed, and
-      // the loader that produces this value is the only thing standing between an
+      // the loader that produces these values is the only thing standing between an
       // operator's typo and a syntax error at three in the morning.
-      expect(SELECT_DUE_TOMBSTONES_SQL).toContain('$1::integer');
-      expect(SELECT_DUE_TOMBSTONES_SQL).not.toMatch(/interval|make_interval/);
+      expect(SELECT_DUE_PURGES_SQL).toContain('$1::integer');
+      expect(SELECT_DUE_PURGES_SQL).toContain('$2::integer');
+      expect(SELECT_DUE_PURGES_SQL).not.toMatch(/interval|make_interval/);
+      expect(ENQUEUE_INACTIVE_PURGES_SQL).toContain('$1::uuid[]');
+      expect(ENQUEUE_INACTIVE_PURGES_SQL).toContain('$2::uuid[]');
     },
     TIMEOUT,
   );
 
   it(
-    'refuses a window of zero, of nothing at all, and of a century and a day',
+    'refuses a window below the floor, of nothing at all, and of a century and a day',
     () => {
-      // Zero is the dangerous one: every tombstone that has ever existed becomes due
-      // on the next sweep. A default of zero would be a retention policy nobody chose
-      // that deletes personal data immediately.
+      // **The floor is the control, and `1` is the case that matters.** Under
+      // `0016`'s `1..36500` bound `RETENTION_TOMBSTONE_DAYS=1` was valid
+      // configuration and hard-destroyed every tombstone in the repository on the
+      // next sweep; the floor is what makes the key mean what the template says it
+      // means.
       for (const [what, argument] of [
         ['zero', '0'],
         ['negative', '-1'],
+        ['one — the shortest route to destroying every tombstone in the repository', '1'],
+        ['just below the five-year floor', '1824'],
         ['beyond the ceiling', '36501'],
       ] as const) {
         const refused = runRoleScript('app_admin', [
@@ -677,21 +747,61 @@ describe('the enqueue scan · the queue is not filled by an empty table', () => 
         expect(refused.ok, `a ${what} window was accepted:\n${refused.output}`).toBe(false);
         expect(refused.output, `a ${what} window did not raise 22023`).toContain('22023');
         expect(refused.output).toContain('retention window must be between');
+        expect(refused.output, `a ${what} window did not name the five-year floor`).toContain('1825');
       }
+
+      // …and the account scan refuses its OWN floor, which is a different number for
+      // a different population. A single function with two arguments could not say
+      // which key it was refusing; that is why there are two.
+      for (const [what, argument] of [
+        ['zero', '0'],
+        ['one', '1'],
+        ['thirty — the value every `.env` shipped before 0017', '30'],
+        ['just below the three-year floor', '1094'],
+        ['beyond the ceiling', '36501'],
+      ] as const) {
+        const refused = runRoleScript('app_admin', [
+          `SELECT a.user_id FROM authz.retention_due_accounts(${argument}) AS a`,
+        ]);
+        expect(refused.ok, `a ${what} account window was accepted:\n${refused.output}`).toBe(false);
+        expect(refused.output, `a ${what} account window did not raise 22023`).toContain('22023');
+        expect(refused.output).toContain('authz.retention_due_accounts');
+        expect(refused.output).toContain('retention window must be between');
+        expect(refused.output, `a ${what} account window did not name the three-year floor`).toContain('1095');
+      }
+
+      // The floor itself is ACCEPTED by both, so these are bounds and not a
+      // function that refuses everything.
+      expect(
+        mustRun('app_admin', [`SELECT count(*) FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)})`]),
+      ).toHaveLength(1);
+      expect(
+        mustRun('app_admin', [`SELECT count(*) FROM authz.retention_due_accounts(${String(ACCOUNT_WINDOW_DAYS)})`]),
+      ).toHaveLength(1);
 
       // No window at all is refused too, rather than defaulting to one.
       const absent = runRoleScript('app_admin', ['SELECT authz.retention_due_tombstones(NULL)']);
       expect(absent.ok, absent.output).toBe(false);
       expect(absent.output).toContain('the retention window is required');
+      const absentAccounts = runRoleScript('app_admin', ['SELECT authz.retention_due_accounts(NULL)']);
+      expect(absentAccounts.ok, absentAccounts.output).toBe(false);
+      expect(absentAccounts.output).toContain('the retention window is required');
 
       // And a NULL target list is refused rather than read as an empty list: "there is
       // nothing to enqueue" and "nobody said" are different, and only the second is an
-      // error.
-      const nullList = runRoleScript('app_admin', ['SELECT authz.enqueue_inactive_purges(NULL)']);
-      expect(nullList.ok, nullList.output).toBe(false);
-      expect(nullList.output).toContain('22023');
+      // error. BOTH arguments, because a NULL in either one would otherwise purge one
+      // population while the caller believed it had reported on both.
+      for (const [what, arguments_] of [
+        ['no lists at all', 'NULL, NULL'],
+        ['no tombstones list', 'NULL, ARRAY[]::uuid[]'],
+        ['no accounts list', "ARRAY[]::uuid[], NULL"],
+      ] as const) {
+        const nullList = runRoleScript('app_admin', [`SELECT authz.enqueue_inactive_purges(${arguments_})`]);
+        expect(nullList.ok, `${what} was accepted:\n${nullList.output}`).toBe(false);
+        expect(nullList.output).toContain('22023');
+      }
 
-      // Nothing was enqueued by any of the five.
+      // Nothing was enqueued by any of the eleven.
       expect(queueContents()).toEqual([]);
     },
     TIMEOUT,
@@ -711,11 +821,12 @@ describe('the seam is narrow, and the permitted case is asserted rather than inf
       // everybody and denies everybody with an ordinary zero-row result — the whole
       // capability axis silently absent. Every denial-only test passes against that.
       // This is the positive case, and it is the one that sees the defect.
-      expect(mustRun('app_admin', [`SELECT t.user_id FROM authz.retention_due_tombstones(${String(WINDOW_DAYS)}) AS t`]))
-        .toHaveLength(1);
+      expect(
+        mustRun('app_admin', [`SELECT t.user_id FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t`]),
+      ).toHaveLength(1);
 
       const enqueued = mustRun('app_admin', [
-        `SELECT authz.enqueue_inactive_purges(ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones(${String(WINDOW_DAYS)}) AS t))`,
+        `SELECT authz.enqueue_inactive_purges(ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t), ARRAY[]::uuid[])`,
       ]);
       expect(enqueued).toEqual(['1']);
 
@@ -743,8 +854,15 @@ describe('the seam is narrow, and the permitted case is asserted rather than inf
           `SELECT authz.complete_purge('00000000-0000-0000-0000-000000000000', '${SWEEPER_INSTANCE}', 1)`,
           `SELECT authz.fail_purge('00000000-0000-0000-0000-000000000000', '${SWEEPER_INSTANCE}', 'x')`,
           `SELECT authz.requeue_purge('00000000-0000-0000-0000-000000000000', '${SWEEPER_INSTANCE}', 'x')`,
-          `SELECT authz.enqueue_inactive_purges(ARRAY['${IDS.users.due}']::uuid[])`,
-          `SELECT t.user_id FROM authz.retention_due_tombstones(${String(WINDOW_DAYS)}) AS t`,
+          `SELECT authz.enqueue_inactive_purges(ARRAY['${IDS.users.due}']::uuid[], ARRAY[]::uuid[])`,
+          `SELECT t.user_id FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t`,
+          // `0017`'s two additions to the seam, refused at the FUNCTION like every
+          // other one — including the WRITER, which is the one seam in this schema a
+          // caller drives: `app_member` holds no `UPDATE` on `users` at all
+          // (`0008:465`), so a grant here would be a widening of the table's write
+          // surface to stamp a column that decides whether the account is destroyed.
+          `SELECT a.user_id FROM authz.retention_due_accounts(${String(ACCOUNT_WINDOW_DAYS)}) AS a`,
+          `SELECT authz.record_user_activity('${IDS.users.due}')`,
         ]) {
           const refused = runRoleScript(role, [statement]);
           expect(refused.ok, `${role} was able to run: ${statement}\n${refused.output}`).toBe(false);
@@ -756,7 +874,7 @@ describe('the seam is narrow, and the permitted case is asserted rather than inf
       }
 
       // Nothing was claimed, completed, failed, requeued or enqueued by any of the
-      // twelve attempts.
+      // sixteen attempts.
       expect(queueContents()).toEqual([]);
     },
     TIMEOUT,
@@ -775,8 +893,13 @@ describe('the seam is narrow, and the permitted case is asserted rather than inf
         'authz.complete_purge(uuid, text, integer)',
         'authz.fail_purge(uuid, text, text)',
         'authz.requeue_purge(uuid, text, text)',
-        'authz.enqueue_inactive_purges(uuid[])',
+        'authz.enqueue_inactive_purges(uuid[], uuid[])',
         'authz.retention_due_tombstones(integer)',
+        // `0017`'s two: the second scan, and the writer. The writer is the sharper of
+        // the two to narrow — it is the only seam here a caller drives, and the
+        // `has_function_privilege` loop below asserts all three serving roles on it.
+        'authz.retention_due_accounts(integer)',
+        'authz.record_user_activity(uuid)',
       ];
 
       // `oid::regprocedure` is the canonical signature rendering — schema, name and
@@ -794,7 +917,7 @@ describe('the seam is narrow, and the permitted case is asserted rather than inf
            JOIN pg_roles r ON r.oid = p.proowner
           ORDER BY w.signature`,
       );
-      // The owner of all six is the migration role, and none of them is owned by a
+      // The owner of all of them is the migration role, and none is owned by a
       // SERVING role: a definer owned by `app_admin` would let any admin request
       // redefine the retention mechanism.
       // The declaration order of the functions is not the point; the SET is, so both
@@ -878,6 +1001,302 @@ describe('this proof ran against a real provisioned database', () => {
           `SELECT has_table_privilege('app_admin', 'public.privacy_purge_queue', 'UPDATE') AS holds`,
         )[0]?.holds,
       ).toBe(false);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '0017 is applied, and the column it adds is NULLABLE with no default',
+    () => {
+      // The two properties `0017` §1 exists to establish, read from the catalog
+      // rather than from the migration file. Both are load-bearing and both are
+      // invisible in the served API:
+      //
+      //   * **nullable** — a NOT NULL column would need a default on `ALTER TABLE`
+      //     for the rows that already exist, which is the backfill `0017` refuses;
+      //   * **no default** — `DEFAULT now()` writes a value at INSERT time, which
+      //     would make the migration's execution time a retention decision for every
+      //     account in the repository, taken by nobody.
+      //
+      // `column_default IS NULL` is asserted separately from nullability because a
+      // column can be nullable AND defaulted (`DEFAULT now()` is exactly that), and
+      // only the second assertion catches it.
+      expect(
+        superuserRows<{ is_nullable: string; column_default: string | null }>(
+          `SELECT is_nullable, column_default
+             FROM information_schema.columns
+            WHERE table_name = 'users' AND column_name = 'last_activity_at'`,
+        ),
+      ).toEqual([{ is_nullable: 'YES', column_default: null }]);
+
+      // And the index the dormant scan serves exists, so the scan is not a
+      // sequential scan over the whole table.
+      expect(
+        superuserRows<{ indexdef: string }>(
+          `SELECT indexdef FROM pg_indexes WHERE tablename = 'users' AND indexname = 'users_last_activity_at_idx'`,
+        ),
+      ).toHaveLength(1);
+    },
+    TIMEOUT,
+  );
+});
+
+
+// =============================================================================
+// 5 — THE SECOND ANCHOR: a dormant LIVE account, and the two floors
+// =============================================================================
+// `0017`. Everything above is `0016`'s machinery; this block is the new population,
+// and it is written so that the dangerous failure — "the scan finds nothing at all,
+// and a suite of negative assertions reports green" — cannot pass silently. The
+// `dormant` fixture is the positive control for that, and it is asserted FIRST.
+// =============================================================================
+
+describe('a dormant live account is retention, and it is enqueued under its own reason code', () => {
+  it(
+    'a LIVE account with observed activity past the window IS enqueued — the positive control',
+    () => {
+      // **THE CONTROL THAT MAKES THE OTHER ASSERTIONS IN THIS BLOCK MEANINGFUL.**
+      // Every test below is a "does not enqueue" test, and every one of them passes
+      // against a scan that returns nothing at all — which is the exact shape a
+      // `last_activity_at IS NOT NULL` bug, a wrong column name, or a broken
+      // predicate all produce. A deletion-only test cannot see it (§B8's positive-case
+      // rule, applied to a scan instead of to a policy).
+      //
+      // So: one live account, never soft-deleted, last observed 2000 days ago, window
+      // 1095. It MUST come back, and it must come back under
+      // `inactive_account_purge` rather than the tombstone code — a shared code is
+      // what makes a wrongly-configured window invisible in the operator's list.
+      const scan = mustRun('app_admin', [
+        `SELECT coalesce(array_agg(a.user_id)::text, '<none>') FROM authz.retention_due_accounts(${String(ACCOUNT_WINDOW_DAYS)}) AS a`,
+      ]);
+      expect(scan, 'the dormant-account scan found nothing, so nothing below can mean anything').toHaveLength(1);
+      expect(scan[0]).toBe(`{${IDS.users.dormant}}`);
+
+      // Through the real pipeline, both populations at once — which is the shape the
+      // operator's single filterable list is filled from.
+      const enqueued = mustRun('app_admin', [
+        `SELECT authz.enqueue_inactive_purges(
+           ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t),
+           ARRAY(SELECT a.user_id FROM authz.retention_due_accounts(${String(ACCOUNT_WINDOW_DAYS)}) AS a))`,
+      ]);
+      // Two rows, and the count is the sum of BOTH populations: one tombstone
+      // (`due`) plus one dormant account (`dormant`). A sweep that enqueued one row
+      // would mean the second population is not really wired in.
+      expect(enqueued).toEqual(['2']);
+
+      // The queue's CONTENTS, read unfiltered by the owner — the operator's list,
+      // with the two populations distinguishable in it. Ordered by target_id, which is
+      // why `due` precedes `dormant`: the assertion is on the SET, and an order that
+      // happened to match the enqueue order would pass against a queue whose contents
+      // were scrambled.
+      expect(queueContents()).toEqual([
+        { target_id: IDS.users.due, reason: 'inactivity_purge', status: 'pending' },
+        { target_id: IDS.users.dormant, reason: 'inactive_account_purge', status: 'pending' },
+      ]);
+
+      // …and the reason a row was purged is a value in the domain, read back from
+      // the CHECK rather than from the migration that wrote it.
+      expect(
+        superuserRows<{ definition: string }>(
+          `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+            WHERE conrelid = 'public.privacy_purge_queue'::regclass
+              AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%inactive_account_purge%'`,
+        ),
+      ).toHaveLength(1);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'an account whose activity was NEVER OBSERVED is not enqueued, whatever its age',
+    () => {
+      // **THE SAFETY PROPERTY, and the reason `last_activity_at` is nullable.**
+      // `unobserved` stands for every account that existed before `0017` and has not
+      // authenticated since: NULL means "we never watched this account", which is
+      // not evidence of dormancy. Destroying it would be destroying an account on
+      // the strength of a measurement that was never taken.
+      //
+      // The TOMBSTONE scan must not return `dormant` either, and that is the other
+      // half of the same property: `deleted_at IS NULL` is what keeps the two
+      // populations disjoint, so one sweep can never put the same row in both lists
+      // with two different reasons. A row that appeared in both would be scheduled
+      // twice — the second attempt would delete nothing, write `rows_deleted = 0`,
+      // and read in the admin view as a successful purge.
+      expect(
+        superuserRows<{ id: string; last_activity_at: string | null }>(
+          `SELECT id, last_activity_at FROM users WHERE id = '${IDS.users.unobserved}'`,
+        ),
+      ).toEqual([{ id: IDS.users.unobserved, last_activity_at: null }]);
+
+      // The account scan does not return it. At the widest window this schema allows,
+      // which is the only place the `IS NOT NULL` conjunct could be doing the work
+      // by accident rather than by design.
+      for (const window of [String(ACCOUNT_WINDOW_DAYS), '1825', '3650', '36500']) {
+        const scan = mustRun('app_admin', [
+          `SELECT coalesce(array_agg(a.user_id)::text, '<none>') FROM authz.retention_due_accounts(${window}) AS a`,
+        ]);
+        expect(scan[0], `an unobserved account became eligible at a ${window}-day window`).not.toContain(
+          IDS.users.unobserved,
+        );
+      }
+
+      // `dormant` is the disjointness control: it IS due, and it comes back from the
+      // ACCOUNT scan and from nowhere else.
+      expect(
+        mustRun('app_admin', [
+          `SELECT coalesce(array_agg(a.user_id)::text, '<none>') FROM authz.retention_due_accounts(${String(ACCOUNT_WINDOW_DAYS)}) AS a`,
+        ])[0],
+      ).toContain(IDS.users.dormant);
+      for (const window of [String(TOMBSTONE_WINDOW_DAYS), '36500']) {
+        expect(
+          mustRun('app_admin', [
+            `SELECT coalesce(array_agg(t.user_id)::text, '<none>') FROM authz.retention_due_tombstones(${window}) AS t`,
+          ])[0],
+          'a LIVE dormant account appeared in the tombstone list',
+        ).not.toContain(IDS.users.dormant);
+      }
+
+      // And the whole pipeline enqueues it neither way, at the widest window the
+      // schema accepts — 36500 days, which is also the widest the FLOOR allows a
+      // window to be, so this is the strongest version of the claim available.
+      mustRun('app_admin', [
+        `SELECT authz.enqueue_inactive_purges(
+           ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones('36500') AS t),
+           ARRAY(SELECT a.user_id FROM authz.retention_due_accounts('36500') AS a))`,
+      ]);
+      expect(queueContents().map((row) => row.target_id)).not.toContain(IDS.users.unobserved);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'an account INSIDE either window is not enqueued, and a tombstone past its window still is',
+    () => {
+      // Both windows have a "recent" side, and both are asserted — a window that
+      // only ever matched would be a window nobody can distinguish from "now".
+      //
+      // `recent`: a LIVE account observed 5 days ago, inside a 1095-day window.
+      // `live` and `fresh` are the same idea for the other shapes: a live account with
+      // no observation at all, and a tombstone 5 days old.
+      const accounts = mustRun('app_admin', [
+        `SELECT coalesce(array_agg(a.user_id)::text, '<none>') FROM authz.retention_due_accounts(${String(ACCOUNT_WINDOW_DAYS)}) AS a`,
+      ]);
+      expect(accounts[0]).not.toContain(IDS.users.recent);
+
+      const tombstones = mustRun('app_admin', [
+        `SELECT coalesce(array_agg(t.user_id)::text, '<none>') FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t`,
+      ]);
+      expect(tombstones[0], 'a tombstone inside its window was returned').not.toContain(IDS.users.fresh);
+
+      // By row COUNT, over the whole fixture, so "not toContain" on an array cannot
+      // pass because the scan returned an empty array for an unrelated reason.
+      expect(
+        superuserRows<{ due: number }>(
+          `SELECT count(*)::int AS due FROM users u
+            WHERE (u.deleted_at IS NULL AND u.last_activity_at IS NOT NULL
+                   AND u.last_activity_at < now() - make_interval(days => ${String(ACCOUNT_WINDOW_DAYS)}))
+               OR (u.deleted_at IS NOT NULL
+                   AND u.deleted_at < now() - make_interval(days => ${String(TOMBSTONE_WINDOW_DAYS)}))`,
+        )[0]?.due,
+        'the fixture no longer holds exactly one due row per population',
+      ).toBe(2);
+
+      mustRun('app_admin', [
+        `SELECT authz.enqueue_inactive_purges(
+           ARRAY(SELECT t.user_id FROM authz.retention_due_tombstones(${String(TOMBSTONE_WINDOW_DAYS)}) AS t),
+           ARRAY(SELECT a.user_id FROM authz.retention_due_accounts(${String(ACCOUNT_WINDOW_DAYS)}) AS a))`,
+      ]);
+      const queued = queueContents().map((row) => row.target_id).sort();
+      expect(queued).toEqual([IDS.users.dormant, IDS.users.due].sort());
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'the reason code is a literal in SQL, so no caller can file a live account under the tombstone code',
+    () => {
+      // The rejected design was `enqueue_inactive_purges(uuid[], text)` with the
+      // caller naming the reason — one argument instead of two, and one bug away
+      // from an operator filtering on "tombstone" and finding a person. What is
+      // asserted here is that the reason is not reachable as an argument at all:
+      // passing one is a type error, and the enqueue is reachable only with two
+      // arrays.
+      const wrongArity = runRoleScript('app_admin', [
+        `SELECT authz.enqueue_inactive_purges(ARRAY['${IDS.users.dormant}']::uuid[])`,
+      ]);
+      expect(wrongArity.ok, 'the one-argument overload is still there:\n' + wrongArity.output).toBe(false);
+      expect(wrongArity.output).toContain('function authz.enqueue_inactive_purges');
+
+      // …and the two-argument call with the DORMANT account in the tombstone array
+      // writes the tombstone code, which is the design's one remaining hazard and is
+      // why the reason is a literal per array rather than a per-row value: the
+      // database cannot tell a misfiled live account from a tombstone, and the
+      // application's `splitByPopulation` is the only thing that can. Asserted so the
+      // behaviour is on the record rather than assumed.
+      const enqueued = mustRun('app_admin', [
+        `SELECT authz.enqueue_inactive_purges(ARRAY['${IDS.users.dormant}']::uuid[], ARRAY[]::uuid[])`,
+      ]);
+      expect(enqueued).toEqual(['1']);
+      expect(queueContents()).toEqual([
+        { target_id: IDS.users.dormant, reason: 'inactivity_purge', status: 'pending' },
+      ]);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'authz.record_user_activity stamps now(), returns whether it landed, and refuses a null id',
+    () => {
+      // The writer, exercised through the boundary the thin app uses. Three
+      // properties, and each is a different kind of wrong if it fails:
+      //
+      //   * it WRITES — a definer body would update zero rows silently here, because
+      //     `users` is FORCE RLS'd and `current_user` rebinds to the owner inside a
+      //     definer (the measurement `0016` records). The positive call is the only
+      //     thing that sees it;
+      //   * it uses ITS OWN clock — the function takes no timestamp, so a caller
+      //     cannot write `'-infinity'` (accelerating its own destruction) or
+      //     `'infinity'` (making itself immortal). Asserted as `now() <= value <=
+      //     now()` measured around the call, not as an exact timestamp;
+      //   * it REPORTS — a `false` answer is an un-deleted row, and a function that
+      //     returned `rowCount` would report 1 either way.
+      const before = new Date();
+      const written = mustRun('app_admin', [`SELECT authz.record_user_activity('${IDS.users.live}')`]);
+      const after = new Date();
+      expect(written).toEqual(['t']);
+
+      const stamped = superuserRows<{ last_activity_at: string }>(
+        `SELECT last_activity_at FROM users WHERE id = '${IDS.users.live}'`,
+      )[0];
+      expect(stamped?.last_activity_at, 'the writer did not stamp the column').toBeDefined();
+      const stampedAt = new Date(stamped?.last_activity_at ?? '');
+      expect(stampedAt.getTime(), 'the stamp is not inside the call window').toBeGreaterThanOrEqual(
+        before.getTime() - 1000,
+      );
+      expect(stampedAt.getTime()).toBeLessThanOrEqual(after.getTime() + 1000);
+
+      // A row that does not exist is `false`, not an error and not `true`.
+      expect(
+        mustRun('app_admin', [`SELECT authz.record_user_activity('00000000-0000-0000-0000-0000000000ff')`]),
+      ).toEqual(['f']);
+
+      // A tombstone is NOT stamped — the person is gone and the row is what retention
+      // keeps; a clock that restarts on every touch is the failure `0017` §5 names.
+      const tombstoneBefore = superuserRows<{ last_activity_at: string | null }>(
+        `SELECT last_activity_at FROM users WHERE id = '${IDS.users.due}'`,
+      )[0]?.last_activity_at;
+      expect(mustRun('app_admin', [`SELECT authz.record_user_activity('${IDS.users.due}')`])).toEqual(['f']);
+      expect(
+        superuserRows<{ last_activity_at: string | null }>(
+          `SELECT last_activity_at FROM users WHERE id = '${IDS.users.due}'`,
+        )[0]?.last_activity_at,
+      ).toBe(tombstoneBefore);
+
+      // And a NULL id is refused rather than recording activity for nobody.
+      const refused = runRoleScript('app_admin', [`SELECT authz.record_user_activity(NULL)`]);
+      expect(refused.ok, refused.output).toBe(false);
+      expect(refused.output).toContain('22023');
+      expect(refused.output).toContain('the user id is required');
     },
     TIMEOUT,
   );

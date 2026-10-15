@@ -93,7 +93,22 @@ export type PurgeExecutor = {
  *
  * ## What is implemented, and what is not, stated rather than implied
  *
- * `inactivity_purge` is implemented: it deletes one `users` row, identified by the
+ * Two of the five reason codes are implemented, and they are implemented by the
+ * SAME statement:
+ *
+ * - `inactivity_purge` — a **tombstone**: an account an erasure already
+ *   anonymised, retained for `RETENTION_TOMBSTONE_DAYS` and then hard-deleted.
+ * - `inactive_account_purge` — a **live account** whose last observed activity is
+ *   older than `RETENTION_INACTIVE_ACCOUNT_DAYS` and which was never soft-deleted
+ *   (`0017`).
+ *
+ * They share `deleteUser()` because the *work* is identical: one `users` row goes
+ * away. They do NOT share a code, and the reason is the operator's filter rather
+ * than the executor's switch — one filterable list only works if the two
+ * populations can be told apart in it, and a shared code is how a wrongly
+ * configured window stops being visible as mass deletion of live accounts.
+ *
+ * `inactivity_purge` deletes one `users` row, identified by the
  * queue row's `target_id`. The queue row carries **no foreign key to `users`**,
  * and that is load-bearing rather than incidental — the queue row must outlive its
  * target, so an FK would either block the delete or cascade the queue row away
@@ -122,7 +137,6 @@ export type PurgeExecutor = {
  *
  * The other three reasons named in `docs/rebase.md` §9A.2 have **no executor here,
  * and this build says so loudly instead of pretending**:
- *
  * - `retention_login_attempts` — `login_attempts` exists, but the predicate needs
  *   `RETENTION_LOGIN_ATTEMPTS_DAYS`, a retention key this change does not read.
  *   Inventing a window here would be a second mechanism for one decision.
@@ -140,6 +154,7 @@ export class SqlPurgeExecutor implements PurgeExecutor {
   async execute(client: PoolClient, claim: PurgeClaim): Promise<number> {
     switch (claim.reason) {
       case 'inactivity_purge':
+      case 'inactive_account_purge':
         return this.deleteUser(client, claim);
       default:
         throw new UnsupportedPurgeReasonError(claim.reason, claim.targetKind);

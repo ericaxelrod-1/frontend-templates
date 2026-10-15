@@ -7,6 +7,7 @@ import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import type { Environment } from '../config/environment.js';
 import { ipSubnetKey, normalizeIpAddress } from './ip-address.js';
+import { recordActivity } from './last-activity.js';
 import { delayForFailures, isBlocked } from './throttle.js';
 import { uuidv7 } from './uuidv7.js';
 import type { LoginRequestDto } from './login-request.dto.js';
@@ -208,6 +209,11 @@ export class AuthService implements OnModuleDestroy {
       const dbRole = await this.dbRoleFor(client, user.id);
       const accessToken = await this.mintAccessToken(user, dbRole);
       const issued = await this.issueRefreshToken(client, user, accessToken.jti);
+      // The FIRST observation an account ever gets, and the reason a row created by
+      // this migration is eligible for the dormant-account purge at all: a column
+      // that is never written is NULL forever, and NULL is never eligible (`0017` §1).
+      // Rides in this transaction, so it costs no round trip.
+      await recordActivity(client, user.id);
 
       await client.query('COMMIT');
       committed = true;
@@ -321,6 +327,11 @@ export class AuthService implements OnModuleDestroy {
         'UPDATE refresh_tokens SET revoked_at = now(), rotated_to = $2 WHERE id = $1',
         [row.id, issued.id],
       );
+      // A refresh is the observation a read-heavy session actually produces: it is
+      // the event that crosses the access-token boundary, and it is the reason a user
+      // who only ever READS through PostgREST is still recorded as active. See
+      // `last-activity.ts` for what this does not see.
+      await recordActivity(client, user.id);
 
       await client.query('COMMIT');
       committed = true;
@@ -345,6 +356,12 @@ export class AuthService implements OnModuleDestroy {
    * Idempotent and existence-agnostic: an unknown or already-revoked token
    * gets the same empty 204 as a live one, so logout cannot probe whether a
    * refresh token is valid.
+   *
+   * A logout is an observation like any other re-authentication event, and it is
+   * recorded for the same reason `refresh` is: it is the moment the user told us
+   * something about themselves. An account that logs out and never returns is
+   * exactly the account the dormant-account purge is for, so recording this LAST
+   * event is what starts that clock honestly rather than at the previous refresh.
    */
   async logout(dto: LogoutRequestDto): Promise<void> {
     const client = await this.pool.connect();
@@ -354,13 +371,14 @@ export class AuthService implements OnModuleDestroy {
       await client.query('SET LOCAL ROLE app_admin');
 
       const tokenHash = createHash('sha256').update(dto.refreshToken).digest('hex');
-      const result = await client.query<{ id: string }>(
-        'SELECT id FROM refresh_tokens WHERE token_hash = $1 FOR UPDATE',
+      const result = await client.query<{ id: string; user_id: string }>(
+        'SELECT id, user_id FROM refresh_tokens WHERE token_hash = $1 FOR UPDATE',
         [tokenHash],
       );
       const row = result.rows[0];
       if (row !== undefined) {
         await this.revokeFamily(client, row.id);
+        await recordActivity(client, row.user_id);
       }
 
       await client.query('COMMIT');

@@ -207,6 +207,74 @@ describe('login orchestration', () => {
     expect(first.accessToken).not.toBe(second.accessToken);
   });
 
+  it('a successful login stamps last_activity_at, and a refused one does not', async () => {
+    // **The producer is asserted HERE, not only in the database.** The RLS suite
+    // proves `authz.record_user_activity()` writes the column; nothing else proved
+    // that the application CALLS it. Deleting the `await recordActivity(...)` line
+    // from `AuthService.issueSession()` would leave every other test in this
+    // repository green, and the column NULL forever — which is not a degraded
+    // feature, it is the dormant-account purge silently purging nothing while
+    // reading as operational (`AGENTS.md` §2.1).
+    //
+    // The negative half is the one that pins it to SUCCESS. A stamp written on
+    // every attempt would keep a dormant account alive forever, because an attacker
+    // hammering a username would refresh its clock — so the failed login below must
+    // leave the timestamp exactly where it was.
+    const admin = await withAdminClient(async (client) => {
+      const found = await client.query<{ id: string }>("SELECT id FROM users WHERE username = 'admin'");
+      return found.rows[0];
+    });
+    expect(admin?.id, 'the seed did not create the admin account this test reads back').toBeDefined();
+
+    // Pinned to a known-distant value first, rather than read and compared to
+    // itself: "it is not NULL" is satisfied by any earlier login in the suite, and
+    // a login that stamped nothing would pass it. The value is written directly so
+    // the test does not depend on this file's execution order.
+    const DORMANT = '2000-01-01T00:00:00.000Z';
+    await withAdminClient(async (client) => {
+      await client.query('UPDATE users SET last_activity_at = $2 WHERE id = $1', [admin?.id, DORMANT]);
+    });
+
+    const before = Date.now();
+    expect((await login({ username: 'admin', password: SEED_PASSWORD })).statusCode).toBe(200);
+
+    const stamped = await withAdminClient(async (client) => {
+      const found = await client.query<{ last_activity_at: string | null }>(
+        'SELECT last_activity_at FROM users WHERE id = $1',
+        [admin?.id],
+      );
+      return found.rows[0]?.last_activity_at ?? null;
+    });
+    expect(stamped, 'a successful login did not stamp last_activity_at').not.toBeNull();
+    expect(new Date(stamped ?? '').getTime(), 'the stamp is the distant value, so login did not move it').toBeGreaterThan(
+      new Date(DORMANT).getTime(),
+    );
+    // The stamp is the function's own `now()`, so it is bracketed by the call rather
+    // than compared to a separately sampled clock — the same rule §B8 applies to a
+    // token's lifetime, for the same reason.
+    expect(new Date(stamped ?? '').getTime()).toBeGreaterThanOrEqual(before - 2_000);
+    expect(new Date(stamped ?? '').getTime()).toBeLessThanOrEqual(Date.now() + 2_000);
+
+    // The refused login moves nothing. Compared as epoch milliseconds, because
+    // `pg` hands back `timestamptz` as a `Date` and `Object.is` is never true for
+    // two distinct Date objects — a `toBe` on them would report a difference where
+    // there is none, which is the §B8 "assert on the value, not on its identity"
+    // rule in a different costume.
+    const failed = await login({ username: 'admin', password: 'wrong-password' });
+    expect(failed.statusCode).toBe(401);
+    const afterFailure = await withAdminClient(async (client) => {
+      const found = await client.query<{ last_activity_at: string | null }>(
+        'SELECT last_activity_at FROM users WHERE id = $1',
+        [admin?.id],
+      );
+      return found.rows[0]?.last_activity_at ?? null;
+    });
+    expect(
+      new Date(afterFailure ?? '').getTime(),
+      'a REFUSED login stamped last_activity_at, which would keep a dormant account alive forever',
+    ).toBe(new Date(stamped ?? '').getTime());
+  });
+
   it('a wrong password is refused and the attempt is recorded', async () => {
     const response = await login({ username: 'admin', password: 'wrong-password' });
 
