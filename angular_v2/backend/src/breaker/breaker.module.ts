@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, DiscoveryModule } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { loadBreakerEnvironment } from './breaker-environment.js';
 import { BREAKER_ENV } from './breaker-environment.js';
@@ -9,6 +9,7 @@ import { BreakerGateInterceptor } from './breaker.interceptor.js';
 import { BreakerMeter } from './breaker-meter.js';
 import { BreakerRegistry } from './breaker-registry.js';
 import { MEMORY_PROBE, nodeMemoryProbeDeps } from './node-memory-probe.js';
+import { RouteCensus } from './route-census.js';
 
 /**
  * The breaker configuration, read and validated at **module-evaluation time** —
@@ -61,15 +62,29 @@ export const APP_BREAKER_ENVIRONMENT = loadBreakerEnvironment(process.env);
  * There is no alternative registration and no factory that could be swapped for a
  * stand-in at runtime; the shape exists so the unit suite can pass a fixture
  * without the application being able to (`AGENTS.md` §2.2).
+ *
+ * ## Why the route census lives here
+ *
+ * `RouteCensus` refuses a boot in which a mounted route names no dispatch token, and it
+ * is registered **in the module that registers the interceptor** rather than in
+ * `app.module.ts`. The gate and the thing it gates are then one edit: dropping either
+ * the census or the `APP_INTERCEPTOR` is visible in the same `@Module` block, which is
+ * the only reason an agent pattern-matching this file cannot leave one without the other.
+ *
+ * `DiscoveryModule` is imported for Nest's own public enumeration API (`DiscoveryService`
+ * is `@publicApi` as of v12) and nothing else. It reads the resolved module graph, so
+ * what the census checks is the controller set Nest actually mounted rather than a list
+ * anybody maintains.
  */
 @Module({
-  imports: [ConfigModule, ScheduleModule.forRoot()],
+  imports: [ConfigModule, ScheduleModule.forRoot(), DiscoveryModule],
   providers: [
     { provide: BREAKER_ENV, useValue: APP_BREAKER_ENVIRONMENT },
     { provide: MEMORY_PROBE, useFactory: (): ReturnType<typeof nodeMemoryProbeDeps> => nodeMemoryProbeDeps() },
     BreakerRegistry,
     BreakerMeter,
     BreakerGate,
+    RouteCensus,
     { provide: APP_INTERCEPTOR, useClass: BreakerGateInterceptor },
   ],
   exports: [BreakerRegistry, BreakerGate, BREAKER_ENV],

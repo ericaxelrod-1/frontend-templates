@@ -15,9 +15,8 @@
  *
  * That check is **one-directional**, and the distinction is the whole of the
  * next block: `BREAKER_PROTECTED` cannot name a token this build does not know,
- * and nothing in this build can tell the reverse — that a route exists which no
- * token names. Read the note on `KNOWN_DISPATCH_TOKENS` before assuming the list
- * below is a census of routes. It is not, and nothing enforces that it is.
+ * and the reverse — that a route exists which no token names — is enforced by
+ * `route-census.ts`, which walks the mounted controllers on every boot.
  */
 
 export const DISPATCH_TOKEN_PATTERN = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
@@ -82,42 +81,35 @@ export const PURGE_ENQUEUER: DispatchToken = 'purge.enqueuer';
  * token here is not a statement that it should survive an open breaker; see
  * `PURGE_ENQUEUER`, which is named, sheddable, and says why.
  *
- * ## This is not a route-coverage gate, and nothing here enforces completeness
+ * ## This list is not a census, and the census is somewhere else
  *
  * An earlier version of this comment claimed that a route added without a line
- * here *fails the boot*. **Nothing implements that.** `dispatchTokenForRoute`
- * below returns `undefined` for anything this build cannot name; no code path
- * and no test walks the mounted routes and compares them against this array. A
- * route added without a line is therefore **silently sheddable** — admitted
- * while the breaker is closed, `202` and not dispatched once it opens, with
- * nothing anywhere saying the site was never classified.
+ * here *fails the boot*. **Nothing implemented that**, and the claim was deleted
+ * rather than left to be believed. It has since been implemented, in
+ * `route-census.ts`: `RouteCensus` runs on `onApplicationBootstrap`, reads the
+ * controllers Nest actually mounted through `DiscoveryService`, and throws
+ * `RouteCensusError` naming every route this list does not cover.
  *
- * That is the same defect family this build has already paid for in both
- * directions, and both instances are in the tree. **The fixture direction:**
- * `test/e2e/email.e2e-spec.ts`'s `EmailProbeController` is a mounted route that no
- * token names, so it is breakable — and the cold-start window (`breaker-state.ts`)
- * is what turned that from a theoretical gap into a red test. **The protection-list
- * direction:** a typo in `BREAKER_PROTECTED` is a site that is sheddable while the
- * operator reads the breaker reporting the crisis accurately. This list is the
- * third spelling of the same omission, and the only one with no check behind it.
+ * So the list below still is not a census — it is the vocabulary, and a
+ * vocabulary is not a claim about the application. **The gate is separate and it
+ * is mechanical**, which is what the deleted sentence was reaching for.
  *
- * **Why the gate is not built, stated so it is not re-proposed as a one-liner.**
- * The obvious implementation is a boot-time walk of the mounted routes. It
- * cannot be correct without also deciding what a *test* route is:
- * `test/e2e/email.e2e-spec.ts` mounts `EmailProbeController` into `AppModule`,
- * and by the same construction that is a dispatch site — the global interceptor
- * really does run on it. A gate that treats it as one fails the boot of a
- * legitimate fixture, and the only two ways to make it pass are the two this
- * comment refuses to suggest: adding the fixture's routes to
- * `BREAKER_PROTECTED`, which makes the symptom vanish while the real defect — no
- * route is ever checked — stays exactly where it was; or exempting test
- * environments, which is a `NODE_ENV` branch around a security control and
- * therefore a silent weakening (AGENTS.md §2.3).
+ * What remains true, and is the part worth carrying forward: this tree has paid
+ * for the omission in both directions, and both instances were invisible.
+ * **The fixture direction:** `test/e2e/email.e2e-spec.ts` mounts
+ * `EmailProbeController` into `AppModule`, so it really was an unnamed dispatch
+ * site, and the cold-start window (`breaker-state.ts`) turned that from a
+ * theoretical gap into a red test. It is now a declared exemption with a checked
+ * reason rather than a silence. **The protection-list direction:** a typo in
+ * `BREAKER_PROTECTED` is a site that is sheddable while the operator reads the
+ * breaker reporting the crisis accurately — and that one is still caught only by
+ * `breaker-environment.ts`, which refuses an unknown token at boot.
  *
- * **Where that leaves the check: a review item, recorded as one**
- * (`docs/rebase.md` §9B.12) rather than dressed up as a gate. The honest
- * statement for the next reader is the one this comment makes: *a new route is
- * breakable until somebody names it, on purpose.*
+ * **The honest limit, which no gate removes.** The census sees routes Nest
+ * mounts. PostgREST is a separate process serving base tables
+ * (`postgrest.conf:96-97`), so a CRUD table added there is a dispatch site no
+ * amount of route-walking in this process can classify; the control that covers
+ * it is §B2's, not this file's.
  */
 export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   AUTH_LOGIN,
@@ -139,12 +131,13 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
  * sheddable rather than silently exempt, so the mistake shows up as a `202` under
  * memory pressure instead of as a site quietly running through one.
  *
- * **The complement of that is the honest limit.** Nothing walks the mounted
- * routes, so `undefined` here is reached by every route that was never added to
- * `KNOWN_DISPATCH_TOKENS` — and with the shipped `BREAKER_PROTECTED` the whole
- * thin-app surface is named, so the interceptor's refusal branch has no runtime
- * exercise at all. See the note on `KNOWN_DISPATCH_TOKENS` for why that check is
- * not built rather than merely missing.
+ * **The complement of that is now checked, and what it does not cover.**
+ * `RouteCensus` (`route-census.ts`) walks the mounted controllers on every boot
+ * and refuses one this function would leave `undefined` — so an unnamed route no
+ * longer survives to the first memory crisis, it stops the process at startup.
+ * With the shipped `BREAKER_PROTECTED` the whole thin-app surface is named, so
+ * the interceptor's refusal branch still has no runtime exercise: the control
+ * that keeps it honest is the boot, not the tests.
  */
 export function dispatchTokenForRoute(controllerName: string, handlerName: string): DispatchToken | undefined {
   const service = controllerName.replace(/Controller$/, '').toLowerCase();

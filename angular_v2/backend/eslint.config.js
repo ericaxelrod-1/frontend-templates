@@ -22,6 +22,13 @@ import tseslint from 'typescript-eslint';
  * *active in every project* and these are deliberately scoped to `backend/src`.
  * Both are proven able to fail — see `docs/rebase.md` §9B.12 — and a violation of
  * either is a red `npm run lint` on the first line of the offending file.
+ *
+ * The third is `NO_NODE_ENV_BRANCH`, likewise scoped to `src/breaker/**` and likewise
+ * proven able to fail. §3 asks for an enforcing rule whenever a convention is added;
+ * this is the convention the route census introduces ("the breaker has no
+ * environment-dependent behaviour"), and the rule is what makes the refused answer —
+ * exempting a test route when `NODE_ENV === 'test'` — unrepresentable rather than merely
+ * discouraged.
  */
 /**
  * §9B.5's contract, enforced rather than reviewed: the abort handle belongs to
@@ -73,6 +80,40 @@ const CLOCK_IS_A_VALUE = {
     'The clock is a value in breaker-state.ts, never a call. Every entry point already takes nowMs, which is what lets the state machine be driven from a fake clock; a Date.now() default here silently reinstates the host clock at the one decision the cold-start fix is about.',
 };
 
+/**
+ * The breaker does not vary by environment, and the route census is the reason.
+ *
+ * `src/breaker/route-census.ts` refuses a boot in which a mounted route names no
+ * dispatch token. The one way to make that gate pass without classifying anything is to
+ * skip it when `NODE_ENV === 'test'`, and there is a concrete reason that temptation
+ * arrives: `test/e2e/email.e2e-spec.ts` mounts `EmailProbeController` into `AppModule`,
+ * so the e2e suite really does boot a graph with an unnamed route in it. That is a fact
+ * to record in `NON_DISPATCHABLE_CONTROLLERS`, where the declaration is checked against
+ * the file it names — **not** an environment to switch off, because a `NODE_ENV` branch
+ * around a resource control is the silent weakening `AGENTS.md` §2.3 names, and it buys
+ * nothing: the fixture is mounted in every mode.
+ *
+ * Both spellings are selectors because this tree is `noPropertyAccessFromIndexSignature`
+ * and therefore writes `process.env['NODE_ENV']` (`src/config/load-env-file.ts:29`), and a
+ * rule that matched only `process.env.NODE_ENV` would be green against every call site
+ * this repository actually writes. A third selector for `const { NODE_ENV } = process.env`
+ * was written and deleted: the AST for an object destructuring puts an `Identifier` where
+ * that selector reads a `MemberExpression`, so it can never match, and a selector that has
+ * never fired proves nothing.
+ */
+const NO_NODE_ENV_BRANCH = [
+  {
+    selector: "MemberExpression[object.object.name='process'][object.property.name='env'][property.name='NODE_ENV']",
+    message:
+      'The breaker has no environment-dependent behaviour, and the route census is why: a NODE_ENV branch here is how a mounted route stops being classified. Record an exemption in NON_DISPATCHABLE_CONTROLLERS (route-census.ts) or name the token in KNOWN_DISPATCH_TOKENS (dispatch-token.ts); do not switch the gate off by mode.',
+  },
+  {
+    selector: "MemberExpression[object.object.name='process'][object.property.name='env'][property.value='NODE_ENV']",
+    message:
+      'The breaker has no environment-dependent behaviour, and the route census is why: a NODE_ENV branch here is how a mounted route stops being classified. Record an exemption in NON_DISPATCHABLE_CONTROLLERS (route-census.ts) or name the token in KNOWN_DISPATCH_TOKENS (dispatch-token.ts); do not switch the gate off by mode.',
+  },
+];
+
 export default tseslint.config(
   {
     ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
@@ -109,15 +150,38 @@ export default tseslint.config(
       'no-restricted-syntax': ['error', ABORT_CONTROLLER_IS_GATE_OWNED],
     },
   },
+{
+    // Every breaker file carries the NODE_ENV ban. The two earlier selectors are
+    // repeated rather than inherited, for the reason the block below states: a later
+    // flat-config object REPLACES `no-restricted-syntax` for the files it matches, so a
+    // narrower block listing only its own selector silently drops the others.
+    files: ['src/breaker/**/*.ts'],
+    ignores: ['src/breaker/breaker-gate.ts', 'src/breaker/breaker-state.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...NO_NODE_ENV_BRANCH, ABORT_CONTROLLER_IS_GATE_OWNED],
+    },
+  },
+  {
+    // The gate is excluded from the AbortController ban (it owns the only controller)
+    // and so needs its own block for the rule it must still carry.
+    files: ['src/breaker/breaker-gate.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...NO_NODE_ENV_BRANCH],
+    },
+  },
   {
     // Both selectors, not just the new one: a later config object REPLACES
-    // `no-restricted-syntax` for the files it matches, so a block carrying only
-    // the clock rule would silently drop the AbortController ban from this file.
-    // Both are the same imported constant, so there is one copy of each rule and
-    // one copy of each message.
+    // `no-restricted-syntax` for the files it matches, so a block carrying only the
+    // clock rule would silently drop the AbortController ban from this file.
+    // All three, for the same reason plus the NODE_ENV ban above.
     files: ['src/breaker/breaker-state.ts'],
     rules: {
-      'no-restricted-syntax': ['error', CLOCK_IS_A_VALUE, ABORT_CONTROLLER_IS_GATE_OWNED],
+      'no-restricted-syntax': [
+        'error',
+        ...NO_NODE_ENV_BRANCH,
+        CLOCK_IS_A_VALUE,
+        ABORT_CONTROLLER_IS_GATE_OWNED,
+      ],
     },
   },
   {

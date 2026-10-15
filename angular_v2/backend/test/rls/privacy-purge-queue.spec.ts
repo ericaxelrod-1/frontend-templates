@@ -39,6 +39,15 @@ import { BACKEND_ROOT } from '../support/paths.js';
  *     list is ONE filterable list. No reason code names a second lifecycle, no column
  *     restates `users.email_anonymized`, and the compliance record is on no purge path.
  *
+ *  5. **The RLS POSTURE is pinned** — `relrowsecurity` and `relforcerowsecurity`, read
+ *     from `pg_class`. `0011` enables the policies and deliberately does not FORCE the
+ *     table, and records that as a trade; until section 8 existed nothing read either
+ *     flag, so the sentence was a comment. The trade is only *bounded* while two other
+ *     facts hold, and section 8 asserts both: no role reaching the table is SUPERUSER or
+ *     BYPASSRLS, and the six `SECURITY DEFINER` writers in `authz` — which run as the
+ *     owner and therefore meet NO policy on this table at all — are callable by
+ *     `app_admin` alone, with EXECUTE revoked from `PUBLIC`.
+ *
  * ## What changed here in `0016`, and why every change is a strengthening
  *
  * `0016` moved the four writes behind narrowly-granted `SECURITY DEFINER` functions in
@@ -1183,6 +1192,266 @@ describe('the purge-queue proof is a real provision, so no denial above is a vac
         superuserRows<{ count: number }>(`SELECT count(*)::int AS count FROM permissions WHERE resource = 'privacy_purge'`)[0]
           ?.count,
       ).toBe(2);
+    },
+    TIMEOUT,
+  );
+});
+
+// =============================================================================
+// 8 — the RLS posture: ENABLEd, deliberately NOT FORCEd, and bounded
+// =============================================================================
+
+/**
+ * The six `authz` writers `0016` installed, addressed by their **exact signatures**.
+ *
+ * A name-only match would also catch a same-named overload, and `aclexplode` over
+ * `proacl` is the only way to ask "who may call this" without assuming `proacl` is
+ * set — a NULL `proacl` means the default ACL, which grants EXECUTE to PUBLIC.
+ */
+const AUTHZ_PURGE_WRITERS: readonly string[] = [
+  'authz.claim_due_purge(text)',
+  'authz.complete_purge(uuid,text,integer)',
+  'authz.fail_purge(uuid,text,text)',
+  'authz.requeue_purge(uuid,text,text)',
+  // Two arguments since 0017: the tombstone and the dormant-account populations are
+  // enqueued by one call with two disjoint id arrays, and the reason is a literal in
+  // the function body rather than a caller argument — so a bug in the enqueuer cannot
+  // file a live account under the tombstone reason. Matching on the FULL signature
+  // rather than the bare name is the point: a bare-name match would pass on a
+  // same-named overload left behind by the old one-argument form.
+  'authz.enqueue_inactive_purges(uuid[],uuid[])',
+  'authz.retention_due_tombstones(integer)',
+];
+
+/** The same six, by bare function name — what `pg_proc.proname` actually holds. */
+const AUTHZ_PURGE_WRITER_NAMES: readonly string[] = AUTHZ_PURGE_WRITERS.map(
+  (signature) => (signature.split('.')[1] ?? '').split('(')[0] ?? '',
+).sort();
+
+/**
+ * The one member of that set which is `SECURITY INVOKER` on purpose.
+ *
+ * It does not write the queue — it scans `users` for tombstones and returns ids — and
+ * making it a definer is the one change that would make it quietly return nothing.
+ * `users` is FORCE RLS'd and `users_read_scope` resolves the caller through
+ * `authz.actor()`, which a definer cannot satisfy because `current_user` has already
+ * rebound to the owner. Asserted in the negative on purpose: see the test body.
+ */
+const AUTHZ_PURGE_INVOKER_READERS: readonly string[] = ['retention_due_tombstones'];
+
+function toRegProcedureList(): string {
+  return AUTHZ_PURGE_WRITERS.map((signature) => `to_regprocedure('${signature}')`).join(', ');
+}
+
+/**
+ * A row count read as `role`, borrowed by the cluster superuser — the only identity that
+ * can borrow another role, which is the reason `test/rls/support/fixture.ts` gives for
+ * doing the same thing.
+ *
+ * `SET LOCAL ROLE` is wrapped in an explicit transaction because outside one it warns
+ * and does nothing, and a probe that silently read as the superuser would assert
+ * nothing. `statementOutput` strips the transaction's own echo.
+ */
+function countAsRole(role: string, relation: string): number {
+  const stdout = superuserExec(
+    PROOF_DB,
+    `BEGIN;\nSET LOCAL ROLE ${role};\nSELECT count(*)::int FROM ${relation};\nCOMMIT;`,
+  );
+  const value = statementOutput(stdout)[0] ?? '';
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`counting ${relation} as ${role} returned '${value}':\n${stdout}`);
+  }
+  return Number(value);
+}
+
+describe('privacy_purge_queue · ENABLEd, NOT FORCEd, and the residual is bounded rather than open', () => {
+  it(
+    'is ENABLE ROW LEVEL SECURITY and is NOT FORCE ROW LEVEL SECURITY, and the catalog is what says it',
+    () => {
+      // THE pin. `0011` enables the policies and deliberately does not FORCE them, and
+      // records the choice as a trade rather than as an oversight — but until now nothing
+      // read `relforcerowsecurity`, so the sentence was a comment. Both halves are
+      // asserted, because each is a change that silently flips the design:
+      //
+      //   · `relrowsecurity = false` removes the policies from every non-owner read;
+      //   · `relforcerowsecurity = true` would bind the OWNER, and the six `authz`
+      //     definers run as the owner — so the purge machine path would be refused by
+      //     `privacy_purge_write`, and the retention job would stop deleting anything,
+      //     which is the one outcome worse than not having the queue.
+      //
+      // Read from `pg_class`, not from the migration file: the question is what the
+      // database presents, and a migration that says `FORCE` and a catalog that says
+      // otherwise is a drift no assertion on the SQL would catch.
+      const posture = superuserRows<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+        `SELECT relrowsecurity, relforcerowsecurity
+           FROM pg_class
+          WHERE oid = 'public.privacy_purge_queue'::regclass`,
+      )[0];
+
+      expect(posture).toBeDefined();
+      expect(posture?.relrowsecurity, 'RLS is disabled, so no policy on this table applies to anybody').toBe(true);
+      expect(
+        posture?.relforcerowsecurity,
+        'this table is FORCEd, so the owner is bound by privacy_purge_write and the authz definers cannot write',
+      ).toBe(false);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'and every role that can reach the table is NOSUPERUSER and NOBYPASSRLS, PUBLIC holds nothing, and the role list is read from the ACL',
+    () => {
+      // AGENTS.md §B2's rule — FORCE does not bind a superuser or a BYPASSRLS role, so
+      // these two attributes are the only thing between a serving role and every row —
+      // applied to THIS table and read from the table's own ACL rather than from a list
+      // of roles somebody remembered.
+      //
+      // `aclexplode` is what makes this exhaustive: it expands every privilege type on
+      // the relation, and `COALESCE(relacl, acldefault('r', relowner))` means a table
+      // whose ACL was never touched is expanded through PostgreSQL's DEFAULT (owner
+      // only) rather than skipped. The LEFT JOIN keeps grantee 0, so a `PUBLIC` grant
+      // appears as the literal string instead of disappearing from the result.
+      const grantees = superuserRows<{ grantee: string; rolsuper: boolean; rolbypassrls: boolean | null }>(
+        `SELECT coalesce(r.rolname, 'PUBLIC') AS grantee, r.rolsuper, r.rolbypassrls
+           FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('r', c.relowner))) AS acl
+           LEFT JOIN pg_roles r ON r.oid = acl.grantee
+          WHERE n.nspname = 'public' AND c.relname = 'privacy_purge_queue'
+          GROUP BY 1, 2, 3
+          ORDER BY 1`,
+      );
+
+      // Properties of the list, not the list: a hardcoded role list is a baseline that
+      // goes stale the moment a fourth grantee appears, which is the change worth
+      // catching. `app_admin` must be in it — the admin list is the reason SELECT is
+      // granted at all — so the assertion cannot pass on an empty result.
+      expect(grantees.length).toBeGreaterThan(0);
+      expect(grantees.map((row) => row.grantee)).toContain('app_admin');
+
+      // `PUBLIC` is checked separately and first, because its row has no `pg_roles`
+      // entry and its attributes are NULL: a `PUBLIC` grant is the shape `0011`'s
+      // `REVOKE ALL … FROM PUBLIC` exists to prevent, and reading it off the LEFT JOIN
+      // is the only way it appears in this result at all.
+      expect(
+        grantees.filter((row) => row.grantee === 'PUBLIC').map((row) => row.grantee),
+        'PUBLIC holds a privilege on privacy_purge_queue',
+      ).toEqual([]);
+
+      // Note what is NOT asserted: that `app_anon` and `app_member` appear here. They do
+      // not, and that is correct — `REVOKE ALL … FROM app_anon` on a role that holds
+      // nothing writes no ACL entry, so their absence from this list IS the finding.
+      // Section 3 asserts the same fact at the privilege layer, where it is readable.
+      for (const row of grantees.filter((candidate) => candidate.grantee !== 'PUBLIC')) {
+        expect(row.rolsuper, `${row.grantee} reaches privacy_purge_queue and is a superuser`).toBe(false);
+        expect(row.rolbypassrls, `${row.grantee} reaches privacy_purge_queue and bypasses RLS`).toBe(false);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'the owner reads every row with no claims in scope, which is the residual being pinned rather than narrated',
+    () => {
+      // The trade `0011` records, asserted as a FACT with row counts on both sides of
+      // it. Not FORCEd means the owner bypasses `privacy_purge_read`, so the
+      // capability gate is not the whole control on this table — the grants above, and
+      // the fact that the owner never receives a request, are. A reader who assumes
+      // FORCE here is wrong, and this is the assertion that says so.
+      enqueue(IDS.targets.readGate);
+      enqueue(IDS.targets.anonymised);
+
+      expect(countAsRole(databaseConfig().user, 'privacy_purge_queue'), 'the fixture did not enqueue two rows').toBe(2);
+
+      // …and the same table read through the boundary is capability-gated: an admin
+      // holding `privacy_purge:read` sees them, and one without it sees nothing. The
+      // contrast is the whole point — without the two numbers side by side, "the owner
+      // reads two" is only half a claim.
+      expect(rowsAsRole<{ reason: string }>('app_admin', IDS.adminProbe, 'SELECT reason FROM privacy_purge_queue')).toHaveLength(2);
+      expect(rowsAsRole<{ reason: string }>('app_admin', IDS.narrowAdmin, 'SELECT reason FROM privacy_purge_queue')).toEqual([]);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'the six authz writers are SECURITY DEFINER and are callable by app_admin alone — which is what makes not-FORCEing this table bounded',
+    () => {
+      // The other half of the trade, and the half that actually decays. Because the
+      // table is not FORCEd and no policy on it names `current_user`, those definers
+      // are subject to NO policy at all: their narrowness is carried entirely by
+      // `EXECUTE`. Grant one of them to `PUBLIC`, or revoke the revoke, and every
+      // caller in the database inherits an owner-privileged writer on a table with no
+      // policy to pass — silently, and with no error anywhere.
+      //
+      // `COALESCE(proacl, acldefault('f', proowner))` again: a function whose ACL was
+      // never touched expands through the DEFAULT, which is EXECUTE to PUBLIC, so the
+      // dangerous case is reported rather than skipped.
+      const writers = superuserRows<{
+        proname: string;
+        prosecdef: boolean;
+        grantee: string;
+      }>(
+        `SELECT p.proname, p.prosecdef, coalesce(r.rolname, 'PUBLIC') AS grantee
+           FROM pg_proc p
+           JOIN pg_namespace n ON n.oid = p.pronamespace
+           CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
+           LEFT JOIN pg_roles r ON r.oid = acl.grantee
+          WHERE n.nspname = 'authz' AND p.oid = ANY(ARRAY[${toRegProcedureList()}]::regprocedure[])
+          GROUP BY 1, 2, 3
+          ORDER BY 1, 3`,
+      );
+
+      // Exactly these six and no others, read from the catalog by exact signature. A
+      // seventh definable writer added without a grant is a red line here rather than a
+      // silent extension of the set; `to_regprocedure` on a signature the database does
+      // not have returns NULL, which `= ANY(…::regprocedure[])` silently drops — so the
+      // count assertion is what catches a rename, not the query.
+      expect([...new Set(writers.map((row) => row.proname))].sort()).toEqual(AUTHZ_PURGE_WRITER_NAMES);
+      expect(writers.length).toBeGreaterThan(AUTHZ_PURGE_WRITER_NAMES.length);
+
+      // The five that WRITE the queue really are definers, which is the fact the whole
+      // residual rests on.
+      for (const row of writers) {
+        if (AUTHZ_PURGE_INVOKER_READERS.includes(row.proname)) {
+          continue;
+        }
+        expect(row.prosecdef, `${row.proname} is not SECURITY DEFINER, so it runs as its caller and the residual above is not the design`).toBe(true);
+      }
+
+      // …and the one that only READS is deliberately NOT, which is the opposite
+      // assertion and the easy one to get backwards.
+      //
+      // `retention_due_tombstones` scans `users`, and `users` is FORCE RLS'd. Inside a
+      // SECURITY DEFINER function `current_user` rebinds to the owner, so a definer
+      // scan satisfies no policy an `actor()`-driven one can satisfy and returns
+      // ZERO rows against a populated table — measured, and the reason this function is
+      // INVOKER. Asserting `prosecdef = true` here would be asserting the bug that
+      // measurement found: the function would silently find nothing, the queue would
+      // stay empty, and an empty queue is indistinguishable from "nothing is due".
+      // One entry per FUNCTION, not per row: the query groups by grantee too, so a
+      // function with two grantees is two rows and a bare `.map` would double-count it.
+      const invoker = [...new Set(writers.filter((row) => AUTHZ_PURGE_INVOKER_READERS.includes(row.proname)).map((row) => row.proname))].sort();
+      expect(invoker, 'the invoker readers are missing from the set').toEqual(
+        [...AUTHZ_PURGE_INVOKER_READERS].sort(),
+      );
+      for (const row of writers.filter((r) => AUTHZ_PURGE_INVOKER_READERS.includes(r.proname))) {
+        expect(row.prosecdef, `${row.proname} became SECURITY DEFINER: it would scan FORCE-RLS \`users\` as the owner and return zero rows`).toBe(false);
+      }
+
+      expect(
+        writers.filter((row) => row.grantee === 'PUBLIC').map((row) => row.proname),
+        'PUBLIC may call an authz purge writer',
+      ).toEqual([]);
+
+      // The owner holds EXECUTE on its own functions, which is the identity these
+      // definers deliberately run as. The assertion is therefore about the SECOND
+      // grantee: exactly one non-owner may call them, and it is `app_admin`.
+      const writerGrantees = [...new Set(writers.map((row) => row.grantee))].sort();
+      expect(writerGrantees).toContain('app_admin');
+      expect(
+        writerGrantees.filter((grantee) => grantee !== databaseConfig().user),
+        'a role other than app_admin may call an authz purge writer',
+      ).toEqual(['app_admin']);
     },
     TIMEOUT,
   );
