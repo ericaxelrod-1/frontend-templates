@@ -38,6 +38,12 @@ beforeAll(() => {
     cwd: BACKEND_ROOT,
     encoding: 'utf8',
     timeout: BUILD_TIMEOUT_MS,
+    // Windows resolves `npm` to `npm.cmd` only through a shell; without this,
+    // `spawnSync` returns `status: null` with `ENOENT` and the failure below
+    // reports an empty build log — a red suite whose cause is the platform rather
+    // than the assets. It is a platform detail, not an assertion: what runs is
+    // still `npm run build` in the same directory with the same arguments.
+    shell: true,
   });
   buildOutput = `${build.stdout ?? ''}\n${build.stderr ?? ''}`;
   if (build.status !== 0) {

@@ -6,6 +6,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BreakerModule } from './breaker/breaker.module.js';
 import { PurgeModule } from './purge/purge.module.js';
+import { ErasureModule } from './privacy/erasure.module.js';
 import { loadEnvironment } from './config/environment.js';
 
 /**
@@ -21,6 +22,10 @@ import { loadEnvironment } from './config/environment.js';
  * proposition is refusing bad configuration must refuse it before it has acted on
  * it, and both jobs register their first interval in `onApplicationBootstrap`,
  * which is strictly later than all of this.
+ *
+ * The erasure namespace's `PRIVACY_*` keys are a third such statement, one import
+ * deeper again (`privacy/erasure.module.ts`), for the same reason and with more
+ * force than either of the others: a default pepper is a published key.
  */
 export const APP_ENVIRONMENT = loadEnvironment(process.env);
 
@@ -41,6 +46,14 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
     // would hand an unauthenticated prober a capacity verdict.
     BreakerModule,
     PurgeModule,
+    // The erasure OPERATION, mounted. Deliberately NOT the deletion-request
+    // ROUTE: a thin-app route names no dispatch token until
+    // `src/breaker/dispatch-token.ts` carries `privacy.submit` /
+    // `privacy.confirm`, and `route-census.ts` refuses to boot a graph with a
+    // mounted route it cannot name. Until that file changes, this module
+    // contributes an operation with no HTTP edge — and registering it is what
+    // makes the operation real rather than a file nothing imports.
+    ErasureModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

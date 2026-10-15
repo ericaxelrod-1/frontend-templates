@@ -9,6 +9,7 @@ import { EmailDeliveryError } from '../../../src/email/email-delivery-error.js';
 import { EmailService } from '../../../src/email/email.service.js';
 import { EmailRenderer } from '../../../src/email/email.renderer.js';
 import { NodemailerEmailProvider } from '../../../src/email/nodemailer-email.provider.js';
+import { tombstoneAddress } from '../../../src/privacy/tombstone.js';
 import {
   PASSWORD_RESET_LINK_LIFETIME_MINUTES,
   VERIFICATION_LINK_LIFETIME_HOURS,
@@ -167,6 +168,52 @@ describe('the two live flows build the message', () => {
     expect(failure.message).toContain('the recipient is not a single-line address');
     expect(failure.message).not.toContain('Bcc:');
     expect(failure.message).not.toContain('\r');
+  });
+});
+
+describe('an anonymised subject receives no mail, and that is a refusal rather than a skip', () => {
+  // The tombstone is minted by the real generator, so this is not a hand-written
+  // lookalike that could drift from the shape the erasure actually writes.
+  const TOMBSTONE = tombstoneAddress(
+    '018f3c2a-1b4d-7c8e-9f01-23456789abcd',
+    'a-test-pepper-of-a-plausible-length-000001',
+    'tombstone.example.test',
+  );
+
+  it('refuses the address, before any transport sees it', async () => {
+    const failure = await serviceFor()
+      .sendPasswordResetEmail(TOMBSTONE, RECIPIENT_NAME, 'tok-xyz')
+      .then(() => 'resolved')
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(EmailDeliveryError);
+    // The address is not echoed: a refused recipient is the same untrusted value as
+    // the CRLF case above, and Nest's handler logs this message.
+    expect((failure as EmailDeliveryError).recipient).toBe('<rejected-recipient>');
+    expect((failure as EmailDeliveryError).message).toContain('an anonymised address');
+    expect((failure as EmailDeliveryError).message).not.toContain(TOMBSTONE);
+    // Nothing was attempted, so no envelope was ever built for it.
+    expect(sink.deliveries).toEqual([]);
+  });
+
+  it('refuses the same address in the delimited display-name form the parser accepts', async () => {
+    await expect(
+      serviceFor().sendVerificationEmail(`"Robin" <${TOMBSTONE}>`, RECIPIENT_NAME, 'tok-abc'),
+    ).rejects.toThrow(EmailDeliveryError);
+    expect(sink.deliveries).toEqual([]);
+  });
+
+  it('refuses the erasure receipt too, so the one flow whose whole point is the address is covered', async () => {
+    await expect(serviceFor().sendErasureReceipt(TOMBSTONE)).rejects.toThrow(EmailDeliveryError);
+    expect(sink.deliveries).toEqual([]);
+  });
+
+  it('still sends to an ordinary address in the same shape, so the check is not "everything is refused"', async () => {
+    // The positive control. Without it, a `send()` that threw unconditionally would
+    // make all three refusals above green.
+    await serviceFor().sendVerificationEmail(RECIPIENT, RECIPIENT_NAME, 'tok-still-works');
+
+    expect(sink.deliveries.at(-1)?.recipients).toEqual([RECIPIENT]);
   });
 });
 

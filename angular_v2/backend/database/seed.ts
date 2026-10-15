@@ -132,13 +132,85 @@ function quoteSqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-async function bootstrapRoles(superuserPsql: string): Promise<void> {
+/**
+ * The `psql` invocation that every **superuser** statement in this file needs,
+ * resolved once for this platform.
+ *
+ * `AGENTS.md` §B1 records why this is a shell-out at all: `CREATE ROLE` needs
+ * `CREATEROLE`, roles are cluster-scoped while migrations are database-scoped,
+ * and the escalation-boundary `GRANT` needs `ADMIN OPTION` and therefore cannot
+ * run inside a migration. So statements in this repository are necessarily
+ * superuser statements, and they have to be invoked as one. **All** of them go
+ * through here — a second spelling of "run psql as a superuser" is a second
+ * mechanism that will drift, and it already had: the bootstrap used a shell
+ * string while everything else used argv arrays spelled out by hand, so on Windows
+ * only some of them could ever be right.
+ *
+ * **Linux is byte-identical to what it always was**: `sudo -u postgres psql`. That
+ * is not incidental. The provisioning docs tell operators to run the bootstrap as
+ * `sudo -u postgres`, and where `postgres` is a peer-authenticated system user that
+ * is the correct escalation. Changing it would alter documented behaviour on the
+ * platform this template primarily targets, for no gain. It is verified **by
+ * execution** rather than by reading this file — the resolved argv is asserted
+ * against the real spawn, because a comment about a call site is not evidence about
+ * a call site.
+ *
+ * **Windows has no `sudo -u`.** Windows 11 ships its own `sudo`, which rejects `-u`
+ * outright (`error: unexpected argument '-u' found`), so the Linux spelling fails
+ * with a usage error that reads like a broken install rather than a wrong platform.
+ * There is also no local socket, so the session is a TCP one like any other and
+ * `-U postgres` is what selects the role.
+ *
+ * `-w` on the Windows spelling is not decoration: without it `psql` **prompts on
+ * stdin** for a password and hangs forever, which turns a provisioning step into an
+ * overnight stall. `-w` makes it fail instead.
+ *
+ * Returned as `command` + `prefixArgs` so callers pass an **argv array** to
+ * `spawnSync` rather than a shell string. A string needs quoting rules that differ
+ * between the two platforms, and the password here is operator-supplied.
+ */
+function superuserPsqlInvocation(): { command: string; prefixArgs: string[] } {
+  if (process.platform === 'win32') {
+    return { command: 'psql', prefixArgs: ['-w', '-U', 'postgres'] };
+  }
+  return { command: 'sudo', prefixArgs: ['-u', 'postgres', 'psql'] };
+}
+
+/**
+ * The argv for one superuser statement against the seed's database.
+ *
+ * `outputFlags` are the `-q -t -A` shape a caller needs when it reads a value back;
+ * they are parameters rather than a second hand-written array because a second
+ * literal is a second place the platform prefix can be forgotten.
+ */
+function superuserPsqlArgs(statement: string, ...outputFlags: string[]): string[] {
+  const { prefixArgs } = superuserPsqlInvocation();
+  return [...prefixArgs, '-d', env().DB_NAME, '-v', 'ON_ERROR_STOP=1', ...outputFlags, '-c', statement];
+}
+
+/** The argv for one superuser statement read from a file on stdin. */
+function superuserPsqlStdinArgs(): string[] {
+  const { prefixArgs } = superuserPsqlInvocation();
+  return [...prefixArgs, '-d', env().DB_NAME, '-v', 'ON_ERROR_STOP=1', '-f', '-'];
+}
+
+async function bootstrapRoles(): Promise<void> {
   console.log('bootstrapping database roles (superuser)...');
   const sql = await readFile(bootstrapPath, 'utf8');
-  execSync(`${superuserPsql} -d ${env().DB_NAME} -v ON_ERROR_STOP=1 -f -`, {
+  const { command } = superuserPsqlInvocation();
+  const result = spawnSync(command, superuserPsqlStdinArgs(), {
     input: sql,
-    stdio: 'inherit',
+    stdio: ['pipe', 'inherit', 'inherit'],
   });
+  if (result.status !== 0) {
+    throw new Error(
+      `role bootstrap failed (exit ${String(result.status)}): ${superuserPsqlInvocation().command} ` +
+        'could not run 001_roles.sql as a superuser. On Linux that is ' +
+        '`sudo -u postgres psql`; if you are not root, run the bootstrap as a ' +
+        'superuser yourself — the escalation-boundary GRANT needs ADMIN OPTION ' +
+        'and therefore cannot live in a migration (AGENTS.md §B1).',
+    );
+  }
   console.log('roles bootstrapped');
 }
 
@@ -164,21 +236,10 @@ class PrerequisiteMissingError extends Error {
  * caused it.
  */
 function superuserStatement(label: string, sql: string): void {
-  const result = spawnSync(
-    'sudo',
-    [
-      '-u',
-      'postgres',
-      'psql',
-      '-d',
-      env().DB_NAME,
-      '-v',
-      'ON_ERROR_STOP=1',
-      '-c',
-      sql,
-    ],
-    { stdio: 'inherit' },
-  );
+  const { command } = superuserPsqlInvocation();
+  const result = spawnSync(command, superuserPsqlArgs(sql), {
+    stdio: 'inherit',
+  });
   if (result.error || result.status !== 0) {
     console.error('cmd:', sql);
     console.error('error:', result.error);
@@ -196,24 +257,10 @@ function superuserStatement(label: string, sql: string): void {
  * false answer, which is exactly the silent-degradation shape §2.3 forbids.
  */
 function superuserScalar(label: string, sql: string): string {
-  const result = spawnSync(
-    'sudo',
-    [
-      '-u',
-      'postgres',
-      'psql',
-      '-d',
-      env().DB_NAME,
-      '-v',
-      'ON_ERROR_STOP=1',
-      '-q',
-      '-t',
-      '-A',
-      '-c',
-      sql,
-    ],
-    { encoding: 'utf8' },
-  );
+  const { command } = superuserPsqlInvocation();
+  const result = spawnSync(command, superuserPsqlArgs(sql, '-q', '-t', '-A'), {
+    encoding: 'utf8',
+  });
   if (result.error || result.status !== 0) {
     console.error('cmd:', sql);
     console.error('error:', result.error);
@@ -312,7 +359,7 @@ async function seed(): Promise<number> {
   const now = new Date().toISOString();
 
   // 1. Role bootstrap — needs CREATEROLE, i.e. a superuser session.
-  await bootstrapRoles('sudo -u postgres psql');
+  await bootstrapRoles();
 
   // 2. Apply the schema migration as the migration/owner role.
   console.log('applying migrations...');
@@ -337,19 +384,10 @@ async function seed(): Promise<number> {
   // cluster exactly where the operator put it and needs no undo; only an explicit
   // `SEED_AUTHENTICATOR_PASSWORD` diverges, and that caller owns the undo.
   const authPass = seedAuthenticatorPassword();
+  const { command: psqlCommand } = superuserPsqlInvocation();
   const result = spawnSync(
-    'sudo',
-    [
-      '-u',
-      'postgres',
-      'psql',
-      '-d',
-      env().DB_NAME,
-      '-v',
-      'ON_ERROR_STOP=1',
-      '-c',
-      `ALTER ROLE pgrst_authenticator WITH LOGIN PASSWORD ${quoteSqlLiteral(authPass)}`,
-    ],
+    psqlCommand,
+    superuserPsqlArgs(`ALTER ROLE pgrst_authenticator WITH LOGIN PASSWORD ${quoteSqlLiteral(authPass)}`),
     { stdio: 'inherit' },
   );
   if (result.status !== 0) {

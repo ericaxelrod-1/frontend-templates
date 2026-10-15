@@ -35,6 +35,19 @@ const BREAKER_ENV: Record<string, string> = {
   BREAKER_PROTECTED: 'auth.login,auth.refresh,auth.logout,auth.me,breaker.meter,breaker.gate',
 };
 
+/**
+ * Booting `AppModule` compiles and initialises the whole graph, which on a cold
+ * module registry is seconds — past vitest's 5s default. `route-census.spec.ts`
+ * pays the same cost and states the same number, and for the same reason: the
+ * suite runs beside `email-assets.spec.ts`, which spawns a real `nest build`, so
+ * the machine this boots on is not an idle one.
+ *
+ * Without it the failure is not a timeout that reads like one — it reports as
+ * `STACK_TRACE_ERROR`, which is how the first version of that file failed for no
+ * visible reason. `route-census.spec.ts:45-50` records the measurement.
+ */
+const BOOT_TIMEOUT = 60_000;
+
 describe('the application wires the breaker into the request path', () => {
   it('resolves the whole graph, with the gate applied as a global interceptor', async () => {
     for (const [key, value] of Object.entries(BREAKER_ENV)) {
@@ -63,7 +76,7 @@ describe('the application wires the breaker into the request path', () => {
     } finally {
       await moduleRef.close();
     }
-  });
+  }, BOOT_TIMEOUT);
 
   it('reads and validates the BREAKER_* keys before any Nest call, so a bad threshold fails the boot', async () => {
     // A separate import graph from the test above, because `breaker.module.ts`

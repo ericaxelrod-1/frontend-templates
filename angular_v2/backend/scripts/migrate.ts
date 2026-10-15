@@ -8,8 +8,39 @@ import { readDownScript } from './down-script.ts';
 // Load .env the same way the application does (but it only runs if the file exists).
 import '../src/config/load-env-file.ts';
 
+import { resolve } from 'node:path';
+
 const backendRoot = dirname(fileURLToPath(import.meta.url));
 const migrationDir = join(backendRoot, '..', 'database', 'migrations');
+
+/**
+ * Is this module the process entry point?
+ *
+ * ## Why this is not `import.meta.url.endsWith(process.argv[1])`
+ *
+ * That spelling is **false on Windows**, and silently. `import.meta.url` is a URL —
+ * `file:///C:/dir/migrate.ts`, forward slashes and a scheme — while
+ * `process.argv[1]` is a filesystem path — `C:\dir\migrate.ts`, backslashes and no
+ * scheme. They are the same file and the suffix test does not match.
+ *
+ * The consequence is the worst shape this repository has a rule about
+ * (`AGENTS.md` §2.3, "silently returning a success-shaped value is a bug"): `run()`
+ * is never called, the script falls off the end, and the process **exits 0 having
+ * applied nothing**. `npm run migration:run` printed no output, reported success, and
+ * left the database with zero tables — while `npm run db:seed` went on to fail
+ * downstream on a table that "had been migrated".
+ *
+ * Comparing resolved filesystem paths is the honest test: convert the URL with
+ * `fileURLToPath`, then `resolve` both sides so a relative `argv[1]` and a
+ * `..`-bearing `import.meta.url` agree.
+ */
+function isEntryPoint(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined || entry === '') {
+    return false;
+  }
+  return resolve(fileURLToPath(import.meta.url)) === resolve(entry);
+}
 
 interface Env {
   DB_HOST: string;
@@ -177,7 +208,7 @@ async function run(up: boolean): Promise<number> {
   }
 }
 
-if (import.meta.url.endsWith(process.argv[1] ?? '')) {
+if (isEntryPoint()) {
   const mode = process.argv[2] === 'down' ? false : true;
   const code = await run(mode);
   process.exit(code);

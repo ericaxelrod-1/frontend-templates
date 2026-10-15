@@ -9,6 +9,7 @@ import {
   isSingleLineAddress,
   type Environment,
 } from '../config/environment.js';
+import { isAnonymizedRecipient } from '../privacy/tombstone.js';
 import { EmailAuditWriter, type EmailAttempt } from './email-audit.writer.js';
 import { EmailDeliveryError } from './email-delivery-error.js';
 import {
@@ -35,6 +36,23 @@ import {
  */
 export const PASSWORD_RESET_TEMPLATE = 'password_reset';
 export const EMAIL_VERIFICATION_TEMPLATE = 'email_verification';
+
+/**
+ * The erasure receipt.
+ *
+ * Free text in the schema on purpose (`0005:58-62`): the set of templates is an
+ * application decision, so adding one is a line rather than a migration, and the
+ * credential-suppression rule keys on a value that renaming a renderer file cannot
+ * change.
+ *
+ * **It is NOT in `CREDENTIAL_BEARING_TEMPLATES`**, and the distinction is the point:
+ * that set is about a rendered body containing a bearer token, and this body
+ * contains none. What this template must not persist is the erased person's own
+ * name and address — writing those into `email_messages` while erasing them from
+ * `users` would be a second copy of the data the erasure exists to remove. So the
+ * body is offered as `null` and the row stays `content_class = 'metadata_only'`.
+ */
+export const ERASURE_RECEIPT_TEMPLATE = 'erasure_receipt';
 
 /** A recipient this application refused to hand to a header parser. See `send`. */
 const REDACTED_RECIPIENT = '<rejected-recipient>';
@@ -139,6 +157,72 @@ export class EmailService implements OnModuleDestroy {
         // verification token, and `contentClassFor` would refuse it. Passing
         // `null` is the credential-suppression rule applied at the call site as
         // well as in the writer, so the two cannot drift apart.
+        body: null,
+      },
+    );
+  }
+
+  /**
+   * Confirm a deletion request, to the address that is still live.
+   *
+   * ## WHY IT IS SENT BEFORE THE ANONYMISATION, AND WHY THAT IS ALSO WHY IT MUST
+   * NOT DESCRIBE THE ANONYMISATION AS DONE
+   *
+   * Once the address is a tombstone there is nowhere to send it, so
+   * `ErasureService` sends this **outside and before** the transaction and refuses
+   * to erase anything if the send fails. A receipt is therefore a statement about
+   * the REQUEST — received, being actioned — and never a claim that the row has
+   * already been rewritten, because at the moment this message is handed to the
+   * transport the rewrite has not happened yet and may still fail. A receipt that
+   * said "your account has been erased" would be describing work that had not run.
+   *
+   * **No name in the body.** The greeting is bare rather than personalised, which
+   * is the boring solution to a real problem: a rendered body that interpolates the
+   * account's username needs an HTML-escaping decision, and there is no reason for
+   * an erasure receipt to carry the identifier the erasure is about to destroy. The
+   * message is still addressed to the right person — the envelope names them.
+   */
+  async sendErasureReceipt(recipient: string, userId?: string): Promise<SentEmail> {
+    const subject = `Your ${this.env.email.appName} account erasure request`;
+    return this.send(
+      {
+        to: recipient,
+        subject,
+        html:
+          '<p>Hello,</p>' +
+          `<p>We have received your request to erase your ${escapeHtmlText(this.env.email.appName)} account.</p>` +
+          '<p>What happens next, in this order:</p>' +
+          '<ol>' +
+          '<li>your username is replaced, so you will not be able to sign in;</li>' +
+          '<li>every session you hold is revoked;</li>' +
+          '<li>the email address on file is replaced with a non-routable placeholder, ' +
+          'so this address will stop receiving mail from us;</li>' +
+          '<li>your sign-in history is kept for security-investigation purposes for the ' +
+          'period the law requires, with your username replaced the same way.</li>' +
+          '</ol>' +
+          '<p>The record of this request is retained independently of your account.</p>' +
+          '<p>If you did not ask for this, reply to this message before the change is actioned.</p>',
+        text:
+          'Hello,\n\n' +
+          `We have received your request to erase your ${this.env.email.appName} account.\n\n` +
+          'What happens next, in this order:\n' +
+          '1. your username is replaced, so you will not be able to sign in;\n' +
+          '2. every session you hold is revoked;\n' +
+          '3. the email address on file is replaced with a non-routable placeholder, so ' +
+          'this address will stop receiving mail from us;\n' +
+          '4. your sign-in history is kept for security-investigation purposes for the ' +
+          'period the law requires, with your username replaced the same way.\n\n' +
+          'The record of this request is retained independently of your account.\n\n' +
+          'If you did not ask for this, reply to this message before the change is actioned.\n',
+      },
+      {
+        userId,
+        template: ERASURE_RECEIPT_TEMPLATE,
+        recipient,
+        subject,
+        // Metadata only, and the reason is the erasure itself: this body carries the
+        // person's name and address, and `email_messages` is a table the erased
+        // person's record will outlive.
         body: null,
       },
     );
@@ -250,6 +334,27 @@ export class EmailService implements OnModuleDestroy {
       );
     }
 
+    // AN ANONYMISED SUBJECT IS EXCLUDED FROM ALL OUTBOUND MAIL, and this is the one
+    // place that can say so — `send()` is the single path every flow goes through.
+    //
+    // Checked by SHAPE (`isAnonymizedRecipient`) rather than by reading
+    // `users.email_anonymized`, because the case that matters is the one where the
+    // database can no longer help: after a retention purge there is no row to ask,
+    // and a check that fails open when the answer is unavailable is a check that
+    // mails tombstones exactly when the system is busiest. The shape is carried by
+    // the address itself and is therefore true with or without a database.
+    //
+    // Refused BEFORE the transport, so no envelope is ever built for it, and
+    // unrecorded, on the same reasoning as the address check above: there was no
+    // attempt, so there is nothing to audit.
+    if (isAnonymizedRecipient(message.to)) {
+      throw new EmailDeliveryError(
+        REDACTED_RECIPIENT,
+        message.subject,
+        new Error('the recipient is an anonymised address, and an anonymised subject receives no mail'),
+      );
+    }
+
     if (subject.userId === undefined) {
       this.logger.warn(
         `email attempt for ${message.to} template=${subject.template} was NOT recorded: no recipient user id was supplied, and email_messages.user_id is NOT NULL because a row's scope is derived from that user's group memberships`,
@@ -316,6 +421,25 @@ export class EmailService implements OnModuleDestroy {
     }
     return `${this.env.email.baseUrl}${path}?token=${encodeURIComponent(token)}`;
   }
+}
+
+/**
+ * HTML-escape one interpolated value.
+ *
+ * The other two flows render through Handlebars, which escapes `{{var}}` for them.
+ * This receipt is assembled as a string because it carries no context worth a
+ * template file, so the same guarantee is made here explicitly rather than assumed:
+ * `APP_NAME` is operator configuration rather than caller input, and a value that
+ * reaches a mail body unescaped is an attribute-injection surface the moment
+ * somebody points it at something untrusted.
+ */
+function escapeHtmlText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**

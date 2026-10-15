@@ -1823,3 +1823,212 @@ describe('privacy_requests · the derived category is structural, not documented
     TIMEOUT,
   );
 });
+
+// =============================================================================
+// THE CLAIMLESS SESSION, AND WHY IT IS ASSERTED HERE RATHER THAN FIXED
+// =============================================================================
+//
+// A serving-role session that carries no `request.jwt.claims` is not an exotic
+// shape — it is the shape of EVERY write the thin Nest app makes, because
+// `request.jwt.claims` is a caller-writable custom GUC that §B2 F1 forbids any
+// request-reachable path from setting (`test/unit/claims-write-surface.spec.ts`
+// fails the build if `src/` writes it). `auth.service.ts`, `email-audit.writer.ts`,
+// `purge-sweeper.service.ts` and `privacy/erasure.service.ts` all connect as
+// `pgrst_authenticator`, `SET LOCAL ROLE app_admin`, and carry no claims.
+//
+// On every table whose READ policy opens with `current_user = 'app_admin'` —
+// `users_read_scope` (`0008:399`) — that is irrelevant, because the superset
+// principal is admitted by the read path itself. `privacy_requests` is the one
+// table where it is not: `privacy_request_read` (`0010:531-548`) has no admin
+// branch, and its only route is `authz.can_read_privacy_request()`, i.e.
+// `has_permission(authz.actor(), …)`, and `actor()` is NULL without the claims
+// GUC. `0010:528-530` states that as intended ("A CLAIMLESS READER GETS ZERO
+// ROWS, and that falls out of the shape rather than being a separate guard").
+//
+// The consequence was measured, not derived, and it is the erasure gap:
+//
+//   EXPLAIN (ANALYZE) of `CLOSE_OPEN_REQUESTS_SQL` as a claimless `app_admin`
+//   shows the read policy ANDed into the UPDATE's scan filter beside its own
+//   UPDATE policy, with `Rows Removed by Filter: 1` and `UPDATE 0` — on a row
+//   that exists, whose `WHERE` is proven to match it. No error anywhere.
+//
+// The assertions below pin that measurement as a CONTROL, in the sense §B2
+// means by it: the claimless session is denied, the denial is a zero-row answer
+// rather than an error, the OWNER is bound by the same policies so there is no
+// owner-side seam either, and the same session WITH a caller identity is
+// permitted. Each can fail. The positive one goes red if
+// `can_read_privacy_request()` ever starts reading identity wrongly, which is
+// the "denies everyone silently" defect §B2 records; the owner one goes red the
+// moment anyone drops `FORCE` from this table, which is precisely the change a
+// "just un-FORCE it" fix for the erasure would make; and the positive control's
+// scope assertion is what the refused wide fix would break.
+//
+// ## WHAT IS DELIBERATELY NOT ASSERTED
+//
+// There is no assertion here that a claimless session CAN close a subject's open
+// request, because it cannot, and adding one would be red against a schema change
+// that has not been approved. The gap is not silently accepted: it is escalated in
+// `src/privacy/erasure.service.ts` on `CLOSE_OPEN_REQUESTS_SQL`, and the candidate
+// fixes were each BUILT AND MEASURED against this database before being refused —
+//
+//   · `SECURITY DEFINER authz.close_subject_privacy_requests(uuid)`, the narrow
+//     privileged seam, updates 0 rows. Inside a DEFINER `current_user` rebinds to
+//     the owner, and `privacy_requests` is FORCE ROW LEVEL SECURITY
+//     (`0010:445`), so `privacy_request_update`'s `current_user = 'app_admin'`
+//     branch cannot match — a fourth "denies everyone silently". `SET LOCAL
+//     row_security = off` inside it does not rescue it either: on a FORCEd table
+//     that raises `query would be affected by row-level security policy` rather
+//     than bypassing anything.
+//   · Adding `current_user = 'app_admin'` to `privacy_request_read` — the wide
+//     fix — DOES work, and measured here it turns a claimless `app_admin` session
+//     from 0 visible rows into every request in the table, across groups. That is
+//     the whole reason it is refused: it hands a `role: app_admin` PostgREST token
+//     the complete DSAR workload of the deployment. Measured 7 of 7 on a live
+//     database, and the closure went from `UPDATE 0` to `UPDATE 1`.
+//   · `ALTER TABLE privacy_requests NO FORCE ROW LEVEL SECURITY` makes the narrow
+//     seam work (measured: 1 row updated), and it costs the MIGRATION role
+//     unrestricted read and write of every request on the table — the most
+//     sensitive personal data in the schema, belonging to exactly the people who
+//     asked to be forgotten. This file already pins `forcerowsecurity = true` for
+//     this table with that reasoning attached, and the owner assertion above makes
+//     the cost executable rather than a matter of taste.
+//
+// All three are security decisions about what the migration role and the admin
+// principal may reach. None of them is the erasure's to make.
+// =============================================================================
+describe('privacy_requests · a session with no caller identity is outside every path to this table', () => {
+  it(
+    'a claimless app_admin session reads ZERO requests and closes none, and the zero is a policy answer rather than an error',
+    () => {
+      // Ground truth first, read by the SUPERUSER. Without it a zero above cannot be
+      // told apart from an empty fixture — the failure §B5 records for a claimless
+      // owner read, which returns 0 rows under FORCE forever.
+      expect(
+        superuserRows<{ count: number }>(`SELECT count(*)::int AS count FROM privacy_requests`)[0]?.count,
+        'the fixture must hold requests for this to mean anything',
+      ).toBeGreaterThan(0);
+
+      // The READ. Zero rows, no error: `rowsAsRole` throws if the statement is refused,
+      // so reaching the assertion at all is the "a denial arrives as a denial" half.
+      expect(
+        rowsAsRole<RequestRow>('app_admin', undefined, 'SELECT id, user_id, status FROM privacy_requests'),
+      ).toEqual([]);
+
+      // A request planted HERE, so the closure below is about the statement and not
+      // about whichever fixture row an earlier test in this file happened to leave
+      // behind — one of them tears its own subject's request down in a `finally`, and
+      // another has anonymised `tombstone`, which is why the plant is filed by the
+      // subject that still holds a role. `usUser` already holds one from the
+      // fixture, so the planted row is identified by the DIFFERENCE rather than by a
+      // `max(id)`, which would be a uuid ordering assumption dressed up as an
+      // identity.
+      const plantedIdsBefore = new Set(
+        superuserRows<{ id: string }>(`SELECT id FROM privacy_requests WHERE user_id = '${IDS.users.usUser}'`).map(
+          (row) => row.id,
+        ),
+      );
+      const planted = fileRequest(IDS.users.usUser);
+      if (!planted.ok) {
+        throw new Error(`planting a request for the closure case failed:\n${planted.output}`);
+      }
+      const plantedId = superuserRows<{ id: string }>(
+        `SELECT id FROM privacy_requests
+          WHERE user_id = '${IDS.users.usUser}'
+            AND NOT (id IN (${[...plantedIdsBefore].map((id) => `'${id}'`).join(',') || 'NULL'}))`,
+      )[0]?.id;
+      if (plantedId === undefined) {
+        throw new Error('the planted request could not be told apart from the fixture rows for the same subject');
+      }
+
+      try {
+        // The WRITE, verbatim as the erasure issues it. `attemptAsRole` keeps psql's
+        // tags so the distinction §B8 insists on is visible: `UPDATE 0` is a silent
+        // no-op and is NOT the same outcome as a refused statement.
+        const closure = attemptAsRole('app_admin', undefined, [
+          `UPDATE privacy_requests
+              SET status = 'fulfilled', closed_at = now()
+            WHERE user_id = '${IDS.users.usUser}'
+              AND status IN ('open', 'in_progress')`,
+        ]);
+        expect(closure.ok, `the claimless closure should SUCCEED and match nothing:\n${closure.output}`).toBe(true);
+        expect(closure.output).toContain('UPDATE 0');
+        expect(closure.output).not.toMatch(/ERROR/);
+
+        // And it is still open, read from OUTSIDE the policy so the assertion is not
+        // itself subject to it. This is the whole defect, as a value: the erasure
+        // reports success and the statutory clock is still running.
+        expect(
+          superuserRows<{ status: string }>(`SELECT status FROM privacy_requests WHERE id = '${plantedId}'`).map(
+            (row) => row.status,
+          ),
+        ).toEqual(['open']);
+      } finally {
+        // Teardown through the OWNER, which holds DELETE and every serving role does
+        // not — the same asymmetry the plan-cost test above tears down through.
+        superuserExec(PROOF_DB, `DELETE FROM privacy_requests WHERE id = '${plantedId}';`);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'the migration/owner role is bound by the same policies, so no owner-side seam into privacy_requests exists',
+    async () => {
+      // `privacy_requests` is FORCE ROW LEVEL SECURITY (`0010:445`), so the table's own
+      // owner is bound by `privacy_request_read` like anybody else. This is what makes
+      // the refusal of "just drop FORCE" mechanical rather than a matter of taste: an
+      // owner session with no claims reads nothing, so a SECURITY DEFINER seam owned
+      // by the migration role is bound by the same policy and updates nothing.
+      const asOwner = ownerClient();
+      await asOwner.connect();
+      try {
+        await asOwner.query('BEGIN');
+        const result = await asOwner.query<{ id: string }>('SELECT id FROM privacy_requests');
+        expect(result.rows).toEqual([]);
+        await asOwner.query('ROLLBACK');
+      } catch (error) {
+        await asOwner.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        await asOwner.end();
+      }
+
+      // Not vacuous: the same query as the SUPERUSER returns rows. If this ever fails
+      // alongside the assertion above, the fixture is empty and the owner assertion is
+      // proving nothing — which is exactly how a claimless zero reads when it is not a
+      // control.
+      expect(
+        superuserRows<{ count: number }>(`SELECT count(*)::int AS count FROM privacy_requests`)[0]?.count,
+      ).toBeGreaterThan(0);
+
+      // The catalog half, because a policy-behaviour statement and a posture statement
+      // are different claims and either alone passes.
+      expect(
+        superuserRows<{ forced: boolean }>(
+          `SELECT relforcerowsecurity AS forced FROM pg_class WHERE oid = 'public.privacy_requests'::regclass`,
+        )[0]?.forced,
+      ).toBe(true);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'POSITIVE CONTROL: the same app_admin session, WITH a caller identity, reads the requests in scope — the zero above is scope, not lockout',
+    () => {
+      // §B2: "Assert the positive case — a caller that HOLDS a permission PASSES;
+      // denial tests cannot see this defect, and every one of them passed against it."
+      // `adminProbe` is a member of EU holding the `admin` role, so its closure
+      // includes FR.
+      const visible = requestSubjects(
+        rowsAsRole<RequestRow>('app_admin', IDS.users.adminProbe, 'SELECT id, user_id, status FROM privacy_requests'),
+      );
+
+      expect(visible).toContain(probeLabel(IDS.users.peer));
+      // …and NOT the out-of-scope one, so the positive control is not "an admin sees
+      // everything". That is the shape the refused wide fix would have produced: a
+      // claimless `app_admin` session reading every request in the table.
+      expect(visible).not.toContain(probeLabel(IDS.users.usUser));
+    },
+    TIMEOUT,
+  );
+});
