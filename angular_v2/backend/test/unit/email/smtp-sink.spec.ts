@@ -50,6 +50,7 @@ function serviceAgainst(sink: SmtpSink, tls: boolean, credentials: boolean): Ema
     DB_NAME: 'app_test',
     JWT_SECRET: 'sink-spec-signing-secret-key-0123456789',
     AUTHENTICATOR_PASSWORD: 'authenticator-password',
+    POSTGREST_URL: 'http://127.0.0.1:3001',
   });
   const config = { getOrThrow: <T>(key: string): T => ({ environment })[key] as T } as ConfigService;
   return new EmailService(
@@ -142,6 +143,7 @@ describe('one transport, whatever the mode', () => {
         DB_NAME: 'app_dev',
         JWT_SECRET: 'sink-spec-signing-secret-key-0123456789',
         AUTHENTICATOR_PASSWORD: 'authenticator-password',
+        POSTGREST_URL: 'http://127.0.0.1:3001',
       });
       const config = {
         getOrThrow: <T>(key: string): T => ({ environment })[key] as T,

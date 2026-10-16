@@ -20,6 +20,7 @@ function validSource(overrides: Record<string, string | number> = {}): Record<st
     APP_BASE_URL: 'https://app.example.test',
     EMAIL_HOST: '127.0.0.1',
     EMAIL_PORT: '1025',
+    POSTGREST_URL: 'http://127.0.0.1:3001',
     ...overrides,
   };
 }
@@ -64,6 +65,9 @@ describe('loadEnvironment', () => {
           rejectUnauthorized: true,
         },
       },
+      postgrest: {
+        baseUrl: 'http://127.0.0.1:3001',
+      },
     });
   });
 
@@ -72,7 +76,7 @@ describe('loadEnvironment', () => {
   });
 
   it('never defaults a database coordinate', () => {
-    for (const key of ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'JWT_SECRET', 'AUTHENTICATOR_PASSWORD', 'APP_BASE_URL', 'EMAIL_HOST', 'EMAIL_PORT']) {
+    for (const key of ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'JWT_SECRET', 'AUTHENTICATOR_PASSWORD', 'APP_BASE_URL', 'EMAIL_HOST', 'EMAIL_PORT', 'POSTGREST_URL']) {
       const source = validSource();
       delete source[key];
 
@@ -124,6 +128,7 @@ describe('loadEnvironment', () => {
       'APP_BASE_URL is required but was not set',
       'EMAIL_HOST is required but was not set',
       'EMAIL_PORT is required but was not set',
+      'POSTGREST_URL is required but was not set',
     ]);
   });
 
@@ -140,7 +145,7 @@ describe('loadEnvironment', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(EnvironmentError);
       expect((error as EnvironmentError).name).toBe('EnvironmentError');
-      expect((error as EnvironmentError).message).toContain('10 problem(s)');
+      expect((error as EnvironmentError).message).toContain('11 problem(s)');
     }
   });
 });

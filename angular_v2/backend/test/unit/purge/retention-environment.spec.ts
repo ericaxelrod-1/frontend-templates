@@ -351,6 +351,7 @@ describe('the BOOT refuses a window below the floor, which is the control the nu
     // under test, and the refusal cannot be a different module's error wearing the
     // right shape.
     await import('../../../src/config/load-env-file.js');
+    process.env['POSTGREST_URL'] = process.env['POSTGREST_URL'] ?? 'http://127.0.0.1:3001';
     Object.assign(process.env, overrides);
 
     try {

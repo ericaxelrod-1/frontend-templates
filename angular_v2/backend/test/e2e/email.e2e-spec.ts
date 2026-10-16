@@ -114,6 +114,7 @@ const BASE_SOURCE: Readonly<Record<string, string>> = {
   DB_NAME: 'app_dev',
   JWT_SECRET: 'e2e-email-signing-secret-key-0123456789',
   AUTHENTICATOR_PASSWORD: 'pgrst',
+  POSTGREST_URL: 'http://127.0.0.1:3001',
 };
 
 /**
@@ -154,6 +155,7 @@ beforeAll(async () => {
   process.env['APP_BASE_URL'] = BASE_URL;
   process.env['EMAIL_HOST'] = plainSink.host;
   process.env['EMAIL_PORT'] = String(plainSink.port);
+  process.env['POSTGREST_URL'] = process.env['POSTGREST_URL'] ?? 'http://127.0.0.1:3001';
   vi.resetModules();
 
   const { AppModule } = await import('../../src/app.module.js');

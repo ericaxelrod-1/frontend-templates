@@ -162,6 +162,19 @@ export type SecurityConfig = {
   readonly enumerationFloorMs: number;
 };
 
+/**
+ * PostgREST configuration.
+ *
+ * `baseUrl` is the HTTP origin where PostgREST serves the API layer (server-host
+ * and server-port in postgrest.conf). Required in EVERY mode with no default:
+ * AGENTS.md §2.3 forbids default fallbacks for security-critical config, and a
+ * silently defaulted PostgREST URL that points somewhere wrong or is unconfigured
+ * would produce an unanchored identity seam.
+ */
+export type PostgrestConfig = {
+  readonly baseUrl: string;
+};
+
 export type Environment = {
   readonly database: DatabaseConfig;
   readonly jwt: JwtConfig;
@@ -169,6 +182,7 @@ export type Environment = {
   readonly authenticator: AuthenticatorConfig;
   readonly security: SecurityConfig;
   readonly email: EmailConfig;
+  readonly postgrest: PostgrestConfig;
 };
 
 export const DEFAULT_SERVER_PORT = 3000;
@@ -807,6 +821,33 @@ function readEmail(
   };
 }
 
+function readPostgrest(
+  source: Readonly<Record<string, unknown>>,
+  problems: string[],
+): PostgrestConfig | undefined {
+  const raw = readString(source, 'POSTGREST_URL', problems);
+  if (raw === undefined) {
+    return undefined;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    problems.push(`POSTGREST_URL must be an absolute http(s) URL, received '${raw}'`);
+    return undefined;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    problems.push(`POSTGREST_URL must use http or https, received '${parsed.protocol}'`);
+    return undefined;
+  }
+  if (parsed.search !== '' || parsed.hash !== '') {
+    problems.push('POSTGREST_URL must not carry a query string or a fragment');
+    return undefined;
+  }
+  const pathname = parsed.pathname === '/' ? '' : parsed.pathname.replace(/\/+$/, '');
+  return { baseUrl: `${parsed.origin}${pathname}` };
+}
+
 export function loadEnvironment(source: Readonly<Record<string, unknown>>): Environment {
   const problems: string[] = [];
   const database = readDatabase(source, problems);
@@ -816,6 +857,7 @@ export function loadEnvironment(source: Readonly<Record<string, unknown>>): Envi
   const authenticator = readAuthenticator(source, problems);
   const security = readSecurity(source, problems);
   const email = readEmail(source, problems);
+  const postgrest = readPostgrest(source, problems);
 
   if (
     database !== undefined &&
@@ -823,9 +865,10 @@ export function loadEnvironment(source: Readonly<Record<string, unknown>>): Envi
     serverConfig !== undefined &&
     authenticator !== undefined &&
     security !== undefined &&
-    email !== undefined
+    email !== undefined &&
+    postgrest !== undefined
   ) {
-    return { database, jwt, server: serverConfig, authenticator, security, email };
+    return { database, jwt, server: serverConfig, authenticator, security, email, postgrest };
   }
   throw new EnvironmentError(problems);
 }

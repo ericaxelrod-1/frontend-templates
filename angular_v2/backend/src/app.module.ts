@@ -8,6 +8,7 @@ import { BreakerModule } from './breaker/breaker.module.js';
 import { PurgeModule } from './purge/purge.module.js';
 import { ErasureModule } from './privacy/erasure.module.js';
 import { TokenModule } from './token/token.module.js';
+import { PostgrestModule } from './postgrest/postgrest.module.js';
 import { loadEnvironment } from './config/environment.js';
 
 /**
@@ -58,6 +59,8 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
     // The shared one-time token primitive (mint, store, deliver, redeem, expire)
     // with no HTTP routes mounted directly.
     TokenModule,
+    // The PostgREST client module for replaying caller identity to the data layer.
+    PostgrestModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

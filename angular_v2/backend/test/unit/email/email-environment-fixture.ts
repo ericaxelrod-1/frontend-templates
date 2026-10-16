@@ -30,6 +30,7 @@ export const BASE_SOURCE: Readonly<Record<string, string>> = Object.freeze({
   APP_BASE_URL: 'https://app.example.test',
   EMAIL_HOST: '127.0.0.1',
   EMAIL_PORT: '1025',
+  POSTGREST_URL: 'http://127.0.0.1:3001',
 });
 
 /** Every SMTP key a production process needs, all present. */

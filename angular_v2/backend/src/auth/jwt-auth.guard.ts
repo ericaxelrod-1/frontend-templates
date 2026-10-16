@@ -27,6 +27,23 @@ export interface AccessTokenPayload {
  * expired, tampered) is the same generic 401: the response never discloses
  * why, and no branch fails open.
  */
+export interface AuthenticatedRequest extends FastifyRequest {
+  user?: AccessTokenPayload;
+  token?: string;
+}
+
+export function extractBearerToken(request: FastifyRequest): string | undefined {
+  const header = request.headers.authorization;
+  if (typeof header !== 'string' || header.trim() === '') {
+    return undefined;
+  }
+  const parts = header.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer' || parts[1] === undefined || parts[1].trim() === '') {
+    return undefined;
+  }
+  return parts[1];
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   private readonly env: Environment;
@@ -48,8 +65,8 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<FastifyRequest & { user?: AccessTokenPayload }>();
-    const token = this.extractBearerToken(request);
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const token = extractBearerToken(request);
     if (token === undefined) {
       throw new UnauthorizedException('unauthorized');
     }
@@ -57,21 +74,10 @@ export class JwtAuthGuard implements CanActivate {
       request.user = await this.jwtService.verifyAsync<AccessTokenPayload>(token, {
         secret: this.env.jwt.secret,
       });
+      request.token = token;
     } catch {
       throw new UnauthorizedException('unauthorized');
     }
     return true;
-  }
-
-  private extractBearerToken(request: FastifyRequest): string | undefined {
-    const header = request.headers.authorization;
-    if (typeof header !== 'string' || header.trim() === '') {
-      return undefined;
-    }
-    const parts = header.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer' || parts[1] === undefined || parts[1].trim() === '') {
-      return undefined;
-    }
-    return parts[1];
   }
 }

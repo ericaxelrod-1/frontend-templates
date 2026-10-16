@@ -252,6 +252,7 @@ describe('the BOOT refuses an unnamed pepper, which is the control the key is fo
     // doctored source is missing is the one under test and the refusal cannot be a
     // different module's error wearing the right shape.
     await import('../../../src/config/load-env-file.js');
+    process.env['POSTGREST_URL'] = process.env['POSTGREST_URL'] ?? 'http://127.0.0.1:3001';
     Object.assign(process.env, overrides);
 
     try {
