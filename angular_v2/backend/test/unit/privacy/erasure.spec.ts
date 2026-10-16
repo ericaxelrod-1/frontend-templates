@@ -9,6 +9,7 @@ import { EmailDeliveryError } from '../../../src/email/email-delivery-error.js';
 import { EmailService, ERASURE_RECEIPT_TEMPLATE } from '../../../src/email/email.service.js';
 import { EmailRenderer } from '../../../src/email/email.renderer.js';
 import { NodemailerEmailProvider } from '../../../src/email/nodemailer-email.provider.js';
+import { SharedDatabasePool } from '../../../src/common/database-pool.js';
 import type { ErasureEnvironment } from '../../../src/privacy/erasure-environment.js';
 import {
   ANONYMISE_LOGIN_ATTEMPTS_SQL,
@@ -112,7 +113,12 @@ beforeEach(() => {
 function serviceFor(smtp: Readonly<Record<string, string>>): EmailService {
   const environment = environmentFor({ EMAIL_HOST: sink.host, EMAIL_PORT: String(sink.port), ...smtp });
   const config = { getOrThrow: <T>(key: string): T => ({ environment })[key] as T } as ConfigService;
-  return new EmailService(config, new NodemailerEmailProvider(environment.email), new EmailRenderer());
+  return new EmailService(
+    config,
+    new NodemailerEmailProvider(environment.email),
+    new EmailRenderer(),
+    new EmailAuditWriter(new SharedDatabasePool(config)),
+  );
 }
 
 /** `deliveries` at the moment the first `UPDATE users` was issued. Filled by the hook. */

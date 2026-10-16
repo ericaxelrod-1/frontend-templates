@@ -46,9 +46,20 @@ path.**
 
 ### Provisioning order
 
-**`npm run db:seed` provisions a database from nothing. `npm run migration:run`
-does not, so the order `migration:run` → `db:seed` cannot work on a fresh
-cluster.**
+**`database/seed.ts` never creates the database.** It connects to `DB_NAME`
+(`app_dev`) via `psql -d app_dev` and will fail immediately if the database
+does not exist (`FATAL: database app_dev does not exist`).
+
+Furthermore, **creating the database as the `postgres` superuser is also
+wrong**: every migration will then fail with `permission denied for schema public`.
+PostgreSQL 15 and later removed `CREATE` on schema `public` from `PUBLIC`. The
+application migration/owner role (`app`, configured as `DB_USER`) only has
+`CREATE` on `public` via membership in the predefined role `pg_database_owner` —
+that is, **only because it owns the database**.
+
+Once the database exists and is owned by `app`, running `migration:run` before
+`db:seed` cannot work on a fresh cluster. `database/seed.ts` provisions the
+database contents (roles, then migrations, then seed data) in that order.
 
 `database/seed.ts` runs these steps in exactly this order, and the order is
 load-bearing: `database/bootstrap/001_roles.sql` **as a superuser** → the
@@ -64,11 +75,14 @@ a cluster with no roles therefore dies on the preflight before any schema
 exists. It went unnoticed because a machine that was provisioned once already
 had the roles, so the same command sequence appeared to work on the next clone.
 
-- **New machine, no database:** `npm run db:seed`, and nothing before it. It
-  bootstraps the roles, applies the migrations and seeds, in that order.
-- **If you prefer explicit steps:** `database/bootstrap/001_roles.sql` as a
-  superuser, then `npm run migration:run`, then `npm run db:seed`. The last two
-  are idempotent, and it is the seed that adds the permissions, the group tree
+- **New machine, fresh cluster:** `createdb -O app app_dev`, then `npm run db:seed`.
+  The database must exist and must be owned by the migration role (`-O app`),
+  or subsequent migrations die with `permission denied for schema public`. Then
+  `db:seed` bootstraps the roles, applies the migrations, and seeds the data.
+- **If you prefer explicit steps:** `createdb -O app app_dev`, then
+  `database/bootstrap/001_roles.sql` as a superuser against `app_dev`, then
+  `npm run migration:run`, then `npm run db:seed`. The last three are
+  idempotent, and it is the seed that adds the permissions, the group tree
   and the admin user.
 - **An existing install:** `npm run migration:run` on its own is correct — it
   applies only the files not already recorded in the `migrations` table.

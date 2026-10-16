@@ -7,6 +7,8 @@ import { BREAKER_ENV } from '../breaker/breaker-environment.js';
 import { BreakerGate } from '../breaker/breaker-gate.js';
 import type { DispatchLease } from '../breaker/breaker-gate.js';
 import { PURGE_SWEEPER } from '../breaker/dispatch-token.js';
+import type { DatabaseConnectionSource } from '../common/database-pool.js';
+import { SharedDatabasePool } from '../common/database-pool.js';
 import type { PurgeClaim, PurgeClaimRow } from './purge-claim.js';
 import {
   CLAIM_DUE_PURGE_SQL,
@@ -28,19 +30,16 @@ import { planDrainStep } from './purge-plan.js';
 /**
  * The connection source the sweeper needs, and nothing more.
  *
- * A narrow structural port rather than the `Pool` class, so the unit suite can
- * assert that a **gated** dispatch never reaches the database at all — the
- * strongest available statement that GATE is a dispatch decision and not a slow
- * rejection — without standing up a cluster and without a stand-in for a real
- * integration in application code (`AGENTS.md` §2.2). `pg.Pool` satisfies it
- * structurally and is the only thing ever bound to it.
+ * `DatabaseConnectionSource` is declared once, in `common/database-pool.ts`, and was
+ * three identical copies — `PurgeConnectionSource`, `ErasureConnectionSource`,
+ * `TokenConnectionSource` — before the pools were consolidated. A narrow structural
+ * port rather than the `Pool` class, so the unit suite can assert that a **gated**
+ * dispatch never reaches the database at all — the strongest available statement that
+ * GATE is a dispatch decision and not a slow rejection — without standing up a
+ * cluster and without a stand-in for a real integration in application code
+ * (`AGENTS.md` §2.2). `pg.Pool` satisfies it structurally and is the only thing ever
+ * bound to it.
  */
-export type PurgeConnectionSource = {
-  connect(): Promise<PoolClient>;
-};
-
-/** The DI token for the one connection pool the sweeper owns. */
-export const PURGE_POOL = 'PURGE_POOL';
 
 export type TickSummary = {
   readonly executed: number;
@@ -101,7 +100,7 @@ export class PurgeSweeper implements OnApplicationBootstrap, OnModuleDestroy {
   constructor(
     @Inject(BREAKER_ENV) private readonly env: BreakerEnvironment,
     private readonly gate: BreakerGate,
-    @Inject(PURGE_POOL) private readonly pool: PurgeConnectionSource,
+    @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
     @Inject(PURGE_EXECUTOR) private readonly executor: PurgeExecutor,
     private readonly scheduler: SchedulerRegistry,
   ) {}

@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import type { Environment } from '../config/environment.js';
+import { DatabasePoolModule } from '../common/database-pool.module.js';
 import { EmailModule } from '../email/email.module.js';
 import { TokenModule } from '../token/token.module.js';
 
@@ -28,6 +29,7 @@ import { TokenModule } from '../token/token.module.js';
 @Module({
   imports: [
     ConfigModule,
+    DatabasePoolModule,
     EmailModule,
     TokenModule,
     JwtModule.registerAsync({

@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import type { DatabaseConnectionSource } from '../common/database-pool.js';
+import { SharedDatabasePool } from '../common/database-pool.js';
 import { EmailService } from '../email/email.service.js';
 import { TOKEN_ENV, type TokenEnvironment } from './token-environment.js';
 import {
@@ -14,12 +16,6 @@ import {
   type RedeemTokenResult,
   type TokenPurpose,
 } from './token.types.js';
-
-export type TokenConnectionSource = {
-  connect(): Promise<PoolClient>;
-};
-
-export const TOKEN_POOL = 'TOKEN_POOL';
 
 const SUBJECT_DOMAIN_LABEL = 'auth.token.subject.v1';
 const TOKEN_HASH_DOMAIN_LABEL = 'auth.token.hash.v1';
@@ -44,7 +40,7 @@ type UserLookupRow = {
 @Injectable()
 export class TokenService {
   constructor(
-    @Inject(TOKEN_POOL) private readonly pool: TokenConnectionSource,
+    @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
     @Inject(TOKEN_ENV) private readonly tokenEnv: TokenEnvironment,
     private readonly emailService: EmailService,
   ) {}

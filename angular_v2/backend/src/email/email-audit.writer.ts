@@ -1,8 +1,7 @@
-import { Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
-import { Pool } from 'pg';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { PoolClient } from 'pg';
-import type { Environment } from '../config/environment.js';
+import type { DatabaseConnectionSource } from '../common/database-pool.js';
+import { SharedDatabasePool } from '../common/database-pool.js';
 import {
   contentClassFor,
   type EmailContentClass,
@@ -23,23 +22,6 @@ import {
  * method whose contract is "throw if the transport refused". One mechanism per
  * concern (§2.4): this writes rows and nothing else. It renders nothing, sends
  * nothing, and decides nothing about delivery.
- *
- * **IT IS BUILT FROM THE ConfigService RATHER THAN INJECTED**, and that is forced
- * by a frozen contract rather than chosen. `EmailService`'s constructor is
- * `(ConfigService, EMAIL_PROVIDER, EmailRenderer)` — three parameters — and the
- * existing unit and e2e suites construct it with exactly those three
- * (`test/unit/email/email.service.spec.ts`, `test/e2e/email.e2e-spec.ts`). Adding
- * a fourth REQUIRED parameter would not compile those suites, and adding a fourth
- * OPTIONAL one would be a dependency that silently does nothing in production —
- * the shape §2.2 exists to forbid. `EmailService` already receives the
- * `ConfigService` this class needs, so it constructs it itself and there is no
- * injection decision to get wrong.
- *
- * **THE POOL IS CREATED ON FIRST USE, not in the constructor.** A `pg.Pool`
- * connects lazily, so a pool that is never used opens no socket — which is what
- * keeps the transport-only unit suite, which points at a database that does not
- * exist, from hanging on an un-closed handle. Building it on the first write also
- * means the cost is paid exactly when it is needed.
  *
  * **The pool connects as `pgrst_authenticator` and every write runs
  * `SET LOCAL ROLE app_admin`**, the same escalation boundary the seed and
@@ -82,41 +64,13 @@ export type EmailAttempt = {
   readonly body: string | null;
 };
 
+@Injectable()
 export class EmailAuditWriter {
   private readonly logger = new Logger(EmailAuditWriter.name);
-  private readonly env: Environment;
-  private pool: Pool | undefined;
 
-  constructor(config: ConfigService) {
-    this.env = config.getOrThrow<Environment>('environment');
-  }
-
-  /** The pool, built on first use. `undefined` until something is recorded. */
-  private connection(): Pool {
-    this.pool ??= new Pool({
-      host: this.env.database.host,
-      port: this.env.database.port,
-      user: this.env.authenticator.user,
-      password: this.env.authenticator.password,
-      database: this.env.database.database,
-    });
-    return this.pool;
-  }
-
-  /**
-   * Closes the pool, if one was ever built. Called from `EmailService`'s destroy
-   * hook so the module does not hold a socket open past shutdown.
-   */
-  async close(): Promise<void> {
-    const pool = this.pool;
-    // Cleared BEFORE the await so a second destroy hook (Nest calls the hook on
-    // both app-close and module-close) cannot call end() on a closed pool, which
-    // rejects with "Called end on pool more than once".
-    this.pool = undefined;
-    if (pool !== undefined) {
-      await pool.end();
-    }
-  }
+  constructor(
+    @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
+  ) {}
 
   /**
    * Records one attempt, inside the escalation boundary.
@@ -136,7 +90,7 @@ export class EmailAuditWriter {
       attempt.body,
     );
 
-    const client: PoolClient = await this.connection().connect();
+    const client: PoolClient = await this.pool.connect();
     let committed = false;
     try {
       await client.query('BEGIN');

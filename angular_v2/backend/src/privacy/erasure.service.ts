@@ -2,26 +2,11 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import type { DatabaseConnectionSource } from '../common/database-pool.js';
+import { SharedDatabasePool } from '../common/database-pool.js';
 import { EmailService } from '../email/email.service.js';
 import { ERASURE_ENV, type ErasureEnvironment } from './erasure-environment.js';
 import { tombstoneAddress, tombstoneLocalPart } from './tombstone.js';
-
-/**
- * Where the thin app's erasure connections come from.
- *
- * Structural rather than a `pg.Pool` so a transaction can be exercised without a
- * cluster — the same pairing `purge-sweeper.service.ts` uses for the sweeper, and
- * for the same reason: the machine this change was written on has no PostgreSQL,
- * and a unit suite that could only run against a server is a unit suite nobody
- * runs. `Pool` satisfies it structurally, so the production binding is the real
- * pool and not a wrapper around one.
- */
-export type ErasureConnectionSource = {
-  connect(): Promise<PoolClient>;
-};
-
-/** The DI token for the connection source. Bound once, in `erasure.module.ts`. */
-export const ERASURE_POOL = 'ERASURE_POOL';
 
 /**
  * The subject row, as the erasure reads it.
@@ -391,7 +376,7 @@ export class ErasureService {
 
   constructor(
     @Inject(ERASURE_ENV) private readonly env: ErasureEnvironment,
-    @Inject(ERASURE_POOL) private readonly pool: ErasureConnectionSource,
+    @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
     private readonly email: EmailService,
   ) {}
 

@@ -6,9 +6,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { startSmtpSink, type SmtpSink } from '../../../scripts/smtp-sink.js';
 import { decodeHtmlEntities, parseSmtpMessage } from '../../../scripts/smtp-message.js';
 import { EmailDeliveryError } from '../../../src/email/email-delivery-error.js';
+import { EmailAuditWriter } from '../../../src/email/email-audit.writer.js';
 import { EmailService } from '../../../src/email/email.service.js';
 import { EmailRenderer } from '../../../src/email/email.renderer.js';
 import { NodemailerEmailProvider } from '../../../src/email/nodemailer-email.provider.js';
+import { SharedDatabasePool } from '../../../src/common/database-pool.js';
 import { tombstoneAddress } from '../../../src/privacy/tombstone.js';
 import {
   PASSWORD_RESET_LINK_LIFETIME_MINUTES,
@@ -61,6 +63,7 @@ function serviceFor(overrides: Readonly<Record<string, string>> = {}): EmailServ
     config,
     new NodemailerEmailProvider(environment.email),
     new EmailRenderer(),
+    new EmailAuditWriter(new SharedDatabasePool(config)),
   );
 }
 

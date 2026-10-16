@@ -1,10 +1,11 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, OnModuleDestroy, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
-import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
+import type { DatabaseConnectionSource } from '../common/database-pool.js';
+import { SharedDatabasePool } from '../common/database-pool.js';
 import type { Environment } from '../config/environment.js';
 import { TokenService } from '../token/token.service.js';
 import type { TokenPurpose } from '../token/token.types.js';
@@ -117,35 +118,17 @@ interface RefreshTokenRow {
  * is resolved by `has_permission()` — never baked into the token (§B5).
  */
 @Injectable()
-export class AuthService implements OnModuleDestroy {
+export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly env: Environment;
-  private readonly pool: Pool;
 
   constructor(
     config: ConfigService,
     private readonly jwtService: JwtService,
     private readonly tokens: TokenService,
+    @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
   ) {
     this.env = config.getOrThrow<Environment>('environment');
-    this.pool = new Pool({
-      host: this.env.database.host,
-      port: this.env.database.port,
-      user: this.env.authenticator.user,
-      password: this.env.authenticator.password,
-      database: this.env.database.database,
-    });
-  }
-
-  private destroyed = false;
-
-  async onModuleDestroy(): Promise<void> {
-    // Nest calls the destroy hook on both app-close and module-close; the
-    // pg Pool rejects a second end() with "Called end on pool more than once".
-    if (!this.destroyed) {
-      this.destroyed = true;
-      await this.pool.end();
-    }
   }
 
   /**

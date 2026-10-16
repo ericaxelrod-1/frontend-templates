@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { Environment } from '../config/environment.js';
+import { DatabasePoolModule } from '../common/database-pool.module.js';
+import { EmailAuditWriter } from './email-audit.writer.js';
 import { EmailService } from './email.service.js';
 import { EMAIL_PROVIDER } from './email.provider.js';
 import { EmailRenderer } from './email.renderer.js';
@@ -23,7 +25,7 @@ import { NodemailerEmailProvider } from './nodemailer-email.provider.js';
  * (ADR-0024).
  */
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, DatabasePoolModule],
   providers: [
     { provide: EmailRenderer, useFactory: () => new EmailRenderer() },
     {
@@ -32,6 +34,7 @@ import { NodemailerEmailProvider } from './nodemailer-email.provider.js';
       useFactory: (config: ConfigService): NodemailerEmailProvider =>
         new NodemailerEmailProvider(config.getOrThrow<Environment>('environment').email),
     },
+    EmailAuditWriter,
     EmailService,
   ],
   exports: [EmailService],

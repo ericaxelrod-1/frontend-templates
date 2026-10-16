@@ -8,7 +8,7 @@ import { BreakerRegistry } from '../../src/breaker/breaker-registry.js';
 import type { DispatchRefusal } from '../../src/breaker/breaker-state.js';
 import { CGROUP_V2_LIMIT_FILE, CGROUP_V2_USAGE_FILE } from '../../src/breaker/memory-reading.js';
 import type { MemoryProbeDeps } from '../../src/breaker/memory-reading.js';
-import type { PurgeConnectionSource } from '../../src/purge/purge-sweeper.service.js';
+import type { DatabaseConnectionSource } from '../../src/common/database-pool.js';
 import type { PurgeExecutor } from '../../src/purge/purge-executor.js';
 import type { PoolClient } from 'pg';
 
@@ -88,7 +88,7 @@ export const T0 = 1_700_000_000_000;
  */
 export class ProbeNeverReachedError extends Error {}
 
-export function connectionSource(): { readonly source: PurgeConnectionSource; readonly connects: () => number } {
+export function connectionSource(): { readonly source: DatabaseConnectionSource; readonly connects: () => number } {
   let connects = 0;
   return {
     source: {
@@ -153,7 +153,7 @@ export function tripHarness(env: BreakerEnvironment = TRIP_ENV): TripHarness {
 /**
  * The narrow `pg` client shape the retention jobs actually use.
  *
- * `PurgeConnectionSource.connect()` returns a real `PoolClient`, and `pg.Pool`
+ * `DatabaseConnectionSource.connect()` returns a real `PoolClient`, and `pg.Pool`
  * is the only thing bound to it in application code (§2.2 forbids substituting a
  * fake of it). A *test* stand-in for the client is a different question from a
  * stand-in for the pool, and this is the seam the design already documents in
@@ -178,7 +178,7 @@ export type ScriptedClient = {
 export type ScriptedResult = { readonly rows: unknown[]; readonly rowCount: number | null };
 
 export type ScriptedPool = {
-  readonly source: PurgeConnectionSource;
+  readonly source: DatabaseConnectionSource;
   readonly connects: () => number;
   readonly statements: () => readonly ScriptedStatement[];
 };
@@ -224,7 +224,7 @@ export function scriptedPool(answers: readonly ScriptedAnswer[], options: Script
   const issued: ScriptedStatement[] = [];
   const cursors = new Map<ScriptedAnswer, number>();
 
-  const source: PurgeConnectionSource = {
+  const source: DatabaseConnectionSource = {
     // `Promise.resolve` rather than `async`: the port is `Promise`-returning, and
     // an `async` body with nothing to await is the one shape of this double that
     // `require-await` is right about.
@@ -257,7 +257,7 @@ export function scriptedPool(answers: readonly ScriptedAnswer[], options: Script
           // Nothing: the client is a plain object with no socket.
         },
       };
-      // Structural: `PurgeConnectionSource.connect()` is typed as `PoolClient`,
+      // Structural: `DatabaseConnectionSource.connect()` is typed as `PoolClient`,
       // and `pg.Pool` satisfies it in production. A test double cast once, here,
       // is the single place that cast exists — §2.2's ban is on fakes in
       // *application* code, and this file is a spec.

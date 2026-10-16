@@ -41,13 +41,26 @@ git clone <repo> && cd angular_v2
 cd backend && npm install
 cp .env.example .env          # then edit — see below
 cp .env.test.example .env.test  # same coordinates; suites never read .env
+createdb -O app app_dev       # database must be owned by the app role (see below)
 npm run db:seed               # roles, then migrations, then permissions + admin user
 cd ../frontend && npm install
 npm run generate:client       # reads ../openapi.json
 ```
 
-**`db:seed` alone provisions a new database, and running `migration:run` first
-is wrong on a fresh cluster.** `database/seed.ts` runs, in this order:
+**`database/seed.ts` does not create the database.** It connects to `DB_NAME`
+(`app_dev`) via `psql -d app_dev` and fails immediately if it does not exist:
+`FATAL: database app_dev does not exist`.
+
+Furthermore, **creating the database as the `postgres` superuser is also
+wrong**: every migration will then fail with `permission denied for schema public`.
+PostgreSQL 15 and later removed `CREATE` on schema `public` from `PUBLIC`. The
+application migration/owner role (`app`, configured as `DB_USER`) only has
+`CREATE` on `public` via membership in the predefined role `pg_database_owner` —
+that is, **only because it owns the database**. The working command on a fresh
+cluster is `createdb -O app app_dev`.
+
+Once the database exists and is owned by `app`, running `migration:run` before
+`db:seed` is still wrong on a fresh cluster. `database/seed.ts` runs, in this order:
 
 1. `database/bootstrap/001_roles.sql`, through `sudo -u postgres psql` — a
    superuser session, because `CREATE ROLE` needs `CREATEROLE`;
@@ -66,7 +79,8 @@ run database/bootstrap/001_roles.sql as a superuser first`, so
 schema exists. It survived this long because a machine provisioned once already
 had the roles: the same two commands worked the second time.
 
-Prefer to see the steps? Run `database/bootstrap/001_roles.sql` as a superuser
+Prefer to see the steps? Create the database owned by `app` (`createdb -O app <DB_NAME>`),
+run `database/bootstrap/001_roles.sql` as a superuser
 (`sudo -u postgres psql -d <DB_NAME> -v ON_ERROR_STOP=1 -f
 database/bootstrap/001_roles.sql`), then `npm run migration:run`, then `npm run
 db:seed`. The second and third are idempotent, and the seed is what adds the
@@ -241,7 +255,7 @@ cannot be read back, and its failure message names the divergence and the
 | `npm run test:rls` | Row-level security proof — real Postgres, real PostgREST |
 | `npm run smoke` | Database smoke check against a live instance |
 | `npm run generate:client` | Regenerate the Angular client from `openapi.json` |
-| `npm run db:seed` | Provision from nothing — bootstrap the roles, apply pending migrations, seed permissions/group tree/admin user. **On a new database, run only this** |
+| `npm run db:seed` | Provision database contents — bootstrap the roles, apply pending migrations, seed permissions/group tree/admin user (requires database created first via `createdb -O app app_dev`) |
 | `npm run migration:run` | Apply pending migrations to a database whose roles already exist (a re-migration) |
 | `npm run migration:revert` | Revert the last migration |
 

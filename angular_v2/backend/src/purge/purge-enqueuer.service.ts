@@ -6,8 +6,8 @@ import { PURGE_ENQUEUER } from '../breaker/dispatch-token.js';
 import { writtenRows } from './purge-claim.js';
 import type { DuePurge, EnqueueSummary } from './purge-enqueue.js';
 import { ENQUEUE_INACTIVE_PURGES_SQL, SELECT_DUE_PURGES_SQL, splitByPopulation } from './purge-enqueue.js';
-import { PURGE_POOL } from './purge-sweeper.service.js';
-import type { PurgeConnectionSource } from './purge-sweeper.service.js';
+import type { DatabaseConnectionSource } from '../common/database-pool.js';
+import { SharedDatabasePool } from '../common/database-pool.js';
 import { RETENTION_ENV } from './retention-environment.js';
 import type { RetentionEnvironment } from './retention-environment.js';
 
@@ -133,7 +133,7 @@ export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
   constructor(
     @Inject(RETENTION_ENV) private readonly env: RetentionEnvironment,
     private readonly gate: BreakerGate,
-    @Inject(PURGE_POOL) private readonly pool: PurgeConnectionSource,
+    @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
     private readonly scheduler: SchedulerRegistry,
   ) {}
 

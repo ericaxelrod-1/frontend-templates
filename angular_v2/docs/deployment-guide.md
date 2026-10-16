@@ -64,7 +64,11 @@ deployment-specific secret:
 # are the only thing between a serving role and every row.
 sudo -u postgres psql -c "CREATE ROLE app LOGIN PASSWORD 'app' NOSUPERUSER NOBYPASSRLS"
 
-# The database, owned by that role. The schema owner is `app`.
+# The database, owned by that role. The schema owner must be `app` (`OWNER app`):
+# PostgreSQL 15 and later removed CREATE on schema public from PUBLIC. The app
+# role only has CREATE on public via pg_database_owner (by owning the database);
+# creating the database as postgres causes migrations to fail with
+# "permission denied for schema public".
 sudo -u postgres psql -c "CREATE DATABASE app_prod OWNER app"
 ```
 
@@ -83,7 +87,8 @@ route change — see [`api-contract.md`](./api-contract.md).
 
 ### 3. Migrations and seed
 
-On a cluster that has no roles yet, **one command provisions it**:
+Against the database created in step 1, on a cluster that has no roles yet,
+**one command provisions its schema and roles**:
 
 ```bash
 cd backend

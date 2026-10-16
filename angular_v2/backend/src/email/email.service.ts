@@ -2,7 +2,6 @@ import {
   Inject,
   Injectable,
   Logger,
-  type OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -85,28 +84,17 @@ const REDACTED_RECIPIENT = '<rejected-recipient>';
  * convention (ADR-0025).
  */
 @Injectable()
-export class EmailService implements OnModuleDestroy {
+export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly env: Environment;
-  private readonly audit: EmailAuditWriter;
 
   constructor(
     config: ConfigService,
     @Inject(EMAIL_PROVIDER) private readonly provider: EmailProvider,
     private readonly renderer: EmailRenderer,
+    private readonly audit: EmailAuditWriter,
   ) {
     this.env = config.getOrThrow<Environment>('environment');
-    // Built here rather than injected, because this class's constructor arity is
-    // a frozen contract: the existing unit and e2e suites construct it with
-    // exactly (ConfigService, provider, renderer). A fourth REQUIRED parameter
-    // would not compile them, and a fourth OPTIONAL one would be a dependency
-    // that silently does nothing — §2.2's exact shape. `ConfigService` is
-    // already here and is everything the writer needs. See email-audit.writer.ts.
-    this.audit = new EmailAuditWriter(config);
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    await this.audit.close();
   }
 
   /**

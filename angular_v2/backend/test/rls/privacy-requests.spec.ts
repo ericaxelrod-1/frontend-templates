@@ -1825,6 +1825,193 @@ describe('privacy_requests · the derived category is structural, not documented
 });
 
 // =============================================================================
+// 9 — the RLS posture of the compliance record: ENABLEd, deliberately NOT
+//     FORCEd, and the residual is bounded rather than open
+// =============================================================================
+//
+// `0010` records the same posture `0011` records for `privacy_purge_queue`, and
+// `privacy-purge-queue.spec.ts` §8 already asserts what makes *that* trade
+// bounded: no role reaching the table is SUPERUSER or BYPASSRLS, and the narrow
+// `SECURITY DEFINER` writers are callable by one role with EXECUTE revoked from
+// PUBLIC. **None of those three assertions existed for `privacy_request_audits`**,
+// so a migration that granted `BYPASSRLS` to anything, added a second
+// owner-privileged writer, or widened the table's ACL would have failed nothing.
+//
+// The fourth test pins the residual itself — the reason the trade is a trade and
+// not a mistake — with row counts on both sides of it, because "the owner reads
+// every row" is only half a claim without the capability gate's answer beside it.
+describe('privacy_request_audits · ENABLEd, NOT FORCEd, and the residual is bounded rather than open', () => {
+  it(
+    'every role that can reach the table is NOSUPERUSER and NOBYPASSRLS, PUBLIC holds nothing, and the role list is read from the table ACL',
+    () => {
+      // AGENTS.md §B2's rule: FORCE does not bind a superuser or a BYPASSRLS role,
+      // so these two attributes are the only thing between a serving role and every
+      // compliance record in the database — and this table is *not* FORCEd, which
+      // makes them even more load-bearing here than on a FORCEd one.
+      //
+      // Read from the table's OWN ACL rather than from a list of roles somebody
+      // remembered, and expanded through `aclexplode` so a fourth grantee is a red
+      // line instead of a silent extension. `COALESCE(relacl, acldefault('r',
+      // relowner))` means a table whose ACL was never touched is expanded through
+      // PostgreSQL's DEFAULT rather than skipped, and the LEFT JOIN keeps grantee 0
+      // so a `PUBLIC` grant appears as the literal string.
+      //
+      // The counterpart assertion — `relrowsecurity` and `relforcerowsecurity` — is
+      // NOT repeated here. It is asserted in §8 above ('both tables a serving role
+      // writes are ENABLEd and FORCEd; the audit table is ENABLEd and deliberately
+      // NOT FORCEd'), and a second copy of it would be a second thing to update
+      // when the posture changes (§2.4).
+      const grantees = superuserRows<{ grantee: string; rolsuper: boolean; rolbypassrls: boolean | null }>(
+        `SELECT coalesce(r.rolname, 'PUBLIC') AS grantee, r.rolsuper, r.rolbypassrls
+           FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('r', c.relowner))) AS acl
+           LEFT JOIN pg_roles r ON r.oid = acl.grantee
+          WHERE n.nspname = 'public' AND c.relname = 'privacy_request_audits'
+          GROUP BY 1, 2, 3
+          ORDER BY 1`,
+      );
+
+      // Properties of the list, not the list: a hardcoded grantee list is a baseline
+      // that goes stale the moment a role appears. `app_admin` must be in it — the
+      // operator's read is the only reason SELECT is granted at all — so the
+      // assertion cannot pass on an empty result.
+      expect(grantees.length).toBeGreaterThan(0);
+      expect(grantees.map((row) => row.grantee)).toContain('app_admin');
+
+      // Checked separately and first, because its row has no `pg_roles` entry and its
+      // attributes are NULL: a `PUBLIC` grant is the shape `0010`'s `REVOKE ALL …
+      // FROM PUBLIC` exists to prevent, and reading it off the LEFT JOIN is the only
+      // way it appears in this result at all.
+      expect(
+        grantees.filter((row) => row.grantee === 'PUBLIC').map((row) => row.grantee),
+        'PUBLIC holds a privilege on privacy_request_audits, so every compliance record is anonymously readable',
+      ).toEqual([]);
+
+      for (const row of grantees.filter((candidate) => candidate.grantee !== 'PUBLIC')) {
+        expect(row.rolsuper, `${row.grantee} reaches privacy_request_audits and is a superuser`).toBe(false);
+        expect(row.rolbypassrls, `${row.grantee} reaches privacy_request_audits and bypasses RLS`).toBe(false);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'its only writer is a SECURITY DEFINER function, and PUBLIC may not call it — which is what makes not-FORCEing the table bounded',
+    () => {
+      // The half of the trade that actually decays, and the exact parallel of
+      // `privacy-purge-queue.spec.ts` §8's writer assertion.
+      //
+      // Because the table is not FORCEd and its only policy is a SELECT capability
+      // gate, `authz.append_privacy_request_audit` is subject to NO policy at all: it
+      // runs as the OWNER and writes a table with no INSERT policy to pass. Its
+      // narrowness is therefore carried ENTIRELY by `EXECUTE`. Grant it to PUBLIC, or
+      // revoke the revoke, and every caller in the cluster inherits an
+      // owner-privileged writer over the statutory record of every consumer request
+      // the system holds — silently, with no error anywhere.
+      const signature =
+        'authz.append_privacy_request_audit(text, uuid, timestamptz, text, text, timestamptz, text, text, text, bytea, text, uuid)';
+
+      // The DEFINER fact itself, which nothing asserted before: a SECURITY INVOKER
+      // rewrite of this function would run as its caller, hit the missing INSERT
+      // privilege, and fail — while every denial assertion in §5 above still passed,
+      // because §5 asserts who may CALL the function and not what it runs as.
+      expect(
+        superuserRows<{ prosecdef: boolean }>(
+          `SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('${signature}')`,
+        )[0]?.prosecdef,
+        'append_privacy_request_audit is not SECURITY DEFINER, so it does not run as the owner and this table does not need the not-FORCEd trade at all',
+      ).toBe(true);
+
+      // The grantee set, from the ACL rather than from `has_function_privilege`
+      // probes: §5 checks four named roles, and this checks that there is no FIFTH.
+      const callables = superuserRows<{ grantee: string }>(
+        `SELECT coalesce(r.rolname, 'PUBLIC') AS grantee
+           FROM pg_proc p
+           JOIN pg_namespace n ON n.oid = p.pronamespace
+           CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
+           LEFT JOIN pg_roles r ON r.oid = acl.grantee
+          WHERE n.nspname = 'authz' AND p.oid = to_regprocedure('${signature}')
+          GROUP BY 1
+          ORDER BY 1`,
+      );
+      // The owner is the identity these definers deliberately run as, so the
+      // assertion is about the SECOND grantee set: PUBLIC holds nothing, and the only
+      // non-owner callers are the two serving roles §5 already names.
+      expect(callables.map((row) => row.grantee)).not.toContain('PUBLIC');
+      expect(
+        callables.map((row) => row.grantee).filter((grantee) => grantee !== databaseConfig().user),
+        'a role other than the two serving roles may append a compliance record',
+      ).toEqual(['app_admin', 'app_member']);
+
+      // AND THERE IS ONLY ONE WRITER. Read from the function bodies rather than from
+      // a remembered list, so a second definable writer added without a grant is a
+      // red line here rather than a silent extension of the set — the same argument
+      // `privacy-purge-queue.spec.ts` makes about its six writers, and the reason
+      // `to_regprocedure` above is paired with it: a signature the database does not
+      // have returns NULL, which would drop the row rather than report the rename.
+      const writers = superuserRows<{ writer: string }>(
+        `SELECT n.nspname || '.' || p.proname AS writer
+           FROM pg_proc p
+           JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE p.prosrc ILIKE '%INSERT INTO%privacy_request_audits%'
+          ORDER BY 1`,
+      );
+      expect(writers.map((row) => row.writer)).toEqual(['authz.append_privacy_request_audit']);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'the owner reads every compliance row with no claims in scope, and the same table through the boundary is capability-gated',
+    async () => {
+      // The residual, asserted as a FACT with row counts on both sides rather than
+      // narrated. Not FORCEd means the owner bypasses `privacy_request_audit_read`,
+      // so the capability gate is NOT the whole control on this table — the grants
+      // above, and the fact that the owner never receives a request, are. A reader
+      // who assumes FORCE here is wrong, and this is the assertion that says so.
+      //
+      // Ground truth first, read by the SUPERUSER: without it the owner count cannot
+      // be told apart from an empty table, which is how a claimless zero reads when
+      // it is not a control (§B5's rule, and this file's own claimless-session
+      // section is the same argument from the other direction).
+      const written = superuserRows<{ count: number }>(
+        `SELECT count(*)::int AS count FROM privacy_request_audits`,
+      )[0]?.count;
+      expect(written, 'the fixture must hold compliance rows for this to mean anything').toBeGreaterThan(0);
+
+      // The owner, through a real connection — the same owner-side read §8 uses to
+      // prove `privacy_requests` IS bound, which is the contrast: one table FORCEd
+      // and one deliberately not.
+      const owner = ownerClient();
+      await owner.connect();
+      let ownerSaw: number;
+      try {
+        const result = await owner.query<{ count: number }>('SELECT count(*)::int AS count FROM privacy_request_audits');
+        ownerSaw = result.rows[0]?.count ?? -1;
+      } finally {
+        await owner.end();
+      }
+      expect(ownerSaw, 'the owner read a different number of rows than the superuser').toBe(written);
+
+      // …and the same table through the boundary is capability-gated. Without the two
+      // answers side by side, "the owner reads them all" is only half a claim.
+      const asAdmin = rowsAsRole<{ event_type: string }>(
+        'app_admin',
+        IDS.users.adminProbe,
+        'SELECT event_type FROM privacy_request_audits',
+      );
+      expect(asAdmin.length, 'the operator holding privacy_request_audit:read reads nothing').toBeGreaterThan(0);
+      expect(
+        rowsAsRole<{ event_type: string }>('app_admin', IDS.users.narrowAdmin, 'SELECT event_type FROM privacy_request_audits'),
+        'an admin without the capability reads rows the owner reads, so the residual is not the only gate',
+      ).toEqual([]);
+    },
+    TIMEOUT,
+  );
+});
+
+// =============================================================================
 // THE CLAIMLESS SESSION, AND WHY IT IS ASSERTED HERE RATHER THAN FIXED
 // =============================================================================
 //

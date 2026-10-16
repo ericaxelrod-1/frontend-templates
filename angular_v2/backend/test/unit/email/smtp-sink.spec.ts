@@ -13,6 +13,8 @@ import { loadEnvironment } from '../../../src/config/environment.js';
 import { NodemailerEmailProvider } from '../../../src/email/nodemailer-email.provider.js';
 import { EmailRenderer } from '../../../src/email/email.renderer.js';
 import { EmailService } from '../../../src/email/email.service.js';
+import { EmailAuditWriter } from '../../../src/email/email-audit.writer.js';
+import { SharedDatabasePool } from '../../../src/common/database-pool.js';
 import { decodeHtmlEntities, parseSmtpMessage } from '../../../scripts/smtp-message.js';
 import { BACKEND_ROOT } from '../../support/paths.js';
 import { selfSignedSmtpSinkTls } from '../../support/self-signed-certificate.js';
@@ -54,6 +56,7 @@ function serviceAgainst(sink: SmtpSink, tls: boolean, credentials: boolean): Ema
     config,
     new NodemailerEmailProvider(environment.email),
     new EmailRenderer(),
+    new EmailAuditWriter(new SharedDatabasePool(config)),
   );
 }
 
@@ -147,6 +150,7 @@ describe('one transport, whatever the mode', () => {
         config,
         new NodemailerEmailProvider(environment.email),
         new EmailRenderer(),
+        new EmailAuditWriter(new SharedDatabasePool(config)),
       );
 
       await service.sendVerificationEmail('robin@example.test', 'Robin', 'sink-token-2');

@@ -1,19 +1,12 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Pool } from 'pg';
 import { BreakerModule } from '../breaker/breaker.module.js';
-import type { Environment } from '../config/environment.js';
+import { DatabasePoolModule } from '../common/database-pool.module.js';
 import { PurgeEnqueuer } from './purge-enqueuer.service.js';
-import { PURGE_POOL, PurgeSweeper } from './purge-sweeper.service.js';
+import { PurgeSweeper } from './purge-sweeper.service.js';
 import { SqlPurgeExecutor } from './purge-executor.js';
 import { PURGE_EXECUTOR } from './purge-executor.js';
 import { loadRetentionEnvironment } from './retention-environment.js';
 import { RETENTION_ENV } from './retention-environment.js';
-
-/** Explicit, because `pg`'s default of 10 is a number nobody chose (§B6). */
-const PURGE_POOL_MAX = 4;
-
-const PURGE_POOL_IDLE_TIMEOUT_MS = 30_000;
 
 /**
  * The retention window, read and validated at **module-evaluation time** — after
@@ -30,25 +23,24 @@ export const APP_RETENTION_ENVIRONMENT = loadRetentionEnvironment(process.env);
 /**
  * The purge sweeper, and the pool it talks to.
  *
- * ## The pool, and the known duplication
+ * ## The pool
  *
- * `AuthService` builds one `Pool` in its constructor and `EmailAuditWriter` builds
- * a second on first use, and this module builds a third. That is a real
- * duplication and a real problem — **neither pool can see the other's
- * `waitingCount`**, which is how a service exceeds `max_connections` with no alarm
- * anywhere: both report themselves healthy while the database saturates.
+ * `SharedDatabasePool` — ONE pool for the whole process, imported from
+ * `common/database-pool.module.ts` like every other writer. This module used to
+ * build a third pool of its own and used to carry a paragraph explaining why it did
+ * not consolidate: *"neither pool can see the other's `waitingCount`, which is how a
+ * service exceeds `max_connections` with no alarm anywhere."* The defect is fixed
+ * and the paragraph is deleted rather than rewritten, because a comment that
+ * documents a resolved defect is a comment the next reader has to check.
  *
- * The fix is one shared pool provider that `AuthModule` and `EmailModule` also
- * consume, and it is **not made here**: both are outside this change's ownership,
- * and re-plumbing them is a wider edit than the defect. What this module does do
- * is the half that is its own — an **explicit `max`**, so this pool is not on an
- * unchosen default, and the same `pgrst_authenticator` login plus
- * `SET LOCAL ROLE app_admin` escalation boundary every other writer uses, read
- * from the one validated `Environment` rather than from `process.env` a second
- * time (§2.3: no config key read with a default that masks a missing namespace).
+ * The per-feature `max: 4` this pool used to carry is gone: a `pg.Pool` has exactly
+ * one `max`, and the process-wide budget is now a single readable number. See
+ * `common/database-pool.ts` §What is lost for what that trades away and why.
  *
- * `pg.Pool` connects lazily, so a process whose scheduler never starts opens no
- * socket — the same property `email-audit.writer.ts` relies on.
+ * Every write still crosses the same escalation boundary — `pgrst_authenticator`
+ * logs in, and each transaction runs `SET LOCAL ROLE app_admin` before any write.
+ * Claims alone cannot buy write access, because the `app_admin` branch of the policy
+ * discriminates on `current_user` and never on a token field (§B2/§B5).
  *
  * ## Why the executor is a token
  *
@@ -58,24 +50,8 @@ export const APP_RETENTION_ENVIRONMENT = loadRetentionEnvironment(process.env);
  * could be registered through outside a test file (§2.2).
  */
 @Module({
-  imports: [BreakerModule, ConfigModule],
+  imports: [BreakerModule, DatabasePoolModule],
   providers: [
-    {
-      provide: PURGE_POOL,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService): Pool => {
-        const env = config.getOrThrow<Environment>('environment');
-        return new Pool({
-          host: env.database.host,
-          port: env.database.port,
-          user: env.authenticator.user,
-          password: env.authenticator.password,
-          database: env.database.database,
-          max: PURGE_POOL_MAX,
-          idleTimeoutMillis: PURGE_POOL_IDLE_TIMEOUT_MS,
-        });
-      },
-    },
     { provide: PURGE_EXECUTOR, useClass: SqlPurgeExecutor },
     { provide: RETENTION_ENV, useValue: APP_RETENTION_ENVIRONMENT },
     PurgeSweeper,
