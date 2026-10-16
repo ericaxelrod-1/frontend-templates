@@ -143,11 +143,15 @@ export const NON_DISPATCHABLE_CONTROLLERS: readonly NonDispatchableDeclaration[]
     controller: 'EmailProbeController',
     declaredIn: 'test/e2e/email.e2e-spec.ts',
     reason:
-      'Declared inside a spec and imported by nothing in src/: it stands in for the registration and ' +
-      'password-reset routes a later slice will own, and this repository ships neither. The global ' +
-      'interceptor does run on it, so it really is a dispatch site, and shedding a route no deployment ' +
-      'exposes is correct behaviour rather than a gap. It is recorded here rather than skipped silently ' +
-      'so that moving it into src/ stops the boot instead of inheriting a test-only exemption.',
+      'Declared inside a spec and imported by nothing in src/: it exercises the mail transport end to end ' +
+      'over a controller of its own. It was written to stand in for the registration and password-reset ' +
+      'routes a later slice would own, and those routes now exist — POST /auth/password-reset/request and ' +
+      'POST /auth/email-verification/request are mounted in AuthController and named in KNOWN_DISPATCH_TOKENS — ' +
+      'so this fixture is no longer standing in for anything and is kept only for the transport assertions ' +
+      '(handshake, rendering, absolute-URL construction, a refusal reaching the client as a failure). ' +
+      'The global interceptor genuinely runs on it, so it really is a dispatch site, and shedding a route ' +
+      'no deployment exposes is correct behaviour rather than a gap. It is recorded here rather than skipped ' +
+      'silently so that moving it into src/ stops the boot instead of inheriting a test-only exemption.',
   },
 ]);
 

@@ -1,0 +1,70 @@
+-- =============================================================================
+-- 0020_users_email_verified_at.sql
+--
+-- When an address was confirmed by its owner.
+-- Target: PostgreSQL 18+, applied as the migration/owner role (`app`).
+--
+-- =============================================================================
+-- WHY THIS COLUMN EXISTS AT ALL, WHICH IS THE INTERESTING PART
+-- =============================================================================
+--
+-- Redeeming an `email_verification` token has to leave something behind, or the
+-- route is a no-op wearing a 200: it consumes a single-use credential and changes
+-- no state, so "your address is verified" would be a claim about nothing. §2.1 is
+-- explicit that this is worse than absence, because it reads as working.
+--
+-- The obvious second move — and the one this migration REFUSES — is to make
+-- `login` require it. Three independent reasons, any one of which is enough:
+--
+--   1. **It would lock out every existing account.** Every `users` row predates
+--      this column, so `email_verified_at` is NULL on all of them. Gating login on
+--      it turns "unverified" into "nonexistent" for the entire installed base.
+--   2. **It is the trap the task is warning about.** "A newly-verified account
+--      must not silently skip other checks" has a mirror image: adding a check that
+--      `AuthService.issueSession` never had makes verification *mean* something
+--      login does not, and the two paths then disagree about what an account is.
+--      The rule this column follows is the consistency one: `issueSession` gates on
+--      the password and nothing else, so this stays DATA and is read by nobody in
+--      this tree.
+--   3. **No requirement names a verified domain.** There is no per-user policy row,
+--      no `require_verified_email` setting, and no membership flag. A gate would
+--      have nothing to be configurable *against*.
+--
+-- So the column is a timestamp a caller can ask about through PostgREST, it is
+-- written exactly once per verified address, and nothing in the application treats
+-- a NULL as a refusal. A forker who wants verification enforced adds the gate in
+-- `issueSession` — where login already decides what it requires — and backfills.
+--
+-- =============================================================================
+-- THE COLUMN
+-- =============================================================================
+--
+-- `timestamptz`, NULL until an address is confirmed and never cleared: the same
+-- shape and the same reasoning as `users.deleted_at` and
+-- `refresh_tokens.revoked_at` (see `0018` §1C on why a timestamp beats a boolean
+-- — it is audit evidence).
+--
+-- **Not `NOT NULL DEFAULT now()`.** That would date every pre-existing address to
+-- the moment the migration ran, which is a lie written into an audit column, and it
+-- would make the null/non-null distinction the column exists to carry unreadable.
+--
+-- `ADD COLUMN IF NOT EXISTS`: a migration is applied to databases that may already
+-- carry it.
+--
+-- **No index.** One predicate reads it, on a table this small, and the forker who
+-- makes it a gate is the one who will know whether it needs one.
+--
+-- **No RLS, no GRANT, no policy change.** `users` is already `ENABLE`+`FORCE`d
+-- with the `current_user = 'app_admin'` policy and its `SELECT, INSERT, UPDATE,
+-- DELETE` grant to `app_admin` alone (`0002`). A new column on an existing table
+-- inherits all of it; changing either would be a privilege change disguised as a
+-- column addition.
+
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS email_verified_at timestamptz;
+
+-- =============================================================================
+-- DOWN
+-- =============================================================================
+-- See database/migrations/0020_users_email_verified_at.down.sql. Kept as a
+-- separate file so this one stays append-only, exactly as in 0001–0019.

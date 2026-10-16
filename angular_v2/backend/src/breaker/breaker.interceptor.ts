@@ -53,11 +53,15 @@ import { BreakerGate } from './breaker-gate.js';
  * system is `privacy_purge_queue`, and it holds purge work, not HTTP requests. So a
  * gated route is *not dispatched and not deferred* — the body says so, the caller
  * can retry, and nothing is silently dropped. It is recorded here as the one gap in
- * the "accepted and queued" promise, and it is unreachable with the shipped
- * `BREAKER_PROTECTED`: all four thin-app routes are protected, so the gate admits
- * them at every zone including `red`, which is the correct behaviour — an operator
- * must stay able to log in and fix the machine — and which is also why the refusal
- * branch has no runtime exercise today. The job dispatcher does.
+ * the "accepted and queued" promise, and it is REACHABLE: `BREAKER_PROTECTED` names
+ * the four `auth.*` SESSION routes and the two instrument sites, while the four
+ * one-time-token routes are named in the vocabulary and deliberately left
+ * **unprotected**, so they shed at `red` and their callers get a `202` to retry.
+ * That is the correct behaviour rather than an oversight —
+ * `AUTH_PASSWORD_RESET_REQUEST` in `dispatch-token.ts` argues it, including why a
+ * gated confirm loses nothing (the handler never runs, so the token is never
+ * consumed). The protected branch is the one that stays unreachable under the
+ * shipped configuration.
  */
 @Injectable()
 export class BreakerGateInterceptor implements NestInterceptor {

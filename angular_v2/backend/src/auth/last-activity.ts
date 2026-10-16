@@ -9,12 +9,13 @@ import type { PoolClient } from 'pg';
  * "Update `users.last_activity_at` on every authenticated request" is not
  * achievable in this architecture, and the reason is not a missing feature:
  *
- *   * **PostgREST is the API layer.** It serves the CRUD surface directly out of
- *     PostgreSQL (`AGENTS.md` §B1: "PostgREST serves base tables. It is the API
- *     layer"). Nest sees **four** routes — `login`, `refresh`, `logout`, `me`. Every
- *     read and every write that is not one of those four never passes through this
+*   * **PostgREST is the API layer.** It serves the CRUD surface directly out of
+ *     PostgreSQL (`AGENTS.md` §B1: "PostgREST serves base tables. It is the
+ *     API layer"). Nest sees a handful of routes — the session ones
+ *     (`login`, `refresh`, `logout`, `me`) and the four one-time-token ones. Every
+ *     read and every write that is not one of those never passes through this
  *     process, so no code here can observe it. A middleware that stamped the column
- *     would stamp it on 4 endpoints out of the entire API.
+ *     would stamp it on a few endpoints out of the entire API.
  *   * **`db-pre-request` cannot write.** `AGENTS.md` §B6 records that it runs in a
  *     **read-only transaction**, so a write there fails `25006` and a working
  *     request returns `405`. It is also the hook this schema reserves for
@@ -28,12 +29,25 @@ import type { PoolClient } from 'pg';
  *
  * ## THE DEFINITION THIS TREE RECORDS, IN ONE SENTENCE
  *
- * **Activity is a successful re-authentication: a login, a refresh, or a logout.**
- * Every one of those three is a transaction this process has *already opened* to
- * do something else, so recording activity costs **no additional round trip** —
- * one indexed `UPDATE` rides inside a transaction that is already committing.
+ * **Activity is a successful re-authentication: a login, a refresh, a logout, or
+ * a password reset.** Every one of those is a transaction this process has
+ * *already opened* to do something else, so recording activity costs **no
+ * additional round trip** — one indexed `UPDATE` rides inside a transaction that
+ * is already committing.
  *
- * ## WHY THESE THREE AND NOT A FOURTH (`GET /auth/me`)
+ * A password reset is the strongest of the four and the reason it belongs here: the
+ * user proved control of a mailbox, which is better evidence than a password, and
+ * an account that resets and never returns is precisely the population the dormant
+ * purge is for. Its `UPDATE` rides in the transaction that changes the password and
+ * revokes the sessions.
+ *
+ * The one-time-token **request** routes are deliberately absent, and they are the
+ * clearest available answer to "why not every route": a request may name a mailbox
+ * that does not exist, so stamping activity for one would let anyone keep an account
+ * alive by asking for its reset link — the exact defect described under the
+ * alternatives below, in a place where it would be hardest to notice.
+ *
+ * ## WHY THESE FOUR AND NOT A FIFTH (`GET /auth/me`)
  *
  * `me` is the only authenticated route in the thin app that is a **pure read**,
  * and it is excluded on purpose. Recording on it turns a read into a write: a

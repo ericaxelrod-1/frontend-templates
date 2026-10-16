@@ -48,6 +48,7 @@ describe('loadEnvironment', () => {
         delayScheduleSeconds: [0, 1, 4, 16],
         delayCapSeconds: 30,
         blockThreshold: 5,
+        enumerationFloorMs: 250,
       },
       server: { port: 4000 },
       email: {

@@ -28,6 +28,42 @@ export const AUTH_LOGIN: DispatchToken = 'auth.login';
 export const AUTH_REFRESH: DispatchToken = 'auth.refresh';
 export const AUTH_LOGOUT: DispatchToken = 'auth.logout';
 export const AUTH_ME: DispatchToken = 'auth.me';
+
+/**
+ * The four one-time-token routes, minted and redeemed over `src/token/`.
+ *
+ * **Named, and deliberately NOT in `BREAKER_PROTECTED`.**
+ *
+ * Naming them is mandatory: `route-census.ts` refuses to boot a graph with a
+ * mounted route no token names, so an unnamed handler does not degrade — it stops
+ * the process at startup. That is the control doing its job, and it is why these
+ * four exist.
+ *
+ * Omitting them from the *protected* list is a decision, and the reasoning is the
+ * same one that keeps `purge.enqueuer` out of it. The default is STOP, so an
+ * omission means **sheddable**, and here shedding is the correct behaviour:
+ *
+ *  - `auth.password_reset_request` and `auth.email_verification_request` answer
+ *    "accepted, check your mail". Holding one while the machine is in memory
+ *    distress produces exactly the behaviour a client already handles, because the
+ *    token was never minted — a retry costs the caller one request and mails
+ *    nothing twice.
+ *  - `auth.password_reset_confirm` and `auth.email_verification_confirm` are
+ *    gated BEFORE the handler runs, so a gated confirm consumes no token: the
+ *    link is still live afterwards and the retry succeeds. Nothing is lost, and a
+ *    caller who cannot retry right now was not going to succeed anyway.
+ *
+ * The counter-argument is "an operator must be able to log in and fix the
+ * machine", which is what protects the four `auth.*` session routes. A reset
+ * confirm is not that: it is not an operator recovering access, it is a user
+ * changing a password, and it can be retried in a minute. Putting it on the
+ * protected list would make four more routes exempt from shedding on every host,
+ * in exchange for a capability nobody needs.
+ */
+export const AUTH_PASSWORD_RESET_REQUEST: DispatchToken = 'auth.password_reset_request';
+export const AUTH_PASSWORD_RESET_CONFIRM: DispatchToken = 'auth.password_reset_confirm';
+export const AUTH_EMAIL_VERIFICATION_REQUEST: DispatchToken = 'auth.email_verification_request';
+export const AUTH_EMAIL_VERIFICATION_CONFIRM: DispatchToken = 'auth.email_verification_confirm';
 export const BREAKER_METER: DispatchToken = 'breaker.meter';
 export const BREAKER_GATE: DispatchToken = 'breaker.gate';
 export const PURGE_SWEEPER: DispatchToken = 'purge.sweeper';
@@ -116,6 +152,10 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   AUTH_REFRESH,
   AUTH_LOGOUT,
   AUTH_ME,
+  AUTH_PASSWORD_RESET_REQUEST,
+  AUTH_PASSWORD_RESET_CONFIRM,
+  AUTH_EMAIL_VERIFICATION_REQUEST,
+  AUTH_EMAIL_VERIFICATION_CONFIRM,
   BREAKER_METER,
   BREAKER_GATE,
   PURGE_SWEEPER,

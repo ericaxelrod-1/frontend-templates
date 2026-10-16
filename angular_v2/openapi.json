@@ -68,6 +68,9 @@
             "$ref": "#/components/parameters/rowFilter.users.last_activity_at"
           },
           {
+            "$ref": "#/components/parameters/rowFilter.users.email_verified_at"
+          },
+          {
             "$ref": "#/components/parameters/select"
           },
           {
@@ -204,6 +207,9 @@
             "$ref": "#/components/parameters/rowFilter.users.last_activity_at"
           },
           {
+            "$ref": "#/components/parameters/rowFilter.users.email_verified_at"
+          },
+          {
             "$ref": "#/components/parameters/preferReturn"
           }
         ],
@@ -262,6 +268,9 @@
           },
           {
             "$ref": "#/components/parameters/rowFilter.users.last_activity_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.users.email_verified_at"
           },
           {
             "$ref": "#/components/parameters/preferReturn"
@@ -3770,6 +3779,9 @@
             "$ref": "#/components/parameters/rowFilter.login_attempts.ip_subnet"
           },
           {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.attempt_kind"
+          },
+          {
             "$ref": "#/components/parameters/select"
           },
           {
@@ -3882,6 +3894,9 @@
             "$ref": "#/components/parameters/rowFilter.login_attempts.ip_subnet"
           },
           {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.attempt_kind"
+          },
+          {
             "$ref": "#/components/parameters/preferReturn"
           }
         ],
@@ -3916,6 +3931,9 @@
           },
           {
             "$ref": "#/components/parameters/rowFilter.login_attempts.ip_subnet"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.login_attempts.attempt_kind"
           },
           {
             "$ref": "#/components/parameters/preferReturn"
@@ -4385,6 +4403,14 @@
       "rowFilter.users.last_activity_at": {
         "name": "last_activity_at",
         "description": "When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant.",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.users.email_verified_at": {
+        "name": "email_verified_at",
         "required": false,
         "in": "query",
         "schema": {
@@ -5398,6 +5424,14 @@
         "schema": {
           "type": "string"
         }
+      },
+      "rowFilter.login_attempts.attempt_kind": {
+        "name": "attempt_kind",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
       }
     },
     "requestBodies": {
@@ -5998,6 +6032,10 @@
           },
           "last_activity_at": {
             "description": "When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant.",
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "email_verified_at": {
             "format": "timestamp with time zone",
             "type": "string"
           }
@@ -6773,7 +6811,8 @@
           "id",
           "username",
           "status",
-          "created_at"
+          "created_at",
+          "attempt_kind"
         ],
         "properties": {
           "id": {
@@ -6804,6 +6843,11 @@
             "type": "string"
           },
           "ip_subnet": {
+            "format": "text",
+            "type": "string"
+          },
+          "attempt_kind": {
+            "default": "login",
             "format": "text",
             "type": "string"
           }

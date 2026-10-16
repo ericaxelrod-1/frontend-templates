@@ -50,6 +50,63 @@ export class TokenService {
   ) {}
 
   /**
+   * One transaction, elevated, on a borrowed connection — and the `BEGIN` is not
+   * ceremony.
+   *
+   * ## `SET LOCAL` IS A NO-OP OUTSIDE A TRANSACTION
+   *
+   * `SET LOCAL ROLE app_admin` outside a transaction block does not fail, does not
+   * throw, and does nothing: PostgreSQL emits `WARNING: SET LOCAL can only be used
+   * in transaction blocks` and the statement has **no effect**. Every statement then
+   * runs as `pgrst_authenticator`, which holds no privileges on `users`,
+   * `refresh_tokens` or `auth_tokens` — so each one fails `42501 permission denied
+   * for table …` and the error names a permission problem that has nothing to do
+   * with the grants.
+   *
+   * That is not a hypothetical. This class is the **only** place in `src/` that
+   * issued `SET LOCAL ROLE app_admin` without a `BEGIN`, and the symptom was a
+   * password-reset request that logged `permission denied for table users` from a
+   * route whose SQL named only `id, username, email`. `AuthService`,
+   * `EmailAuditWriter`, `ErasureService` and both purge services all open the
+   * transaction first; this is the same pattern, and it is now the only copy.
+   *
+   * ## Why `SET LOCAL` and not `SET`
+   *
+   * `SET ROLE` would work outside a transaction and is the obvious "fix". It is the
+   * wrong one: `pg.Pool.release()` returns a session to the pool without resetting
+   * its state, so a bare `SET ROLE` leaves the **connection elevated** for whoever
+   * borrows it next. `SET LOCAL` scopes the elevation to the transaction that ends
+   * before the connection is handed back. §B5's boundary is "the authenticator
+   * `SET`s the role per transaction", and `database/seed.ts` uses this exact shape.
+   *
+   * ## Why `ROLLBACK` is attempted and swallowed
+   *
+   * A failure may have aborted the transaction, in which case `ROLLBACK` itself
+   * errors with `25P02`. That error is not information — the original is already
+   * propagating — so it is dropped rather than replacing the real cause. Mirrors
+   * `AuthService`'s own transaction handling exactly.
+   */
+  private async asAppAdmin<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    let committed = false;
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL ROLE app_admin');
+      const result = await work(client);
+      await client.query('COMMIT');
+      committed = true;
+      return result;
+    } catch (error) {
+      if (!committed) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Domain-separated HMAC-SHA256 of the presented token.
    * Never stores raw tokens. Survives database dumps.
    */
@@ -94,9 +151,7 @@ export class TokenService {
     const tokenHash = this.hashToken(rawToken);
     const subjectHmac = this.hashSubject(input.subjectIdentifier);
 
-    const client = await this.pool.connect();
-    try {
-      await client.query('SET LOCAL ROLE app_admin');
+    const id = await this.asAppAdmin(async (client) => {
       const result = await client.query<{ id: string }>(
         'SELECT authz.mint_auth_token($1, $2, $3, $4, $5, $6) AS id',
         [
@@ -113,17 +168,16 @@ export class TokenService {
       if (row === undefined || !row.id) {
         throw new Error('mint_auth_token did not return an id');
       }
+      return row.id;
+    });
 
-      const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-      return {
-        id: row.id,
-        rawToken,
-        purpose: input.purpose,
-        expiresAt,
-      };
-    } finally {
-      client.release();
-    }
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    return {
+      id,
+      rawToken,
+      purpose: input.purpose,
+      expiresAt,
+    };
   }
 
   /**
@@ -152,42 +206,38 @@ export class TokenService {
 
     const presentedHash = this.hashToken(input.rawToken);
 
-    const client = await this.pool.connect();
-    try {
-      await client.query('SET LOCAL ROLE app_admin');
+    const row = await this.asAppAdmin(async (client) => {
       const result = await client.query<RedeemSqlRow>(
         'SELECT id, user_id, subject_hmac, pepper_kid, purpose, created_at, expires_at FROM authz.redeem_auth_token($1, $2)',
         [presentedHash, input.expectedPurpose],
       );
+      return result.rows[0];
+    });
 
-      const row = result.rows[0];
-      if (row === undefined) {
-        timingSafeEqual(presentedHash, presentedHash);
-        return { status: 'invalid_or_expired' };
-      }
-
-      // Constant-time confirmation
+    if (row === undefined) {
       timingSafeEqual(presentedHash, presentedHash);
-
-      const subjectHmac = Buffer.isBuffer(row.subject_hmac)
-        ? row.subject_hmac
-        : Buffer.from(row.subject_hmac, 'hex');
-
-      return {
-        status: 'success',
-        token: {
-          id: row.id,
-          userId: row.user_id,
-          subjectHmac,
-          pepperKid: row.pepper_kid,
-          purpose: input.expectedPurpose,
-          createdAt: new Date(row.created_at),
-          expiresAt: new Date(row.expires_at),
-        },
-      };
-    } finally {
-      client.release();
+      return { status: 'invalid_or_expired' };
     }
+
+    // Constant-time confirmation
+    timingSafeEqual(presentedHash, presentedHash);
+
+    const subjectHmac = Buffer.isBuffer(row.subject_hmac)
+      ? row.subject_hmac
+      : Buffer.from(row.subject_hmac, 'hex');
+
+    return {
+      status: 'success',
+      token: {
+        id: row.id,
+        userId: row.user_id,
+        subjectHmac,
+        pepperKid: row.pepper_kid,
+        purpose: input.expectedPurpose,
+        createdAt: new Date(row.created_at),
+        expiresAt: new Date(row.expires_at),
+      },
+    };
   }
 
   /**
@@ -202,34 +252,26 @@ export class TokenService {
     }
 
     const subjectHmac = this.hashSubject(subjectIdentifier);
-    const client = await this.pool.connect();
-    try {
-      await client.query('SET LOCAL ROLE app_admin');
+    return this.asAppAdmin(async (client) => {
       const result = await client.query<{ count: number }>(
         'SELECT authz.invalidate_auth_tokens($1, $2) AS count',
         [subjectHmac, purpose],
       );
       return result.rows[0]?.count ?? 0;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   /**
    * Delete tokens whose expires_at is older than the specified cutoff.
    */
   async purgeExpiredTokens(olderThan: Date): Promise<number> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('SET LOCAL ROLE app_admin');
+    return this.asAppAdmin(async (client) => {
       const result = await client.query<{ count: number }>(
         'SELECT authz.purge_expired_auth_tokens($1) AS count',
         [olderThan],
       );
       return result.rows[0]?.count ?? 0;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   /**
@@ -248,19 +290,16 @@ export class TokenService {
 
     const normalizedEmail = input.email.trim().toLowerCase();
 
-    // Check if account exists
-    const client = await this.pool.connect();
-    let user: UserLookupRow | undefined;
-    try {
-      await client.query('SET LOCAL ROLE app_admin');
+    // Check if account exists. Inside the elevated transaction for the same reason
+    // as every other statement here: `pgrst_authenticator` holds no grant on
+    // `users`, so an un-elevated lookup is `42501`, not "no such account".
+    const user = await this.asAppAdmin(async (client) => {
       const res = await client.query<UserLookupRow>(
         'SELECT id, username, email FROM public.users WHERE lower(email) = $1 AND deleted_at IS NULL LIMIT 1',
         [normalizedEmail],
       );
-      user = res.rows[0];
-    } finally {
-      client.release();
-    }
+      return res.rows[0];
+    });
 
     if (user !== undefined) {
       const minted = await this.mint({

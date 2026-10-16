@@ -5,24 +5,31 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import type { Environment } from '../config/environment.js';
 import { EmailModule } from '../email/email.module.js';
+import { TokenModule } from '../token/token.module.js';
 
 /**
- * W11 slice 2 — login, JWT issuance, refresh-token rotation and logout.
- * Rate limiting, CAPTCHA and password reset are later slices (rebase.md
- * W11); nothing here pretends otherwise.
+ * W11 — login, JWT issuance, refresh-token rotation, logout, and the four
+ * one-time-token routes over `src/token/`.
  *
- * `EmailModule` is imported so the verification and reset mails have one
- * configured provider behind them. No route in this module sends one yet, and
- * that is stated rather than stubbed: `POST /auth/register` and
- * `POST /auth/password-reset/request` need a token table and a migration, which
- * is a later slice. A `sendVerificationEmail(...)` call with nowhere real to
- * call from would be a stub that reads as a feature (`AGENTS.md` §2.1), so the
- * wiring stops at the module edge and `docs/adr.md` ADR-0024 records it.
+ * `TokenModule` is imported for `TokenService` — the mint / redeem / deliver
+ * primitive and its `AUTH_TOKEN_*` environment — so this module owns no second
+ * token machinery. It was previously imported for nothing, and the comment that
+ * said so was the honest record of a route that did not exist yet:
+ * `POST /auth/password-reset/request` and `POST /auth/register` "need a token
+ * table and a migration, which is a later slice". The table and the migration
+ * (`0018_auth_tokens.sql`) have landed, the routes are mounted, and the wiring
+ * stops being a statement about the future. **Registration remains unmounted**
+ * because it still does: there is no way to create a `users` row through any
+ * public route, which is a different feature and is not faked here (§2.1).
+ *
+ * `EmailModule` is what `TokenService` reaches for when a link is delivered, so
+ * there is one configured provider behind both flows rather than one per module.
  */
 @Module({
   imports: [
     ConfigModule,
     EmailModule,
+    TokenModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

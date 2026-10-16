@@ -122,6 +122,36 @@ export type EmailConfig = {
  * name ("five failures from one IP"); once either counter reaches it the
  * handler refuses before any credential check, and the refusal audits a
  * 'failed' row like any other attack surface.
+ *
+ * ## `enumerationFloorMs` — the one threshold here that is about EXISTENCE
+ *
+ * Every other key above decides *how hard* a requester is pushed. This one
+ * decides whether the application is allowed to differ in TIME between an address
+ * that exists and one that does not, which is the difference between a password
+ * -reset endpoint and a user-enumeration service.
+ *
+ * A request for an address that exists mints a token and hands it to a real SMTP
+ * server; a request for one that does not returns immediately. Same status, same
+ * body — and a gap of tens of milliseconds an attacker can average over a few
+ * hundred samples. The floor is what closes it: the handler waits out the
+ * remainder of the floor so **both** answers take at least this long.
+ *
+ * **Applied to both paths, not only to the cheap one, and that is the point.** A
+ * pad that only ran on the miss would make the code carry a branch whose presence
+ * *is* the answer, and padding only the miss still leaves the two distributions
+ * separated above the floor. One unconditional wait has no branch to get wrong.
+ *
+ * **It is a floor, not an equaliser, and the residual is stated rather than
+ * hidden:** a real delivery that costs more than the floor is still measurably
+ * slower. Closing that last gap needs constant-work SMTP or a fixed queue, which
+ * is not a timing knob. What the floor buys is that the gap is the *unusual*
+ * case rather than the default one, which is the difference between a bar an
+ * attacker has to work at and one they do not.
+ *
+ * **It cannot be set to 0.** `readCount` rejects zero, deliberately: a config key
+ * whose value silently removes a security control is the `JWT_SECRET` default this
+ * file exists to argue against, and nobody should be able to type `0` and get a
+ * request-timing oracle back.
  */
 export type SecurityConfig = {
   readonly ipAllowlist: readonly string[];
@@ -129,6 +159,7 @@ export type SecurityConfig = {
   readonly delayScheduleSeconds: readonly number[];
   readonly delayCapSeconds: number;
   readonly blockThreshold: number;
+  readonly enumerationFloorMs: number;
 };
 
 export type Environment = {
@@ -155,6 +186,16 @@ export const DEFAULT_FAILURE_WINDOW_SECONDS = 600;
 export const DEFAULT_DELAY_SCHEDULE_SECONDS: readonly number[] = [0, 1, 4, 16];
 export const DEFAULT_DELAY_CAP_SECONDS = 30;
 export const DEFAULT_BLOCK_THRESHOLD = 5;
+
+/**
+ * 250 ms. Chosen against the cost of the work it is hiding, not by taste: a real
+ * reset delivery is one token insert plus one SMTP round trip on loopback, which
+ * is single-digit milliseconds, so a floor an order of magnitude above it
+ * swallows the whole gap rather than shaving it.
+ *
+ * See `SecurityConfig.enumerationFloorMs` for what this closes and what it does not.
+ */
+export const DEFAULT_ENUMERATION_FLOOR_MS = 250;
 
 /** The SMTP keys that carry a secret or a sender domain: asserted in
  * production, never defaulted. `EMAIL_HOST` and `EMAIL_PORT` are additionally
@@ -419,12 +460,16 @@ function readSecurity(
   );
   const delayCapSeconds = readCount(source, 'SECURITY_DELAY_CAP_SECONDS', problems, DEFAULT_DELAY_CAP_SECONDS);
   const blockThreshold = readCount(source, 'SECURITY_BLOCK_THRESHOLD', problems, DEFAULT_BLOCK_THRESHOLD);
+  const enumerationFloorMs = readCount(
+    source, 'SECURITY_ENUMERATION_FLOOR_MS', problems, DEFAULT_ENUMERATION_FLOOR_MS,
+  );
   if (
     failureWindowSeconds === undefined ||
     delayScheduleSeconds === undefined ||
     delayScheduleSeconds.length === 0 ||
     delayCapSeconds === undefined ||
-    blockThreshold === undefined
+    blockThreshold === undefined ||
+    enumerationFloorMs === undefined
   ) {
     if (delayScheduleSeconds !== undefined && delayScheduleSeconds.length === 0) {
       problems.push('SECURITY_DELAY_SCHEDULE_SECONDS must not be an empty list');
@@ -437,6 +482,7 @@ function readSecurity(
     delayScheduleSeconds,
     delayCapSeconds,
     blockThreshold,
+    enumerationFloorMs,
   };
 }
 

@@ -121,15 +121,38 @@ describe('the census enumerates the routes Nest actually mounted', () => {
       const discovery = moduleRef.get(DiscoveryService, { strict: false });
       const routes = mountedRoutesOf(discovery.getControllers());
 
+      // Declaration order in the class, which is the order `handlerNames()` reads
+      // it from the prototype. The four one-time-token routes sit between `logout`
+      // and `me` because that is where they are declared in `AuthController`.
+      //
+      // Pinned as an exact list on purpose: `verdict.tokens` below already asserts
+      // that every one of these is NAMEABLE, and a list of eight entries compared
+      // for equality is also the assertion that none of them is quietly un-named by
+      // being spelled differently — `dispatchTokenForRoute` returns `undefined` for a
+      // near-miss, so `auth.passwordResetRequest` would fail the boot rather than
+      // pass this one.
       expect(routes.map((route) => `${route.requestMethod} ${route.path}`)).toEqual([
         'POST /auth/login',
         'POST /auth/refresh',
         'POST /auth/logout',
+        'POST /auth/password-reset/request',
+        'POST /auth/password-reset/confirm',
+        'POST /auth/email-verification/request',
+        'POST /auth/email-verification/confirm',
         'GET /auth/me',
       ]);
 
       const verdict = assertRouteCoverage(routes);
-      expect(verdict.tokens).toEqual(['auth.login', 'auth.refresh', 'auth.logout', 'auth.me']);
+      expect(verdict.tokens).toEqual([
+        'auth.login',
+        'auth.refresh',
+        'auth.logout',
+        'auth.password_reset_request',
+        'auth.password_reset_confirm',
+        'auth.email_verification_request',
+        'auth.email_verification_confirm',
+        'auth.me',
+      ]);
       // The graph mounts no fixture, so nothing is exempt — and a gate that only passed
       // because of its exemption table would pass here while the table covered a route
       // it had no business covering.

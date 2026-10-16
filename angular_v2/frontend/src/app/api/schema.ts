@@ -64,6 +64,7 @@ export interface paths {
                     geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
+                    email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
                     /** @description Filtering Columns */
                     select?: components["parameters"]["select"];
                     /** @description Ordering */
@@ -151,6 +152,7 @@ export interface paths {
                     geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
+                    email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
                 };
                 header?: {
                     /** @description Preference */
@@ -191,6 +193,7 @@ export interface paths {
                     geo_updated_at?: components["parameters"]["rowFilter.users.geo_updated_at"];
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
+                    email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
                 };
                 header?: {
                     /** @description Preference */
@@ -2980,6 +2983,7 @@ export interface paths {
                     created_at?: components["parameters"]["rowFilter.login_attempts.created_at"];
                     ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
                     ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
+                    attempt_kind?: components["parameters"]["rowFilter.login_attempts.attempt_kind"];
                     /** @description Filtering Columns */
                     select?: components["parameters"]["select"];
                     /** @description Ordering */
@@ -3058,6 +3062,7 @@ export interface paths {
                     created_at?: components["parameters"]["rowFilter.login_attempts.created_at"];
                     ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
                     ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
+                    attempt_kind?: components["parameters"]["rowFilter.login_attempts.attempt_kind"];
                 };
                 header?: {
                     /** @description Preference */
@@ -3089,6 +3094,7 @@ export interface paths {
                     created_at?: components["parameters"]["rowFilter.login_attempts.created_at"];
                     ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
                     ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
+                    attempt_kind?: components["parameters"]["rowFilter.login_attempts.attempt_kind"];
                 };
                 header?: {
                     /** @description Preference */
@@ -3308,6 +3314,8 @@ export interface components {
              * @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant.
              */
             last_activity_at?: string;
+            /** Format: timestamp with time zone */
+            email_verified_at?: string;
         };
         auth_tokens: {
             /**
@@ -3829,6 +3837,11 @@ export interface components {
             ip_normalized?: string;
             /** Format: text */
             ip_subnet?: string;
+            /**
+             * Format: text
+             * @default login
+             */
+            attempt_kind: string;
         };
     };
     responses: never;
@@ -3871,6 +3884,7 @@ export interface components {
         "rowFilter.users.geo_updated_at": string;
         /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
         "rowFilter.users.last_activity_at": string;
+        "rowFilter.users.email_verified_at": string;
         "rowFilter.auth_tokens.id": string;
         "rowFilter.auth_tokens.user_id": string;
         "rowFilter.auth_tokens.subject_hmac": string;
@@ -3997,6 +4011,7 @@ export interface components {
         "rowFilter.login_attempts.created_at": string;
         "rowFilter.login_attempts.ip_normalized": string;
         "rowFilter.login_attempts.ip_subnet": string;
+        "rowFilter.login_attempts.attempt_kind": string;
     };
     requestBodies: {
         /** @description login_attempts */
