@@ -212,6 +212,159 @@ export interface paths {
         };
         trace?: never;
     };
+    "/auth_tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.auth_tokens.id"];
+                    user_id?: components["parameters"]["rowFilter.auth_tokens.user_id"];
+                    subject_hmac?: components["parameters"]["rowFilter.auth_tokens.subject_hmac"];
+                    pepper_kid?: components["parameters"]["rowFilter.auth_tokens.pepper_kid"];
+                    token_hash?: components["parameters"]["rowFilter.auth_tokens.token_hash"];
+                    purpose?: components["parameters"]["rowFilter.auth_tokens.purpose"];
+                    created_at?: components["parameters"]["rowFilter.auth_tokens.created_at"];
+                    expires_at?: components["parameters"]["rowFilter.auth_tokens.expires_at"];
+                    consumed_at?: components["parameters"]["rowFilter.auth_tokens.consumed_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["auth_tokens"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["auth_tokens"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["auth_tokens"][];
+                        "text/csv": components["schemas"]["auth_tokens"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["auth_tokens"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.auth_tokens.id"];
+                    user_id?: components["parameters"]["rowFilter.auth_tokens.user_id"];
+                    subject_hmac?: components["parameters"]["rowFilter.auth_tokens.subject_hmac"];
+                    pepper_kid?: components["parameters"]["rowFilter.auth_tokens.pepper_kid"];
+                    token_hash?: components["parameters"]["rowFilter.auth_tokens.token_hash"];
+                    purpose?: components["parameters"]["rowFilter.auth_tokens.purpose"];
+                    created_at?: components["parameters"]["rowFilter.auth_tokens.created_at"];
+                    expires_at?: components["parameters"]["rowFilter.auth_tokens.expires_at"];
+                    consumed_at?: components["parameters"]["rowFilter.auth_tokens.consumed_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.auth_tokens.id"];
+                    user_id?: components["parameters"]["rowFilter.auth_tokens.user_id"];
+                    subject_hmac?: components["parameters"]["rowFilter.auth_tokens.subject_hmac"];
+                    pepper_kid?: components["parameters"]["rowFilter.auth_tokens.pepper_kid"];
+                    token_hash?: components["parameters"]["rowFilter.auth_tokens.token_hash"];
+                    purpose?: components["parameters"]["rowFilter.auth_tokens.purpose"];
+                    created_at?: components["parameters"]["rowFilter.auth_tokens.created_at"];
+                    expires_at?: components["parameters"]["rowFilter.auth_tokens.expires_at"];
+                    consumed_at?: components["parameters"]["rowFilter.auth_tokens.consumed_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["auth_tokens"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/privacy_request_audits": {
         parameters: {
             query?: never;
@@ -3156,6 +3309,38 @@ export interface components {
              */
             last_activity_at?: string;
         };
+        auth_tokens: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id?: string;
+            /** Format: bytea */
+            subject_hmac: string;
+            /** Format: text */
+            pepper_kid: string;
+            /** Format: bytea */
+            token_hash: string;
+            /** Format: text */
+            purpose: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /** Format: timestamp with time zone */
+            expires_at: string;
+            /** Format: timestamp with time zone */
+            consumed_at?: string;
+        };
         privacy_request_audits: {
             /**
              * Format: uuid
@@ -3686,6 +3871,15 @@ export interface components {
         "rowFilter.users.geo_updated_at": string;
         /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
         "rowFilter.users.last_activity_at": string;
+        "rowFilter.auth_tokens.id": string;
+        "rowFilter.auth_tokens.user_id": string;
+        "rowFilter.auth_tokens.subject_hmac": string;
+        "rowFilter.auth_tokens.pepper_kid": string;
+        "rowFilter.auth_tokens.token_hash": string;
+        "rowFilter.auth_tokens.purpose": string;
+        "rowFilter.auth_tokens.created_at": string;
+        "rowFilter.auth_tokens.expires_at": string;
+        "rowFilter.auth_tokens.consumed_at": string;
         "rowFilter.privacy_request_audits.id": string;
         "rowFilter.privacy_request_audits.request_key": string;
         "rowFilter.privacy_request_audits.event_type": string;
@@ -3875,6 +4069,15 @@ export interface components {
                 "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["privacy_requests"];
                 "application/vnd.pgrst.object+json": components["schemas"]["privacy_requests"];
                 "text/csv": components["schemas"]["privacy_requests"];
+            };
+        };
+        /** @description auth_tokens */
+        auth_tokens: {
+            content: {
+                "application/json": components["schemas"]["auth_tokens"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["auth_tokens"];
+                "application/vnd.pgrst.object+json": components["schemas"]["auth_tokens"];
+                "text/csv": components["schemas"]["auth_tokens"];
             };
         };
         /** @description privacy_request_audits */

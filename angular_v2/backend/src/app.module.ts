@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { BreakerModule } from './breaker/breaker.module.js';
 import { PurgeModule } from './purge/purge.module.js';
 import { ErasureModule } from './privacy/erasure.module.js';
+import { TokenModule } from './token/token.module.js';
 import { loadEnvironment } from './config/environment.js';
 
 /**
@@ -54,6 +55,9 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
     // contributes an operation with no HTTP edge — and registering it is what
     // makes the operation real rather than a file nothing imports.
     ErasureModule,
+    // The shared one-time token primitive (mint, store, deliver, redeem, expire)
+    // with no HTTP routes mounted directly.
+    TokenModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

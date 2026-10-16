@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "angular_v2 API",
-    "version": "1.0.0",
-    "description": "The CRUD surface served by PostgREST over PostgreSQL, generated from the live schema and committed (README.md, ADR-0003/ADR-0004). PostgREST serves Swagger 2.0 at GET /; swagger2openapi converts it to OpenAPI 3.0; `npm run generate:client` in frontend/ generates the Angular types from this file. Do not hand-edit — regenerate. Only relations in db-schemas = \"public\" appear here: the row-scoping internals live in a second PostgreSQL schema outside it, so they cannot be addressed at all. openapi-mode = \"ignore-privileges\" keeps this contract role-independent, which also means it advertises every relation in \"public\" whether or not a serving role is granted it — including the \"migrations\" bookkeeping table, which no serving role can reach. Restrict a table with GRANT, not by omission here."
+    "description": "",
+    "title": "standard public schema",
+    "version": "16.4"
   },
   "paths": {
     "/": {
@@ -277,6 +277,213 @@
         },
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/auth_tokens": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.subject_hmac"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.pepper_kid"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.token_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.purpose"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.expires_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.consumed_at"
+          },
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/range"
+          },
+          {
+            "$ref": "#/components/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/auth_tokens"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json;nulls=stripped": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/auth_tokens"
+                  },
+                  "type": "array"
+                }
+              },
+              "application/vnd.pgrst.object+json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/auth_tokens"
+                  },
+                  "type": "array"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/auth_tokens"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "auth_tokens"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/select"
+          },
+          {
+            "$ref": "#/components/parameters/preferPost"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/auth_tokens"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "auth_tokens"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.subject_hmac"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.pepper_kid"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.token_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.purpose"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.expires_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.consumed_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "auth_tokens"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.user_id"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.subject_hmac"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.pepper_kid"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.token_hash"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.purpose"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.created_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.expires_at"
+          },
+          {
+            "$ref": "#/components/parameters/rowFilter.auth_tokens.consumed_at"
+          },
+          {
+            "$ref": "#/components/parameters/preferReturn"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/auth_tokens"
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "auth_tokens"
         ]
       }
     },
@@ -4184,6 +4391,78 @@
           "type": "string"
         }
       },
+      "rowFilter.auth_tokens.id": {
+        "name": "id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.auth_tokens.user_id": {
+        "name": "user_id",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.auth_tokens.subject_hmac": {
+        "name": "subject_hmac",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.auth_tokens.pepper_kid": {
+        "name": "pepper_kid",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.auth_tokens.token_hash": {
+        "name": "token_hash",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.auth_tokens.purpose": {
+        "name": "purpose",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.auth_tokens.created_at": {
+        "name": "created_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.auth_tokens.expires_at": {
+        "name": "expires_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "rowFilter.auth_tokens.consumed_at": {
+        "name": "consumed_at",
+        "required": false,
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
       "rowFilter.privacy_request_audits.id": {
         "name": "id",
         "required": false,
@@ -5322,6 +5601,31 @@
         },
         "description": "privacy_requests"
       },
+      "auth_tokens": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/auth_tokens"
+            }
+          },
+          "application/vnd.pgrst.object+json;nulls=stripped": {
+            "schema": {
+              "$ref": "#/components/schemas/auth_tokens"
+            }
+          },
+          "application/vnd.pgrst.object+json": {
+            "schema": {
+              "$ref": "#/components/schemas/auth_tokens"
+            }
+          },
+          "text/csv": {
+            "schema": {
+              "$ref": "#/components/schemas/auth_tokens"
+            }
+          }
+        },
+        "description": "auth_tokens"
+      },
       "privacy_request_audits": {
         "content": {
           "application/json": {
@@ -5694,6 +5998,60 @@
           },
           "last_activity_at": {
             "description": "When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant.",
+            "format": "timestamp with time zone",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "auth_tokens": {
+        "required": [
+          "id",
+          "subject_hmac",
+          "pepper_kid",
+          "token_hash",
+          "purpose",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": {
+          "id": {
+            "default": "uuidv7()",
+            "description": "Note:\nThis is a Primary Key.<pk/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+            "format": "uuid",
+            "type": "string"
+          },
+          "subject_hmac": {
+            "format": "bytea",
+            "type": "string"
+          },
+          "pepper_kid": {
+            "format": "text",
+            "type": "string"
+          },
+          "token_hash": {
+            "format": "bytea",
+            "type": "string"
+          },
+          "purpose": {
+            "format": "text",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "now()",
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "timestamp with time zone",
+            "type": "string"
+          },
+          "consumed_at": {
             "format": "timestamp with time zone",
             "type": "string"
           }

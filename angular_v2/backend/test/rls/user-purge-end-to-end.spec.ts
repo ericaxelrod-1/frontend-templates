@@ -726,13 +726,14 @@ describe('a purge that fails leaves no half-purged user', () => {
 
 describe('no foreign key naming users can block a purge again', () => {
   it(
-    'every table that references users carries ON DELETE CASCADE, and the set is exactly the five 0015 names',
+    'every table that references users carries ON DELETE CASCADE, and the set is exactly the six names (widened by 0018 for auth_tokens)',
     () => {
       // This is the assertion that closes the CLASS rather than the instance. `0015`
-      // fixed two constraints; this says any table added later as `NO ACTION` — the
-      // exact shape of the defect — fails the gate instead of re-opening it
-      // silently. A test that only purges one fixture user cannot see a sixth
-      // referencing table at all.
+      // fixed two constraints; `0018_auth_tokens.sql` legitimately widened the set
+      // by adding `auth_tokens` with CASCADE. This says any table added later as
+      // `NO ACTION` — the exact shape of the defect — fails the gate instead of
+      // re-opening it silently. A test that only purges one fixture user cannot see
+      // another referencing table at all.
       //
       // Read from `pg_constraint` rather than from a list in this file, and the list
       // itself is asserted, so a new referencing table has to be given a name and a
@@ -750,6 +751,7 @@ describe('no foreign key naming users can block a purge again', () => {
       );
 
       expect(referencing.map((row) => row.child)).toEqual([
+        'auth_tokens',
         'email_messages',
         'privacy_requests',
         'refresh_tokens',
