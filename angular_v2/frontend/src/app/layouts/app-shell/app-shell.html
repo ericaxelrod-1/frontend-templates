@@ -1,0 +1,38 @@
+<mat-sidenav-container class="shell__container" autosize>
+  <mat-sidenav #drawer [mode]="navMode()" [opened]="!isHandset()">
+    <div class="shell__brand">angular_v2</div>
+    <mat-divider />
+    <mat-nav-list>
+      @for (item of navItems; track item.path) {
+        <a
+          mat-list-item
+          [routerLink]="item.path"
+          routerLinkActive
+          #active="routerLinkActive"
+          [activated]="active.isActive"
+        >
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <mat-toolbar class="shell__toolbar">
+      @if (isHandset()) {
+        <button matButton type="button" aria-label="Open navigation" (click)="drawer.toggle()">
+          Menu
+        </button>
+      }
+      <span class="shell__spacer"></span>
+      @if (databaseRole(); as role) {
+        <span class="shell__role">{{ role }}</span>
+      }
+      <button matButton type="button" (click)="signOut()">Sign out</button>
+    </mat-toolbar>
+
+    <div class="shell__content">
+      <router-outlet />
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>

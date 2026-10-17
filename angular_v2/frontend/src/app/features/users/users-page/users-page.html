@@ -1,0 +1,64 @@
+<mat-card class="page">
+  <mat-card-header>
+    <mat-card-title>Users</mat-card-title>
+    <mat-card-subtitle>{{ summary() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading users" />
+    }
+
+    @if (failureReason(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    } @else if (rolesBlocked()) {
+      <p class="notice">
+        Role assignments are not readable for this role, so no role names are shown. The
+        capability axis is granted at table level to administrators only.
+      </p>
+    }
+
+    @if (groupsBlocked()) {
+      <p class="notice">
+        Group memberships are not readable for this role, so no group names are shown.
+      </p>
+    }
+
+    <table class="users">
+      <caption class="users__caption">
+        Rows returned by PostgREST for the signed-in database role. Nothing is filtered
+        client-side.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Username</th>
+          <th scope="col">Email</th>
+          <th scope="col">Created</th>
+          <th scope="col">Roles</th>
+          <th scope="col">Groups</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.id) {
+          <tr>
+            <th scope="row">{{ row.username }}</th>
+            <td>{{ row.email }}</td>
+            <td>{{ row.createdAt | date: 'medium' }}</td>
+            <td>
+              <app-name-list [names]="row.roleNames" [blocked]="rolesBlocked()" />
+            </td>
+            <td>
+              <app-name-list [names]="row.groupNames" [blocked]="groupsBlocked()" />
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td class="users__empty" colspan="5">
+              No user rows were returned to this role.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </mat-card-content>
+</mat-card>

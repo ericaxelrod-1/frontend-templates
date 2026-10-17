@@ -254,7 +254,12 @@ dist
 
 # Gatsby files
 .cache/
-public
+# Root-anchored, because this is Gatsby's *generated* output directory. Unanchored
+# it matched any `public` at any depth — including `angular_v2/frontend/public/`,
+# which is Angular's static-asset SOURCE directory. Assets there (favicon.svg) are
+# committed, and the broad rule dropped them from every clone, so the favicon 404ed
+# for everyone but the machine that happened to have the file on disk.
+/public
 
 # Storybook build outputs
 .out

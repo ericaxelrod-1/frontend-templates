@@ -1,0 +1,45 @@
+<main class="page">
+  <mat-card class="card">
+    <mat-card-header>
+      <mat-card-title>Sign in</mat-card-title>
+      <mat-card-subtitle>Credentials are checked by the application, not by this page.</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form class="form" [formRoot]="loginForm">
+        <mat-form-field>
+          <mat-label>Username</mat-label>
+          <input
+            matInput
+            autocomplete="username"
+            [formField]="loginForm.username"
+          />
+          @if (loginForm.username().touched() && loginForm.username().invalid()) {
+            <mat-error>A username is required.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            type="password"
+            autocomplete="current-password"
+            [formField]="loginForm.password"
+          />
+          @if (loginForm.password().touched() && loginForm.password().invalid()) {
+            <mat-error>A password is required.</mat-error>
+          }
+        </mat-form-field>
+
+        @if (failureReason(); as reason) {
+          <p class="notice notice--error" role="alert">{{ reason }}</p>
+        }
+
+        <button matButton="filled" type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Signing in…' : 'Sign in' }}
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</main>

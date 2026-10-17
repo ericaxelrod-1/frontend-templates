@@ -1,25 +1,31 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { App } from './app';
+import { routes } from './app.routes';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
+      providers: [provideRouter(routes)],
     }).compileComponents();
   });
 
-  it('creates the shell', () => {
+  it('is created', () => {
     const fixture = TestBed.createComponent(App);
     expect(fixture.componentInstance).toBeInstanceOf(App);
   });
 
-  it('renders the shell markup', async () => {
+  /**
+   * `App` is the router host and nothing else: the shell is `AppShell`, loaded by
+   * the `''` route. Asserting the shell's markup here would be asserting another
+   * component's template; those assertions live in `app-shell.spec.ts`.
+   */
+  it('renders the router outlet it exists to host', () => {
     const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
+    fixture.detectChanges();
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(element.querySelector('header.shell-header')).not.toBeNull();
-    expect(element.querySelector('h1.shell-title')?.textContent).toBe('angular_v2');
-    expect(element.querySelector('main.shell-main router-outlet')).not.toBeNull();
+    expect(element.querySelector('router-outlet')).not.toBeNull();
   });
 });

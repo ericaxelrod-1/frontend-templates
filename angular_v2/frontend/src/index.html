@@ -5,6 +5,9 @@
     <title>angular_v2</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Without this the browser requests /favicon.ico unprompted and the SSR
+         server answers 404, which is the one console error on every page load. -->
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   </head>
   <body>
     <app-root></app-root>
