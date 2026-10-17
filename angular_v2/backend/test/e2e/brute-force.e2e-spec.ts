@@ -289,6 +289,45 @@ async function countTrackedFailed(username: string): Promise<number> {
   });
 }
 
+/**
+ * A user this suite owns, with a password it knows, inserted through the same
+ * authenticator + `SET ROLE app_admin` boundary the application uses — the same
+ * discipline as `login.e2e-spec.ts`, and for the same reason: a fixture that could not
+ * be written in production must fail here too.
+ *
+ * The cost is `12` because that is `BCRYPT_COST`. This file counts bcrypt calls, so a
+ * hash at any other cost would make every timing this suite can observe meaningless.
+ */
+async function createUser(username: string, password: string): Promise<string> {
+  const bcrypt = (await import('bcrypt')).default;
+  return withAdminClient(async (client) => {
+    const result = await client.query<{ id: string }>(
+      'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
+      [username, `${username}@example.test`, await bcrypt.hash(password, 12)],
+    );
+    const id = result.rows[0]?.id;
+    if (id === undefined) {
+      throw new Error(`the fixture for ${username} was not created`);
+    }
+    return id;
+  });
+}
+
+/**
+ * Switches an account off through the boundary, with the database's own clock supplying
+ * every timestamp. Not a value from this process, for the reason `login.e2e-spec.ts`
+ * states: a fixture written from `new Date()` would exercise the application clock
+ * while the production predicate uses the other one.
+ */
+async function disablePermanently(userId: string): Promise<void> {
+  await withAdminClient(async (client) => {
+    await client.query(
+      "UPDATE users SET disabled_at = now(), disabled_until = NULL, disabled_reason = 'admin' WHERE id = $1",
+      [userId],
+    );
+  });
+}
+
 describe('brute-force login gate', () => {
   it('a failed credential attempt is audited before bcrypt, and a blocked attempt neither reaches bcrypt nor evades audit', async () => {
     const username = 'ordering-victim';
@@ -437,4 +476,73 @@ describe('brute-force login gate', () => {
     expect(after.statusCode).toBe(401);
   });
 
+  /**
+   * The disable check runs AFTER bcrypt, and this file is the only place that can prove
+   * it: it already wraps `bcrypt.compare` with a counter, and a counter is the
+   * deterministic "did the handler reach the credential check" signal. Everything else
+   * about this case is already covered by `login.e2e-spec.ts`; what is asserted here is
+   * the thing a status code cannot show.
+   *
+   * A check placed above the compare would answer in the time of two indexed lookups
+   * for exactly the requests where the account exists and is switched off — which is
+   * the same oracle as a distinct message, delivered over a channel the message
+   * argument never inspects. There is no wall-clock assertion here on purpose: a
+   * `toBeGreaterThan` on latency would fail on a loaded box and pass on an idle one for
+   * the wrong reasons. The number of compares does not depend on the machine.
+   */
+  it('a disabled account still pays for the compare, so neither its latency nor its counter discloses that it is switched off', async () => {
+    const off = 'disabled-timing-victim';
+    const on = 'enabled-timing-victim';
+    const password = 'the-correct-password-for-both-accounts';
+    await resetFailedPenalty(off);
+    await resetFailedPenalty(on);
+
+    const offId = await createUser(off, password);
+    await disablePermanently(offId);
+    await createUser(on, password);
+
+    // Same source address, same password, one request apart. The ONLY difference
+    // between them is the `disabled_at` an administrator wrote, so the pair isolates
+    // the check: anything else that differed would be a fixture bug, and anything the
+    // two share cannot be the disclosure.
+    compareStats.calls = 0;
+    const refused = await loginFrom({ username: off, password }, '10.7.0.1');
+    const comparedForRefusal = compareStats.calls;
+
+    compareStats.calls = 0;
+    const admitted = await loginFrom({ username: on, password }, '10.7.0.1');
+    const comparedForSuccess = compareStats.calls;
+
+    expect(refused.statusCode).toBe(401);
+    expect(refused.json()).toEqual({ statusCode: 401, message: 'invalid credentials', error: 'Unauthorized' });
+    expect(admitted.statusCode).toBe(200);
+
+    // THE assertion: the disabled account cost exactly as much CPU as the live one.
+    // Zero here is the defect this case exists for — it would mean the handler answered
+    // without ever comparing a password, which is both a timing oracle and an
+    // unauthenticated bypass of the whole credential check.
+    expect(comparedForRefusal, 'a disabled account skipped the bcrypt compare').toBe(1);
+    expect(comparedForRefusal).toBe(comparedForSuccess);
+
+    // And it is still counted. `gate()` runs before the credential check and its row is
+    // only flipped to 'succeeded' past the refusal, so a disabled account leaves one
+    // TRACKED failure — the counter's own keys set — exactly as a wrong password does.
+    // Not exempting it is what keeps the §B6 abuse signal honest about traffic aimed at
+    // a name somebody has already acted on.
+    expect(await countTrackedFailed(off)).toBe(1);
+    expect((await lastAttempt(off))?.status).toBe('failed');
+    expect(await countTrackedFailed(on)).toBe(0);
+
+    // The admitted account is not a fixture accident: its password really did verify,
+    // which is what makes `comparedForRefusal === comparedForSuccess` a statement about
+    // the disable rather than about two accounts that both failed.
+    const issued = await withAdminClient(async (client) => {
+      const result = await client.query<{ count: number }>(
+        'SELECT count(*)::int AS count FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id WHERE u.username = $1',
+        [on],
+      );
+      return result.rows[0]?.count ?? 0;
+    });
+    expect(issued, 'the live account issued no session, so the pair proves nothing').toBeGreaterThan(0);
+  });
 });

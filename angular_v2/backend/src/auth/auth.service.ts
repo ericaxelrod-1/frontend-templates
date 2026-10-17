@@ -29,6 +29,12 @@ interface UserRow {
   readonly id: string;
   readonly username: string;
   readonly password_hash: string;
+  /**
+   * Whether this account is currently switched off, decided by the DATABASE in the
+   * `SELECT` that read the row rather than by the application after reading it. See
+   * `DISABLED_ACCOUNT_PREDICATE_SQL`.
+   */
+  readonly is_disabled: boolean;
 }
 
 /**
@@ -92,6 +98,167 @@ function unusableTokenWithoutSubject(purpose: TokenPurpose): Error {
   );
 }
 
+/**
+ * THE ONE CREDENTIAL REFUSAL, AND WHY IT IS A CONSTANT RATHER THAN A LITERAL IN
+ * FOUR PLACES.
+ *
+ * Four answers reach the caller as this exact `401` with this exact body: an
+ * unknown username, a wrong password, an account an operator has **disabled**, and
+ * a request the gate blocked before it ever reached bcrypt. Three of the four are
+ * decided by a single condition in `issueSession` and the fourth by a single `throw`
+ * in `login`, so the property that makes this route safe — that a prober cannot tell
+ * them apart — would otherwise rest entirely on two authors typing the same two words
+ * identically. A constant makes it a fact about the module instead of a coincidence
+ * between two lines, which is the difference between reading it once and reviewing it
+ * forever.
+ *
+ * ## WHY A DISABLED ACCOUNT IS IN THIS LIST AND NOT SOMEWHERE ELSE
+ *
+ * "Your account has been disabled" is the single most useful thing an attacker can
+ * be handed on this route, and it is worth being precise about the three reasons,
+ * because only the first is obvious:
+ *
+ *   * **It confirms the account exists.** The whole enumeration defence is that a
+ *     wrong password and a missing account answer identically — see `login()`'s own
+ *     docstring, which the disabled case would become the single exception to. One
+ *     exception to an anti-enumeration property is the enumeration.
+ *   * **It says the account is a TARGET, not merely that it exists.** A disable is
+ *     recorded for a reason, and `0023` closes that vocabulary at four values
+ *     (`admin`, `security`, `compliance`, `user_request`). "This account is
+ *     disabled" therefore narrows the population from every account in the
+ *     installation to the accounts somebody has *already acted on* — the residue of
+ *     a compromise, a compliance case, a leaver. That is a shortlist, not an
+ *     existence bit, and the whole value of the column to an attacker is that it
+ *     hands them one.
+ *   * **It is a DIFFERENT FAILURE from a wrong password, and so it changes what the
+ *     caller does.** A caller told the credentials are wrong gives up on that
+ *     account. A caller told the account is disabled retries through another route,
+ *     complains to support, or comes back tomorrow with the same password. The
+ *     account holder is the one caller for whom the message would be genuinely
+ *     useful — and the account holder is not who an attacker is.
+ *
+ * §B6's rule that behavioural and risk scoring is *triage* rather than prevention
+ * is the same thought from the other direction: the decision is made, the detail
+ * belongs to whoever is already inside, and it belongs on the row — `disabled_reason`,
+ * `disabled_by`, `disabled_until` — where the account holder and an investigator
+ * can both read it. It does not belong on the login response.
+ *
+ * `0023`'s own header is the other half of the argument, and it is the reason this
+ * was a defect rather than a feature nobody had asked for yet: that migration adds
+ * four columns that record a decision **and enforce nothing**, and names the login
+ * path as the enforcement half. Until the check existed, `disabled_at` was a
+ * record that read exactly like a control, which is §2.1's most expensive shape.
+ */
+const INVALID_CREDENTIALS_MESSAGE = 'invalid credentials';
+
+/**
+ * WHAT COUNTS AS DISABLED — the whole rule, in one SQL expression — and why each
+ * clause of it is load-bearing.
+ *
+ *     disabled_at IS NOT NULL AND (disabled_until IS NULL OR disabled_until > now())
+ *
+ * Four rows and the last one is the case a naive check gets wrong:
+ *
+ *   * `disabled_at IS NULL` — never disabled. The overwhelming majority, forever.
+ *   * `disabled_at` set, `disabled_until` NULL — disabled until somebody lifts it.
+ *     NULL here is a real answer ("not temporary"), not "unknown", on exactly the
+ *     rule `0009:192-212` establishes for the `deleted_at` pair.
+ *   * `disabled_at` set, `disabled_until` in the future — a SUSPENSION: still off.
+ *   * `disabled_at` set, `disabled_until` in the past — **the suspension is OVER**
+ *     and the account may sign in again without an administrator noticing.
+ *
+ * Writing `WHERE disabled_at IS NOT NULL` throws the last case away and produces
+ * the support incident the column was added to prevent: an account suspended for an
+ * hour stays suspended until a human lifts it. `disabled_until` exists for exactly
+ * that account, so a predicate that ignores it is not a simpler policy — it is a
+ * *different* policy from the one the schema expresses, and it is the one a reader
+ * of the migration would assume the code implements.
+ *
+ * ## WHY `now()` AND NOT A TIMESTAMP THIS PROCESS SUPPLIED
+ *
+ * This is §B2's position about a caller-supplied value a policy reads, applied to a
+ * caller-supplied value the account-state decision reads. The application clock and
+ * the database clock are two clocks, and a comparison against the wrong one is wrong
+ * by exactly the skew between them: at a `disabled_until` a few milliseconds away
+ * the two disagree about whether this account may sign in, and whichever half is
+ * wrong refuses a legitimate credential check for the size of the skew. Reading the
+ * timestamp into a `Date` and testing it here would also mean the decision is made
+ * by a process whose clock nobody in this schema has an opinion about.
+ *
+ * `now()` is additionally the **transaction** timestamp, which is a second, quieter
+ * win: the predicate, the `UPDATE login_attempts` that records the refusal, and the
+ * `last_login_at` write on the success branch are then all stamped by one clock
+ * reading, so the audit rows cannot disagree with each other about when the request
+ * happened.
+ *
+ * ## WHY IT IS A CONSTANT AND NOT A STRING INSIDE TWO `SELECT`s
+ *
+ * `findUser` (sign-in) and `findUserById` (refresh) both need it, and §2.4's rule
+ * about duplicated mechanisms is exact here: a predicate that exists in two copies
+ * is a predicate that exists in one correct copy and one drifted copy, and the
+ * drifted one is the one nobody re-reads. Exporting it also makes it *assertable* —
+ * the fact that this check runs against the database's clock is carried by the word
+ * `now()` in the shipped text, and text is the one thing a test can read without a
+ * database.
+ */
+export const DISABLED_ACCOUNT_PREDICATE_SQL = '(disabled_at IS NOT NULL AND (disabled_until IS NULL OR disabled_until > now()))';
+
+/**
+ * THE ONE STATEMENT THAT RECORDS THAT A CREDENTIAL CHECK SUCCEEDED.
+ *
+ * ## WHY IT IS NOT `recordActivity`, AND WHY IT MUST NOT BECOME IT
+ *
+ * `last-activity.ts` argues at length what "activity" means in this architecture:
+ * an **observed** re-authentication, written by four routes, read by the
+ * dormant-account retention scan. `last_login_at` answers a different question —
+ * "when did a password last pass a check" — and `0023`'s column comment is explicit
+ * that collapsing the two is a defect rather than a simplification: "collapsing them
+ * would let a broad activity signal overwrite an authentication fact."
+ *
+ * That is not a style preference, it is a count. A refresh, a logout and a password
+ * reset are all activity and **none of them is a credential check**, so the four
+ * writers of `last_activity_at` must stay four writers, and this column must get
+ * exactly one: `issueSession`, on the branch where the password matched. Writing it
+ * from `refresh` would let anyone holding a stolen refresh token keep an account's
+ * authentication clock current indefinitely.
+ *
+ * ## WHY `now()` IS IN THE STATEMENT AND NOT IN ITS PARAMETERS
+ *
+ * `0023` states this as a requirement rather than a preference — "the writing path
+ * supplies it from its own `now()`, never from a caller, so a caller cannot backdate
+ * or postdate its own sign-in". A caller-supplied value here would let a request
+ * decide when its own sign-in happened, on a column whose entire purpose is to be
+ * believed by whoever reads it in an incident review.
+ *
+ * ## WHY THERE IS NO `authz.record_user_login()` SEAM — A RECORDED GAP, NOT AN OVERSIGHT
+ *
+ * `authz.record_user_activity()` exists for three reasons (`0017:198-217`): the
+ * timestamp is not the caller's, the write is **named** rather than pasted into
+ * three call sites, and `EXECUTE` is granted to `app_admin` alone. An inline
+ * statement written this way keeps the first — `now()` is called by the database, in
+ * the statement — and the third is already true at the grant layer (`app_member`
+ * holds no `UPDATE` on `users` at all, `0008:465-466`, and `app_anon` has no table
+ * grant), so the seam would guard a boundary that is already closed by grants.
+ *
+ * What it does **not** buy is the name, and that is the half that matters over
+ * time: this is a second writer of a second column on the row `0017`'s function
+ * already writes, which is the shape `0017` was written to avoid arriving one
+ * column later. The honest fix is a `0025` adding `authz.record_user_login(uuid)`
+ * beside the existing one, and it is not written here because this unit was scoped to
+ * `src/` and a migration is a schema change whose reviewer must own the decision.
+ * Stated in the file rather than left in a diff, because a gap that only appears in
+ * a diff is the same gap with better PR archaeology.
+ *
+ * ## WHY `deleted_at IS NULL` IS IN THE `WHERE`
+ *
+ * `0017` refuses to stamp `last_activity_at` on a tombstone and gives the reason:
+ * "the clock on a scrubbed row must not restart". The argument is *stronger* here,
+ * because this column is an authentication fact rather than an activity estimate —
+ * an investigator asking "was this account in use last Tuesday" must not be
+ * answered by an anonymised row that something touched after erasure.
+ */
+export const RECORD_LAST_LOGIN_SQL = 'UPDATE users SET last_login_at = now() WHERE id = $1 AND deleted_at IS NULL';
+
 interface RefreshTokenRow {
   readonly id: string;
   readonly user_id: string;
@@ -136,6 +303,12 @@ export class AuthService {
    * a wrong password produce the same body, so the response does not leak
    * whether the account exists.
    *
+   * **A disabled account produces that same body too**, for the same reason and by
+   * the same constant — see `INVALID_CREDENTIALS_MESSAGE`. Of the four answers that
+   * message covers, three are decided further down in `issueSession`; what lives here
+   * is everything that has to happen *before* any of them, and the blocked case in
+   * particular has to answer identically while having run no credential check at all.
+   *
    * Slice 3 ordering (security.md): every attempt writes its audit row in
    * its own committed transaction *before* any credential check, the
    * throttle gate (delay or block) runs next, and only then the password is
@@ -156,7 +329,12 @@ export class AuthService {
 
     const gate = await this.gate('login', dto.username, ip, normalizedIp, subnet, allowlisted);
     if (gate.blocked) {
-      throw new UnauthorizedException('invalid credentials');
+      // The fourth answer that shares `INVALID_CREDENTIALS_MESSAGE` with the three in
+      // `issueSession`. A caller who has been rate-limited has learned only that they
+      // were rate-limited — in particular, not whether the account behind the username
+      // they were guessing at exists, which is the one thing the counter must never
+      // become an oracle for. See `gate()` for why the row is written unconditionally.
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
     if (gate.delayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, gate.delayMs));
@@ -273,9 +451,49 @@ export class AuthService {
     }
   }
 
-  /** Phase 2: bcrypt, then tokens. The audit row from phase 1 is flipped
+  /**
+   * Phase 2: bcrypt, then tokens. The audit row from phase 1 is flipped
    * to 'succeeded' only on a real success; a rejected password leaves the
-   * optimistic 'failed' row in place. */
+   * optimistic 'failed' row in place.
+   *
+   * ## WHY THE DISABLE IS CHECKED HERE AND NOT BEFORE `bcrypt.compare`
+   *
+   * Three properties depend on this being the *last* conjunct of one condition rather
+   * than a guard clause above the lookup, and each one is a way the obvious
+   * implementation leaks:
+   *
+   *  1. **Timing.** A check placed above the compare answers in the time of two indexed
+   *     lookups instead of the time of a cost-12 bcrypt (~324ms idle, measurably over a
+   *     second on a loaded box). That is a *faster* answer for exactly the requests
+   *     where the account exists and is switched off — which is the same oracle as a
+   *     distinct message, arriving over a channel the message argument never sees. The
+   *     `UNKNOWN_USER_PASSWORD_HASH` canary above exists to equalise the two
+   *     account-shaped cases; a pre-compare check would reintroduce the asymmetry it
+   *     removes.
+   *  2. **The audit row.** `gate()` already committed a `'failed'` row for this attempt,
+   *     and the statement that would flip it to `'succeeded'` is the first one after this
+   *     `if`. A disabled account therefore leaves exactly what a wrong password leaves
+   *     — one tracked `'failed'` row — so a party hammering a disabled account is still
+   *     counted against the §B6 per-account failure budget and still shows up in the
+   *     ledger. A refusal that returned before this point would be recorded too (the row
+   *     is already committed), but a refusal placed above `gate()` would be recorded
+   *     nowhere at all.
+   *  3. **The counter.** Refusing earlier cannot accidentally *exempt* the attempt from
+   *     the throttle, because the throttle has already run either way. Putting the
+   *     disable check below the compare also means the disabled account keeps paying
+   *     the delays, which is the honest signal: the traffic is still unproven pressure
+   *     aimed at that name.
+   *
+   * ## WHY THE THROW IS THE SAME STATEMENT, NOT A SECOND ONE
+   *
+   * The condition is one `if` with one `throw` and one message constant, so "the disable
+   * is answered differently from a wrong password" is not a convention a future author has
+   * to remember, it is a shape the code cannot express. Two `if`s with two messages would
+   * differ the moment one of them was edited, and it would differ in exactly the
+   * direction §2.1 warns about: the account state readable from the response, with a
+   * test suite that was asserting the *message* of each branch independently and so
+   * stayed green on both.
+   */
   private async issueSession(
     dto: LoginRequestDto,
     attemptId: string,
@@ -293,10 +511,13 @@ export class AuthService {
       const candidate = user?.password_hash ?? UNKNOWN_USER_PASSWORD_HASH;
       const passwordOk = await bcrypt.compare(dto.password, candidate);
 
-      if (user === undefined || !passwordOk) {
+      // `user.is_disabled` is the FOURTH reason for one refusal, decided by the database
+      // in the SELECT above — and last in the condition so that its cost is paid after
+      // the compare, never instead of it.
+      if (user === undefined || !passwordOk || user.is_disabled) {
         await client.query('COMMIT');
         committed = true;
-        throw new UnauthorizedException('invalid credentials');
+        throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
       }
 
       await client.query("UPDATE login_attempts SET status = 'succeeded' WHERE id = $1", [attemptId]);
@@ -308,6 +529,34 @@ export class AuthService {
       // that is never written is NULL forever, and NULL is never eligible (`0017` §1).
       // Rides in this transaction, so it costs no round trip.
       await recordActivity(client, user.id);
+
+      // A CREDENTIAL CHECK SUCCEEDED. One statement, one column, and deliberately NOT
+      // the one above: `last_activity_at` is what the application OBSERVED and
+      // `last_login_at` is what the PASSWORD PROVED. See `RECORD_LAST_LOGIN_SQL`.
+      //
+      // **A failure here fails the sign-in, and that is the decision rather than an
+      // accident.** The write rides inside the transaction that is already minting the
+      // tokens, so there is exactly one outcome available: a statement that errors
+      // aborts it, nothing is committed, no token is issued, and the request ends in a
+      // `500` rather than a session. That is §2.3's obligation met without a
+      // `try`/`catch` at all — the alternative is a catch that logs and returns `200`,
+      // which is precisely the "a sign-in succeeded but its audit write did not" state
+      // this unit is asked to treat as a different thing from a sign-in.
+      //
+      // It costs no availability this route did not already carry: the statement above
+      // is `authz.record_user_activity()`, an `UPDATE` on this same table in this same
+      // transaction, so whatever can break this one has already broken that one, and
+      // the failure would have been a `500` regardless.
+      //
+      // A ZERO-ROW result is not an error and is not treated as one, which is
+      // `recordActivity`'s documented single `false` answer. The row was read a few
+      // statements ago and is **not** locked by this transaction, so the one reachable
+      // cause is an erasure landing in between — and for a row that has stopped existing
+      // the correct value of `last_login_at` is NULL, not a stamp and not a `500`.
+      // Failing the request over it would be a login-path error for an account nobody is
+      // going to keep, which `last-activity.ts` already argues is noise dressed as a
+      // check.
+      await client.query(RECORD_LAST_LOGIN_SQL, [user.id]);
 
       await client.query('COMMIT');
       committed = true;
@@ -389,6 +638,27 @@ export class AuthService {
    * A presented token that is already rotated or revoked is replay evidence:
    * the whole `rotated_to` family is revoked, live leaf included, and the
    * caller gets the same generic 401 a garbage token gets.
+   *
+   * ## WHY A DISABLED ACCOUNT IS REFUSED HERE TOO
+   *
+   * **This is the second of the two places the rule is enforced, and not a
+   * restatement for completeness.** Sign-in is where an account first proves a
+   * credential; refresh is where a session keeps proving one, indefinitely, without ever
+   * touching a password again. A disable enforced only on `login` is a disable with a
+   * fuse the length of one access token: the account holder already holds an unexpired
+   * bearer token and a live refresh token, and a route that never re-reads the account
+   * state lets them mint a fresh one every thirty seconds for as long as they keep
+   * presenting the old one. "Cannot sign in" is not "disabled" — it is "may not start
+   * a session", which is what the login check alone would enforce.
+   *
+   * Login and refresh are the only two ways an unproven caller becomes a proven one in
+   * this architecture, so those two are the whole of the boundary. The *access-token*
+   * window is the residual and is stated rather than papered over: a disable does not
+   * revoke tokens already issued and does not reach PostgREST (§B1 — PostgREST is the
+   * API layer and this process never sees its requests), so an account switched off
+   * mid-session stays usable until its current access token expires. Closing that window
+   * needs token revocation at the `db-pre-request` hook, which is a separate unit with
+   * its own §B2 F1 argument.
    */
   async refresh(dto: RefreshRequestDto): Promise<RefreshResponseDto> {
     const client = await this.pool.connect();
@@ -420,7 +690,27 @@ export class AuthService {
       }
 
       const user = await this.findUserById(client, row.user_id);
-      if (user === undefined) {
+      if (user === undefined || user.is_disabled) {
+        // The same 401 as an unknown, revoked, replayed or expired token, for the same
+        // reason `INVALID_CREDENTIALS_MESSAGE` gives on the login route: a caller who
+        // learns that their refresh failed *because the account is switched off* has
+        // learned three things — that the account exists, that it is under security
+        // action, and which of the reasons applies. `0023`'s vocabulary makes the third
+        // of those a four-way answer, so this is a shortlist rather than an existence
+        // bit.
+        //
+        // **The token is deliberately NOT consumed, and that falls out of the ordering
+        // rather than being a decision somebody implemented.** The throw happens before
+        // the rotation, so the transaction rolls back with the `FOR UPDATE` lock and no
+        // write to `refresh_tokens` at all: the row is byte-for-byte as it was. That is
+        // the right direction for a *temporary* disable — an account suspended for an
+        // hour resumes with the token it already had instead of needing to sign in
+        // again — and it is why the re-enable path is a column update rather than an
+        // un-revocation.
+        //
+        // Note the asymmetry with the replay branch above, which DOES commit before it
+        // throws: replay evidence is something this route must act on, and a disabled
+        // account is not.
         throw new UnauthorizedException('invalid refresh token');
       }
 
@@ -907,17 +1197,42 @@ export class AuthService {
     return [...ids];
   }
 
+  /**
+   * The credential row, by id. Carries `is_disabled` so the refresh path refuses a
+   * disabled account from the statement it was already making, rather than adding a
+   * second lookup whose only content would be account state.
+   */
   private async findUserById(client: PoolClient, userId: string): Promise<UserRow | undefined> {
     const result = await client.query<UserRow>(
-      'SELECT id, username, password_hash FROM users WHERE id = $1',
+      `SELECT id, username, password_hash, ${DISABLED_ACCOUNT_PREDICATE_SQL} AS is_disabled
+         FROM users WHERE id = $1`,
       [userId],
     );
     return result.rows[0];
   }
 
+  /**
+   * The credential row, by username. **This statement is the only place account state is
+   * read on the sign-in path** — the disable predicate rides in the `SELECT` list rather
+   * than arriving as a second column read afterwards.
+   *
+   * It rides in the same statement rather than as a separate
+   * `SELECT disabled_at, disabled_until FROM users WHERE id = …` because that alternative
+   * is the one worth refusing, and it is worse rather than merely longer: a separate read
+   * returns two timestamps into this process, and any decision taken on them here is a
+   * decision against **this machine's** clock. Folding the predicate into the statement
+   * keeps the comparison on the database's `now()` and keeps it on the same snapshot as
+   * the `password_hash` it is deciding beside — two statements could see two states of
+   * one row, and "the row was enabled when we read the hash" is not a sentence anybody
+   * should have to reason about.
+   *
+   * Both readers use the one exported predicate, because the alternative is two copies
+   * of an expression whose correctness is the whole of the clock argument above.
+   */
   private async findUser(client: PoolClient, username: string): Promise<UserRow | undefined> {
     const result = await client.query<UserRow>(
-      'SELECT id, username, password_hash FROM users WHERE username = $1',
+      `SELECT id, username, password_hash, ${DISABLED_ACCOUNT_PREDICATE_SQL} AS is_disabled
+         FROM users WHERE username = $1`,
       [username],
     );
     return result.rows[0];

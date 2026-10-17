@@ -255,8 +255,78 @@ async function pinActivityTo(userId: string, value: string): Promise<void> {
   });
 }
 
-const DORMANT = '2000-01-01T00:00:00.000Z';
 
+/**
+ * A user this suite owns, with a password it knows.
+ *
+ * **Not the seeded `admin`.** The case below disables an account, and doing that to the
+ * account every other case in this file authenticates as would couple them through a
+ * mutable fixture. The insert goes through the same authenticator + `SET ROLE app_admin`
+ * boundary the application uses, so a fixture that could not be written in production
+ * fails here too. The cost is `12` because that is `BCRYPT_COST`.
+ */
+async function createUser(username: string, password: string): Promise<string> {
+  const bcrypt = (await import('bcrypt')).default;
+  return withAdminClient(async (client) => {
+    const result = await client.query<{ id: string }>(
+      'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
+      [username, `${username}@example.test`, await bcrypt.hash(password, 12)],
+    );
+    const id = result.rows[0]?.id;
+    if (id === undefined) {
+      throw new Error(`the fixture for ${username} was not created`);
+    }
+    return id;
+  });
+}
+
+/** Switched off, with the database's clock and a reason rather than an invented actor. */
+async function disablePermanently(userId: string): Promise<void> {
+  await withAdminClient(async (client) => {
+    await client.query(
+      "UPDATE users SET disabled_at = now(), disabled_until = NULL, disabled_reason = 'security' WHERE id = $1",
+      [userId],
+    );
+  });
+}
+
+/**
+ * Lifted, the way an administrator would: all three `disabled_*` columns go, so the row
+ * is left in the state a never-disabled account is in. Clearing only `disabled_at` would
+ * pass the sign-in assertion below and leave a stale reason on a live account, which is a
+ * row an investigator reads as "disabled, and no explanation for it".
+ */
+async function enable(userId: string): Promise<void> {
+  await withAdminClient(async (client) => {
+    await client.query(
+      'UPDATE users SET disabled_at = NULL, disabled_until = NULL, disabled_reason = NULL WHERE id = $1',
+      [userId],
+    );
+  });
+}
+
+/** `last_login_at` as epoch milliseconds, or `null` — by value, never by identity. */
+async function lastLoginAt(userId: string): Promise<number | null> {
+  return withAdminClient(async (client) => {
+    const result = await client.query<{ last_login_at: Date | null }>(
+      'SELECT last_login_at FROM users WHERE id = $1',
+      [userId],
+    );
+    return result.rows[0]?.last_login_at?.getTime() ?? null;
+  });
+}
+
+/** Pins the credential clock to a known-distant value, for the same reason as above. */
+async function pinLastLoginTo(userId: string, value: string): Promise<void> {
+  await withAdminClient(async (client) => {
+    await client.query('UPDATE users SET last_login_at = $2 WHERE id = $1', [
+      userId,
+      value,
+    ]);
+  });
+}
+
+const DORMANT = '2000-01-01T00:00:00.000Z';
 describe('refresh rotation and logout', () => {
   it('a valid refresh rotates the pair: new distinct tokens, old row revoked and linked to the new row', async () => {
     const first = (await login({ username: 'admin', password: SEED_PASSWORD })).json<TokenPair>();
@@ -461,5 +531,98 @@ describe('refresh rotation and logout', () => {
     expect(await lastActivityAt(user), 'a logout for a token with no row stamped last_activity_at').toBe(
       new Date(DORMANT).getTime(),
     );
+  });
+
+  /**
+   * A disable enforced only on `login` is not a disable. A session keeps proving itself
+   * here without ever touching a password again, so an account that cannot sign in can
+   * still mint a fresh access token every thirty seconds for as long as it keeps
+   * presenting the token it already holds — which is the whole of "not disabled".
+   */
+  it('a disabled account cannot mint a new access token by refreshing, and the refusal consumes nothing', async () => {
+    const username = 'switched-off-refresh';
+    const password = 'the-password-for-a-disabled-session';
+    const userId = await createUser(username, password);
+
+    // A real session, minted while the account was live, so what is refused below is a
+    // valid token rather than a forged one.
+    const session = (await login({ username, password })).json<TokenPair>();
+    const minted = await rowByHash(session.refreshToken);
+    expect(minted?.revoked_at, 'the fixture did not mint a live session').toBeNull();
+
+    await disablePermanently(userId);
+    const before = await rowCount();
+
+    const response = await refresh({ refreshToken: session.refreshToken });
+
+    expect(response.statusCode).toBe(401);
+    // The same body an unknown, revoked, replayed or expired token gets. A "your
+    // account is disabled" here would hand an attacker the same shortlist of acted-on
+    // accounts that the login route refuses to give them.
+    expect(response.json()).toEqual({
+      statusCode: 401,
+      message: 'invalid refresh token',
+      error: 'Unauthorized',
+    });
+    expect(await rowCount(), 'the refusal minted a session anyway').toBe(before);
+
+    // The token is untouched, which is what makes a TEMPORARY disable resumable rather
+    // than a forced sign-out. Asserted as an unrotated row rather than inferred from
+    // the 401, because "the throw happens before the rotation" is the claim and the row
+    // is the evidence.
+    const afterRefusal = await rowByHash(session.refreshToken);
+    const revoked = afterRefusal?.revoked_at;
+    expect(revoked, 'a refusal revoked the token, so a temporary disable forces a sign-in').toBeNull();
+    expect(afterRefusal?.rotated_to).toBeNull();
+
+    // Lifted, and the same token works — the two halves together say the refusal is a
+    // gate and not a revocation.
+    await enable(userId);
+    expect((await refresh({ refreshToken: session.refreshToken })).statusCode).toBe(200);
+  });
+
+  /**
+   * `0023`: `last_activity_at` is what the application OBSERVED and `last_login_at` is
+   * when a credential last passed its check, and "collapsing them would let a broad
+   * activity signal overwrite an authentication fact". A refresh is the broadest signal
+   * this service has — it fires for every read-heavy session — so it is the one route
+   * where the collapse would be most visible.
+   */
+  it('a refresh stamps last_activity_at and never last_login_at, so a session cannot rewrite the credential fact', async () => {
+    const user = await adminId();
+    const session = (await login({ username: 'admin', password: SEED_PASSWORD })).json<TokenPair>();
+    // Pinned AFTER the login, so this is about the refresh and not about a stamp the
+    // login left one statement earlier.
+    await pinActivityTo(user, DORMANT);
+    await pinLastLoginTo(user, DORMANT);
+
+    expect((await refresh({ refreshToken: session.refreshToken })).statusCode).toBe(200);
+
+    const activity = await lastActivityAt(user);
+    expect(activity, 'a refresh did not stamp last_activity_at').not.toBeNull();
+    expect(activity ?? 0).toBeGreaterThan(new Date(DORMANT).getTime());
+
+    // THE assertion. A refresh proves the SESSION, not the password, so the column that
+    // answers "when did a credential last succeed" must not move. An attacker holding a
+    // stolen refresh token could otherwise keep that column current indefinitely.
+    // `DORMANT` read as epoch milliseconds, because `pg` hands back a `Date` and
+    // `Object.is` is never true for two distinct Date objects.
+    const pinned = new Date(DORMANT).getTime();
+    const untouched = 'a refresh stamped last_login_at, so a stolen refresh token can keep the credential clock current forever';
+    expect(await lastLoginAt(user), untouched).toBe(pinned);
+  });
+
+  it('a REFUSED refresh stamps neither column, so an unauthenticated caller can write no fact at all', async () => {
+    const user = await adminId();
+    const session = (await login({ username: 'admin', password: SEED_PASSWORD })).json<TokenPair>();
+    expect((await refresh({ refreshToken: session.refreshToken })).statusCode).toBe(200);
+    await pinActivityTo(user, DORMANT);
+    await pinLastLoginTo(user, DORMANT);
+
+    expect((await refresh({ refreshToken: session.refreshToken })).statusCode).toBe(401);
+
+    const pinned = new Date(DORMANT).getTime();
+    expect(await lastActivityAt(user), 'a refused refresh stamped last_activity_at').toBe(pinned);
+    expect(await lastLoginAt(user), 'a refused refresh stamped last_login_at').toBe(pinned);
   });
 });
