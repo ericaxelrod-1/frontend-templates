@@ -1,0 +1,110 @@
+-- =============================================================================
+-- 0024_alert_subject_cascade.sql
+--
+-- One foreign key's delete behaviour, corrected.
+-- Target: PostgreSQL 18+, applied as the migration/owner role (`app`).
+--
+-- =============================================================================
+-- WHAT CHANGES
+-- =============================================================================
+--
+-- `security_alerts.user_id` moves from `ON DELETE SET NULL` to `ON DELETE CASCADE`.
+-- Nothing else in this migration changes a foreign key, a policy or a grant.
+--
+-- The other four foreign keys that name `users` stay `ON DELETE SET NULL`, and the
+-- reason they are different from this one is the whole content of this file, so it
+-- is worth stating before the SQL.
+--
+-- =============================================================================
+-- THE DISTINCTION: A SUBJECT IS DATA, AN ACTOR IS A POINTER
+-- =============================================================================
+--
+-- Five foreign keys name `users` and they are not interchangeable:
+--
+--   SUBJECT — the row IS a record about this person:
+--     security_alerts.user_id
+--
+--   ACTOR — the row records that SOMEONE ELSE acted, and that someone is a
+--   pointer at a person, not a row owned by this one:
+--     security_alerts.acknowledged_by
+--     security_alerts.resolved_by
+--     security_detected_patterns.resolved_by
+--     users.disabled_by
+--
+-- A purge is the removal of a person's data. So:
+--
+--   * A SUBJECT row CASCADES. When the person is erased, the record of what
+--     happened to them goes with them. `email_messages` and `privacy_requests`
+--     already cascade for exactly this reason, and `0015_purge_user_cascade.sql`
+--     is the migration that established it.
+--
+--   * An ACTOR row is SET NULL. The record survives and the pointer is cleared,
+--     because the record is evidence of what was done and must not be destroyed
+--     by the erasure of somebody who merely touched it.
+--
+-- The `users.disabled_by` case is the sharpest, and it is why the actor
+-- references must never be "harmonised" into CASCADE: `disabled_by` records
+-- WHICH ADMINISTRATOR disabled an account. If it cascaded, then purging that
+-- administrator's row would DELETE every account they had disabled — an
+-- erasure of one person silently erasing other people's accounts. That is the
+-- exact class of defect `0015` fixed for `email_messages`, one level of
+-- indirection away.
+--
+-- `0010` already reasoned about the same shape from the other direction: the
+-- compliance record carries NO foreign key at all, "so nothing can cascade
+-- into it", and that evidence outlives both the request and the user. SET NULL
+-- is the weaker version of the same decision, and it is the right one for a
+-- pointer that is not the row's subject.
+--
+-- =============================================================================
+-- WHY `SET NULL` WAS WRONG FOR THE SUBJECT
+-- =============================================================================
+--
+-- `security_alerts` carries `ip_address`, `ip_normalized` and `ip_subnet` — the
+-- address the activity came from. An IP address is personal data.
+--
+-- With `ON DELETE SET NULL`, erasing a person nulls `user_id` and LEAVES THE
+-- ALERT — and with it the person's IP address, the geo columns and the free-text
+-- `message` — in a row that is still there. The erasure would then have removed
+-- the pointer to the person and left the personal data behind, which is the
+-- shape §2.1 exists to prevent: a system that appears to have honoured an
+-- erasure and has not.
+--
+-- `CASCADE` removes the row. There is no surviving copy to reconcile.
+--
+-- The counter-argument, stated rather than assumed: §B6 says "security alerts
+-- persist to the database". That sentence is about alerts being RECORDED —
+-- stored rather than logged and forgotten — and not about alerts outliving the
+-- erasure of the person they describe. A security record about a person who has
+-- been lawfully erased is a record about a person who must no longer be
+-- traceable, and keeping it is the defect, not the feature.
+--
+-- =============================================================================
+-- WHY THIS IS A MIGRATION AND NOT AN EDIT OF 0022
+-- =============================================================================
+--
+-- `0022` has already been applied to every database this repository has ever
+-- provisioned, so the file is append-only by convention and this correction is a
+-- new file. Editing `0022` in place would leave a database that applied the old
+-- shape and a fresh provision that applied the new one — two schemas from one
+-- tree, which is the drift this repository is about.
+--
+-- The down restores `SET NULL`, and the asymmetry with the four actor references
+-- is intentional in both directions: reverting this migration re-introduces the
+-- GDPR gap described above, which is why the down says so in words.
+-- =============================================================================
+
+ALTER TABLE public.security_alerts
+  DROP CONSTRAINT IF EXISTS security_alerts_user_id_fkey;
+
+ALTER TABLE public.security_alerts
+  ADD CONSTRAINT security_alerts_user_id_fkey
+  FOREIGN KEY (user_id) REFERENCES public.users (id) ON DELETE CASCADE;
+
+NOTIFY pgrst, 'reload schema';
+
+-- =============================================================================
+-- DOWN
+-- =============================================================================
+-- See database/migrations/0024_alert_subject_cascade.down.sql. Kept as a separate
+-- file so this one stays append-only, exactly as in 0001–0023.

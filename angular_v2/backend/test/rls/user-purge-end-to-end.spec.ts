@@ -193,6 +193,45 @@ function superuserRows<T>(sql: string): readonly T[] {
   return trimmed === '' ? [] : (JSON.parse(trimmed) as readonly T[]);
 }
 
+/**
+ * Every foreign key in `public` that names `public.users`, with its delete
+ * behaviour. Read from the CATALOGUE rather than from a list in this file, and
+ * the list is asserted separately, so a new referencing table has to be given a
+ * name and a decision before this suite goes green.
+ *
+ * `conname` is part of the result because one table can carry SEVERAL foreign
+ * keys naming `users` and they do not all carry the same delete behaviour —
+ * `security_alerts` alone has three, and two of them must not cascade.
+ */
+function foreignKeysNamingUsers(): readonly {
+  child: string;
+  conname: string;
+  confdeltype: string;
+}[] {
+  return superuserRows<{ child: string; conname: string; confdeltype: string }>(
+    `SELECT child.relname AS child, con.conname AS conname, con.confdeltype AS confdeltype
+       FROM pg_constraint con
+       JOIN pg_class child  ON child.oid = con.conrelid
+       JOIN pg_class parent ON parent.oid = con.confrelid
+       JOIN pg_namespace n  ON n.oid = child.relnamespace
+      WHERE con.contype = 'f'
+        AND n.nspname = 'public'
+        AND parent.relname = 'users'
+      ORDER BY child.relname, con.conname`,
+  );
+}
+
+/**
+ * `confdeltype` values that BLOCK a purge. `a` is NO ACTION and `r` is RESTRICT;
+ * both make a delete of the parent row fail with `23503`, which is the defect
+ * `0015` fixed. `c` (CASCADE) and `n` (SET NULL) block nothing.
+ */
+const BLOCKING_DELETE_BEHAVIOURS = ['a', 'r'] as const;
+
+function isBlocking(confdeltype: string): boolean {
+  return (BLOCKING_DELETE_BEHAVIOURS as readonly string[]).includes(confdeltype);
+}
+
 function psqlAsSuperuserFile(database: string, path: string): void {
   const result = spawnSync('sudo', ['-u', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-q', '-d', database, '-f', path], {
     encoding: 'utf8',
@@ -726,42 +765,122 @@ describe('a purge that fails leaves no half-purged user', () => {
 
 describe('no foreign key naming users can block a purge again', () => {
   it(
-    'every table that references users carries ON DELETE CASCADE, and the set is exactly the six names (widened by 0018 for auth_tokens)',
+    'every foreign key naming users cannot BLOCK a purge, and each one names whether it cascades or is set null',
     () => {
       // This is the assertion that closes the CLASS rather than the instance. `0015`
-      // fixed two constraints; `0018_auth_tokens.sql` legitimately widened the set
-      // by adding `auth_tokens` with CASCADE. This says any table added later as
-      // `NO ACTION` — the exact shape of the defect — fails the gate instead of
-      // re-opening it silently. A test that only purges one fixture user cannot see
-      // another referencing table at all.
+      // fixed two constraints; `0018_auth_tokens.sql` legitimately widened the set by
+      // adding `auth_tokens`; `0022` added four more; `0023` added one. This says any
+      // table added later as `NO ACTION` — the exact shape of the defect — fails the
+      // gate instead of re-opening it silently. A test that only purges one fixture
+      // user cannot see another referencing table at all.
       //
       // Read from `pg_constraint` rather than from a list in this file, and the list
       // itself is asserted, so a new referencing table has to be given a name and a
       // decision before this suite goes green.
-      const referencing = superuserRows<{ child: string; confdeltype: string }>(
-        `SELECT child.relname AS child, con.confdeltype AS confdeltype
-           FROM pg_constraint con
-           JOIN pg_class child  ON child.oid = con.conrelid
-           JOIN pg_class parent ON parent.oid = con.confrelid
-           JOIN pg_namespace n  ON n.oid = child.relnamespace
-          WHERE con.contype = 'f'
-            AND n.nspname = 'public'
-            AND parent.relname = 'users'
-          ORDER BY child.relname`,
-      );
+      //
+      // The constraint NAME is now part of the assertion, not just the child table,
+      // because one table can carry SEVERAL foreign keys naming `users` and they do
+      // not all carry the same delete behaviour. `security_alerts` alone has three.
+      const referencing = foreignKeysNamingUsers();
 
-      expect(referencing.map((row) => row.child)).toEqual([
-        'auth_tokens',
-        'email_messages',
-        'privacy_requests',
-        'refresh_tokens',
-        'user_groups',
-        'user_roles',
+      // `c` is CASCADE, `n` is SET NULL, `a` is NO ACTION and `r` is RESTRICT.
+      //
+      // WHAT THE INVARIANT ACTUALLY IS: the describe block's name is "no foreign
+      // key naming users can BLOCK a purge again", and only `a` and `r` block one —
+      // `a` made every purge of a real user raise `23503`, and `r` does the same.
+      // Neither `c` nor `n` blocks anything, so BOTH are permitted, and the
+      // distinction between them is a decision about ownership rather than about
+      // purging:
+      //
+      //   CASCADE   — the row IS a record ABOUT the person. It goes with them.
+      //               `email_messages` and `privacy_requests` have always cascaded,
+      //               and `0015_purge_user_cascade.sql` is why.
+      //   SET NULL  — the row records that SOMEONE ELSE acted, and that someone is
+      //               a pointer at a person, not a row owned by this one. The
+      //               evidence survives the pointer being cleared, which is the
+      //               same decision `0010` took for the compliance record by
+      //               giving it NO foreign key at all.
+      //
+      // The sharpest case, and the reason the actor references must never be
+      // "harmonised" into CASCADE: `users.disabled_by` records WHICH ADMINISTRATOR
+      // disabled an account. If it cascaded, purging that administrator's row would
+      // DELETE every account they had disabled — an erasure of one person silently
+      // erasing other people's accounts.
+      //
+      // So the expected map below is not a list of "everything is CASCADE" with
+      // exceptions. It is a decision per constraint, and a constraint that moves
+      // from one column to the other FAILS this test.
+      expect(
+        referencing.map((row) => [row.conname, row.confdeltype]).sort((a, b) =>
+          String(a[0]).localeCompare(String(b[0])),
+        ),
+      ).toEqual([
+        ['auth_tokens_user_id_fkey', 'c'],
+        ['email_messages_user_id_fkey', 'c'],
+        ['privacy_requests_user_id_fkey', 'c'],
+        ['refresh_tokens_user_id_fkey', 'c'],
+        // The actor pointers: the alert is about one person and an administrator
+        // merely touched it, so the administrator's erasure must not destroy it.
+        ['security_alerts_acknowledged_by_fkey', 'n'],
+        ['security_alerts_resolved_by_fkey', 'n'],
+        // The alert is ABOUT the user, and it carries that user's IP address — which
+        // is personal data. Nulling the link and keeping the row would leave the
+        // personal data behind, so the row goes with the person. `0024`.
+        ['security_alerts_user_id_fkey', 'c'],
+        ['security_detected_patterns_resolved_by_fkey', 'n'],
+        ['user_groups_user_id_fkey', 'c'],
+        ['user_roles_user_id_fkey', 'c'],
+        // See the `disabled_by` case above: CASCADE here deletes other people's
+        // accounts.
+        ['users_disabled_by_fkey', 'n'],
       ]);
 
-      // `c` is `confdeltype` for CASCADE. `a` (NO ACTION) is what made every purge
-      // of a real user raise `23503`.
-      expect(referencing.filter((row) => row.confdeltype !== 'c')).toEqual([]);
+      // THE INVARIANT ITSELF, asserted separately so that a NEW constraint cannot
+      // slip in by being added to the map above without being thought about. A
+      // constraint naming `users` with NO ACTION or RESTRICT is the defect this
+      // suite exists to prevent, and it is refused in either shape.
+      expect(referencing.filter((row) => isBlocking(row.confdeltype))).toEqual([]);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'the detector really does catch a blocking foreign key, proven by building one',
+    () => {
+      // A catalogue assertion is only worth anything if it can go red, and a suite
+      // that passes whether or not the protection exists is the exact failure
+      // AGENTS.md §B8 exists to prevent. So the violating constraint is BUILT, in
+      // this database, and the SAME query and the SAME predicate are pointed at
+      // it.
+      //
+      // It cannot be built from outside: this suite creates and drops its own
+      // `PROOF_DB` in `beforeAll`/`afterAll`, so an external tamper is either
+      // refused (wrong database) or destroyed before the assertion runs (the
+      // proof database does not survive the run). Building it here is the only
+      // place it exists at the moment the assertion looks.
+      superuserExec(
+        `CREATE TABLE public.purge_blocking_probe (
+           id uuid PRIMARY KEY DEFAULT uuidv7(),
+           user_id uuid REFERENCES public.users (id) ON DELETE NO ACTION
+         )`,
+      );
+      try {
+        const withProbe = foreignKeysNamingUsers();
+        const probe = withProbe.find((row) => row.conname === 'purge_blocking_probe_user_id_fkey');
+
+        // The detector SEES it...
+        expect(probe, 'the catalogue query did not report the probe constraint').toBeDefined();
+        expect(probe?.confdeltype).toBe('a');
+        // ...and classifies it as blocking, which is what would make the
+        // catalogue assertion above go red.
+        expect(isBlocking(probe?.confdeltype ?? '')).toBe(true);
+      } finally {
+        superuserExec('DROP TABLE IF EXISTS public.purge_blocking_probe');
+      }
+
+      // And once it is gone the suite's own assertion is satisfied again, so the
+      // probe is not what the catalogue test is passing on.
+      expect(foreignKeysNamingUsers().filter((row) => isBlocking(row.confdeltype))).toEqual([]);
     },
     TIMEOUT,
   );
