@@ -65,6 +65,19 @@ export interface paths {
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                     email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
+                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157). */
+                    first_name?: components["parameters"]["rowFilter.users.first_name"];
+                    /** @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed. */
+                    last_name?: components["parameters"]["rowFilter.users.last_name"];
+                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller. */
+                    last_login_at?: components["parameters"]["rowFilter.users.last_login_at"];
+                    disabled_at?: components["parameters"]["rowFilter.users.disabled_at"];
+                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
+                    disabled_by?: components["parameters"]["rowFilter.users.disabled_by"];
+                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string. */
+                    disabled_reason?: components["parameters"]["rowFilter.users.disabled_reason"];
+                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
+                    disabled_until?: components["parameters"]["rowFilter.users.disabled_until"];
                     /** @description Filtering Columns */
                     select?: components["parameters"]["select"];
                     /** @description Ordering */
@@ -153,6 +166,19 @@ export interface paths {
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                     email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
+                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157). */
+                    first_name?: components["parameters"]["rowFilter.users.first_name"];
+                    /** @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed. */
+                    last_name?: components["parameters"]["rowFilter.users.last_name"];
+                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller. */
+                    last_login_at?: components["parameters"]["rowFilter.users.last_login_at"];
+                    disabled_at?: components["parameters"]["rowFilter.users.disabled_at"];
+                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
+                    disabled_by?: components["parameters"]["rowFilter.users.disabled_by"];
+                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string. */
+                    disabled_reason?: components["parameters"]["rowFilter.users.disabled_reason"];
+                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
+                    disabled_until?: components["parameters"]["rowFilter.users.disabled_until"];
                 };
                 header?: {
                     /** @description Preference */
@@ -194,6 +220,19 @@ export interface paths {
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                     email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
+                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157). */
+                    first_name?: components["parameters"]["rowFilter.users.first_name"];
+                    /** @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed. */
+                    last_name?: components["parameters"]["rowFilter.users.last_name"];
+                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller. */
+                    last_login_at?: components["parameters"]["rowFilter.users.last_login_at"];
+                    disabled_at?: components["parameters"]["rowFilter.users.disabled_at"];
+                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
+                    disabled_by?: components["parameters"]["rowFilter.users.disabled_by"];
+                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string. */
+                    disabled_reason?: components["parameters"]["rowFilter.users.disabled_reason"];
+                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
+                    disabled_until?: components["parameters"]["rowFilter.users.disabled_until"];
                 };
                 header?: {
                     /** @description Preference */
@@ -950,6 +989,150 @@ export interface paths {
         };
         trace?: never;
     };
+    "/pattern_login_attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.pattern_login_attempts.id"];
+                    pattern_id?: components["parameters"]["rowFilter.pattern_login_attempts.pattern_id"];
+                    login_attempt_id?: components["parameters"]["rowFilter.pattern_login_attempts.login_attempt_id"];
+                    is_primary_evidence?: components["parameters"]["rowFilter.pattern_login_attempts.is_primary_evidence"];
+                    is_mock?: components["parameters"]["rowFilter.pattern_login_attempts.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.pattern_login_attempts.created_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["pattern_login_attempts"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["pattern_login_attempts"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["pattern_login_attempts"][];
+                        "text/csv": components["schemas"]["pattern_login_attempts"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["pattern_login_attempts"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.pattern_login_attempts.id"];
+                    pattern_id?: components["parameters"]["rowFilter.pattern_login_attempts.pattern_id"];
+                    login_attempt_id?: components["parameters"]["rowFilter.pattern_login_attempts.login_attempt_id"];
+                    is_primary_evidence?: components["parameters"]["rowFilter.pattern_login_attempts.is_primary_evidence"];
+                    is_mock?: components["parameters"]["rowFilter.pattern_login_attempts.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.pattern_login_attempts.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.pattern_login_attempts.id"];
+                    pattern_id?: components["parameters"]["rowFilter.pattern_login_attempts.pattern_id"];
+                    login_attempt_id?: components["parameters"]["rowFilter.pattern_login_attempts.login_attempt_id"];
+                    is_primary_evidence?: components["parameters"]["rowFilter.pattern_login_attempts.is_primary_evidence"];
+                    is_mock?: components["parameters"]["rowFilter.pattern_login_attempts.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.pattern_login_attempts.created_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["pattern_login_attempts"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -1079,6 +1262,546 @@ export interface paths {
                 cookie?: never;
             };
             requestBody?: components["requestBodies"]["customers"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/security_detected_patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.security_detected_patterns.id"];
+                    pattern_type?: components["parameters"]["rowFilter.security_detected_patterns.pattern_type"];
+                    severity?: components["parameters"]["rowFilter.security_detected_patterns.severity"];
+                    ip?: components["parameters"]["rowFilter.security_detected_patterns.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.security_detected_patterns.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.security_detected_patterns.ip_subnet"];
+                    detection_timestamp?: components["parameters"]["rowFilter.security_detected_patterns.detection_timestamp"];
+                    time_window_start?: components["parameters"]["rowFilter.security_detected_patterns.time_window_start"];
+                    time_window_end?: components["parameters"]["rowFilter.security_detected_patterns.time_window_end"];
+                    attempt_count?: components["parameters"]["rowFilter.security_detected_patterns.attempt_count"];
+                    unique_email_count?: components["parameters"]["rowFilter.security_detected_patterns.unique_email_count"];
+                    evidence?: components["parameters"]["rowFilter.security_detected_patterns.evidence"];
+                    status?: components["parameters"]["rowFilter.security_detected_patterns.status"];
+                    resolved_at?: components["parameters"]["rowFilter.security_detected_patterns.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.security_detected_patterns.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.security_detected_patterns.resolution_notes"];
+                    metadata?: components["parameters"]["rowFilter.security_detected_patterns.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.security_detected_patterns.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.security_detected_patterns.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.security_detected_patterns.updated_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["security_detected_patterns"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["security_detected_patterns"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["security_detected_patterns"][];
+                        "text/csv": components["schemas"]["security_detected_patterns"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["security_detected_patterns"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.security_detected_patterns.id"];
+                    pattern_type?: components["parameters"]["rowFilter.security_detected_patterns.pattern_type"];
+                    severity?: components["parameters"]["rowFilter.security_detected_patterns.severity"];
+                    ip?: components["parameters"]["rowFilter.security_detected_patterns.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.security_detected_patterns.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.security_detected_patterns.ip_subnet"];
+                    detection_timestamp?: components["parameters"]["rowFilter.security_detected_patterns.detection_timestamp"];
+                    time_window_start?: components["parameters"]["rowFilter.security_detected_patterns.time_window_start"];
+                    time_window_end?: components["parameters"]["rowFilter.security_detected_patterns.time_window_end"];
+                    attempt_count?: components["parameters"]["rowFilter.security_detected_patterns.attempt_count"];
+                    unique_email_count?: components["parameters"]["rowFilter.security_detected_patterns.unique_email_count"];
+                    evidence?: components["parameters"]["rowFilter.security_detected_patterns.evidence"];
+                    status?: components["parameters"]["rowFilter.security_detected_patterns.status"];
+                    resolved_at?: components["parameters"]["rowFilter.security_detected_patterns.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.security_detected_patterns.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.security_detected_patterns.resolution_notes"];
+                    metadata?: components["parameters"]["rowFilter.security_detected_patterns.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.security_detected_patterns.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.security_detected_patterns.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.security_detected_patterns.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.security_detected_patterns.id"];
+                    pattern_type?: components["parameters"]["rowFilter.security_detected_patterns.pattern_type"];
+                    severity?: components["parameters"]["rowFilter.security_detected_patterns.severity"];
+                    ip?: components["parameters"]["rowFilter.security_detected_patterns.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.security_detected_patterns.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.security_detected_patterns.ip_subnet"];
+                    detection_timestamp?: components["parameters"]["rowFilter.security_detected_patterns.detection_timestamp"];
+                    time_window_start?: components["parameters"]["rowFilter.security_detected_patterns.time_window_start"];
+                    time_window_end?: components["parameters"]["rowFilter.security_detected_patterns.time_window_end"];
+                    attempt_count?: components["parameters"]["rowFilter.security_detected_patterns.attempt_count"];
+                    unique_email_count?: components["parameters"]["rowFilter.security_detected_patterns.unique_email_count"];
+                    evidence?: components["parameters"]["rowFilter.security_detected_patterns.evidence"];
+                    status?: components["parameters"]["rowFilter.security_detected_patterns.status"];
+                    resolved_at?: components["parameters"]["rowFilter.security_detected_patterns.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.security_detected_patterns.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.security_detected_patterns.resolution_notes"];
+                    metadata?: components["parameters"]["rowFilter.security_detected_patterns.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.security_detected_patterns.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.security_detected_patterns.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.security_detected_patterns.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["security_detected_patterns"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/captcha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.captcha.id"];
+                    type?: components["parameters"]["rowFilter.captcha.type"];
+                    token_hash?: components["parameters"]["rowFilter.captcha.token_hash"];
+                    challenge?: components["parameters"]["rowFilter.captcha.challenge"];
+                    solution_salt?: components["parameters"]["rowFilter.captcha.solution_salt"];
+                    solution_hash?: components["parameters"]["rowFilter.captcha.solution_hash"];
+                    is_used?: components["parameters"]["rowFilter.captcha.is_used"];
+                    used_at?: components["parameters"]["rowFilter.captcha.used_at"];
+                    issued_at?: components["parameters"]["rowFilter.captcha.issued_at"];
+                    expires_at?: components["parameters"]["rowFilter.captcha.expires_at"];
+                    ip?: components["parameters"]["rowFilter.captcha.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.captcha.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.captcha.ip_subnet"];
+                    metadata?: components["parameters"]["rowFilter.captcha.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.captcha.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.captcha.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.captcha.updated_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["captcha"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["captcha"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["captcha"][];
+                        "text/csv": components["schemas"]["captcha"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["captcha"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.captcha.id"];
+                    type?: components["parameters"]["rowFilter.captcha.type"];
+                    token_hash?: components["parameters"]["rowFilter.captcha.token_hash"];
+                    challenge?: components["parameters"]["rowFilter.captcha.challenge"];
+                    solution_salt?: components["parameters"]["rowFilter.captcha.solution_salt"];
+                    solution_hash?: components["parameters"]["rowFilter.captcha.solution_hash"];
+                    is_used?: components["parameters"]["rowFilter.captcha.is_used"];
+                    used_at?: components["parameters"]["rowFilter.captcha.used_at"];
+                    issued_at?: components["parameters"]["rowFilter.captcha.issued_at"];
+                    expires_at?: components["parameters"]["rowFilter.captcha.expires_at"];
+                    ip?: components["parameters"]["rowFilter.captcha.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.captcha.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.captcha.ip_subnet"];
+                    metadata?: components["parameters"]["rowFilter.captcha.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.captcha.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.captcha.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.captcha.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.captcha.id"];
+                    type?: components["parameters"]["rowFilter.captcha.type"];
+                    token_hash?: components["parameters"]["rowFilter.captcha.token_hash"];
+                    challenge?: components["parameters"]["rowFilter.captcha.challenge"];
+                    solution_salt?: components["parameters"]["rowFilter.captcha.solution_salt"];
+                    solution_hash?: components["parameters"]["rowFilter.captcha.solution_hash"];
+                    is_used?: components["parameters"]["rowFilter.captcha.is_used"];
+                    used_at?: components["parameters"]["rowFilter.captcha.used_at"];
+                    issued_at?: components["parameters"]["rowFilter.captcha.issued_at"];
+                    expires_at?: components["parameters"]["rowFilter.captcha.expires_at"];
+                    ip?: components["parameters"]["rowFilter.captcha.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.captcha.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.captcha.ip_subnet"];
+                    metadata?: components["parameters"]["rowFilter.captcha.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.captcha.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.captcha.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.captcha.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["captcha"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/ip_reputation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.ip_reputation.id"];
+                    ip?: components["parameters"]["rowFilter.ip_reputation.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.ip_reputation.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.ip_reputation.ip_subnet"];
+                    status?: components["parameters"]["rowFilter.ip_reputation.status"];
+                    reputation_score?: components["parameters"]["rowFilter.ip_reputation.reputation_score"];
+                    failed_attempts?: components["parameters"]["rowFilter.ip_reputation.failed_attempts"];
+                    captcha_required_count?: components["parameters"]["rowFilter.ip_reputation.captcha_required_count"];
+                    is_blocked?: components["parameters"]["rowFilter.ip_reputation.is_blocked"];
+                    blocked_until?: components["parameters"]["rowFilter.ip_reputation.blocked_until"];
+                    geo_location?: components["parameters"]["rowFilter.ip_reputation.geo_location"];
+                    statistics?: components["parameters"]["rowFilter.ip_reputation.statistics"];
+                    block_history?: components["parameters"]["rowFilter.ip_reputation.block_history"];
+                    metadata?: components["parameters"]["rowFilter.ip_reputation.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.ip_reputation.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.ip_reputation.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.ip_reputation.updated_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ip_reputation"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["ip_reputation"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["ip_reputation"][];
+                        "text/csv": components["schemas"]["ip_reputation"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["ip_reputation"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.ip_reputation.id"];
+                    ip?: components["parameters"]["rowFilter.ip_reputation.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.ip_reputation.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.ip_reputation.ip_subnet"];
+                    status?: components["parameters"]["rowFilter.ip_reputation.status"];
+                    reputation_score?: components["parameters"]["rowFilter.ip_reputation.reputation_score"];
+                    failed_attempts?: components["parameters"]["rowFilter.ip_reputation.failed_attempts"];
+                    captcha_required_count?: components["parameters"]["rowFilter.ip_reputation.captcha_required_count"];
+                    is_blocked?: components["parameters"]["rowFilter.ip_reputation.is_blocked"];
+                    blocked_until?: components["parameters"]["rowFilter.ip_reputation.blocked_until"];
+                    geo_location?: components["parameters"]["rowFilter.ip_reputation.geo_location"];
+                    statistics?: components["parameters"]["rowFilter.ip_reputation.statistics"];
+                    block_history?: components["parameters"]["rowFilter.ip_reputation.block_history"];
+                    metadata?: components["parameters"]["rowFilter.ip_reputation.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.ip_reputation.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.ip_reputation.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.ip_reputation.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.ip_reputation.id"];
+                    ip?: components["parameters"]["rowFilter.ip_reputation.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.ip_reputation.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.ip_reputation.ip_subnet"];
+                    status?: components["parameters"]["rowFilter.ip_reputation.status"];
+                    reputation_score?: components["parameters"]["rowFilter.ip_reputation.reputation_score"];
+                    failed_attempts?: components["parameters"]["rowFilter.ip_reputation.failed_attempts"];
+                    captcha_required_count?: components["parameters"]["rowFilter.ip_reputation.captcha_required_count"];
+                    is_blocked?: components["parameters"]["rowFilter.ip_reputation.is_blocked"];
+                    blocked_until?: components["parameters"]["rowFilter.ip_reputation.blocked_until"];
+                    geo_location?: components["parameters"]["rowFilter.ip_reputation.geo_location"];
+                    statistics?: components["parameters"]["rowFilter.ip_reputation.statistics"];
+                    block_history?: components["parameters"]["rowFilter.ip_reputation.block_history"];
+                    metadata?: components["parameters"]["rowFilter.ip_reputation.metadata"];
+                    is_mock?: components["parameters"]["rowFilter.ip_reputation.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.ip_reputation.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.ip_reputation.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["ip_reputation"];
             responses: {
                 /** @description No Content */
                 204: {
@@ -2555,6 +3278,198 @@ export interface paths {
         };
         trace?: never;
     };
+    "/security_alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.security_alerts.id"];
+                    alert_type?: components["parameters"]["rowFilter.security_alerts.alert_type"];
+                    severity?: components["parameters"]["rowFilter.security_alerts.severity"];
+                    title?: components["parameters"]["rowFilter.security_alerts.title"];
+                    message?: components["parameters"]["rowFilter.security_alerts.message"];
+                    source?: components["parameters"]["rowFilter.security_alerts.source"];
+                    pattern_id?: components["parameters"]["rowFilter.security_alerts.pattern_id"];
+                    ip?: components["parameters"]["rowFilter.security_alerts.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.security_alerts.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.security_alerts.ip_subnet"];
+                    user_id?: components["parameters"]["rowFilter.security_alerts.user_id"];
+                    status?: components["parameters"]["rowFilter.security_alerts.status"];
+                    acknowledged_at?: components["parameters"]["rowFilter.security_alerts.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.security_alerts.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.security_alerts.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.security_alerts.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.security_alerts.resolution_notes"];
+                    alert_data?: components["parameters"]["rowFilter.security_alerts.alert_data"];
+                    expires_at?: components["parameters"]["rowFilter.security_alerts.expires_at"];
+                    is_mock?: components["parameters"]["rowFilter.security_alerts.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.security_alerts.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.security_alerts.updated_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["security_alerts"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["security_alerts"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["security_alerts"][];
+                        "text/csv": components["schemas"]["security_alerts"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["security_alerts"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.security_alerts.id"];
+                    alert_type?: components["parameters"]["rowFilter.security_alerts.alert_type"];
+                    severity?: components["parameters"]["rowFilter.security_alerts.severity"];
+                    title?: components["parameters"]["rowFilter.security_alerts.title"];
+                    message?: components["parameters"]["rowFilter.security_alerts.message"];
+                    source?: components["parameters"]["rowFilter.security_alerts.source"];
+                    pattern_id?: components["parameters"]["rowFilter.security_alerts.pattern_id"];
+                    ip?: components["parameters"]["rowFilter.security_alerts.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.security_alerts.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.security_alerts.ip_subnet"];
+                    user_id?: components["parameters"]["rowFilter.security_alerts.user_id"];
+                    status?: components["parameters"]["rowFilter.security_alerts.status"];
+                    acknowledged_at?: components["parameters"]["rowFilter.security_alerts.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.security_alerts.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.security_alerts.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.security_alerts.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.security_alerts.resolution_notes"];
+                    alert_data?: components["parameters"]["rowFilter.security_alerts.alert_data"];
+                    expires_at?: components["parameters"]["rowFilter.security_alerts.expires_at"];
+                    is_mock?: components["parameters"]["rowFilter.security_alerts.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.security_alerts.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.security_alerts.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.security_alerts.id"];
+                    alert_type?: components["parameters"]["rowFilter.security_alerts.alert_type"];
+                    severity?: components["parameters"]["rowFilter.security_alerts.severity"];
+                    title?: components["parameters"]["rowFilter.security_alerts.title"];
+                    message?: components["parameters"]["rowFilter.security_alerts.message"];
+                    source?: components["parameters"]["rowFilter.security_alerts.source"];
+                    pattern_id?: components["parameters"]["rowFilter.security_alerts.pattern_id"];
+                    ip?: components["parameters"]["rowFilter.security_alerts.ip"];
+                    ip_normalized?: components["parameters"]["rowFilter.security_alerts.ip_normalized"];
+                    ip_subnet?: components["parameters"]["rowFilter.security_alerts.ip_subnet"];
+                    user_id?: components["parameters"]["rowFilter.security_alerts.user_id"];
+                    status?: components["parameters"]["rowFilter.security_alerts.status"];
+                    acknowledged_at?: components["parameters"]["rowFilter.security_alerts.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.security_alerts.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.security_alerts.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.security_alerts.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.security_alerts.resolution_notes"];
+                    alert_data?: components["parameters"]["rowFilter.security_alerts.alert_data"];
+                    expires_at?: components["parameters"]["rowFilter.security_alerts.expires_at"];
+                    is_mock?: components["parameters"]["rowFilter.security_alerts.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.security_alerts.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.security_alerts.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["security_alerts"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/projects": {
         parameters: {
             query?: never;
@@ -3316,6 +4231,41 @@ export interface components {
             last_activity_at?: string;
             /** Format: timestamp with time zone */
             email_verified_at?: string;
+            /**
+             * Format: text
+             * @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157).
+             */
+            first_name?: string;
+            /**
+             * Format: text
+             * @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed.
+             */
+            last_name?: string;
+            /**
+             * Format: timestamp with time zone
+             * @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller.
+             */
+            last_login_at?: string;
+            /** Format: timestamp with time zone */
+            disabled_at?: string;
+            /**
+             * Format: uuid
+             * @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason).
+             *
+             *     Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            disabled_by?: string;
+            /**
+             * Format: text
+             * @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string.
+             */
+            disabled_reason?: string;
+            /**
+             * Format: timestamp with time zone
+             * @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered.
+             */
+            disabled_until?: string;
         };
         auth_tokens: {
             /**
@@ -3445,6 +4395,42 @@ export interface components {
              */
             created_at: string;
         };
+        pattern_login_attempts: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `security_detected_patterns.id`.<fk table='security_detected_patterns' column='id'/>
+             */
+            pattern_id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `login_attempts.id`.<fk table='login_attempts' column='id'/>
+             */
+            login_attempt_id: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_primary_evidence: boolean;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_mock: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+        };
         customers: {
             /**
              * Format: uuid
@@ -3469,6 +4455,205 @@ export interface components {
              * @default now()
              */
             created_at: string;
+        };
+        security_detected_patterns: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            pattern_type: string;
+            /**
+             * Format: text
+             * @default medium
+             */
+            severity: string;
+            /** Format: text */
+            ip?: string;
+            /** Format: text */
+            ip_normalized?: string;
+            /** Format: text */
+            ip_subnet?: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            detection_timestamp: string;
+            /** Format: timestamp with time zone */
+            time_window_start: string;
+            /** Format: timestamp with time zone */
+            time_window_end: string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            attempt_count: number;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            unique_email_count: number;
+            /** Format: jsonb */
+            evidence: unknown;
+            /**
+             * Format: text
+             * @default active
+             */
+            status: string;
+            /** Format: timestamp with time zone */
+            resolved_at?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            resolved_by?: string;
+            /** Format: text */
+            resolution_notes?: string;
+            /** Format: jsonb */
+            metadata?: unknown;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_mock: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
+        };
+        captcha: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: text
+             * @default text
+             */
+            type: string;
+            /** Format: text */
+            token_hash: string;
+            /** Format: text */
+            challenge: string;
+            /** Format: text */
+            solution_salt: string;
+            /** Format: text */
+            solution_hash: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_used: boolean;
+            /** Format: timestamp with time zone */
+            used_at?: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            issued_at: string;
+            /** Format: timestamp with time zone */
+            expires_at: string;
+            /** Format: text */
+            ip?: string;
+            /** Format: text */
+            ip_normalized?: string;
+            /** Format: text */
+            ip_subnet?: string;
+            /** Format: jsonb */
+            metadata?: unknown;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_mock: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
+        };
+        ip_reputation: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            ip: string;
+            /** Format: text */
+            ip_normalized: string;
+            /** Format: text */
+            ip_subnet?: string;
+            /**
+             * Format: text
+             * @default good
+             */
+            status: string;
+            /**
+             * Format: numeric
+             * @default 100
+             */
+            reputation_score: number;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            failed_attempts: number;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            captcha_required_count: number;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_blocked: boolean;
+            /** Format: timestamp with time zone */
+            blocked_until?: string;
+            /** Format: jsonb */
+            geo_location?: unknown;
+            /** Format: jsonb */
+            statistics?: unknown;
+            /** Format: jsonb */
+            block_history?: unknown;
+            /** Format: jsonb */
+            metadata?: unknown;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_mock: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
         };
         privacy_requests: {
             /**
@@ -3754,6 +4939,91 @@ export interface components {
              */
             group_id: string;
         };
+        security_alerts: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            alert_type: string;
+            /**
+             * Format: text
+             * @default medium
+             */
+            severity: string;
+            /** Format: text */
+            title: string;
+            /** Format: text */
+            message: string;
+            /**
+             * Format: text
+             * @default system
+             */
+            source: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `security_detected_patterns.id`.<fk table='security_detected_patterns' column='id'/>
+             */
+            pattern_id?: string;
+            /** Format: text */
+            ip?: string;
+            /** Format: text */
+            ip_normalized?: string;
+            /** Format: text */
+            ip_subnet?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id?: string;
+            /**
+             * Format: text
+             * @default active
+             */
+            status: string;
+            /** Format: timestamp with time zone */
+            acknowledged_at?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            acknowledged_by?: string;
+            /** Format: timestamp with time zone */
+            resolved_at?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            resolved_by?: string;
+            /** Format: text */
+            resolution_notes?: string;
+            /** Format: jsonb */
+            alert_data?: unknown;
+            /** Format: timestamp with time zone */
+            expires_at?: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_mock: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
+        };
         projects: {
             /**
              * Format: uuid
@@ -3885,6 +5155,19 @@ export interface components {
         /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
         "rowFilter.users.last_activity_at": string;
         "rowFilter.users.email_verified_at": string;
+        /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157). */
+        "rowFilter.users.first_name": string;
+        /** @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed. */
+        "rowFilter.users.last_name": string;
+        /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller. */
+        "rowFilter.users.last_login_at": string;
+        "rowFilter.users.disabled_at": string;
+        /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
+        "rowFilter.users.disabled_by": string;
+        /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string. */
+        "rowFilter.users.disabled_reason": string;
+        /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
+        "rowFilter.users.disabled_until": string;
         "rowFilter.auth_tokens.id": string;
         "rowFilter.auth_tokens.user_id": string;
         "rowFilter.auth_tokens.subject_hmac": string;
@@ -3920,11 +5203,71 @@ export interface components {
         "rowFilter.company_profile.support_email": string;
         "rowFilter.company_profile.privacy_contact_email": string;
         "rowFilter.company_profile.created_at": string;
+        "rowFilter.pattern_login_attempts.id": string;
+        "rowFilter.pattern_login_attempts.pattern_id": string;
+        "rowFilter.pattern_login_attempts.login_attempt_id": string;
+        "rowFilter.pattern_login_attempts.is_primary_evidence": string;
+        "rowFilter.pattern_login_attempts.is_mock": string;
+        "rowFilter.pattern_login_attempts.created_at": string;
         "rowFilter.customers.group_id": string;
         "rowFilter.customers.id": string;
         "rowFilter.customers.name": string;
         "rowFilter.customers.internal_notes": string;
         "rowFilter.customers.created_at": string;
+        "rowFilter.security_detected_patterns.id": string;
+        "rowFilter.security_detected_patterns.pattern_type": string;
+        "rowFilter.security_detected_patterns.severity": string;
+        "rowFilter.security_detected_patterns.ip": string;
+        "rowFilter.security_detected_patterns.ip_normalized": string;
+        "rowFilter.security_detected_patterns.ip_subnet": string;
+        "rowFilter.security_detected_patterns.detection_timestamp": string;
+        "rowFilter.security_detected_patterns.time_window_start": string;
+        "rowFilter.security_detected_patterns.time_window_end": string;
+        "rowFilter.security_detected_patterns.attempt_count": string;
+        "rowFilter.security_detected_patterns.unique_email_count": string;
+        "rowFilter.security_detected_patterns.evidence": string;
+        "rowFilter.security_detected_patterns.status": string;
+        "rowFilter.security_detected_patterns.resolved_at": string;
+        "rowFilter.security_detected_patterns.resolved_by": string;
+        "rowFilter.security_detected_patterns.resolution_notes": string;
+        "rowFilter.security_detected_patterns.metadata": string;
+        "rowFilter.security_detected_patterns.is_mock": string;
+        "rowFilter.security_detected_patterns.created_at": string;
+        "rowFilter.security_detected_patterns.updated_at": string;
+        "rowFilter.captcha.id": string;
+        "rowFilter.captcha.type": string;
+        "rowFilter.captcha.token_hash": string;
+        "rowFilter.captcha.challenge": string;
+        "rowFilter.captcha.solution_salt": string;
+        "rowFilter.captcha.solution_hash": string;
+        "rowFilter.captcha.is_used": string;
+        "rowFilter.captcha.used_at": string;
+        "rowFilter.captcha.issued_at": string;
+        "rowFilter.captcha.expires_at": string;
+        "rowFilter.captcha.ip": string;
+        "rowFilter.captcha.ip_normalized": string;
+        "rowFilter.captcha.ip_subnet": string;
+        "rowFilter.captcha.metadata": string;
+        "rowFilter.captcha.is_mock": string;
+        "rowFilter.captcha.created_at": string;
+        "rowFilter.captcha.updated_at": string;
+        "rowFilter.ip_reputation.id": string;
+        "rowFilter.ip_reputation.ip": string;
+        "rowFilter.ip_reputation.ip_normalized": string;
+        "rowFilter.ip_reputation.ip_subnet": string;
+        "rowFilter.ip_reputation.status": string;
+        "rowFilter.ip_reputation.reputation_score": string;
+        "rowFilter.ip_reputation.failed_attempts": string;
+        "rowFilter.ip_reputation.captcha_required_count": string;
+        "rowFilter.ip_reputation.is_blocked": string;
+        "rowFilter.ip_reputation.blocked_until": string;
+        "rowFilter.ip_reputation.geo_location": string;
+        "rowFilter.ip_reputation.statistics": string;
+        "rowFilter.ip_reputation.block_history": string;
+        "rowFilter.ip_reputation.metadata": string;
+        "rowFilter.ip_reputation.is_mock": string;
+        "rowFilter.ip_reputation.created_at": string;
+        "rowFilter.ip_reputation.updated_at": string;
         "rowFilter.privacy_requests.id": string;
         "rowFilter.privacy_requests.request_key": string;
         "rowFilter.privacy_requests.user_id": string;
@@ -3993,6 +5336,28 @@ export interface components {
         "rowFilter.privacy_purge_queue.error": string;
         "rowFilter.user_groups.user_id": string;
         "rowFilter.user_groups.group_id": string;
+        "rowFilter.security_alerts.id": string;
+        "rowFilter.security_alerts.alert_type": string;
+        "rowFilter.security_alerts.severity": string;
+        "rowFilter.security_alerts.title": string;
+        "rowFilter.security_alerts.message": string;
+        "rowFilter.security_alerts.source": string;
+        "rowFilter.security_alerts.pattern_id": string;
+        "rowFilter.security_alerts.ip": string;
+        "rowFilter.security_alerts.ip_normalized": string;
+        "rowFilter.security_alerts.ip_subnet": string;
+        "rowFilter.security_alerts.user_id": string;
+        "rowFilter.security_alerts.status": string;
+        "rowFilter.security_alerts.acknowledged_at": string;
+        "rowFilter.security_alerts.acknowledged_by": string;
+        "rowFilter.security_alerts.resolved_at": string;
+        "rowFilter.security_alerts.resolved_by": string;
+        "rowFilter.security_alerts.resolution_notes": string;
+        "rowFilter.security_alerts.alert_data": string;
+        "rowFilter.security_alerts.expires_at": string;
+        "rowFilter.security_alerts.is_mock": string;
+        "rowFilter.security_alerts.created_at": string;
+        "rowFilter.security_alerts.updated_at": string;
         "rowFilter.projects.group_id": string;
         "rowFilter.projects.id": string;
         "rowFilter.projects.name": string;
@@ -4014,6 +5379,15 @@ export interface components {
         "rowFilter.login_attempts.attempt_kind": string;
     };
     requestBodies: {
+        /** @description pattern_login_attempts */
+        pattern_login_attempts: {
+            content: {
+                "application/json": components["schemas"]["pattern_login_attempts"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["pattern_login_attempts"];
+                "application/vnd.pgrst.object+json": components["schemas"]["pattern_login_attempts"];
+                "text/csv": components["schemas"]["pattern_login_attempts"];
+            };
+        };
         /** @description login_attempts */
         login_attempts: {
             content: {
@@ -4030,6 +5404,42 @@ export interface components {
                 "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["customers"];
                 "application/vnd.pgrst.object+json": components["schemas"]["customers"];
                 "text/csv": components["schemas"]["customers"];
+            };
+        };
+        /** @description captcha */
+        captcha: {
+            content: {
+                "application/json": components["schemas"]["captcha"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["captcha"];
+                "application/vnd.pgrst.object+json": components["schemas"]["captcha"];
+                "text/csv": components["schemas"]["captcha"];
+            };
+        };
+        /** @description security_alerts */
+        security_alerts: {
+            content: {
+                "application/json": components["schemas"]["security_alerts"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["security_alerts"];
+                "application/vnd.pgrst.object+json": components["schemas"]["security_alerts"];
+                "text/csv": components["schemas"]["security_alerts"];
+            };
+        };
+        /** @description ip_reputation */
+        ip_reputation: {
+            content: {
+                "application/json": components["schemas"]["ip_reputation"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["ip_reputation"];
+                "application/vnd.pgrst.object+json": components["schemas"]["ip_reputation"];
+                "text/csv": components["schemas"]["ip_reputation"];
+            };
+        };
+        /** @description security_detected_patterns */
+        security_detected_patterns: {
+            content: {
+                "application/json": components["schemas"]["security_detected_patterns"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["security_detected_patterns"];
+                "application/vnd.pgrst.object+json": components["schemas"]["security_detected_patterns"];
+                "text/csv": components["schemas"]["security_detected_patterns"];
             };
         };
         /** @description privacy_request_regulations */
