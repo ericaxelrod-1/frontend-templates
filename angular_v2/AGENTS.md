@@ -492,6 +492,45 @@ CREATE POLICY row_scope ON projects USING (
   caller-supplied, `current_user` is not, and a member forging `"role":"app_admin"`
   into their own validly-signed token gets zero rows. *(In a policy `current_user` is
   right; inside a `SECURITY DEFINER` function it is wrong. See §Capability.)*
+
+- **Eleven tables in `angular/docs/DATABASE_SCHEMA.md` are SQLite residue and must
+  NOT be recreated.** That document is the SQLite design — its own line 35 says "a
+  clear structure primarily for SQLite" — and it is the single most likely thing to
+  pattern-match a migration off, because it reads like a specification. Creating these
+  would be §2.1 exactly: a populated table that reads like a working mechanism and is
+  not one.
+
+  | Retired table(s) | Why |
+  |---|---|
+  | `rls_rules`, `rls_join_paths`, `rls_join_conditions`, `rls_scope_templates` | SQLite has no row-level security, so tenant isolation meant keeping the predicate **as data** and having the *application* append it to every query — enforcement in application code, which is the design the previous ~2,400-line implementation used and enforced nothing. PostgreSQL enforces this in `0001_rls_foundation.sql`. |
+  | `user_permissions`, `group_permissions` | Both carry `is_granted`, and `is_granted = false` **is** a deny. This section forbids denies, per-user grants and precedence rules. |
+  | `ui_components`, `frontend_routes`, `api_endpoints` + their four permission joins, `cache_components`, `cache_routes`, `cache_endpoints` | The same mechanism aimed at the frontend: "which route and which component need which permission". Table grants and real route guards replaced it. |
+  | `resources` | Empty in the document itself; `permissions.resource_name` carries it. |
+
+  **The argument in one line: a stored predicate must be interpreted by something.**
+  If the *application* interprets it, the application is the enforcement point (§B2's
+  prohibition). If the *database* interprets it, the database already had RLS and the
+  table was never needed. There is no third option — which is why **no new group ever
+  needs a new rule**, and why that is forced rather than chosen: onboarding a customer
+  automatically, with no deploy, requires the policy to be group-agnostic, and
+  `org_closure` is what makes it so.
+
+  **A row in `rls_rules` is a *claim about what enforces a tenant's data***, which is
+  why it must not be mockable either. The legacy RLS pages are not thereby abandoned:
+  they become the surfaces that actually change enforcement — group membership (scope)
+  and role assignment (capability) — plus a read-only inspector over `pg_policies`.
+
+- **`migration:revert` reverts EVERYTHING, not one step.** `node scripts/migrate.ts
+  down` unwinds the whole ledger back to `0001`. It is not the inverse of a single
+  `APPLY` line, and using it to undo one bad migration destroys every migration after
+  it. Worse, the result is not re-appliable on its own: reverting drops columns and
+  tables that later data references, so the next `migration:run` fails FK validation
+  (measured: `0008` refusing `user_roles.user_id` orphans that a migration cannot count,
+  because it runs as the owner of a FORCE-RLS table and reads zero rows).
+  **To undo one migration, drop its objects by hand** and delete its row from
+  `migrations`. To recover from a botched revert, the supported path is
+  `dropdb app_dev && createdb -O app app_dev && npm run db:seed`.
+
 - **The scoping subquery is hoisted once per statement — a `hashed SubPlan`, not an
   `InitPlan`.** Measured `loops = 1` at 305 and at 3305 rows; a correlated variant
   gives `loops = 305`. **Uncorrelatedness buys it, not the node name** — `x IN
