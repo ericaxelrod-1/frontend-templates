@@ -609,10 +609,9 @@ Named here rather than written into the steps above as if they existed.
 - **No CAPTCHA, no geo-IP, no alerting module.** `AGENTS.md` B6 requires them for
   a real deployment; none is in the tree.
 - **No frontend HTTP layer.** No service, no `HttpClient`, no API base URL, no
-  proxy config, no environment file. `src/app/api/schema.ts` is generated from a
-  committed placeholder `openapi.json` with no paths, because the contract is
-  regenerated from a live PostgREST and that has not been run against a deployed
-  database.
+  proxy config, no environment file. `src/app/api/schema.ts` is generated from the
+  committed `openapi.json`, which `npm run smoke` now checks against the live
+  catalog — a spec that omits a table or column the database has fails `verify`.
 - **No routes in the frontend.** `app.routes.ts` is empty, so nothing is
   prerendered and option **B** needs the `index.cr.html` copy described above.
 - **No container, systemd, or process-supervisor configuration**, and no

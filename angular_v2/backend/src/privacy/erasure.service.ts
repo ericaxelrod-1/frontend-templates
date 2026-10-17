@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { DatabaseConnectionSource } from '../common/database-pool.js';
 import { SharedDatabasePool } from '../common/database-pool.js';
@@ -259,6 +259,20 @@ UPDATE privacy_requests
    AND status IN ('open', 'in_progress')
 `;
 
+/**
+ * Gap B: Statutory compliance audit record (11 CCR §7101(b)).
+ *
+ * Appends the 'responded' / 'fulfilled' record to `privacy_request_audits`.
+ * Written through the narrow `authz.record_erasure_audit` SECURITY DEFINER seam
+ * running as the owner (`app`), called under `SET LOCAL ROLE app_admin`.
+ *
+ * `subject_hmac` is computed application-side under `this.env.pepper` (which is
+ * never sent to PostgreSQL) and passed in along with `this.env.pepperKid`.
+ */
+export const RECORD_ERASURE_AUDIT_SQL = `
+SELECT authz.record_erasure_audit($1, $2, $3)
+`;
+
 /** bcrypt cost, matched to the cost `AuthService` hashes at. A change here is a change to login timing too. */
 const BCRYPT_COST = 12;
 
@@ -503,6 +517,7 @@ export class ErasureService {
     // Never recoverable: 32 CSPRNG bytes whose plaintext exists only in this
     // frame, and which nothing stores.
     const unusablePassword = await bcrypt.hash(randomBytes(32).toString('hex'), BCRYPT_COST);
+    const subjectHmac = createHmac('sha256', this.env.pepper).update(subject.id).digest();
 
     const client: PoolClient = await this.pool.connect();
     let committed = false;
@@ -534,6 +549,7 @@ export class ErasureService {
       await client.query(ANONYMISE_LOGIN_ATTEMPTS_SQL, [subject.username, neutralUsername]);
       await client.query(REVOKE_SESSIONS_SQL, [subject.id]);
       await client.query(CLOSE_OPEN_REQUESTS_SQL, [subject.id]);
+      await client.query(RECORD_ERASURE_AUDIT_SQL, [subject.id, subjectHmac, this.env.pepperKid]);
 
       await client.query('COMMIT');
       committed = true;

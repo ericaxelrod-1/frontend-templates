@@ -15,6 +15,7 @@ import {
   ANONYMISE_LOGIN_ATTEMPTS_SQL,
   ANONYMISE_SUBJECT_SQL,
   CLOSE_OPEN_REQUESTS_SQL,
+  RECORD_ERASURE_AUDIT_SQL,
   REVOKE_SESSIONS_SQL,
   ErasureService,
   SELECT_SUBJECT_SQL,
@@ -36,21 +37,22 @@ import { environmentFor } from '../email/email-environment-fixture.js';
  * receipt is a genuine `ECONNREFUSED` against a port nothing binds, for the same
  * reason `email.service.spec.ts` uses one.
  *
- * **The `email_messages` write is stood in for.** `EmailAuditWriter` opens its own
- * `pg.Pool` on first use and this machine has no PostgreSQL, so the one thing
- * stubbed is the audit INSERT — and it is replaced by a RECORDER, so the assertion
- * below still proves the attempt was attributed to the subject. That is a test
- * double for a database, inside a spec, which is exactly what
- * `test/support/breaker-harness.ts` already does for the retention jobs; §2.2's ban
- * is on fakes in application code.
+ * **The `email_messages` write is stood in for.** `EmailAuditWriter` reaches the
+ * database through the process's ONE pool (`common/database-pool.ts`), and this
+ * machine has no PostgreSQL, so the one thing stubbed is the audit INSERT — and it
+ * is replaced by a RECORDER, so the assertion below still proves the attempt was
+ * attributed to the subject. That is a test double for a database, inside a spec,
+ * which is exactly what `test/support/breaker-harness.ts` already does for the
+ * retention jobs; §2.2's ban is on fakes in application code.
  *
  * ## Why the existing scripted pool and not a new one
  *
  * `test/support/breaker-harness.ts` already ships a scripted pg *client* double
- * behind the same narrow connection port the retention jobs use, and
- * `ErasureConnectionSource` is structurally that port. Reusing it is §2.4 rather
- * than tidiness: a second scripted client is a second mechanism for "record the
- * statements a service issued", and it is the mechanism that would drift.
+ * behind the same narrow connection port every database-touching service uses, and
+ * that port — `DatabaseConnectionSource` — is what this suite's own
+ * `ErasureService` and `EmailService` are constructed with. Reusing it is §2.4
+ * rather than tidiness: a second scripted client is a second mechanism for "record
+ * the statements a service issued", and it is the mechanism that would drift.
  *
  * ## What the double can and cannot show
  *
@@ -295,7 +297,8 @@ describe('the whole write is one transaction, in this order', () => {
     expect(at('UPDATE users SET email')).toBeLessThan(at('UPDATE login_attempts SET username'));
     expect(at('UPDATE login_attempts SET username')).toBeLessThan(at('UPDATE refresh_tokens SET revoked_at'));
     expect(at('UPDATE refresh_tokens SET revoked_at')).toBeLessThan(at('UPDATE privacy_requests SET status'));
-    expect(at('UPDATE privacy_requests SET status')).toBeLessThan(issued.lastIndexOf('COMMIT'));
+    expect(at('UPDATE privacy_requests SET status')).toBeLessThan(at('authz.record_erasure_audit'));
+    expect(at('authz.record_erasure_audit')).toBeLessThan(issued.lastIndexOf('COMMIT'));
   });
 
   it('rolls the whole thing back when a later statement fails, rather than leaving a half-rewritten row', async () => {
@@ -339,6 +342,7 @@ describe('the whole write is one transaction, in this order', () => {
     }
     expect(REVOKE_SESSIONS_SQL).toMatch(/revoked_at IS NULL/);
     expect(CLOSE_OPEN_REQUESTS_SQL).toMatch(/status IN \('open', 'in_progress'\)/);
+    expect(RECORD_ERASURE_AUDIT_SQL).toContain('authz.record_erasure_audit');
   });
 
   it('replaces the password hash rather than leaving one that still verifies', async () => {
@@ -401,8 +405,8 @@ describe('user A cannot erase user B, because the API cannot express it', () => 
       /\/\*[\s\S]*?\*\//g,
       '',
     );
-    // Past the class declaration, because the `ErasureConnectionSource` type above
-    // it declares a `connect(` and a class-body scan would find it.
+    // Past the class declaration, because the `@Inject(SharedDatabasePool)`
+    // constructor parameter names a type a class-body scan would find.
     const source = whole.slice(whole.indexOf('export class ErasureService'));
 
     const methods = [

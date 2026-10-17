@@ -18,6 +18,7 @@ function completeSource(): Record<string, string> {
     AUTH_TOKEN_PEPPER_KID: 'test-v1',
     JWT_SECRET: 'a-completely-different-jwt-secret-000000000001',
     PRIVACY_HMAC_PEPPER: 'a-completely-different-privacy-pepper-00000001',
+    POSTGREST_URL: 'http://127.0.0.1:3001',
   };
 }
 

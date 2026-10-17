@@ -23,6 +23,12 @@ import { NodemailerEmailProvider } from './nodemailer-email.provider.js';
  * it always speaks the same transport; what configuration changes between
  * environments is the destination it speaks to, never the mechanism
  * (ADR-0024).
+ *
+ * `DatabasePoolModule` is imported for the ONE pool `EmailAuditWriter` writes
+ * through. `EmailAuditWriter` used to build a `pg.Pool` of its own inside its
+ * constructor — a second pool in a process that already had four, and a
+ * connection budget nobody could see the whole of. See
+ * `src/common/database-pool.ts` §What this replaces.
  */
 @Module({
   imports: [ConfigModule, DatabasePoolModule],

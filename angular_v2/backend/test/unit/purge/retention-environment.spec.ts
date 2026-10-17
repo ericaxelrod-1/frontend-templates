@@ -62,6 +62,7 @@ function withTombstoneDays(value: string): Record<string, string> {
   return {
     RETENTION_TOMBSTONE_DAYS: value,
     RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+    POSTGREST_URL: 'http://127.0.0.1:3001',
   };
 }
 
@@ -69,6 +70,7 @@ function withInactiveAccountDays(value: string): Record<string, string> {
   return {
     RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
     RETENTION_INACTIVE_ACCOUNT_DAYS: value,
+    POSTGREST_URL: 'http://127.0.0.1:3001',
   };
 }
 
@@ -351,7 +353,7 @@ describe('the BOOT refuses a window below the floor, which is the control the nu
     // under test, and the refusal cannot be a different module's error wearing the
     // right shape.
     await import('../../../src/config/load-env-file.js');
-    process.env['POSTGREST_URL'] = process.env['POSTGREST_URL'] ?? 'http://127.0.0.1:3001';
+    process.env['POSTGREST_URL'] = process.env['POSTGREST_URL'] || 'http://127.0.0.1:3001';
     Object.assign(process.env, overrides);
 
     try {
@@ -369,6 +371,7 @@ describe('the BOOT refuses a window below the floor, which is the control the nu
     const thrown = await bootWith({
       RETENTION_TOMBSTONE_DAYS: '1',
       RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+      POSTGREST_URL: 'http://127.0.0.1:3001',
     });
 
     expect(thrown?.name, 'the boot did not abort').toBe('RetentionEnvironmentError');
@@ -381,6 +384,7 @@ describe('the BOOT refuses a window below the floor, which is the control the nu
     const thrown = await bootWith({
       RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
       RETENTION_INACTIVE_ACCOUNT_DAYS: '30',
+      POSTGREST_URL: 'http://127.0.0.1:3001',
     });
 
     expect(thrown?.name, 'the boot did not abort').toBe('RetentionEnvironmentError');
@@ -393,6 +397,7 @@ describe('the BOOT refuses a window below the floor, which is the control the nu
     const thrown = await bootWith({
       RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
       RETENTION_INACTIVE_ACCOUNT_DAYS: '',
+      POSTGREST_URL: 'http://127.0.0.1:3001',
     });
 
     expect(thrown?.name, 'the boot did not abort').toBe('RetentionEnvironmentError');
@@ -406,6 +411,7 @@ describe('the BOOT refuses a window below the floor, which is the control the nu
     const thrown = await bootWith({
       RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
       RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+      POSTGREST_URL: 'http://127.0.0.1:3001',
     });
     expect(thrown, `a source at both floors was refused:\n${thrown?.message ?? ''}`).toBeUndefined();
   });

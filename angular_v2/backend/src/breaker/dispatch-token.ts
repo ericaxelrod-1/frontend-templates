@@ -106,6 +106,16 @@ export const PURGE_SWEEPER: DispatchToken = 'purge.sweeper';
 export const PURGE_ENQUEUER: DispatchToken = 'purge.enqueuer';
 
 /**
+ * The authenticated account erasure route (`PrivacyController.erase`).
+ *
+ * Runs `ErasureService.eraseSelf` on a claimless `app_admin` session — NOT yet on the
+ * identity seam (spec-identity.md), which is proven but not yet consumed here.
+ * Named in `KNOWN_DISPATCH_TOKENS` so `RouteCensus` admits the mounted route at boot.
+ * Sheddable under memory pressure (not in `BREAKER_PROTECTED` by default).
+ */
+export const PRIVACY_ERASE: DispatchToken = 'privacy.erase';
+
+/**
  * Every dispatch site this build knows about.
  *
  * The interceptor derives a token from `AuthController` + method name, and the
@@ -160,6 +170,7 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   BREAKER_GATE,
   PURGE_SWEEPER,
   PURGE_ENQUEUER,
+  PRIVACY_ERASE,
 ]);
 
 /**

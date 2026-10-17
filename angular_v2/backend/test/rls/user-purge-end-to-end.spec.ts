@@ -256,11 +256,11 @@ function runSeed(): { readonly code: number; readonly output: string } {
 /**
  * The escalation boundary PostgREST itself uses, with the CONFIGURED password.
  *
- * A `Pool` rather than a bare `Client`, because `PurgeExecutor.execute()` takes a
- * `PoolClient` and the sweeper takes its connection from `PurgeConnectionSource
- * .connect()` — which is a pool. A `Client` is not a `PoolClient` (it has no
- * `release()`), so widening the shipped port type to accept one would be editing
- * the mechanism to suit the test.
+* A `Pool` rather than a bare `Client`, because `PurgeExecutor.execute()` takes a
+ * `PoolClient` and the sweeper takes its connection from the shipped port's
+ * `connect()` — which is a pool. A `Client` is not a `PoolClient` (it has no
+ * `release()`), so widening `DatabaseConnectionSource` to accept one would be
+ * editing the mechanism to suit the test.
  *
  * ONE pool for the file, closed in `afterAll`. A pool built per call would leave a
  * socket open behind every probe, and the last one would be held against a

@@ -140,6 +140,7 @@ describe('the census enumerates the routes Nest actually mounted', () => {
         'POST /auth/email-verification/request',
         'POST /auth/email-verification/confirm',
         'GET /auth/me',
+        'POST /privacy/erase',
       ]);
 
       const verdict = assertRouteCoverage(routes);
@@ -152,6 +153,7 @@ describe('the census enumerates the routes Nest actually mounted', () => {
         'auth.email_verification_request',
         'auth.email_verification_confirm',
         'auth.me',
+        'privacy.erase',
       ]);
       // The graph mounts no fixture, so nothing is exempt — and a gate that only passed
       // because of its exemption table would pass here while the table covered a route

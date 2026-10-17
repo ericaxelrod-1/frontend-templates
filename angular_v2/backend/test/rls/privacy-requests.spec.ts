@@ -1734,8 +1734,8 @@ describe('privacy_requests · the derived category is structural, not documented
   it(
     'both tables a serving role writes are ENABLEd and FORCEd; the audit table is ENABLEd and deliberately NOT FORCEd',
     () => {
-      // The audit table is not FORCEd because its only writer is a SECURITY DEFINER
-      // function running as the OWNER: under FORCE, `current_user` inside it would be
+      // The audit table is not FORCEd because its writers are SECURITY DEFINER
+      // functions running as the OWNER: under FORCE, `current_user` inside them would be
       // the owner, the predicate false, and EVERY audit write would fail — the
       // compliance record unreadable by construction. The trade is asserted rather than
       // left in a comment, because a later "FORCE everything" sweep would close it with
@@ -1897,55 +1897,62 @@ describe('privacy_request_audits · ENABLEd, NOT FORCEd, and the residual is bou
   );
 
   it(
-    'its only writer is a SECURITY DEFINER function, and PUBLIC may not call it — which is what makes not-FORCEing the table bounded',
+    'the two authz writers are SECURITY DEFINER functions, and PUBLIC may not call them — which is what makes not-FORCEing the table bounded',
     () => {
       // The half of the trade that actually decays, and the exact parallel of
       // `privacy-purge-queue.spec.ts` §8's writer assertion.
       //
       // Because the table is not FORCEd and its only policy is a SELECT capability
-      // gate, `authz.append_privacy_request_audit` is subject to NO policy at all: it
-      // runs as the OWNER and writes a table with no INSERT policy to pass. Its
-      // narrowness is therefore carried ENTIRELY by `EXECUTE`. Grant it to PUBLIC, or
+      // gate, the writer functions are subject to NO policy at all: they
+      // run as the OWNER and write a table with no INSERT policy to pass. Their
+      // narrowness is therefore carried ENTIRELY by `EXECUTE`. Grant them to PUBLIC, or
       // revoke the revoke, and every caller in the cluster inherits an
       // owner-privileged writer over the statutory record of every consumer request
       // the system holds — silently, with no error anywhere.
-      const signature =
-        'authz.append_privacy_request_audit(text, uuid, timestamptz, text, text, timestamptz, text, text, text, bytea, text, uuid)';
+      const writerSignatures = [
+        'authz.append_privacy_request_audit(text, uuid, timestamptz, text, text, timestamptz, text, text, text, bytea, text, uuid)',
+        'authz.record_erasure_audit(uuid, bytea, text, uuid)',
+      ] as const;
 
       // The DEFINER fact itself, which nothing asserted before: a SECURITY INVOKER
-      // rewrite of this function would run as its caller, hit the missing INSERT
+      // rewrite of these functions would run as their caller, hit the missing INSERT
       // privilege, and fail — while every denial assertion in §5 above still passed,
       // because §5 asserts who may CALL the function and not what it runs as.
-      expect(
-        superuserRows<{ prosecdef: boolean }>(
-          `SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('${signature}')`,
-        )[0]?.prosecdef,
-        'append_privacy_request_audit is not SECURITY DEFINER, so it does not run as the owner and this table does not need the not-FORCEd trade at all',
-      ).toBe(true);
+      for (const signature of writerSignatures) {
+        expect(
+          superuserRows<{ prosecdef: boolean }>(
+            `SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('${signature}')`,
+          )[0]?.prosecdef,
+          `${signature} is not SECURITY DEFINER, so it does not run as the owner and this table does not need the not-FORCEd trade at all`,
+        ).toBe(true);
 
-      // The grantee set, from the ACL rather than from `has_function_privilege`
-      // probes: §5 checks four named roles, and this checks that there is no FIFTH.
-      const callables = superuserRows<{ grantee: string }>(
-        `SELECT coalesce(r.rolname, 'PUBLIC') AS grantee
-           FROM pg_proc p
-           JOIN pg_namespace n ON n.oid = p.pronamespace
-           CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
-           LEFT JOIN pg_roles r ON r.oid = acl.grantee
-          WHERE n.nspname = 'authz' AND p.oid = to_regprocedure('${signature}')
-          GROUP BY 1
-          ORDER BY 1`,
-      );
-      // The owner is the identity these definers deliberately run as, so the
-      // assertion is about the SECOND grantee set: PUBLIC holds nothing, and the only
-      // non-owner callers are the two serving roles §5 already names.
-      expect(callables.map((row) => row.grantee)).not.toContain('PUBLIC');
-      expect(
-        callables.map((row) => row.grantee).filter((grantee) => grantee !== databaseConfig().user),
-        'a role other than the two serving roles may append a compliance record',
-      ).toEqual(['app_admin', 'app_member']);
+        // The grantee set, from the ACL rather than from `has_function_privilege`
+        // probes: §5 checks four named roles, and this checks that there is no FIFTH.
+        const callables = superuserRows<{ grantee: string }>(
+          `SELECT coalesce(r.rolname, 'PUBLIC') AS grantee
+             FROM pg_proc p
+             JOIN pg_namespace n ON n.oid = p.pronamespace
+             CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
+             LEFT JOIN pg_roles r ON r.oid = acl.grantee
+            WHERE n.nspname = 'authz' AND p.oid = to_regprocedure('${signature}')
+            GROUP BY 1
+            ORDER BY 1`,
+        );
+        // The owner is the identity these definers deliberately run as, so the
+        // assertion is about the SECOND grantee set: PUBLIC holds nothing, and the only
+        // non-owner callers are the two serving roles §5 already names.
+        expect(callables.map((row) => row.grantee)).not.toContain('PUBLIC');
+        const expectedGrantees = signature.startsWith('authz.record_erasure_audit')
+          ? ['app_admin']
+          : ['app_admin', 'app_member'];
+        expect(
+          callables.map((row) => row.grantee).filter((grantee) => grantee !== databaseConfig().user),
+          `${signature} is granted to a role other than the expected role(s)`,
+        ).toEqual(expectedGrantees);
+      }
 
-      // AND THERE IS ONLY ONE WRITER. Read from the function bodies rather than from
-      // a remembered list, so a second definable writer added without a grant is a
+      // AND THERE ARE ONLY THESE TWO WRITERS. Read from the function bodies rather than from
+      // a remembered list, so a third definable writer added without a grant is a
       // red line here rather than a silent extension of the set — the same argument
       // `privacy-purge-queue.spec.ts` makes about its six writers, and the reason
       // `to_regprocedure` above is paired with it: a signature the database does not
@@ -1957,7 +1964,10 @@ describe('privacy_request_audits · ENABLEd, NOT FORCEd, and the residual is bou
           WHERE p.prosrc ILIKE '%INSERT INTO%privacy_request_audits%'
           ORDER BY 1`,
       );
-      expect(writers.map((row) => row.writer)).toEqual(['authz.append_privacy_request_audit']);
+      expect(writers.map((row) => row.writer)).toEqual([
+        'authz.append_privacy_request_audit',
+        'authz.record_erasure_audit',
+      ]);
     },
     TIMEOUT,
   );

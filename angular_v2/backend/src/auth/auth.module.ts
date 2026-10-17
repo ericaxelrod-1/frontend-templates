@@ -25,6 +25,13 @@ import { TokenModule } from '../token/token.module.js';
  *
  * `EmailModule` is what `TokenService` reaches for when a link is delivered, so
  * there is one configured provider behind both flows rather than one per module.
+ *
+ * `DatabasePoolModule` is imported for the ONE pool `AuthService` reads and writes
+ * through. `AuthService` used to build its own `pg.Pool` in its constructor — one of
+ * four in this process, each unable to see another's `waitingCount` — and to end it
+ * from its own destroy hook, which made it a second owner of a socket the rest of
+ * the process had no handle on. See `src/common/database-pool.ts` §What this
+ * replaces.
  */
 @Module({
   imports: [

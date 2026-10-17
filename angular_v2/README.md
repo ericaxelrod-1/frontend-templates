@@ -109,7 +109,7 @@ ADR-0023 §F1, §Least privilege, §The closure matview.
 |---|---|
 | Node.js | `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0` — the Angular 22 CLI refuses to start on anything older. `frontend/.npmrc` sets `engine-strict=true`, so `npm install` fails with that message rather than failing later |
 | TypeScript | 6.0.x — pinned by both projects |
-| PostgreSQL | **15 or later** — verified on 15.19; 16/17 also fine. Local instance, **no Docker** |
+| PostgreSQL | **18 or later** — *required, not a preference*: every key defaults to `uuidv7()`, which is a core function from 18, and `0006_uuidv7.sql` refuses to run on an older server. Local instance, **no Docker** |
 
 ---
 
@@ -122,17 +122,41 @@ cd ../frontend && npm install
 
 # 2. configure
 cd ../backend && cp .env.example .env     # set JWT_SECRET — the app refuses to boot without it
+cp .env.test.example .env.test           # same coordinates; suites never read .env
 
-# 3. client — regenerates the Angular types from the committed openapi.json
+# 3. the database. createdb, not db:seed — see below.
+createdb -O app app_dev
+
+# 4. provision: roles, then migrations, then permissions + group tree + admin user
+cd ../backend && npm run db:seed
+
+# 5. client — regenerates the Angular types from the committed openapi.json
 cd ../frontend && npm run generate:client
 ```
 
-**Not available yet.** `npm run migration:run`, `npm run migration:revert`,
-`npm run db:seed` and `npm run dev` are documented in
-[`docs/development.md`](docs/development.md) and land in phase P1-N2, with the
-migration runner, the seed and the four database roles. They are recorded as
-outstanding in `backend/test/unit/docs/doc-claims.spec.ts`, so `verify` reports
-them on every run rather than pretending they exist.
+**`npm run db:seed` never creates the database, and the OWNER on `createdb` is
+load-bearing.** `database/seed.ts` connects to `DB_NAME` through
+`psql -d app_dev`, so on a fresh machine it dies immediately with
+`FATAL: database app_dev does not exist`.
+
+Create it as `app`, the `DB_USER` role, and not as the `postgres` superuser.
+PostgreSQL 15 and later removed `CREATE` on schema `public` from `PUBLIC`, and
+`app` holds it **only** through membership in the predefined role
+`pg_database_owner` — which it gets by owning the database. A database created by
+`postgres` leaves `app` with nothing, and every migration then fails with
+`permission denied for schema public` and no hint about which statement is at
+fault. (Measured on this cluster: `app_dev` is owned by `app`, and
+`has_schema_privilege('app','public','CREATE')` is true **because**
+`nspacl` carries `pg_database_owner=UC/pg_database_owner`.)
+
+Once the database exists and is owned by `app`, `npm run db:seed` provisions
+everything else, in one order that is not interchangeable: the role bootstrap
+(as a superuser) → the migrations (as the owner role) → the authenticator's
+`LOGIN` password → the superuser-only grants → the seed data (through the
+escalation boundary). Running `npm run migration:run` *first* on a fresh cluster
+cannot work: `0001_rls_foundation.sql` opens with a preflight that raises
+`missing role(s) […] — run database/bootstrap/001_roles.sql as a superuser first`,
+so it dies before creating any schema.
 
 Full detail: [`docs/development.md`](docs/development.md).
 
@@ -152,10 +176,14 @@ PostgREST 16 serves **Swagger 2.0**, not OpenAPI 3, so `swagger2openapi` is a
 required step: `openapi-typescript` targets 3.x. The converted spec is
 committed, so only the regenerator needs the tool.
 
-The file committed today is a **placeholder with no paths** — the template has no
-tables yet. It is replaced by the output of that chain once the baseline
-migration lands. The frontend types are generated from whatever is committed:
-`cd frontend && npm run generate:client`.
+**The committed spec is gated.** `backend/test/smoke/openapi-contract.smoke-spec.ts`
+runs in `verify` and compares `openapi.json` against the **live catalog** —
+every table in `db-schemas` must have a path and a component schema, every column
+must be a property, and nothing may be described that the database does not have.
+It was added because a 610-byte placeholder with no paths once survived thirteen
+migrations and nothing failed. Regenerating after a migration is
+`cd frontend && npm run generate:client` for the types, and the spec itself comes
+from the PostgREST → `swagger2openapi` chain above.
 
 ---
 

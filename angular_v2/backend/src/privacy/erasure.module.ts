@@ -3,6 +3,7 @@ import { DatabasePoolModule } from '../common/database-pool.module.js';
 import { EmailModule } from '../email/email.module.js';
 import { ERASURE_ENV, loadErasureEnvironment } from './erasure-environment.js';
 import { ErasureService } from './erasure.service.js';
+import { PrivacyController } from './privacy.controller.js';
 
 /**
  * The erasure namespace, read and validated at **module-evaluation time** — after
@@ -44,6 +45,7 @@ export const APP_ERASURE_ENVIRONMENT = loadErasureEnvironment(process.env);
  */
 @Module({
   imports: [EmailModule, DatabasePoolModule],
+  controllers: [PrivacyController],
   providers: [{ provide: ERASURE_ENV, useValue: APP_ERASURE_ENVIRONMENT }, ErasureService],
   exports: [ErasureService],
 })

@@ -51,9 +51,9 @@ export const DATABASE_POOL_IDLE_TIMEOUT_MS = 30_000;
  *
  * ## What this replaces, and why it was a real defect
  *
- * Four pools, one per consumer: `AuthService`, `EmailAuditWriter`, `PurgeModule` and
- * `ErasureModule` each called `new Pool(...)`, and `TokenModule` a fifth. Each read
- * the connection configuration for itself. The consequence was not stylistic: a
+ * Five pools, one per consumer: `AuthService`, `EmailAuditWriter`, `PurgeModule`,
+ * `ErasureModule` and `TokenModule` each called `new Pool(...)` and each read the
+ * connection configuration for itself. The consequence was not stylistic: a
  * process could exceed the server's `max_connections` with **no signal anywhere**,
  * because every pool was individually healthy and none could see another's
  * `waitingCount` or `totalCount`. `purge.module.ts` and `erasure.module.ts` each

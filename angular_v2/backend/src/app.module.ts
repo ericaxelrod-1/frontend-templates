@@ -48,18 +48,16 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
     // would hand an unauthenticated prober a capacity verdict.
     BreakerModule,
     PurgeModule,
-    // The erasure OPERATION, mounted. Deliberately NOT the deletion-request
-    // ROUTE: a thin-app route names no dispatch token until
-    // `src/breaker/dispatch-token.ts` carries `privacy.submit` /
-    // `privacy.confirm`, and `route-census.ts` refuses to boot a graph with a
-    // mounted route it cannot name. Until that file changes, this module
-    // contributes an operation with no HTTP edge — and registering it is what
-    // makes the operation real rather than a file nothing imports.
+    // The erasure operation and authenticated route (`POST /privacy/erase`),
+    // dispatch token `privacy.erase` (named in KNOWN_DISPATCH_TOKENS and checked
+    // by RouteCensus). NOT yet on the identity seam — see `privacy.controller.ts`.
     ErasureModule,
     // The shared one-time token primitive (mint, store, deliver, redeem, expire)
     // with no HTTP routes mounted directly.
     TokenModule,
-    // The PostgREST client module for replaying caller identity to the data layer.
+    // The identity seam: replaying a caller's verified bearer token into
+    // PostgREST so the database resolves `authz.actor()` to that caller. No
+    // route consumes it yet — `test/rls/identity-seam.spec.ts` is its proof.
     PostgrestModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
