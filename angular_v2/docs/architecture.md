@@ -139,8 +139,31 @@ backend/
 
 Later W11 slices add `security/` (rate limiting, IP reputation, pattern
 detection, cron) and `captcha/` (the previous self-rolled challenge, which was
-correct and is kept). They are named here so the shape is predictable; nothing in
-the tree pretends they exist.
+correct and is kept). They are named here so the shape is predictable.
+
+**The storage arrived before the modules, and that is worth being precise
+about.** `0022_security_telemetry.sql` creates `ip_reputation`,
+`security_detected_patterns`, `pattern_login_attempts`, `security_alerts` and
+`captcha`, and the frontend has five admin pages reading the first four. So the
+sentence that used to stand here — "nothing in the tree pretends they exist" —
+is no longer true, and was wrong in the direction of understating.
+
+What does **not** exist is the part that makes the tables mean anything:
+
+- **`backend/src/security/` and `backend/src/captcha/` do not exist.** No
+  collector writes `ip_reputation` or `security_detected_patterns` from live
+  traffic; the rows present are seeded, and the admin pages render them
+  honestly as seeded rather than implying a live pipeline.
+- **`captcha` is a table with no issuer and no verifier.** Nothing mints a
+  challenge and nothing checks an answer, so the challenge flow AGENTS.md §B6
+  requires is unbuilt.
+- **There is still no rate limiter**, for the reason §B6 gives: PostgREST does
+  not rate-limit and `db-pre-request` runs read-only.
+
+The five admin pages are real and tested; what they display is seed data. That
+distinction is recorded in the deployment guide's gap ledger and enforced by
+`backend/test/unit/docs/deployment-gaps.spec.ts`, so this paragraph cannot go
+stale the way the version above it did.
 
 **There is no `src/privacy/`, and that is the design rather than a gap.** The
 privacy/DSAR feature (`docs/rebase.md` §9, ADR-0029, ADR-0030) is **migrations and

@@ -371,12 +371,20 @@ export class EmailService {
    * asserted by `email-messages.spec.ts`, which proves the recorded path end to end
    * against a real database.
    *
-   * **Every production caller must pass `userId`.** There is no production caller
-   * yet (ADR-0024 §Consequences: `EmailService` is wired but not yet called), so
-   * the gap costs nothing today and closes itself when the registration and
-   * password-reset routes land: they already hold the user row they are mailing.
-   * The alternative — a required parameter, and editing 19 call sites in two suites
-   * this slice does not own — was rejected as out of scope, not as wrong.
+   * **Every production caller must pass `userId`.** There ARE now five call
+   * sites, across three services — `token/token.service.ts` (password reset,
+   * address verification, erasure receipt), `users/users.service.ts` (email
+   * change) and `privacy/erasure.service.ts` (erasure receipt) — and each one
+   * carries the user id it already holds. This paragraph used to say there was
+   * no production caller yet and that the gap "closes itself when the
+   * registration and password-reset routes land"; they landed, and the gap is
+   * closed. An earlier draft of this comment described a required parameter as
+   * rejected out of scope rather than wrong; that is still the right call for
+   * the test suites, but it is no longer a live production question.
+   *
+   * A caller with no recipient user row is the case that matters: it leaves no
+   * evidence in the trail, which is the §2.3 obligation stated above. So a new
+   * call site passes the id it has, or it is not a production call site.
    */
   private async send(
     message: EmailMessage,
