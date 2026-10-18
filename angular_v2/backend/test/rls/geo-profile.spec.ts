@@ -892,19 +892,37 @@ describe('0012 · a member cannot forge the provenance of their own geography', 
   );
 
   it(
-    'app_member holds NO write verb on users at all — the control is a grant, asserted per role rather than in a comment',
+    'app_member holds NO table-level write verb on users — the forgery control is a grant, asserted per role rather than in a comment',
     () => {
       // 0012's forgery control is not a trigger or a CHECK; it is the absence of a
       // grant, and an absence asserted only in prose is an absence nobody re-checks.
+      //
+      // Read from `pg_class`, which is TABLE-level, and the distinction is load-bearing since
+      // `0026_member_self_write.sql`: `app_member` now holds `UPDATE (first_name, last_name)`,
+      // so a reader checking "does a member hold UPDATE here?" has to be told explicitly that
+      // the answer is about the TABLE verb. It is. The member's own name write is bounded by
+      // the two-column grant and by `users_update`, and neither of those touches the six
+      // geography columns this suite is about — `member-self-write.spec.ts` proves the exact
+      // column set from `pg_attribute`'s ACL.
       for (const privilege of ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) {
         const holds = superuserRows<{ holds: boolean }>(
           `SELECT has_table_privilege('app_member', 'public.users', '${privilege}') AS holds`,
         );
-        expect(holds[0]?.holds, `app_member holds ${privilege} on users, so the forgery case above is not load-bearing`).toBe(false);
+        expect(holds[0]?.holds, `app_member holds table-level ${privilege} on users, so the forgery case above is not load-bearing`).toBe(false);
+      }
+
+      // The six geography columns specifically, because "no table verb" would still leave a
+      // column grant able to forge `geo_source` — and forging provenance about yourself is
+      // the entire point of the case above.
+      for (const column of ['country_code', 'region_code', 'city', 'geo_source', 'geo_accuracy_km', 'geo_updated_at']) {
+        const writable = superuserRows<{ holds: boolean }>(
+          `SELECT has_column_privilege('app_member', 'public.users', '${column}', 'UPDATE') AS holds`,
+        );
+        expect(writable[0]?.holds, `app_member can UPDATE users.${column}, so the forgery control is not the grant`).toBe(false);
       }
 
       // The superset, on the other side: `app_admin` writes these columns, because the
-      // only write path `users` has is the thin app acting as `app_admin`. An admin
+      // administrative write path `users` has runs as `app_admin`. An admin
       // narrower than a member on this table would be a different design.
       for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
         const holds = superuserRows<{ holds: boolean }>(

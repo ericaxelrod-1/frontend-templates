@@ -922,19 +922,46 @@ describe('users · password_hash is unreachable by a member and essential to the
   );
 
   it(
-    'app_member holds NO write verb on users, so erasure is not silently half-delivered as a member UPDATE',
+    'app_member holds NO table-level write verb on users — and the two columns 0026 granted are a COLUMN grant, not a verb',
     () => {
-      // Asserted per role. This migration grants a member a COLUMN `SELECT` and
-      // nothing else: erasure-as-CRUD needs a per-column `UPDATE` grant AND a
-      // `WITH CHECK` pinning `id` so a member cannot rewrite `created_at` or
-      // repoint their own row, and that is a separate change with its own argument.
-      // Claiming otherwise here would be the "looks finished and isn't" shape.
+      // Asserted per role, and read from `pg_class`, which is TABLE-level: a column privilege
+      // does not answer true there. That distinction is the whole content of this case now.
+      //
+      // `0026_member_self_write.sql` grants `app_member` `UPDATE (first_name, last_name)` so a
+      // member's own name write is the policy's decision rather than the service's `WHERE`.
+      // That is the change `0008:457-464` predicted and deferred — a per-column `UPDATE` grant
+      // AND a `WITH CHECK` pinning `id` — and it is now shipped. It is NOT a table-level
+      // `UPDATE`, which is why the loop below still holds and why erasure is still not
+      // reachable as a member write: `0008`'s `ON DELETE CASCADE` reaches `email_messages` and
+      // `refresh_tokens` (`0015`), which no serving role may otherwise destroy.
+      //
+      // `test/rls/member-self-write.spec.ts` proves the column grant's exact shape from
+      // `pg_attribute`'s ACL; asserting the same list here would be a second copy of one fact.
+      // What is asserted here is the DENIAL, plus the fact that the grant that arrived later
+      // is a column grant — because that is the only reading under which the loop is a
+      // meaningful assertion rather than a coincidence.
       for (const privilege of ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) {
         const holds = superuserRows<{ holds: boolean }>(
           `SELECT has_table_privilege('app_member', 'public.users', '${privilege}') AS holds`,
         );
-        expect(holds[0]?.holds, `app_member holds ${privilege} on users`).toBe(false);
+        expect(holds[0]?.holds, `app_member holds table-level ${privilege} on users`).toBe(false);
       }
+
+      const writable = superuserRows<{ count: number }>(
+        `SELECT count(*)::int AS count
+           FROM pg_attribute a,
+                aclexplode(coalesce(a.attacl, acldefault('c', a.attrelid))) AS priv
+           JOIN pg_roles r ON r.oid = priv.grantee
+          WHERE a.attrelid = 'public.users'::regclass
+            AND a.attnum > 0
+            AND NOT a.attisdropped
+            AND r.rolname = 'app_member'
+            AND priv.privilege_type = 'UPDATE'`,
+      );
+      expect(
+        writable[0]?.count,
+        'app_member holds UPDATE on some number of users columns other than exactly two',
+      ).toBe(2);
 
       // And the admin keeps all four, which is what the login and provisioning
       // paths write through.
@@ -1143,6 +1170,15 @@ describe('0008 · user_roles and user_groups cannot name a user that does not ex
       // success reveals any id, in scope or not. The mitigation the rule names is
       // that the FK terminate at a table members cannot WRITE to, so the oracle is
       // not reachable by the member role at all.
+      //
+      // **READ `users_update` IS NOT A WRITE PATH INTO EITHER MEMBERSHIP TABLE**, and
+      // `0026` is what made that worth saying rather than assuming. `app_member` holds
+      // `UPDATE (first_name, last_name)` on its own row, and `users_update` admits that
+      // row — but the oracle is about naming a `user_id` or a `role_id` that belongs to
+      // somebody else, and the two membership tables are UNSCOPED reference data
+      // (`AGENTS.md` §B2's category table) on which no serving role holds INSERT,
+      // UPDATE or DELETE at all (`0001:1009-1019`). Writing the display name on your
+      // own identity row cannot name another id.
       for (const privilege of ['INSERT', 'UPDATE', 'DELETE']) {
         const holds = superuserRows<{ holds: boolean }>(
           `SELECT has_table_privilege('app_member', 'public.users', '${privilege}') AS holds`,

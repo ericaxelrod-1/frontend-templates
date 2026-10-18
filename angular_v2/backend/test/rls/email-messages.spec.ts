@@ -874,7 +874,15 @@ describe('email_messages · the derived category is structural, not documented',
 
       // The mitigation, stated exactly as the rule states it: the FK must
       // terminate at a table MEMBERS cannot write to. `app_member` is the member
-      // role and holds no write grant on `users` at all.
+      // role and holds no TABLE-level write grant on `users`.
+      //
+      // **TABLE-level is the operative word since `0026`,** which gave `app_member`
+      // `UPDATE (first_name, last_name)` — two columns of its own identity row, and
+      // nothing that could name another user's id. The oracle this rule closes is
+      // naming somebody else's `users.id` from `email_messages`, and two display-name
+      // columns on your own row cannot do that. `has_table_privilege` reads
+      // `pg_class.relacl`, so a column grant does not answer true here; that is what
+      // makes this loop still mean what it says.
       //
       // `app_admin` IS granted INSERT/UPDATE/DELETE on `users` — deliberately,
       // by 0002, because the superset principal is what provisions accounts. So
@@ -886,7 +894,7 @@ describe('email_messages · the derived category is structural, not documented',
         );
         expect(
           member[0]?.holds,
-          `app_member can ${privilege} users, so the FK is a write path into identity`,
+          `app_member holds table-level ${privilege} on users, so the FK is a write path into identity`,
         ).toBe(false);
       }
 

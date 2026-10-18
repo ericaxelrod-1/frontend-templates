@@ -372,15 +372,59 @@ describe('a wrong current_password is refused by validation as nothing, and by t
   });
 });
 
-describe('the administrator body names the five contract fields and refuses a shell of an address', () => {
-  it('is exactly the five, in snake_case', () => {
+describe('the administrator body carries the authority it confers, and refuses a shell of an address', () => {
+  it('is exactly the seven, in snake_case', () => {
+    // Seven, and the two that arrived after this was written are `role` and `group`. They are
+    // what §B2's invariant requires of every account and what the route can no longer leave to
+    // a `warn` log: an account with neither signs in and then reads zero rows for its own
+    // profile. See `create-user.dto.ts` and `UsersService.createUser` for why they are names,
+    // and for why the invariant cannot be a database constraint in this schema.
     expect([...declaredProperties(DTO_FILE[CreateUserDto.name])].sort()).toEqual([
       'email',
       'first_name',
+      'group',
       'last_name',
       'password',
+      'role',
       'username',
     ]);
+  });
+
+  it('refuses a body that names no role or group, because that is the account that cannot read itself', async () => {
+    // NOT `@IsOptional()`. A missing field reaches the validator as `undefined` — `tsconfig`
+    // targets ES2023, so `useDefineForClassFields` writes every declared field onto every
+    // instance, and the global pipe's `transform: true` means `dto` IS such an instance — and
+    // `@IsString()` is false for it. That is the whole mechanism, and it is why this DTO must
+    // not acquire an `@IsOptional()` to make a form easier to write: the omission is the defect
+    // the change exists to close, and §2.1 calls a success-shaped report for work that did not
+    // happen worse than a refusal.
+    for (const incomplete of [
+      { username: 'jane', email: 'a@example.test', password: 'p' },
+      { username: 'jane', email: 'a@example.test', password: 'p', role: 'member' },
+      { username: 'jane', email: 'a@example.test', password: 'p', group: 'EU' },
+    ]) {
+      const errors = await validate(plainToInstance(CreateUserDto, incomplete));
+      const reported = errors.map((error) => error.property);
+      expect(
+        reported.includes('role') || reported.includes('group'),
+        `${JSON.stringify(incomplete)} was accepted and would create an account missing ` +
+          `${reported.includes('role') ? 'a role' : 'a group'}`,
+      ).toBe(true);
+    }
+
+    // …and the complete body is accepted, so the case above is a requirement rather than a
+    // DTO that refuses everything.
+    expect(
+      await validate(
+        plainToInstance(CreateUserDto, {
+          username: 'jane',
+          email: 'a@example.test',
+          password: 'p',
+          role: 'member',
+          group: 'EU',
+        }),
+      ),
+    ).toEqual([]);
   });
 
   it('refuses a username that is not a login name, before it reaches a row', async () => {
@@ -389,13 +433,25 @@ describe('the administrator body names the five contract fields and refuses a sh
     // naming policy — §B2 has no username vocabulary and this route must not invent one.
     for (const bad of ['', ' leading-space', 'has space', 'has\nnewline', 'ünïcode-only', 'a'.repeat(256)]) {
       const errors = await validate(
-        plainToInstance(CreateUserDto, { username: bad, email: 'a@example.test', password: 'p' }),
+        plainToInstance(CreateUserDto, {
+          username: bad,
+          email: 'a@example.test',
+          password: 'p',
+          role: 'member',
+          group: 'EU',
+        }),
       );
       expect(errors.some((error) => error.property === 'username'), `'${bad}' was accepted`).toBe(true);
     }
     for (const good of ['jane', 'jane.doe', 'jane_doe-99']) {
       const errors = await validate(
-        plainToInstance(CreateUserDto, { username: good, email: 'a@example.test', password: 'p' }),
+        plainToInstance(CreateUserDto, {
+          username: good,
+          email: 'a@example.test',
+          password: 'p',
+          role: 'member',
+          group: 'EU',
+        }),
       );
       expect(errors, `'${good}' was refused`).toEqual([]);
     }

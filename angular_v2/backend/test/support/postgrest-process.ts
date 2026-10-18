@@ -167,8 +167,22 @@ export async function startPostgrestProcess(options: PostgrestProcessOptions): P
     if (child.exitCode !== null) {
       throw new Error(`PostgREST exited before it was ready (code ${String(child.exitCode)}):\n${log}`);
     }
+    // `probePort` resolves a STRING when the port is IN USE and `undefined` when it is
+    // FREE — it binds the port itself and reports EADDRINUSE as the signal. So the
+    // readiness condition is the port being BUSY, which is our own PostgREST answering.
+    //
+    // This was inverted (`=== undefined`), so the loop returned on the FIRST tick while
+    // the port was still free — before PostgREST had bound it. Every caller then raced a
+    // server that did not exist yet, and the race surfaced as an intermittent
+    // `connection refused` rather than as a failed assertion. `member-self-write.spec.ts`
+    // grew its own guard to route around it, which is what made the inversion survive:
+    // the one suite that noticed it worked around it instead of reporting it.
+    //
+    // It is safe to treat "busy" as "ready" because the contention guard above already
+    // refused to start if anything was serving on this port BEFORE the spawn. The only
+    // thing that can occupy it since is the child this function started.
     const serving = await probePort(port);
-    if (serving === undefined) {
+    if (serving !== undefined) {
       owned = true;
       return {
         baseUrl: `http://127.0.0.1:${String(port)}`,

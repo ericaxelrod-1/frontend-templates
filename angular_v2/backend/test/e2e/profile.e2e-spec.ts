@@ -53,8 +53,10 @@ import { startPostgrestProcess, type PostgrestProcess } from '../support/postgre
  *
  * `createMember` plants a user with the `member` role and a group, because `0023`'s
  * twelve-column read is bounded by `authz.can_read_user()` and a user with no role rows
- * reads ZERO rows — which is exactly the incompleteness `POST /api/users` deliberately
- * produces, and is asserted as such in its own case below.
+ * reads ZERO rows. That is no longer something a route produces: `POST /api/users` now
+ * requires `role` and `group` and writes both membership rows in the transaction that
+ * creates the account, and its own case below asserts a created account CAN read its own
+ * profile rather than 404-ing on it.
  */
 
 const TEST_DB = 'profile_e2e';
@@ -285,8 +287,9 @@ async function signIn(username: string, password: string): Promise<string> {
  * **Both are required and that is the point.** `users_read_scope` is
  * `id IN (SELECT authz.actor() WHERE authz.can_read_user())`, and `can_read_user()` is
  * `has_permission(actor, 'user', 'read')` — false for a user with no `user_roles` row.
- * So a user without a role reads ZERO rows of their own profile, which is the
- * incompleteness `POST /api/users` deliberately leaves and asserts below.
+ * So a user without a role reads ZERO rows of their own profile. That shape used to be
+ * what `POST /api/users` produced; it now has to be built by hand, which is what this
+ * fixture is, and which is why the created-account case below asserts the opposite.
  */
 async function createMember(username: string, email: string, password: string): Promise<string> {
   return withAdminClient(async (client) => {
@@ -958,7 +961,7 @@ describe('a member sees their OWN sign-in history and nobody else\'s', () => {
 // 7. POST /api/users
 // =============================================================================
 
-describe('creating an account is an administrator action', () => {
+describe('creating an account is an administrator action, and it creates a COMPLETE one', () => {
   it('refuses a member, and the database would refuse the row even if this did not', async () => {
     await createMember('creator-member', 'creator-member@example.test', 'creator-password-0020');
     const memberToken = await signIn('creator-member', 'creator-password-0020');
@@ -971,6 +974,8 @@ describe('creating an account is an administrator action', () => {
         username: 'member-made-this',
         email: 'member-made-this@example.test',
         password: 'made-up-0021',
+        role: 'member',
+        group: 'EU',
       },
     });
 
@@ -994,7 +999,66 @@ describe('creating an account is an administrator action', () => {
     expect(grant?.may_insert).toBe(true);
   });
 
-  it('creates the account for an administrator, refuses a duplicate username, and leaves it VISIBLY incomplete', async () => {
+  it('refuses a body that names no role or group, because the account it would make cannot read itself', async () => {
+    const adminToken = await signIn('admin', SEED_PASSWORD);
+
+    // `400`, not `422`: the global pipe runs `forbidNonWhitelisted` and `@IsString()` is
+    // false for an absent field, and the distinction from the `422` below is the point —
+    // a `422` would say "we understood you and refused the content", which is not what a
+    // missing required field is.
+    for (const incomplete of [
+      { username: 'no-authority-0025', email: 'no-authority-0025@example.test', password: 'created-password-0025' },
+      {
+        username: 'half-authority-0025',
+        email: 'half-authority-0025@example.test',
+        password: 'created-password-0026',
+        role: 'member',
+      },
+    ]) {
+      const refused = await inject({ method: 'POST', url: '/users', token: adminToken, payload: incomplete });
+      expect(refused.statusCode, `${JSON.stringify(incomplete)} was accepted`).toBe(400);
+      expect(
+        await count(`SELECT count(*)::int AS value FROM users WHERE username = '${incomplete.username}'`),
+        `${incomplete.username} was created despite the refusal`,
+      ).toBe(0);
+    }
+
+    // An authority that DOES NOT EXIST is a `422` naming it, not a `500` from the foreign
+    // key. A `uuid` would have made that failure silent; a name makes it a sentence.
+    const unknownRole = await inject({
+      method: 'POST',
+      url: '/users',
+      token: adminToken,
+      payload: {
+        username: 'unknown-role-0025',
+        email: 'unknown-role-0025@example.test',
+        password: 'created-password-0027',
+        role: 'there-is-no-such-role',
+        group: 'EU',
+      },
+    });
+    expect(unknownRole.statusCode).toBe(422);
+    expect(unknownRole.json<{ readonly message: string }>().message).toContain('there is no role named');
+    expect(await count("SELECT count(*)::int AS value FROM users WHERE username = 'unknown-role-0025'")).toBe(0);
+
+    const unknownGroup = await inject({
+      method: 'POST',
+      url: '/users',
+      token: adminToken,
+      payload: {
+        username: 'unknown-group-0025',
+        email: 'unknown-group-0025@example.test',
+        password: 'created-password-0028',
+        role: 'member',
+        group: 'there-is-no-such-group',
+      },
+    });
+    expect(unknownGroup.statusCode).toBe(422);
+    expect(unknownGroup.json<{ readonly message: string }>().message).toContain('there is no group named');
+    expect(await count("SELECT count(*)::int AS value FROM users WHERE username = 'unknown-group-0025'")).toBe(0);
+  });
+
+  it('creates the account for an administrator, refuses a duplicate username, and the new account can read its own profile', async () => {
     const adminToken = await signIn('admin', SEED_PASSWORD);
 
     const created = await inject({
@@ -1006,6 +1070,8 @@ describe('creating an account is an administrator action', () => {
         email: 'Created-By-Admin@Example.Test',
         password: 'created-password-0022',
         first_name: 'Grace',
+        role: 'member',
+        group: 'EU',
       },
     });
 
@@ -1014,7 +1080,9 @@ describe('creating an account is an administrator action', () => {
     // Six fields — not the twelve of `UserProfileDto`, because this route creates the row
     // and `GET /users/me` is the creator's OWN row. A client that reused one shape for
     // both would be asserting they are the same account, and for a newly created account
-    // they are not.
+    // they are not. `role` and `group` are INPUT, not output: they are names the route
+    // resolved, and echoing them back would be a second copy of the caller's own request
+    // rather than a statement about what the database stored.
     expect(Object.keys(body).sort()).toEqual(['created_at', 'email', 'first_name', 'id', 'last_name', 'username']);
     expect(body['username']).toBe('created-by-admin');
     // The address is stored NORMALISED, and the response reports what the database
@@ -1052,6 +1120,8 @@ describe('creating an account is an administrator action', () => {
         username: 'created-by-admin',
         email: 'somewhere-else@example.test',
         password: 'created-password-0023',
+        role: 'member',
+        group: 'EU',
       },
     });
     expect(duplicate.statusCode).toBe(422);
@@ -1070,23 +1140,51 @@ describe('creating an account is an administrator action', () => {
         username: 'created-with-shared-address',
         email: 'created-by-admin@example.test',
         password: 'created-password-0024',
+        role: 'member',
+        group: 'EU',
       },
     });
     expect(sharedAddress.statusCode).toBe(201);
 
-    // …AND THE INCOMPLETENESS IS ASSERTED, NOT MERELY LOGGED.
+    // …AND THE COMPLETION IS ASSERTED, NOT MERELY PROMISED.
     //
-    // §B2's invariant is "every user has at least one role and at least one group", and
-    // this row has neither. Nothing was invented to fill it — an account silently holding
-    // `member` would be a security decision made by a route whose job is to make a row.
-    // The consequence is concrete and is what "visibly incomplete" means: the account can
-    // sign in, and `GET /users/me` for it reads ZERO rows, because `users_read_scope`
-    // requires `authz.can_read_user()` and that is false with no `user_roles` row.
-    expect(await count('SELECT count(*)::int AS value FROM user_roles WHERE user_id = $1', [userId])).toBe(0);
-    expect(await count('SELECT count(*)::int AS value FROM user_groups WHERE user_id = $1', [userId])).toBe(0);
+    // §B2's invariant is "every user has at least one role and at least one group". Nothing
+    // was invented to fill it — an account silently holding `admin` would be a security
+    // decision made by a route whose job is to make a row, which is why `role` and `group`
+    // are REQUIRED on the body and resolved against the live tables before the row is
+    // written. So this account holds exactly what the caller asked for and nothing more.
+    expect(await count('SELECT count(*)::int AS value FROM user_roles WHERE user_id = $1', [userId])).toBe(1);
+    expect(await count('SELECT count(*)::int AS value FROM user_groups WHERE user_id = $1', [userId])).toBe(1);
 
+    // …and it names the authority it was given, so a `201` cannot be a `201` for an account
+    // holding something other than what was asked for. Read through the admin boundary,
+    // which is the only identity holding `SELECT` on `user_roles` — a member holds none,
+    // and that absence is the control which stops a member widening their own scope.
+    const conferred = await withAdminClient(async (client) => {
+      const result = await client.query<{ readonly role: string; readonly group_name: string }>(
+        `SELECT r.name AS role, g.name AS group_name
+           FROM user_roles ur
+           JOIN roles r ON r.id = ur.role_id
+           JOIN user_groups ug ON ug.user_id = ur.user_id
+           JOIN groups g ON g.id = ug.group_id
+          WHERE ur.user_id = $1`,
+        [userId],
+      );
+      return result.rows;
+    });
+    expect(conferred).toEqual([{ role: 'member', group_name: 'EU' }]);
+
+    // THE CONSEQUENCE, which is the whole point: the created account signs in and reads its
+    // OWN profile. Before this change it read ZERO rows and answered 404, because
+    // `users_read_scope` requires `authz.can_read_user()` and that is false with no
+    // `user_roles` row — a success-shaped 201 for an account that could do nothing.
     const createdToken = await signIn('created-by-admin', 'created-password-0022');
-    expect((await inject({ method: 'GET', url: '/users/me', token: createdToken })).statusCode).toBe(404);
+    const ownProfile = await inject({ method: 'GET', url: '/users/me', token: createdToken });
+    expect(ownProfile.statusCode, `the created account could not read itself: ${ownProfile.body}`).toBe(200);
+    expect(ownProfile.json<{ readonly id: string; readonly first_name: string }>()).toMatchObject({
+      id: userId,
+      first_name: 'Grace',
+    });
   });
 });
 

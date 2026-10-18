@@ -95,14 +95,22 @@ export class UsersController {
    * DATABASE stored, including its refusals of a blank name and its own timestamp
    * format, rather than an echo of what the client submitted. The frontend's
    * `profile-api.service.ts` documents that it relies on exactly this.
+   *
+   * **The caller's bearer token is forwarded** for the same reason `me()` forwards it:
+   * `0026` made this write structural — `app_member` holds
+   * `UPDATE (first_name, last_name)` and `users_update` admits only the caller's own
+   * undeleted row — so the schema can only answer "is this the actor's own row?" if it
+   * can see who the actor is, and PostgREST is the one seam that tells it from a verified
+   * token. `req.token` is set by `JwtAuthGuard` on the same assignment that sets
+   * `req.user`, so reaching here without one is not reachable over HTTP.
    */
   @Patch('me')
   @HttpCode(200)
   update_me(
     @Body() dto: UpdateProfileDto,
-    @Req() req: FastifyRequest & { user?: AccessTokenPayload },
+    @Req() req: FastifyRequest & { user?: AccessTokenPayload; token?: string },
   ): Promise<UserProfileDto> {
-    return this.usersService.updateMe(requireUser(req).sub, dto);
+    return this.usersService.updateMe(requireUser(req).sub, dto, req.token);
   }
 
   /**
@@ -200,9 +208,12 @@ export class UsersController {
    * a message a human can act on; that refusal is a fast answer, not a second mechanism
    * pretending to be the boundary.
    *
-   * **The created account has no role and no group**, which violates §B2's invariant and
-   * is logged at `warn` rather than papered over. `UsersService.createUser` explains the
-   * choice and what it costs.
+   * **The account is created COMPLETE.** `role` and `group` are required on the body and
+   * both membership rows are written in the same transaction as the `users` row, so the
+   * `201` describes an account that can read its own profile rather than one that signs
+   * in and gets a `404`. `UsersService.createUser` explains why the caller is asked
+   * rather than the route guessing, and why the invariant has no database constraint in
+   * this schema.
    */
   @Post()
   create(

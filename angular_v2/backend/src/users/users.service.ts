@@ -15,6 +15,7 @@ import { BCRYPT_COST } from '../auth/auth.service.js';
 import type { AccessTokenPayload } from '../auth/jwt-auth.guard.js';
 import { EmailService } from '../email/email.service.js';
 import { PostgrestClient } from '../postgrest/postgrest-client.js';
+import type { PostgrestResponse } from '../postgrest/postgrest.types.js';
 import { TokenService } from '../token/token.service.js';
 import { UNUSABLE_TOKEN_MESSAGE } from '../token/unusable-token-message.js';
 import { normalizePendingEmail } from '../token/email-change-token.js';
@@ -37,16 +38,19 @@ import type { UserProfileDto } from './user-profile.dto.js';
  * three things that must agree and only two of them are the database's:
  *
  *   1. the `select=` list of every read a member makes of their own row;
- *   2. the columns the `RETURNING` clause of the name write names;
+ *   2. the columns PostgREST's `RETURNING` names on the name write, which a
+ *      column-restricted role has to be told explicitly or the write is refused
+ *      with `42501` (`0026` §What this costs the client);
  *   3. the shape `UserProfileDto` describes.
  *
- * `0023_user_profile_and_disable.sql:687-692` is where the list comes from, and it is
- * the member's COLUMN GRANT — so a name added here that is not in the grant makes the
- * member's own read fail outright rather than return one field too many. That is why
- * `readProfileRow` refuses a row carrying a key this list does not name, instead of
- * spreading it: a passthrough would make a future column silently appear in the profile
- * response, and the frontend's `ProfileMe` `Pick` would then be describing a shape the
- * server stopped guaranteeing.
+ * `0026_member_self_write.sql` is where the list comes from — it is the member's
+ * COLUMN GRANT, so a name added here that is not in the grant makes the member's own
+ * read fail outright rather than return one field too many, and a name REMOVED here
+ * that is still in the grant makes `readProfileRow` refuse the row rather than publish
+ * it. That is why `readProfileRow` refuses a row carrying a key this list does not
+ * name, instead of spreading it: a passthrough would make a future column silently
+ * appear in the profile response, and the frontend's `ProfileMe` `Pick` would then be
+ * describing a shape the server stopped guaranteeing.
  *
  * **A column-restricted role cannot use `select=*`** (`0008:475-481`), so naming the
  * columns is not politeness — a `select=*` here is a `403` for every member.
@@ -151,9 +155,18 @@ function sqlStateOf(error: unknown): string | undefined {
  *   * **a read of a table the serving role holds NO grant on** — `login_attempts`, where
  *     §B6's "admin-only, and that is deliberate" rules out PostgREST entirely and the
  *     thin app reads it elevated instead; or
- *   * **a write the member's grant deliberately withholds** — `app_member` holds no
- *     `UPDATE` on `users` at all (`0023:629-634`), so the name write is the thin app's
- *     job and not CRUD.
+ *   * **an administrative write over a table the member's grant withholds entirely** —
+ *     creating an account (`users_insert` is `WITH CHECK (current_user =
+ *     'app_admin')`), reading a credential, or moving an address after a mailbox has
+ *     answered for it.
+ *
+ * Note what is NOT on that list any more: `PATCH /users/me`. `0026` gave `app_member`
+ * a two-column `UPDATE` grant and `users_update` the member's own row, so that write is
+ * plain CRUD over a table PostgREST already serves, and it is issued as the CALLER
+ * (`updateMe`) rather than elevated. It stayed on this controller because it is the
+ * thin app that turns a database refusal into a `422` a form can render and because
+ * §B1 reserves the controller for routes that are not expressible as bare CRUD; the
+ * write itself is one PATCH.
  *
  * None of them is CRUD a client could have issued directly, which is the test §B1 sets.
  */
@@ -234,131 +247,165 @@ export class UsersService {
   /**
    * `first_name` and `last_name`, on the caller's own row, and nothing else.
    *
-   * ## WHY THIS DOES NOT GO THROUGH POSTGREST, WHICH IS THE INTERESTING PART
+   * ## IT RUNS AS THE CALLER, AND THAT IS THE WHOLE OF THE CHANGE
    *
-   * PostgREST would be the obvious route for a CRUD update, and it cannot perform this
-   * one. `app_member` holds **no** `UPDATE` on `users` — `0023:629-634` re-states it,
-   * and it is a decision with a reason attached: giving a member a write verb here would
-   * need a per-column `UPDATE` grant *and* a `WITH CHECK` pinning `id`, so that a member
-   * could not rewrite their own `created_at` or repoint `id` at another row. So the
-   * member's own name is written by the thin app, which owns password hashing and email
-   * re-verification for exactly this class of change.
+   * This route used to open a `pg` transaction, `SET LOCAL ROLE app_admin`, and write:
    *
-   * ## THE SPEC'S `WITH CHECK` IS NOT AVAILABLE HERE, AND WHAT STANDS IN ITS PLACE
+   *     UPDATE users SET first_name = …, last_name = …
+   *      WHERE id = $1 AND deleted_at IS NULL RETURNING <twelve columns>;
    *
-   * The brief names "a `WITH CHECK` that pins `id` to the actor" as the mechanism. That
-   * mechanism lives in a RLS policy, and `users_update` is `USING (current_user =
-   * 'app_admin')` (`0008:421`) — so this route runs under the one role whose policy
-   * admits every row. A `WITH CHECK` would have to be added by a migration that also
-   * grants `app_member` the column-level `UPDATE`, and this unit writes no migration.
+   * Correct, and correct by ACCOMERSE. `app_member` held no `UPDATE` on `users` and
+   * `users_update` was `USING (current_user = 'app_admin')` (`0008:421`), so the write
+   * ran under the one role whose policy admits every row and `id = $1` was the only
+   * thing bounding it — a check that lived in this file, so a third column in the
+   * `SET` list or a forgotten `id` would be silent, invisible, and refused by nothing.
+   * `0026_member_self_write.sql` grants `UPDATE (first_name, last_name)` to
+   * `app_member` and moves the bounding into `users_update`, and this method now goes
+   * through the same seam `me()` uses so the policy is what decides.
    *
-   * What stands in its place is deliberately narrow and stated rather than implied:
+   * **Why PostgREST and not a `pg` connection.** §B2 F1: `request.jwt.claims` is a
+   * caller-writable custom GUC, and the only sanctioned way for this application to
+   * have a policy see who is asking is to replay the caller's already-verified token
+   * into PostgREST, which verifies it, `SET ROLE`s from its `role` claim (bounded by
+   * the bootstrap `GRANT`) and sets the claims inside its own transaction.
+   * `test/unit/claims-write-surface.spec.ts` refuses `set_config('request.jwt.claims',
+   * …)` anywhere in `src/`, so `SET LOCAL ROLE app_member` over the `pg` pool is not
+   * an option at all: it would produce a policy with no actor, which denies everyone.
+   * The comment `0008:457-464` predicted this exact migration and said it was owed.
    *
-   *   * `id = $1`, where `$1` is `AccessTokenPayload.sub` — the id the VERIFIED TOKEN
-   *     carried. It is not a path parameter, not a body field and not a query
-   *     parameter, so no caller can express "update user B" on this route. That is the
-   *     same unrepresentable-not-merely-checked property `PrivacyController.erase` has
-   *     and argues for at length.
-   *   * The `SET` list is a CONSTANT. Both assignments are written out with a `CASE` that
-   *     carries a "was this field supplied" flag and a value, so the statement's shape
-   *     never varies and nothing a caller supplies reaches the SQL text — only ever a
-   *     parameter. An earlier draft assembled the list from the two column names and
-   *     interpolated it, which `test/unit/claims-write-surface.spec.ts` refuses: it reads
-   *     `SET` followed by `${` as "a setting name built by interpolation", and the rule
-   *     exists because a payload inside a string has to be read as a payload. The `CASE`
-   *     form is also simply better — one statement, one plan, and `null` still clears a
-   *     column because the cast is explicit.
-   *   * `AND deleted_at IS NULL`, matching what `users_read_scope` does for the read
-   *     path (`0009:332`), so this write cannot put a name on a tombstone.
+   * ## WHAT THE SCHEMA NOW DECIDES THAT THIS METHOD USED TO
    *
-   * **The migration that would make the second bullet structural is named here so the
-   * gap is a decision with an owner rather than a silence:** a `0025` that grants
-   * `UPDATE (first_name, last_name)` on `users` to `app_member` and rewrites
-   * `users_update` with `USING (id = authz.actor())`. It is not written here because it
-   * is a schema change, and a migration whose reviewer must own the decision is not
-   * something a controller change can smuggle in.
+   *   * WHICH ROW — `users_update`'s `id IN (SELECT authz.actor())`. The `id=eq.<sub>`
+   *     filter below is still written, for the reason `me()` writes its own: it makes
+   *     this route correct independently of the policy, and `sub` comes from the
+   *     VERIFIED token, so "this request cannot be pointed at user B" is a property of
+   *     the statement as well as of the schema.
+   *   * WHICH COLUMN — the `GRANT UPDATE (first_name, last_name)`. PostgREST turns the
+   *     body into the `SET` list, so a column this route does not parse cannot be
+   *     written, and the global pipe's `forbidNonWhitelisted` is the first place that
+   *     is said.
+   *   * WHETHER A TOMBSTONE MAY BE NAMED — `deleted_at IS NULL`, inside the policy.
+   *     This method used to say it in its `WHERE`, and it can no longer: a PostgREST
+   *     filter on `deleted_at` is privilege-checked like any other column reference and
+   *     `deleted_at` is not in the member's twelve-column grant. Moving the rule into
+   *     the policy is what makes it expressible at all, which is a better place for it
+   *     than it was.
+   *
+   * ## THE BODY IS THE `SET` LIST, WHICH IS WHY THE `CASE` SENTENCES ARE GONE
+   *
+   * PostgREST writes only the keys the body carries, so "was this field supplied" is
+   * answered by whether the key is present rather than by a `CASE` with a boolean flag
+   * beside it. The hazard that produced the `CASE` form in the first place is
+   * unchanged and is still handled where it always was: `UpdateProfileDto` declares
+   * both fields, `useDefineForClassFields` writes them onto every instance as
+   * `undefined`, and the global pipe runs `transform: true`, so `dto` is such an
+   * instance and `hasOwnProperty` would answer `true` for a field the client never
+   * sent. `!== undefined` is exact — the body is JSON and JSON has no `undefined`.
+   * The key is only added to the object when the value is not `undefined`, and `null`
+   * IS added, which is how "null clears a name" survives the move.
+   *
+   * ## `RETURNING` IS WHY `select=` IS MANDATORY AND WHY `Prefer` IS SET
+   *
+   * A column-restricted role cannot read `password_hash`, so PostgREST's `RETURNING`
+   * clause has to name the twelve columns or the write is refused with `42501` — the
+   * same rule `0008:475-481` records for reads, and it is why the response body is
+   * assembled from `MEMBER_PROFILE_COLUMNS` rather than from a list written here.
+   * `Prefer: return=representation` asks for the affected rows back rather than
+   * PostgREST's default for `PATCH`, which is `return=minimal` and answers `204` with
+   * no body — and the `200` of this route is the DATABASE's row, not the client's
+   * request (`frontend/.../profile-api.service.ts` documents that it relies on
+   * exactly this).
+   *
+   * THE SPELLING IS `return=representation`, and `return=full` DOES NOT WORK —
+   * measured against the live PostgREST 16.4:
+   *
+   *     Prefer: return=full            -> 204, empty body
+   *     Prefer: return=representation  -> 200, [{"id":"...","first_name":"..."}]
+   *
+   * PostgREST accepts only `minimal` and `representation`. It does not reject an
+   * unknown preference with an error; it IGNORES it and applies the default, so the
+   * wrong spelling is indistinguishable from not asking at all. That is why the
+   * `isArray` check below is load-bearing rather than defensive: with the wrong
+   * spelling the write genuinely succeeds and the response is a legitimate `204`,
+   * and the only honest reading of a `204` from this route is "a write happened and
+   * this method cannot report what it did".
    *
    * ## THE DATABASE SAYS NO AND THE CLIENT HEARS 422
    *
    * `users_first_name_not_blank` / `users_last_name_not_blank` (`0023:216-251`) reject
-   * `''`, `' '` and `'CA '`. That arrives as `23514`, and it is translated here into a
-   * `422` with the rule named — because "the database refused a value" is a validation
-   * answer about the member's own input, and letting it surface as a `500` would report
-   * a server fault for the most ordinary thing a person can get wrong on a form.
+   * `''`, `' '` and `'CA '`. PostgREST carries the SQLSTATE through as `code`, so
+   * `sqlStateOf` reads it and the refusal is translated into a `422` naming the rule —
+   * because "the database refused a value" is a validation answer about the member's
+   * own input, and letting it surface as a `500` would report a server fault for the
+   * most ordinary thing a person can get wrong on a form.
    *
-   * `RETURNING` names the same twelve columns as the read, so the `200` is what the
-   * DATABASE stored rather than what the client submitted. A form that echoed its own
-   * input would report success for a value the server trimmed, refused or normalised —
-   * and `frontend/.../profile-api.service.ts` says exactly that it relies on this.
+   * ## ZERO ROWS IS A `404`, AND IT IS NOT AN ERROR CONDITION TO HIDE
    *
-   * ## "WAS THIS FIELD SUPPLIED" IS `!== undefined`, AND `hasOwnProperty` IS WRONG HERE
-   *
-   * The obvious test — `Object.prototype.hasOwnProperty.call(dto, 'first_name')` — is
-   * what an earlier draft used, and it answers `true` for a field the client never sent.
-   * `tsconfig.json` targets `ES2023`, so `useDefineForClassFields` is on and every field
-   * `UpdateProfileDto` declares is DEFINED on each instance, with the value `undefined`.
-   * The global `ValidationPipe` runs `transform: true`, so `dto` is such an instance
-   * (`plainToInstance(UpdateProfileDto, {})` has both own properties). The draft
-   * therefore read every body as "both supplied": `{}` was answered `200` after writing
-   * `NULL` to both columns, and `{ first_name: 'Ada' }` silently cleared `last_name` —
-   * a data-loss bug on the one route whose `200` promises it is what the database
-   * stored. `test/e2e/profile.e2e-spec.ts` caught it as the empty-body case answering
-   * `200`.
-   *
-   * `!== undefined` is exact rather than approximate: the body is JSON, and JSON has no
-   * `undefined`, so a value that is `undefined` here is a key the client did not send.
-   * `null` is a value JSON DOES carry, and it still reaches the `CASE` as "supplied, and
-   * clear it", which is the `null`-clears-a-name rule `UpdateProfileDto` documents.
+   * The policy denies the write — not the grant, the POLICY — when the row is a
+   * tombstone, when the caller's token resolves no actor, and when the caller is not
+   * the subject the filter names. All three are correctly "there is nothing here you
+   * may write", and PostgREST answers `200 []`, which is reported rather than passed
+   * off as a successful write of nothing.
    */
-  async updateMe(userId: string, dto: UpdateProfileDto): Promise<UserProfileDto> {
-    const setFirst = dto.first_name !== undefined;
-    const setLast = dto.last_name !== undefined;
-    if (!setFirst && !setLast) {
+  async updateMe(userId: string, dto: UpdateProfileDto, callerToken: string | undefined): Promise<UserProfileDto> {
+    // The token is what makes the write the CALLER's, and `JwtAuthGuard` sets it on the
+    // same assignment that sets `req.user`. Checked rather than assumed, for the reason
+    // `me()` gives: without it `PostgrestClient` omits the header, PostgREST serves the
+    // write as `app_anon`, and the answer is a `42501` naming a table rather than a
+    // token that was never forwarded.
+    if (callerToken === undefined || callerToken === '') {
+      throw new UnauthorizedException(
+        'this request reached the name write with no verified bearer token to forward; JwtAuthGuard sets it on ' +
+          'the same assignment that sets req.user, so this is not reachable from an HTTP request',
+      );
+    }
+
+    const body: Record<string, string | null> = {};
+    if (dto.first_name !== undefined) {
+      body['first_name'] = dto.first_name;
+    }
+    if (dto.last_name !== undefined) {
+      body['last_name'] = dto.last_name;
+    }
+    if (Object.keys(body).length === 0) {
       throw new UnprocessableEntityException('nothing to change: send first_name, last_name, or both');
     }
 
-    const client = await this.pool.connect();
-    let committed = false;
-    let profile: UserProfileDto;
+    let updated: PostgrestResponse<unknown>;
     try {
-      await client.query('BEGIN');
-      await client.query('SET LOCAL ROLE app_admin');
-
-      const updated = await client.query<Record<string, unknown>>(
-        `UPDATE users
-            SET first_name = CASE WHEN $2::boolean THEN $3::text ELSE first_name END,
-                last_name  = CASE WHEN $4::boolean THEN $5::text ELSE last_name END
-          WHERE id = $1 AND deleted_at IS NULL
-          RETURNING ${MEMBER_PROFILE_COLUMNS.join(', ')}`,
-        [userId, setFirst, setFirst ? (dto.first_name ?? null) : null, setLast, setLast ? (dto.last_name ?? null) : null],
-      );
-      const returned: unknown = updated.rows[0];
-      if (updated.rowCount !== 1 || returned === undefined) {
-        throw new NotFoundException('no profile is writable for this token');
-      }
-      // Mapped INSIDE the transaction, from the row this statement just wrote. Reading
-      // it here rather than re-reading it is not only one round trip: it is the only way
-      // the `200` can be the value the DATABASE stored, including the timestamp format,
-      // because `readProfileRow` is the single place either reader's row becomes a DTO.
-      profile = readProfileRow(returned);
-
-      await client.query('COMMIT');
-      committed = true;
+      updated = await this.postgrest.patch<unknown>(callerToken, '/users', body, {
+        params: {
+          select: MEMBER_PROFILE_COLUMNS.join(','),
+          id: `eq.${userId}`,
+        },
+        headers: { Prefer: 'return=representation' },
+      });
     } catch (error) {
-      if (!committed) {
-        await client.query('ROLLBACK').catch(() => {});
-      }
       if (sqlStateOf(error) === CHECK_VIOLATION) {
         throw new UnprocessableEntityException(
           'a name may not be blank or carry leading or trailing whitespace — send null to clear it instead',
         );
       }
       throw error;
-    } finally {
-      client.release();
     }
 
-    return profile;
+    const data: unknown = updated.data;
+    if (!Array.isArray(data)) {
+      throw new Error(
+        `PostgREST answered the name write of ${userId} with ${updated.status} and a body that is not an array; ` +
+          'a member name write that cannot be parsed must fail loudly rather than answer 200 over a write that ' +
+          'did not happen',
+      );
+    }
+    const first: unknown = data[0];
+    if (first === undefined) {
+      throw new NotFoundException('no profile is writable for this token');
+    }
+    // Mapped from the row PostgREST read back out of the database inside the write's own
+    // transaction, which is the same single place `me()`'s row becomes a DTO. It is not
+    // merely one round trip: it is the only way the `200` can be the value the DATABASE
+    // stored, including the timestamp format.
+    return readProfileRow(first);
   }
 
   // =============================================================================
@@ -855,7 +902,7 @@ export class UsersService {
   // =============================================================================
 
   /**
-   * An administrator creates an account.
+   * An administrator creates an account — a COMPLETE one.
    *
    * ## THE THIN APP REFUSES THIS ROUTE TO A MEMBER, AND WHY IT IS NOT THE ENFORCEMENT
    *
@@ -902,27 +949,83 @@ export class UsersService {
    * `LIMIT 1` has to be lucky about. The `201` returns what the database stored, so the
    * caller sees the normalised form rather than the form it sent.
    *
-   * ## THE CREATED ACCOUNT HAS NO ROLE AND NO GROUP — A RECORDED INCOMPLETENESS
+   * ## §B2'S INVARIANT IS HONOURED HERE, IN ONE TRANSACTION, AND NOTHING IS INVENTED
    *
-   * §B2's invariant is "every user has at least one role and at least one group", and
-   * this row has neither. That is not an oversight to be discovered: it is logged at
-   * `warn` below, naming the two inserts that would complete it, and
-   * `test/e2e/profile.e2e-spec.ts` asserts the row really has neither.
+   * "Every user has at least one role and at least one group." This route used to create
+   * the row and log a `warn` naming the two inserts that would complete it — an account
+   * that can sign in and then reads **zero rows** for `GET /users/me`, because
+   * `users_read_scope` requires `authz.can_read_user()` and that is false with no
+   * `user_roles` row. §2.1 calls a success-shaped report for work that did not happen the
+   * worst shape available, and this was one.
    *
-   * **Nothing is invented to fill it.** Assigning `member` would be "silently creating a
-   * role assignment nobody asked for", which is the outcome the brief refuses; and it
-   * would be a security decision made by a route whose job is to make a row. §B2's
-   * invariant also has **no mechanical enforcement anywhere** — nothing in the schema can
-   * require a child row from a parent — so the invariant is currently documentation, and
-   * a route that honours it silently would be the one place it looked true.
+   * The fix is that `role` and `group` are REQUIRED on the body and the two membership
+   * rows are written in the SAME transaction as the `users` row, so a `201` means an
+   * account exists that can actually be used. `test/e2e/profile.e2e-spec.ts` asserts the
+   * completed shape: one `user_roles` row, one `user_groups` row, and a `200` from
+   * `GET /users/me` for the account that was just created.
    *
-   * What a caller can do with the account as it stands: sign in, and nothing else that
-   * this application exposes. `dbRoleFor` gives it `app_member`, `users_read_scope`
-   * requires `authz.can_read_user()`, and with no role rows that is false — so
-   * `GET /users/me` returns zero rows and the new member's own profile reads as a `404`.
-   * That is the "visibly incomplete" the brief offers as the honest option, and it is
-   * chosen here over requiring a role and group in the body, which the five-field
-   * contract does not carry.
+   * **Why the caller is asked rather than the route guessing, which is the decision.**
+   * The three alternatives were each available and each is worse:
+   *
+   *   * **Invent a default** (`member`, plus some group) is what the previous version of
+   *     this method refused on purpose and was right to. A role is CAPABILITY and a group
+   *     is SCOPE; both are security decisions, and a route whose job is to make a row has
+   *     no business making either. An account that silently holds `admin` is worse than
+   *     an account that cannot read its own profile.
+   *   * **Enforce it in the database** is not available here, and the reason is a
+   *     property of the schema rather than an omission. `user_roles.user_id` and
+   *     `user_groups.user_id` are `REFERENCES users (id)` (`0008`), so the `users` row
+   *     must exist BEFORE its membership rows can name it. A `CHECK` cannot see another
+   *     table at all, and a row trigger on `users` firing at INSERT time therefore cannot
+   *     see membership rows that have not been written yet and cannot be — the foreign
+   *     key forbids it. The only shape left is a `DEFERRABLE INITIALLY DEFERRED`
+   *     constraint trigger, and that fires at COMMIT, which makes "insert the user, then
+   *     insert the memberships" a two-statement AUTOCOMMIT sequence impossible. Every
+   *     operator provisioning an account by hand through `psql`, and every test fixture
+   *     that creates a member, writes it that way; a constraint that refuses the
+   *     COMMIT would turn §B2's invariant into a refusal of the bootstrap path the brief
+   *     asks about, and would fire again inside `authz.revoke_subject_authority`'s
+   *     anonymisation and inside `0016`'s retention sweep. A `DELETE` of the last
+   *     membership row is likewise uncatchable without a trigger on `user_roles`, which
+   *     `0008`'s `ON DELETE CASCADE` would then fire on during every purge.
+   *   * **Refuse the account and log it** is what this method used to do, and §2.3 calls
+   *     silently returning a success-shaped value a bug.
+   *
+   * So the invariant is enforced where it CAN be enforced — at the one boundary that
+   * creates accounts, atomically — and the residual is stated rather than hidden: a
+   * direct `INSERT INTO users` by `app_admin` (the seed does exactly that, and always
+   * writes the memberships in the same transaction) still produces a row with no
+   * authority, and §B2's invariant has **no mechanical enforcement in this schema**. The
+   * deferred-constraint design above is recorded here so the next person to want it
+   * starts from the FK-ordering argument rather than from the idea.
+   *
+   * ## THE ROLE AND THE GROUP ARE NAMES, AND AN UNKNOWN ONE IS A 422
+   *
+   * A `uuid` would be the other wire shape and it is refused because it makes the
+   * failure silent: a caller passing a role id that does not exist gets `23503` from the
+   * foreign key, which names a constraint rather than a mistake. A name answers "there
+   * is no role named 'boss'" — the sentence an administrator can act on. Both lookups
+   * happen BEFORE the `users` INSERT, so a refusal costs no row; and both run as
+   * `app_admin`, which is the only principal holding `SELECT` on `roles` (§B2 keeps the
+   * permission matrix admin-only at the table level).
+   *
+   * ## THE MEMBERSHIP WRITES NEED A GRANT THAT ONLY A SEEDED DATABASE CARRIES
+   *
+   * `0001:1009-1019` withholds `INSERT` on `user_groups` from EVERY serving role,
+   * `app_admin` included, because a member who can write their own membership row
+   * widens their own scope in one statement. `database/seed.ts`'s `grantSeedAccess()`
+   * grants it to `app_admin` as seed-time provisioning, and that grant persists — the
+   * same asymmetry `0008:160-171` records about the cascade. So this route writes the
+   * membership rows on any database that has been seeded, and on a MIGRATIONS-ONLY
+   * database it cannot. That is stated rather than worked around, because on such a
+   * database there are no `roles` and no `groups` rows either and the lookups above have
+   * already answered `422` — the account could not have been completed there by any
+   * means.
+   *
+   * `user_roles_grant_subset` (`0004`) fires on this insert and permits it: the thin
+   * app's session is claimless, so `authz.actor()` is NULL, and `0004:126-133`'s second
+   * branch returns NEW when `current_setting('role') = 'app_admin'` — which is what
+   * `SET LOCAL ROLE app_admin` two statements above established.
    */
   async createUser(caller: AccessTokenPayload, dto: CreateUserDto): Promise<CreatedUserDto> {
     const servingRoles = new Set(['app_anon', 'app_member', 'app_admin']);
@@ -944,6 +1047,21 @@ export class UsersService {
     try {
       await client.query('BEGIN');
       await client.query('SET LOCAL ROLE app_admin');
+
+      // Resolved BEFORE the insert, so an unknown role or group refuses without writing
+      // a row and without hashing into a transaction that is about to roll back.
+      const roleId = await this.resolveNamedId(
+        client,
+        'SELECT id FROM public.roles WHERE name = $1',
+        'role',
+        dto.role,
+      );
+      const groupId = await this.resolveNamedId(
+        client,
+        'SELECT id FROM public.groups WHERE name = $1',
+        'group',
+        dto.group,
+      );
 
       const inserted = await client.query<{
         id: string;
@@ -979,6 +1097,27 @@ export class UsersService {
         created_at: readTimestamp(returned.created_at, 'users.created_at'),
       };
 
+      // §B2's invariant, discharged. Both rows are written inside the transaction that
+      // created the account, so a `201` cannot describe a half-provisioned principal —
+      // and `ON CONFLICT DO NOTHING` is not used, because a conflict here would mean this
+      // transaction created a SECOND membership for a user that already had one, which
+      // is a different bug and should raise rather than be absorbed.
+      const role = await client.query(
+        'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
+        [created.id, roleId],
+      );
+      const group = await client.query(
+        'INSERT INTO user_groups (user_id, group_id) VALUES ($1, $2)',
+        [created.id, groupId],
+      );
+      if (role.rowCount !== 1 || group.rowCount !== 1) {
+        throw new Error(
+          `provisioning ${created.username} inserted ${String(role.rowCount ?? 0)} role row(s) and ` +
+            `${String(group.rowCount ?? 0)} membership row(s); §B2 requires exactly one of each and the ` +
+            'account was not created',
+        );
+      }
+
       await client.query('COMMIT');
       committed = true;
     } catch (error) {
@@ -1002,14 +1141,37 @@ export class UsersService {
       client.release();
     }
 
-    this.logger.warn(
-      `user ${created.id} (${created.username}) was created with NO role and NO group, so it can sign in but ` +
-        'holds no capability and no scope: GET /users/me for that account reads zero rows because ' +
-        "authz.can_read_user() is false with no user_roles row. Complete it with an INSERT INTO user_roles " +
-        'and one into user_groups, or close the gap by carrying them in the body of this route.',
+    this.logger.log(
+      `user ${created.id} (${created.username}) was created with role '${dto.role}' and group '${dto.group}', ` +
+        'so it holds both axes §B2 requires and GET /users/me is readable for it immediately',
     );
 
     return created;
+  }
+
+  /**
+   * A `name` to the `id` of the row carrying it, or a `422` naming what does not exist.
+   *
+   * **The statement is a literal at both call sites and is never assembled.** That is
+   * the whole of the injection argument: there is no table name in a variable, no
+   * `format('%I', …)`, and nothing a caller supplies reaches the SQL text — only ever a
+   * parameter. It also keeps the helper honest about what it is, which is a nicer
+   * shape to have than a function whose safety depends on its two call sites passing
+   * something from an allow-list.
+   *
+   * `422` and not `404`: the request named something, and that something does not exist.
+   * The same distinction `requestEmailChange` draws between `422` and `409`.
+   */
+  private async resolveNamedId(client: PoolClient, sql: string, label: string, name: string): Promise<string> {
+    const found = await client.query<{ id: string }>(sql, [name]);
+    const id: unknown = found.rows[0]?.id;
+    if (typeof id !== 'string') {
+      throw new UnprocessableEntityException(
+        `there is no ${label} named '${name}'; an account is created with the ${label} it will hold, and ` +
+          'that has to be one this installation already has',
+      );
+    }
+    return id;
   }
 
   // =============================================================================
