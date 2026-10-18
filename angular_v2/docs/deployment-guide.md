@@ -134,11 +134,12 @@ npm run db:seed
 What each one does, and why the order matters:
 
 - `migration:run` applies the plain-SQL migrations in
-  `backend/database/migrations/` (`0001_rls_foundation`,
-  `0002_refresh_tokens`, `0003_login_attempt_ip_keys`, `0004_grant_subset`,
-  `0005_email_messages`, `0006_uuidv7`) as the owner role, one transaction each.
-  **`0001` refuses to run until the four serving roles exist** — it raises,
-  naming them. Migrations cannot create roles:
+  `backend/database/migrations/` as the owner role, one transaction each. It
+  applies exactly the files missing from the `migrations` table, so the count
+  moves with the tree — read `ls backend/database/migrations/*.sql` rather than a
+  number written here, because a number written here is exactly the kind of claim
+  that goes stale silently. **`0001` refuses to run until the four serving roles
+  exist** — it raises, naming them. Migrations cannot create roles:
   `CREATE ROLE` needs `CREATEROLE`, which is cluster-scoped, and the escalation
   boundary `GRANT` needs `ADMIN OPTION`, so the boundary is *necessarily* a
   superuser statement.
@@ -420,11 +421,14 @@ authenticated and row-scoped to the caller**, so it is not crawlable public
 HTML, and the page a browser receives depends on who is holding the token. That
 is what decides the default.
 
-Note one detail of the current build: `app.routes.server.ts` sets
-`RenderMode.Server` for `**`, so `ng build` writes **no `index.html`** — the
-browser folder contains `index.csr.html`, and nothing is prerendered
-(`prerendered-routes.json` is empty, and `app.routes.ts` has no routes yet).
-Both static options below depend on that file.
+Note one detail of the current build, because both static options depend on it.
+`app.routes.server.ts` marks `/login`, `/verify-email`, `/reset-password` and
+`/verify-email-change` `RenderMode.Server` and everything else — `**` — 
+`RenderMode.Client`, because the token lives in `localStorage` and a server
+render of the authenticated area would answer a question it cannot. **No route is
+`RenderMode.Prerender`**, so `ng build` writes **no `index.html`** — the browser
+folder contains `index.csr.html` and no `prerendered-routes.json` at all. Option
+**B** exists because of that file.
 
 ### A. Server-side rendering — the usual choice
 
@@ -469,20 +473,30 @@ server {
         try_files $uri $uri/ /index.html;   # Angular's client-side router
     }
 
+    # The thin Nest app. /api is the prefix the bundle asks for; see
+    # src/app/core/api/api-base-urls.ts. It is relative on purpose.
     location /api/ {
         proxy_pass http://127.0.0.1:3000/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 
-    # PostgREST. It binds 127.0.0.1, so this proxy has to live on the same host.
+    # PostgREST. /rest, not /db — the prefix is in api-base-urls.ts and in
+    # src/server/api-proxy.ts, and changing it in only one of the three is the
+    # failure. It binds 127.0.0.1, so this proxy has to live on the same host.
     # PostgREST does no rate limiting of its own — do it here.
-    location /db/ {
+    location /rest/ {
         proxy_pass http://127.0.0.1:3001/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         limit_req zone=api burst=20 nodelay;
     }
+
+    # See docs/security.md §Transport headers: nothing in this template sets a
+    # Content-Security-Policy, and the proxy is where it belongs.
+    add_header Content-Security-Policy "default-src 'self'; frame-ancestors 'none'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 }
 ```
 
@@ -498,18 +512,24 @@ status page — set those routes to `RenderMode.Prerender` in
 `index.html` per prerendered route, and you deploy it exactly as **B**, with no
 per-route copy step.
 
-**Not active today.** `app.routes.server.ts` is `RenderMode.Server` on `**` and
-`prerendered-routes.json` is `{"routes": {}}`, so this option produces nothing
+**Not active today.** No entry in `app.routes.server.ts` is `RenderMode.Prerender`
+— four are `Server`, the catch-all is `Client` — so this option produces nothing
 until a forker changes it.
 
 ### Reverse proxy, whichever you pick
 
 PostgREST listens on `127.0.0.1:3001` only, so the proxy must be on the same
 host. All three processes are plain HTTP and expect a TLS terminator in front of
-them. The path prefixes above are the fork's decision — the frontend has no API
-base URL wired up yet (no environment file, no HTTP client), and when you add
-one keep it **relative**; an absolute `http://localhost:3000` baked into the
-bundle breaks every browser that is not the build machine.
+them.
+
+**The two path prefixes are already decided, and they are the fork's only
+freedom here:** `/api` for the thin app and `/rest` for PostgREST, both declared
+in `frontend/src/app/core/api/api-base-urls.ts` and both mounted by
+`frontend/src/server/api-proxy.ts` (SSR) and `frontend/proxy.conf.json`
+(`ng serve`). **Keep them relative.** An absolute `http://localhost:3000` baked
+into the bundle breaks every browser that is not the build machine, which is why
+there is no frontend environment file to put one in — the three places that name
+these prefixes name them as paths, and that is the whole mechanism.
 
 ### Host header validation and proxy headers (`NG_ALLOWED_HOSTS`, `NG_TRUST_PROXY_HEADERS`)
 
@@ -706,7 +726,7 @@ The full key set, and where the values come from:
 | `SECURITY_DELAY_CAP_SECONDS` | no (30) | Ceiling on any scheduled entry. |
 | `SECURITY_BLOCK_THRESHOLD` | no (5) | Failures before a refusal, before any credential check. |
 | `APP_BASE_URL` | **yes, in every mode** | The application's public origin. Every email template carries an absolute link, so there is no default to fall back to. Must be `https:` in production. |
-| `NG_ALLOWED_HOSTS` | **yes, in production** | Comma-separated allowed hostnames for Angular SSR (e.g. `localhost,127.0.0.1,app.example.com`). Configured in `backend/.env.production` (SSR inherits it via `prod.mjs`). Replaces the `angular.json` allowlist. |
+| `NG_ALLOWED_HOSTS` | **yes, in production** | Comma-separated allowed hostnames for Angular SSR (e.g. `localhost,127.0.0.1,app.example.com`). Configured in `backend/.env.production` (SSR inherits it via `prod.mjs`). **Adds to** the `angular.json` allowlist rather than replacing it — see below. |
 | `NG_TRUST_PROXY_HEADERS` | **yes, behind a reverse proxy** | Comma-separated proxy headers Angular SSR trusts (`x-forwarded-proto,x-forwarded-host,x-forwarded-port`). Configured in `backend/.env.production`. Allows SSR to detect HTTPS behind TLS termination. |
 | `EMAIL_HOST` `EMAIL_PORT` `EMAIL_USER` `EMAIL_PASSWORD` `EMAIL_FROM` | **yes, in production** | The SMTP submission endpoint. Required with no defaults and **not read at all** outside production, so no mode needs a credential it cannot use. |
 | `EMAIL_SECURE` | no (from the port) | Implicit TLS. Defaults to `true` on port 465, `false` otherwise (STARTTLS on 587). |
@@ -749,8 +769,10 @@ database file ever belongs in the repository.
       `pgrst_authenticator` reaches exactly `app_admin, app_anon, app_member`
       and nothing else. `backend/database/bootstrap/001_roles.sql` asserts this
       itself on every run — read the output rather than assuming it ran.
-- [ ] All six migrations applied: the `migrations` table names every file in
-      `backend/database/migrations/`, up to `0006_uuidv7`.
+- [ ] Every file in `backend/database/migrations/` is applied: the `migrations`
+      table names each one. Read the directory and compare — do not check a count
+      written here, because a stale count is a green tick on an unfinished
+      migration.
 - [ ] `openapi.json` and the generated frontend types are current for the schema
       you deployed (`cd frontend && npm run generate:client`).
 - [ ] The reverse proxy sits in front of all three processes, terminates TLS,
@@ -771,35 +793,106 @@ database file ever belongs in the repository.
 
 ## Not yet present
 
-Named here rather than written into the steps above as if they existed.
+Named here rather than written into the steps above as if they existed. Each one
+names its reason, because an absence without a reason reads as an oversight
+rather than as a decision.
+
+**This list is machine-checked, and it fails when it stops being true.**
+`backend/test/unit/docs/deployment-gaps.spec.ts` re-derives each absence from the
+tree. It reads this document for exactly one thing — *which entries exist*, via a
+`<!-- gap:… -->` marker on each bullet below — and never to decide whether an
+absence holds, because a guard that compared the document against itself would be
+a tautology. Building one of these turns `verify` red, and the fix is to delete
+the bullet rather than to relax the check. So does adding a bullet with no marker
+or no matching check: a new gap cannot be documented without deciding how it is
+watched. And so does removing a bullet without removing its check, because a check
+with nothing left to assert is not a control.
+
+Every top-level `- ` bullet in this section is therefore an entry, and each must
+carry a marker. The checks differ in kind and the test says which, per entry.
+*File-absence* entries — "no CI", "no container config" — are near-exhaustive,
+because the thing is a file with a conventional name. *Behaviour-absence* entries
+— "no CAPTCHA issuer", "no telemetry producer" — are keyword gates over source
+files that exist, so each one prints its blind spot in the suite's log. Read that
+line before trusting one.
 
 - **No script creates the owner role or the database.** Step 1 above is two
-  `psql` commands run as a superuser. There is no `npm run db:create`.
-- **No route sends an email.** `backend/src/email/` exists and is complete —
-  provider, renderer, two templates, two service methods — but the registration
-  and password-reset endpoints that would call it are later W11 slices and need
-  a token table. So `EmailService` has no production caller yet. See
-  [`adr.md`](./adr.md) ADR-0024 and §Transactional email in production below.
-- **No frontend routes for the links.** The templates point at
-  `APP_BASE_URL/verify-email` and `APP_BASE_URL/reset-password`, and
-  `frontend/src/app/app.routes.ts` is still empty, so those links 404 until the
-  routes exist. Sending mail from a deployment whose frontend has no such route
-  mails every user a dead link.
-- **No CAPTCHA, no geo-IP, no alerting module.** `AGENTS.md` B6 requires them for
-  a real deployment; none is in the tree.
-- **No frontend HTTP layer.** No service, no `HttpClient`, no API base URL, no
-  proxy config, no environment file. `src/app/api/schema.ts` is generated from the
-  committed `openapi.json`, which `npm run smoke` now checks against the live
-  catalog — a spec that omits a table or column the database has fails `verify`.
-- **No routes in the frontend.** `app.routes.ts` is empty, so nothing is
-  prerendered and option **B** needs the `index.cr.html` copy described above.
+  `psql` commands run as a superuser, because `CREATE ROLE` needs `CREATEROLE`,
+  which is cluster-scoped, and the escalation boundary needs `ADMIN OPTION` — so
+  neither statement *can* be a migration or a seeded step. There is no
+  `npm run db:create`. <!-- gap:db-create -->
+
+- **CAPTCHA has storage and no logic.** `0022_security_telemetry.sql` creates
+  `public.captcha` complete, and its columns are shaped for an issuer and a
+  verifier that do not exist: `token_hash`, a per-row `solution_salt` beside
+  `solution_hash`, and an `is_used` / `used_at` pair that makes single-use a
+  property of the write rather than a hope about the read. **Nothing in
+  `backend/src/` issues a challenge and nothing verifies one.** `AGENTS.md` B6's
+  "validated server-side" is owed, not met, and the migration says so itself.
+  `ip_reputation.captcha_required_count` is a column the seed fills and no code
+  increments. [`security.md`](./security.md) §CAPTCHA. <!-- gap:captcha-logic -->
+
+- **No geo-IP resolution.** `users.geo_source` / `geo_accuracy_km` /
+  `geo_updated_at` and `ip_reputation.geo_location` are columns; `shared/geo-place.ts`
+  renders them. No provider is called and no place is derived from an address, so
+  `geo_source` records where a value came from rather than a lookup this
+  application performed. Geo-blocking — B6's "off by default, correct namespace"
+  — has no key in any `.env*` file, which is what "off by default" looks like
+  when the feature is absent rather than disabled. <!-- gap:geo-resolver -->
+
+- **Nothing produces the security telemetry.** Four tables —
+  `ip_reputation`, `security_detected_patterns`, `pattern_login_attempts`,
+  `security_alerts` — are created, granted, RLS-scoped to `app_admin` and read by
+  five admin routes. **No application code writes them.** The only writer is
+  `database/seed.ts`, and every row it inserts carries `is_mock = true`, which is
+  a display filter and not a fabrication guard: the alerts in a development
+  database are fixtures. Detection, scoring and the alert pipeline are owed.
+  <!-- gap:telemetry-producers -->
+
+- **No CSP headers.** Nothing in either project sets `Content-Security-Policy`:
+  no `helmet`, no `@fastify/helmet`, no `<meta http-equiv>`, no
+  `contentSecurityPolicy` block in `frontend/angular.json`. **The gap belongs in
+  the layer in front of the stack, and setting it there is the normal answer** —
+  an operator's reverse proxy can add it without touching this repository. What is
+  a gap here is that the template does not say so: a deployer who copies the
+  nginx block below verbatim gets no policy at all and finds out in an audit.
+  [`security.md`](./security.md) §Transport headers. <!-- gap:csp -->
+
+- **No cookie-consent banner, and no cookie for one to gate.** This is a
+  considered position, not a backlog item, and the argument is short: **a
+  consent banner is only meaningful once something consumes the consent.** This
+  tree sets no cookie, reads no cookie, stores no consent and loads no tracker —
+  the session lives in `localStorage`, which GDPR does not classify as a cookie
+  and which the session document treats as a weaker store on purpose. A banner
+  over an empty set of cookies is a compliance-shaped artifact with no compliance
+  behind it, and it is worse than its absence because it reads as evidence.
+  **The obligation attaches the moment a fork adds a tracker or a non-essential
+  cookie** — at that moment GDPR and UK GDPR consent requirements apply, and the
+  template will not supply a banner for it. The substantive privacy work in v2 is
+  elsewhere and is real: erasure, retention windows, the purge queue, tombstones
+  and the statutory compliance record. See [`security.md`](./security.md).
+  <!-- gap:cookies -->
+
 - **No container, systemd, or process-supervisor configuration**, and no
   orchestrator that survives a reboot. `npm run prod` is a foreground process;
-  putting it under a supervisor is the fork's work.
-- **No `swagger2openapi` regeneration script.** `openapi.json` is committed and
-  the conversion step is documented in `README.md`, not automated.
+  putting it under a supervisor is the fork's work. No `Dockerfile`, no
+  `compose.yml`, no `*.service`, no `Procfile`, no `fly.toml`, no `k8s/` — and
+  that is deliberate rather than merely unfinished: a deployment recipe nobody
+  reviews in this repository is a deployment recipe that describes an
+  architecture this repository no longer has.
+  <!-- gap:container -->
+
+- **No `swagger2openapi` regeneration script.** PostgREST 16 serves Swagger 2.0
+  and `openapi-typescript` targets OpenAPI 3, so the conversion is a required
+  step. It is documented in [`README.md`](../README.md) and performed by hand;
+  `openapi.json` is committed, and `backend/test/smoke/openapi-contract.smoke-spec.ts`
+  gates that committed file against the live catalog, so a spec that drifts is a
+  red run even though nothing regenerates it.
+  <!-- gap:openapi-regen -->
+
 - **No CI.** The template has no pipeline by design; `npm run verify` is the gate
-  a fork inherits. See [`development.md` §Why there is no CI](./development.md).
+  a fork inherits. See [`development.md` §Why there is no CI](./development.md#why-there-is-no-ci).
+  <!-- gap:ci -->
 ---
 
 ## Transactional email in production

@@ -28,7 +28,7 @@ same level, because they are not equally strong.
 | **Runs before the query** | `db-pre-request` | Revocation and per-request throttling, ahead of any data access |
 | **Fails on abuse** | Per-account counter → delay + challenge | Cannot be weaponised into a lockout DoS. |
 | **Corroborating** | IP reputation | Weak identity in 2026; never the primary control. |
-| **Speed bump** | CAPTCHA | Defeats unsophisticated traffic. Bypassable by farms. |
+| **Speed bump** | CAPTCHA — **storage only, no issuer or verifier** | Would defeat unsophisticated traffic. Bypassable by farms. |
 | **Triage only** | Behavioural scoring | Informs a decision. Never blocks. |
 
 The previous implementation inverted this: the weakest signal (IP) carried the
@@ -75,11 +75,17 @@ and still counts toward throttling:
 ```
 POST /auth/login          (thin Nest app)
   1. IP block check        ─┐
-  2. CAPTCHA verification   │ before any password is examined
+  2. CAPTCHA verification   │ before any password is examined   ← NOT IMPLEMENTED, §CAPTCHA
   3. bcrypt.compare        ─┘
   4. record the attempt, pass or fail
   5. issue tokens
 ```
+
+Steps 1, 3, 4 and 5 run, in that order, inside the handler. Step 2 is the
+position a CAPTCHA has to occupy, not something that occupies it today: there is
+no issuer and no verifier (§CAPTCHA). The ordering is the part that is
+load-bearing, and it is why the sequence is written with the credential check
+inside the bracket rather than below it.
 
 There is no Passport strategy to hook. The checks live inside the handler, ordered
 so they cannot be skipped by a successful credential comparison.
@@ -113,36 +119,146 @@ on elevated risk. All thresholds come from config.
 
 ## IP reputation
 
-Secondary signal. Two requirements, both currently unmet:
+Secondary signal, and both of its requirements are met — so read this as the
+signal's ceiling rather than as a wish list:
 
 1. **Canonical normalisation.** `1.2.3.4` and `::ffff:1.2.3.4` are the same host
-   and must key the same counter. Without this, an attacker rotates string
-   representation and never accumulates five failures.
-2. **Subnet aggregation.** Per-address counters are worthless against an IPv6
-   `/64` or a rotating IPv4 pool. Aggregate to a subnet before counting.
+   and key the same counter. `normalizeIpAddress` in `src/auth/ip-address.ts`
+   flattens the IPv4-mapped form to the dotted quad, and `auth.service.ts` writes
+   `ip_normalized` on every `login_attempts` row. Without this, an attacker
+   rotates string representation and never accumulates five failures.
+2. **Subnet aggregation.** `ipSubnetKey` produces the /64 for IPv6 and the
+   normalised host for IPv4, written to `ip_subnet`, and the per-account counters
+   in `auth.service.ts` query on `ip_subnet` rather than on the raw string.
+   Per-address counters are worthless against an IPv6 `/64` or a rotating IPv4
+   pool.
 
 Allowlisted IPs skip counting entirely and cannot be blocked. The allowlist is
-populated explicitly; it is not a loopback-only stub.
+populated explicitly; it is not a loopback-only stub, and
+`normalizeIpAddress` is applied to every entry before comparison.
+
+**What does not exist is the standing reputation itself.** `ip_reputation` is a
+table with no writer: nothing scores an address and nothing consults the score, so
+the row's `reputation_score` and `is_blocked` describe nothing. The per-account
+brute-force counters above it are real; the reputation row is storage. See §
+Detection and alerting.
 
 ---
 
 ## CAPTCHA
 
-Server-side, self-rolled, zero credentials — the correct answer to the
-portability constraint.
+**The storage half ships. The logic half does not.** `0022_security_telemetry.sql`
+creates `public.captcha` complete — `token_hash`, a per-row `solution_salt` beside
+`solution_hash`, and an `is_used` / `used_at` pair that makes single-use a property
+of the write rather than a hope about the read. **Nothing in `backend/src/` issues
+a challenge and nothing verifies one.** Read this section as the shape the missing
+code must take, not as a description of what the template does.
+
+The requirements it exists to satisfy are below. They are requirements, not
+current behaviour:
 
 - The server issues the challenge and stores the answer. **The answer never
   appears in the challenge payload.**
-- Single-use: consumed on verification, so replay fails.
-- Expiring: short TTL, plus periodic cleanup of abandoned challenges.
+- Single-use: consumed on verification, so replay fails. The columns are shaped
+  for it — `is_used` alone cannot answer "used when", and two replays inside the
+  same instant are indistinguishable on a boolean that does not record the moment
+  it flipped. The redemption path is `UPDATE … SET is_used = true, used_at = now()
+  WHERE id = $1 AND is_used = false`, asserting one row.
+- Expiring: short TTL, plus periodic cleanup of abandoned challenges. `expires_at`
+  is `NOT NULL` and `CHECK (expires_at > issued_at)` already enforces the window.
 - **Never validated in the browser.** There is nothing to validate client-side —
   this is impossible rather than unfinished.
 - An accessible non-visual alternative is required. An image challenge that
   excludes screen-reader users is a liability shipped into every fork.
 
+Where it sits in the login path is in §Login flow ordering above: **before any
+password is examined**, so the challenge cannot be skipped by a successful
+credential comparison.
+
 The three previous implementations were: one correct, one self-solving
 (`challenge: solution`), and one frontend service with the answers hardcoded in
-client JavaScript. Two deleted, one kept.
+client JavaScript. Two deleted, one kept — and the kept one is now only half
+present. `ip_reputation.captcha_required_count` is a column the seed fills and no
+code increments, so a dashboard showing a non-zero count is showing seed data.
+
+---
+
+## Transport headers
+
+**Neither project sets `Content-Security-Policy`.** No `helmet`, no
+`@fastify/helmet`, no `<meta http-equiv>`, no `contentSecurityPolicy` block in
+`frontend/angular.json`. That is the whole of it, and it is stated here because it
+is the kind of absence a deployer discovers in an audit rather than in a README.
+
+**Where it belongs is the layer in front of the stack.** All three processes are
+plain HTTP on loopback behind a TLS terminator, so the reverse proxy is already
+the place every other transport decision is made — TLS, `NG_TRUST_PROXY_HEADERS`,
+rate limiting on the PostgREST path. A policy header added there costs this
+repository nothing and survives a rebuild; a policy header added in application
+code is duplicated per runtime and can drift between the three processes.
+
+What the template owes an operator is therefore the *statement*, and
+[`deployment-guide.md`](./deployment-guide.md) carries it beside the nginx block
+so the two are read together. Two properties of a policy for this application are
+worth naming before one is written, because both are easy to get wrong:
+
+- **`frame-ancestors`, not `X-Frame-Options`,** for clickjacking. They are not
+  equivalent and the legacy header does not cover nested frames.
+- **`connect-src` must include the same-origin prefixes the application actually
+  uses** — `/api` and `/rest`, both relative. A policy that names `http://127.0.0.1:3000`
+  in `connect-src` because that is what the SSR process proxies to will break every
+  browser request, because the browser never sees that host: it sees
+  `https://your-domain`. See §`NG_ALLOWED_HOSTS` in
+  [`deployment-guide.md`](./deployment-guide.md) for the same trap on the host
+  allowlist.
+
+The reverse proxy should also send `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`
+and `Referrer-Policy` — none of which the application can usefully set, because all
+three are meaningless on a plain-HTTP loopback listener.
+
+---
+
+## Cookies and consent
+
+**This template sets no cookie, reads no cookie, stores no consent, and loads no
+tracker.** That is a checked absence, not an observation: the §`Not yet present`
+ledger in [`deployment-guide.md`](./deployment-guide.md) greps application code,
+the migrations and the environment files for the cookie API, a `cookie_consent`
+table and a fixed list of analytics vendors, so adding one without deciding what
+to do about consent turns `verify` red.
+
+It is also a deliberate position rather than a gap, and the argument is short: **a
+consent banner is only meaningful once something consumes the consent.** A banner
+over an empty set of cookies is a compliance-shaped artifact with no compliance
+behind it — it is worse than its absence, because it reads as evidence during the
+exact review it was meant to satisfy.
+
+The session token is in `localStorage`, not a cookie, and that choice is
+deliberate and documented in `session.service.ts`. `localStorage` is not
+classified as a cookie under GDPR or UK GDPR, so no consent requirement attaches
+to it. It is a weaker store — readable by any script on the origin, which is why
+a CSP is the control that matters above — and §Transport headers is where that
+trade is answered. Setting `HttpOnly; Secure; SameSite=Lax` would move the token
+out of reach of injected script entirely, and it is the change a fork that wants
+cookie-based sessions should make first.
+
+**The obligation attaches the moment a fork adds a tracker or any non-essential
+cookie.** At that point GDPR and UK GDPR consent requirements apply to it, and the
+template will not supply a banner: the consent mechanism belongs to the thing that
+needs consent, and it is written knowing what is being gated. Two obligations
+survive that fork and neither is optional:
+
+1. **The banner has to be wired, not merely rendered.** A consent record nobody
+   reads is the artifact-without-compliance case again, one layer up.
+2. **The retention window starts at consent, not at account creation.** A record
+   kept longer than the consent justifies is its own finding.
+
+**None of this is where this template's substantive privacy work is.** Erasure,
+retention windows, the purge queue, tombstones and the statutory compliance
+record are all in the tree, all enforced below the application, and none of them
+is affected by the absence above. A fork that ships zero trackers is compliant
+with cookie consent *and* has real rights machinery behind it; a fork that ships a
+tracker and a banner has a banner.
 
 ---
 
@@ -521,8 +637,22 @@ Known limits, stated so a forker is not misled:
 - **Adversarial adaptation** — user-agent and IP baselines are spoofable once
   known to the attacker.
 
-Alerts persist to the database. Notification channels are opt-in via config. No
-channel stubs that log "would send".
+Alerts **persist to the database** — `security_alerts` is created, granted,
+RLS-scoped to `app_admin` and read by `/admin/security-alerts`. **Nothing
+produces them.** No application code writes `security_alerts`,
+`ip_reputation`, `security_detected_patterns` or `pattern_login_attempts`; the
+only writer is `database/seed.ts`, and every row it inserts is `is_mock = true`.
+There is no scoring pipeline and no notification channel, so there is no opt-in
+config to set and no stub logging "would send" — the whole pipeline is the
+absence, which is a different thing from a pipeline with a stub in it, and is
+recorded as such in [`deployment-guide.md`](./deployment-guide.md) §
+`Not yet present`.
+
+So a dashboard showing live-looking rows in a development database is showing
+fixtures, and `is_mock` is the display filter that lets you exclude them. It is a
+filter and not a fabrication guard: nothing in the schema prevents application
+code from writing a row that is not what it claims to be, because a guard here
+would turn a synthetic row into a hard failure instead of an excluded one.
 
 ---
 
