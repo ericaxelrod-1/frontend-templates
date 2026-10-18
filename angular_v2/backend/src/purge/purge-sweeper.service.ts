@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
-import { SchedulerRegistry } from '@nestjs/schedule';
 import type { PoolClient } from 'pg';
 import type { BreakerEnvironment } from '../breaker/breaker-environment.js';
 import { BREAKER_ENV } from '../breaker/breaker-environment.js';
@@ -26,6 +25,7 @@ import type { PurgeExecutor } from './purge-executor.js';
 import { PURGE_EXECUTOR } from './purge-executor.js';
 import type { DrainStep, DrainStepOutcome } from './purge-plan.js';
 import { planDrainStep } from './purge-plan.js';
+import { JobRunner } from '../scheduler/job-runner.service.js';
 
 /**
  * The connection source the sweeper needs, and nothing more.
@@ -94,7 +94,6 @@ export class PurgeSweeper implements OnApplicationBootstrap, OnModuleDestroy {
    * carries it.
    */
   private readonly instanceId = `${process.pid}-${randomUUID().slice(0, 8)}`;
-  private timer: NodeJS.Timeout | undefined;
   private ticking = false;
 
   constructor(
@@ -102,36 +101,20 @@ export class PurgeSweeper implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly gate: BreakerGate,
     @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
     @Inject(PURGE_EXECUTOR) private readonly executor: PurgeExecutor,
-    private readonly scheduler: SchedulerRegistry,
+    private readonly jobs: JobRunner,
   ) {}
 
   onApplicationBootstrap(): void {
-    const periodMs = this.env.purgePollSeconds * 1000;
-    const timer = setInterval(() => {
-      // `tick()` rejects on a real failure; the scheduler boundary is where that
-      // becomes a log line instead of an unhandled rejection, and it is the last
-      // place the error is still attributable to a job and an instance.
-      void this.tick().catch((error: unknown) => {
-        this.logger.error(
-          `purge.sweeper tick failed (instance ${this.instanceId}): ${error instanceof Error ? error.message : String(error)}`,
-        );
-      });
-    }, periodMs);
-    timer.unref();
-    this.timer = timer;
-    this.scheduler.addInterval(PURGE_SWEEPER, timer);
-    this.logger.log(`purge.sweeper ticks every ${this.env.purgePollSeconds}s, instance ${this.instanceId}`);
+    // Through the runner, which owns the only `setInterval` in `src/`: the interval
+    // cannot reach this tick without the tick having taken `PURGE_SWEEPER`'s
+    // advisory lock on a dedicated connection, so a second instance skips with a
+    // reason instead of draining the same queue beside this one.
+    this.jobs.schedule(PURGE_SWEEPER, this.env.purgePollSeconds, () => this.tick());
+    this.logger.log(`purge.sweeper ticks as instance ${this.instanceId}`);
   }
 
   onModuleDestroy(): void {
-    const timer = this.timer;
-    this.timer = undefined;
-    if (timer !== undefined) {
-      clearInterval(timer);
-    }
-    if (this.scheduler.doesExist('interval', PURGE_SWEEPER)) {
-      this.scheduler.deleteInterval(PURGE_SWEEPER);
-    }
+    this.jobs.stop(PURGE_SWEEPER);
   }
 
   /**

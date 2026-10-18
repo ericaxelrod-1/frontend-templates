@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, DiscoveryModule } from '@nestjs/core';
-import { ScheduleModule } from '@nestjs/schedule';
+import { SchedulerModule } from '../scheduler/scheduler.module.js';
 import { loadBreakerEnvironment } from './breaker-environment.js';
 import { BREAKER_ENV } from './breaker-environment.js';
 import { BreakerGate } from './breaker-gate.js';
@@ -28,10 +28,16 @@ export const APP_BREAKER_ENVIRONMENT = loadBreakerEnvironment(process.env);
 /**
  * The breaker, and the schedule library it needs.
  *
- * `ScheduleModule.forRoot()` is registered here rather than in `app.module.ts`
- * beside the `APP_INTERCEPTOR`, so the two halves of the change — the decision
- * and the clock that drives it — travel together and neither can be deleted
- * without the other failing visibly.
+ * `ScheduleModule.forRoot()` used to be registered here rather than in
+ * `app.module.ts` beside the `APP_INTERCEPTOR`, so the two halves of the change —
+ * the decision and the clock that drives it — travel together and neither can be
+ * deleted without the other failing visibly. **It has moved to
+ * `src/scheduler/scheduler.module.ts`**, which is the feature that owns the clock:
+ * the breaker's meter and gate *consume* the scheduler (they register intervals in
+ * its registry and go through its `JobRunner`), so a reader of this file now sees
+ * an import of the thing it depends on rather than a `forRoot()` that appears to be
+ * about the breaker. The ordering argument below is unchanged and is why this
+ * feature takes the runner rather than `@Cron`.
  *
  * ## Why `@nestjs/schedule` at all, given this tree's stated preference
  *
@@ -44,17 +50,17 @@ export const APP_BREAKER_ENVIRONMENT = loadBreakerEnvironment(process.env);
  * configuration that has not been asserted yet.
  *
  * This build takes the ordering without the decorator: both jobs register through
- * `SchedulerRegistry` in `onApplicationBootstrap`, which is strictly later than
- * the module-evaluation-time `loadBreakerEnvironment(...)` above. So the
+ * `JobRunner` in `onApplicationBootstrap`, which is strictly later than the
+ * module-evaluation-time `loadBreakerEnvironment(...)` above. So the
  * scheduling library is here for the reason that is actually true — a real,
  * inspectable registry of named intervals that are cleared on shutdown, rather
  * than a bare `setInterval` nobody can see — and not for `@Cron`.
  *
- * ## Why `ScheduleModule` is not `@Global()`
+ * ## Why `SchedulerModule` is not `@Global()`
  *
  * `AGENTS.md` §B7: a module imported explicitly by the one feature that needs it
  * is easier to read than one every feature can reach. The purge module imports
- * this one; nothing else does.
+ * this one and, through it, the scheduler; nothing else does.
  *
  * ## Why there is exactly one binding of the memory probe
  *
@@ -77,7 +83,7 @@ export const APP_BREAKER_ENVIRONMENT = loadBreakerEnvironment(process.env);
  * anybody maintains.
  */
 @Module({
-  imports: [ConfigModule, ScheduleModule.forRoot(), DiscoveryModule],
+  imports: [ConfigModule, SchedulerModule, DiscoveryModule],
   providers: [
     { provide: BREAKER_ENV, useValue: APP_BREAKER_ENVIRONMENT },
     { provide: MEMORY_PROBE, useFactory: (): ReturnType<typeof nodeMemoryProbeDeps> => nodeMemoryProbeDeps() },

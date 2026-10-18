@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { loadBreakerEnvironment } from '../../src/breaker/breaker-environment.js';
 import type { BreakerEnvironment } from '../../src/breaker/breaker-environment.js';
@@ -11,6 +12,8 @@ import type { MemoryProbeDeps } from '../../src/breaker/memory-reading.js';
 import type { DatabaseConnectionSource } from '../../src/common/database-pool.js';
 import type { PurgeExecutor } from '../../src/purge/purge-executor.js';
 import type { PoolClient } from 'pg';
+import { JobRunner } from '../../src/scheduler/job-runner.service.js';
+import { loadTestEnvironment } from './database.js';
 
 /**
  * **The breaker trip path, assembled once.**
@@ -127,6 +130,16 @@ export function refusalOf(admission: DispatchAdmission): DispatchRefusal {
 export type TripHarness = {
   readonly registry: BreakerRegistry;
   readonly scheduler: SchedulerRegistry;
+  /**
+   * The REAL `JobRunner`, bound to this harness's registry.
+   *
+   * Real, and not a stand-in: the retention jobs take their runner by injection, so
+   * a spec that constructs a job has to hand it one. Nothing here connects — the
+   * runner opens its dedicated connection inside `runExclusive()`, which a
+   * scheduling spec reaches only through the interval, never by calling `tick()` —
+   * so driving a job's control path needs no database.
+   */
+  readonly jobs: JobRunner;
   readonly gate: BreakerGate;
   readonly meterAt: (percent: number) => BreakerMeter;
 };
@@ -134,7 +147,7 @@ export type TripHarness = {
 /**
  * A registry, a gate and a meter factory, all sharing one registry.
  *
- * `meterAt` rather than a single meter because the trip path needs *two*
+ * `meterAt` rather than a single meter because the trip path needs **two**
  * readings in one test — one that trips and one that has cooled — over the same
  * published state.
  */
@@ -145,6 +158,7 @@ export function tripHarness(env: BreakerEnvironment = TRIP_ENV): TripHarness {
   return {
     registry,
     scheduler,
+    jobs: new JobRunner(new ConfigService({ environment: loadTestEnvironment() }), scheduler),
     gate,
     meterAt: (percent: number) => new BreakerMeter(registry, probeAt(percent), scheduler),
   };

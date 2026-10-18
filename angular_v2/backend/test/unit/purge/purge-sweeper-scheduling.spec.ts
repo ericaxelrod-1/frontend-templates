@@ -88,7 +88,7 @@ async function armed(env: BreakerEnvironment, pool: ScriptedPool, executor: Purg
 }> {
   const harness = tripHarness(env);
   await harness.meterAt(percent).tick(T0);
-  return { harness, sweeper: new PurgeSweeper(env, harness.gate, pool.source, executor, harness.scheduler) };
+  return { harness, sweeper: new PurgeSweeper(env, harness.gate, pool.source, executor, harness.jobs) };
 }
 
 function countOf(statements: readonly string[], fragment: string): number {
@@ -186,7 +186,7 @@ describe('the half-open probe allowance is one purge for the WHOLE tick', () => 
 
     const pool = queueWith(10);
     const { executor, executed } = countingExecutor();
-    const sweeper = new PurgeSweeper(breakerEnv(5), harness.gate, pool.source, executor, harness.scheduler);
+    const sweeper = new PurgeSweeper(breakerEnv(5), harness.gate, pool.source, executor, harness.jobs);
 
     // Nothing is admitted while the breaker is open, budget or no budget.
     await expect(sweeper.sweep(T0)).resolves.toMatchObject({ executed: 0, lastOutcome: 'gated' });
@@ -221,7 +221,7 @@ describe('the half-open probe allowance is one purge for the WHOLE tick', () => 
         return Promise.reject(failing);
       },
     };
-    const sweeper = new PurgeSweeper(breakerEnv(5), harness.gate, pool.source, executor, harness.scheduler);
+    const sweeper = new PurgeSweeper(breakerEnv(5), harness.gate, pool.source, executor, harness.jobs);
 
     const summary = await sweeper.sweep(T0 + 200_000);
 
@@ -261,7 +261,7 @@ describe('GATE is consulted per purge, so a mid-drain trip stops the drain', () 
       },
     );
     const { executor, executed } = countingExecutor();
-    const sweeper = new PurgeSweeper(breakerEnv(10), harness.gate, pool.source, executor, harness.scheduler);
+    const sweeper = new PurgeSweeper(breakerEnv(10), harness.gate, pool.source, executor, harness.jobs);
 
     const sweep = sweeper.sweep(T0);
     await claimed;

@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_ENQUEUE_INTERVAL_SECONDS,
+  MAXIMUM_ENQUEUE_INTERVAL_SECONDS,
   MAXIMUM_INACTIVE_ACCOUNT_DAYS,
   MAXIMUM_TOMBSTONE_DAYS,
   MINIMUM_INACTIVE_ACCOUNT_DAYS,
@@ -134,16 +136,21 @@ describe('both retention windows are required in every mode', () => {
 });
 
 describe('loadRetentionEnvironment', () => {
-  it('returns both windows for a complete source', () => {
+  it('returns both windows for a complete source, and the interval at its default', () => {
     expect(
       loadRetentionEnvironment({
         RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
         RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
       }),
-    ).toEqual({ tombstoneDays: MINIMUM_TOMBSTONE_DAYS, inactiveAccountDays: MINIMUM_INACTIVE_ACCOUNT_DAYS });
+    ).toEqual({
+      tombstoneDays: MINIMUM_TOMBSTONE_DAYS,
+      inactiveAccountDays: MINIMUM_INACTIVE_ACCOUNT_DAYS,
+      enqueueIntervalSeconds: DEFAULT_ENQUEUE_INTERVAL_SECONDS,
+    });
     expect(loadRetentionEnvironment({ RETENTION_TOMBSTONE_DAYS: 3650, RETENTION_INACTIVE_ACCOUNT_DAYS: 2000 })).toEqual({
       tombstoneDays: 3650,
       inactiveAccountDays: 2000,
+      enqueueIntervalSeconds: DEFAULT_ENQUEUE_INTERVAL_SECONDS,
     });
   });
 
@@ -281,6 +288,109 @@ describe('loadRetentionEnvironment', () => {
   });
 });
 
+/**
+ * The one key in this namespace that IS a scheduling fact, and therefore HAS a
+ * default while the two windows refuse one.
+ *
+ * The asymmetry is the point and it is asserted from both directions, because a
+ * loader that simply added a default everywhere would pass the window tests:
+ *
+ *   * an **absent** interval is the documented default and boots — an interval
+ *     changes WHEN the question is asked, and a process that has never been asked
+ *     to change the cadence should not have to invent one;
+ *   * a **malformed** interval refuses the boot naming the key, because the failure
+ *     this prevents is not a wrong cadence — hourly is fine — it is
+ *     `RETENTION_ENQUEUE_INTERVAL_SECONDS=1h` becoming a scan that never runs, with
+ *     the two windows above it looking entirely configured (§2.3).
+ */
+describe('the enqueue interval: a scheduling fact, so defaulted, and refused when malformed', () => {
+  /** `unknown`, not `string`: the non-string case below is one of the refusals. */
+  function withInterval(value: unknown): Record<string, unknown> {
+    return {
+      RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
+      RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+      RETENTION_ENQUEUE_INTERVAL_SECONDS: value,
+    };
+  }
+
+  /** The two windows, and nothing else — the "key absent" case. */
+  function windowsOnly(): Record<string, unknown> {
+    return {
+      RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
+      RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+    };
+  }
+
+  it('is present, uncommented, and a whole number of seconds in every .env* file', () => {
+    // "Every mode", for the same reason the windows are checked in every mode: a key
+    // present in four files and absent from the fifth is a key that is absent from
+    // production. The value is read rather than the key's presence, because a file
+    // that ships a value its own validator refuses is a file nobody can boot from.
+    const files = environmentFiles();
+    expect(files.length, 'the .env* files were not found; this assertion would be vacuous').toBeGreaterThanOrEqual(6);
+
+    for (const file of files) {
+      const assigned = readFileSync(join(BACKEND_ROOT, file), 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('RETENTION_ENQUEUE_INTERVAL_SECONDS='));
+
+      expect(assigned, `${file} does not assign RETENTION_ENQUEUE_INTERVAL_SECONDS`).toHaveLength(1);
+      expect(assigned[0], `${file} assigns a commented-out RETENTION_ENQUEUE_INTERVAL_SECONDS`).not.toMatch(/^#/);
+
+      const value = Number((assigned[0] ?? '').split('=')[1]);
+      expect(Number.isInteger(value) && value > 0, `${file} sets a nonsensical interval`).toBe(true);
+      expect(
+        value <= MAXIMUM_ENQUEUE_INTERVAL_SECONDS,
+        `${file} ships an interval past the ${String(MAXIMUM_ENQUEUE_INTERVAL_SECONDS)}-second ceiling`,
+      ).toBe(true);
+    }
+  });
+
+  it('applies the documented default when the key is absent, and an empty value counts as absent', () => {
+    // The positive control for the refusals below: without it, a loader that refused
+    // every source would satisfy them all.
+    expect(loadRetentionEnvironment(windowsOnly()).enqueueIntervalSeconds).toBe(DEFAULT_ENQUEUE_INTERVAL_SECONDS);
+    expect(loadRetentionEnvironment(withInterval('')).enqueueIntervalSeconds).toBe(DEFAULT_ENQUEUE_INTERVAL_SECONDS);
+    // …and an explicit value is honoured rather than overridden by the default.
+    expect(loadRetentionEnvironment(withInterval('900')).enqueueIntervalSeconds).toBe(900);
+  });
+
+  it('refuses a malformed interval, naming the key and the value received', () => {
+    for (const value of ['1h', 'thirty', '-60', '60.5', '3,600']) {
+      const problems = problemsOf(withInterval(value)).join('\n');
+      expect(problems, `RETENTION_ENQUEUE_INTERVAL_SECONDS=${value} was accepted`).toContain(
+        'RETENTION_ENQUEUE_INTERVAL_SECONDS',
+      );
+      expect(problems, `RETENTION_ENQUEUE_INTERVAL_SECONDS=${value} did not name what it received`).toContain(
+        `'${value}'`,
+      );
+    }
+    // …and it says WHY, because the operator reading a boot failure needs to know
+    // that a value they consider reasonable produced a sweep that never runs.
+    expect(problemsOf(withInterval('1h')).join('\n')).toContain('retention sweep that never runs');
+  });
+
+  it('refuses zero and a value past the ceiling, which is a units mistake rather than a schedule', () => {
+    expect(problemsOf(withInterval('0')).join('\n')).toContain('must be between 1 and');
+    expect(problemsOf(withInterval(String(MAXIMUM_ENQUEUE_INTERVAL_SECONDS + 1))).join('\n')).toContain(
+      'units mistake',
+    );
+    expect(
+      loadRetentionEnvironment(withInterval(String(MAXIMUM_ENQUEUE_INTERVAL_SECONDS))).enqueueIntervalSeconds,
+    ).toBe(MAXIMUM_ENQUEUE_INTERVAL_SECONDS);
+  });
+
+  it('refuses a value that is not a string or a number, rather than coercing it', () => {
+    // A parsed-looking object is the shape a careless `JSON.parse` of a config blob
+    // produces, and `String({seconds: 60})` would reach the range check as
+    // `[object Object]` — a refusal by accident rather than by the type check.
+    expect(problemsOf(withInterval({ seconds: 60 })).join('\n')).toContain(
+      'must be an integer number of seconds, received object',
+    );
+  });
+});
+
 describe('the windows are read at module-evaluation time, before any job can act on them', () => {
   it('purge.module calls the loader on process.env at module scope, not inside a factory', () => {
     // The moment is the whole of it. `loadEnvironment` and `loadBreakerEnvironment`
@@ -402,6 +512,35 @@ describe('the BOOT refuses a window below the floor, which is the control the nu
 
     expect(thrown?.name, 'the boot did not abort').toBe('RetentionEnvironmentError');
     expect(thrown?.message).toContain('RETENTION_INACTIVE_ACCOUNT_DAYS is required');
+  });
+
+  it('a malformed enqueue interval aborts the boot too, naming the key and the value', async () => {
+    // The interval has a default, so this is NOT a missing-key refusal — it is the
+    // distinction the boot has to make between "nobody chose a cadence" (fine, the
+    // documented default applies) and "somebody chose one and it cannot be parsed"
+    // (a retention sweep that never runs, silently). The moment matters as much as
+    // the rule: the loader is a module-evaluation statement, so this fires before a
+    // single interval is registered.
+    const thrown = await bootWith({
+      RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
+      RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+      RETENTION_ENQUEUE_INTERVAL_SECONDS: '1h',
+      POSTGREST_URL: 'http://127.0.0.1:3001',
+    });
+
+    expect(thrown?.name, 'the boot did not abort').toBe('RetentionEnvironmentError');
+    expect(thrown?.message).toContain('RETENTION_ENQUEUE_INTERVAL_SECONDS');
+    expect(thrown?.message).toContain("received '1h'");
+  });
+
+  it('an interval left at its default boots, so the refusal above is the VALUE and not the key', async () => {
+    const thrown = await bootWith({
+      RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
+      RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+      RETENTION_ENQUEUE_INTERVAL_SECONDS: '',
+      POSTGREST_URL: 'http://127.0.0.1:3001',
+    });
+    expect(thrown, `a defaulted interval was refused:\n${thrown?.message ?? ''}`).toBeUndefined();
   });
 
   it('the same source at its floors boots, so the refusals above are the FLOOR and not a broken import', async () => {

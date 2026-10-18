@@ -48,6 +48,22 @@
  * which is the shape of a knob nobody can reason about: lowering it for the
  * tombstone population would silently accelerate the destruction of live
  * accounts, and no operator reading the key name could tell that had happened.
+ *
+ * ## …and ONE key here IS a scheduling fact, so it has a default
+ *
+ * `RETENTION_ENQUEUE_INTERVAL_SECONDS` is the interval the scan runs on, and the
+ * line `breaker-environment.ts:19-24` draws is exactly the line this key sits on: the
+ * two windows decide WHOSE DATA ENDS, and an interval decides only WHEN the question
+ * is asked. A default is therefore allowed here and refused for the windows — and it
+ * is still **refused when malformed**, naming the key, because "hourly" in a
+ * `.env` file is a process that boots with a scan that never runs and nothing that
+ * says so (§2.3). The default is 3600, which is what the constant it replaced said.
+ *
+ * It is here rather than in `breaker-environment.ts` with `PURGE_POLL_SECONDS`
+ * because it belongs to the `RETENTION_*` namespace an operator reads for the rest
+ * of retention, and one namespace one loader is the rule the two existing loaders
+ * established. What it does NOT do is decide dispatch, which is what keeps it from
+ * being a breaker key.
  */
 export type RetentionEnvironment = {
   /**
@@ -64,6 +80,12 @@ export type RetentionEnvironment = {
    * is unmeasured, and it is not eligible for destruction.
    */
   readonly inactiveAccountDays: number;
+  /**
+   * How often the enqueue scan runs. Seconds, and it HAS a default — see
+   * {@link DEFAULT_ENQUEUE_INTERVAL_SECONDS} for why this key is on the other side
+   * of the line the two windows are on.
+   */
+  readonly enqueueIntervalSeconds: number;
 };
 
 /**
@@ -121,6 +143,22 @@ export const MINIMUM_TOMBSTONE_DAYS = 1825;
 export const MAXIMUM_TOMBSTONE_DAYS = 36500;
 export const MINIMUM_INACTIVE_ACCOUNT_DAYS = 1095;
 export const MAXIMUM_INACTIVE_ACCOUNT_DAYS = 36500;
+
+/**
+ * An hour, which is what the constant this key replaced said. The scan is a
+ * window comparison measured in DAYS, so an hourly cadence is already two orders of
+ * magnitude finer than the thing it measures — the number is small enough that
+ * nobody tunes it, and the key exists so that *changing* it is a configuration
+ * decision somebody made rather than an edit to a source file somebody forgot.
+ */
+export const DEFAULT_ENQUEUE_INTERVAL_SECONDS = 3600;
+
+/**
+ * A year, as a ceiling, and for the reason `MAXIMUM_TOMBSTONE_DAYS` exists: past
+ * this point the value is far more likely to be a units mistake — milliseconds, or
+ * seconds typed into a key that wanted days — than a schedule anybody wants.
+ */
+export const MAXIMUM_ENQUEUE_INTERVAL_SECONDS = 365 * 24 * 60 * 60;
 
 export class RetentionEnvironmentError extends Error {
   readonly problems: readonly string[];
@@ -238,6 +276,48 @@ function readRequiredDays(
   return value;
 }
 
+/**
+ * One interval, with a default — the other half of the namespace's rule.
+ *
+ * Absent means the documented default and nothing else. Present but malformed is a
+ * boot failure naming the key, the value received and the range, because the failure
+ * this guards against is not "the wrong cadence" — an hourly scan is fine — it is a
+ * scan that never runs because a value like `1h` became `NaN`, silently, with the
+ * retention windows above them looking entirely configured.
+ */
+function readIntervalSeconds(
+  source: Readonly<Record<string, unknown>>,
+  key: string,
+  problems: string[],
+  fallback: number,
+): number | undefined {
+  const raw = source[key];
+  if (raw === undefined || raw === null || raw === '') {
+    return fallback;
+  }
+  if (typeof raw !== 'string' && typeof raw !== 'number') {
+    problems.push(`${key} must be an integer number of seconds, received ${typeof raw}`);
+    return undefined;
+  }
+  const text = String(raw);
+  if (!/^\d+$/.test(text)) {
+    problems.push(
+      `${key} must be a whole number of seconds, received '${text}'. A scan interval nobody can ` +
+        'parse is a retention sweep that never runs, reported by no log line.',
+    );
+    return undefined;
+  }
+  const value = Number.parseInt(text, 10);
+  if (value < 1 || value > MAXIMUM_ENQUEUE_INTERVAL_SECONDS) {
+    problems.push(
+      `${key} must be between 1 and ${String(MAXIMUM_ENQUEUE_INTERVAL_SECONDS)} seconds, received ` +
+        `${String(value)} — past a year the value is far more likely to be a units mistake than a schedule.`,
+    );
+    return undefined;
+  }
+  return value;
+}
+
 export function loadRetentionEnvironment(source: Readonly<Record<string, unknown>>): RetentionEnvironment {
   const problems: string[] = [];
   const read = (specification: RetentionKey): number | undefined =>
@@ -250,12 +330,20 @@ export function loadRetentionEnvironment(source: Readonly<Record<string, unknown
   // "required in every mode" a property this function can actually have.
   const tombstoneDays = read(byKey('RETENTION_TOMBSTONE_DAYS'));
   const inactiveAccountDays = read(byKey('RETENTION_INACTIVE_ACCOUNT_DAYS'));
+  // …and the one key with a default, read through the loader like the other two
+  // rather than by the job reaching for the environment itself.
+  const enqueueIntervalSeconds = readIntervalSeconds(
+    source,
+    'RETENTION_ENQUEUE_INTERVAL_SECONDS',
+    problems,
+    DEFAULT_ENQUEUE_INTERVAL_SECONDS,
+  );
 
-  // Both are checked before either is acted on, and both problems are reported in
+  // All three are checked before any is acted on, and every problem is reported in
   // one error — a boot that names only the first of two bad keys sends the
   // operator round the loop a second time to discover the second.
-  if (tombstoneDays === undefined || inactiveAccountDays === undefined) {
+  if (tombstoneDays === undefined || inactiveAccountDays === undefined || enqueueIntervalSeconds === undefined) {
     throw new RetentionEnvironmentError(problems);
   }
-  return { tombstoneDays, inactiveAccountDays };
+  return { tombstoneDays, inactiveAccountDays, enqueueIntervalSeconds };
 }

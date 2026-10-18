@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { describe, expect, it } from 'vitest';
 import type { BreakerEnvironment } from '../../../src/breaker/breaker-environment.js';
@@ -8,6 +9,7 @@ import { buildHealthSnapshot } from '../../../src/breaker/breaker-health.js';
 import { AUTH_LOGIN, BREAKER_METER, PURGE_SWEEPER } from '../../../src/breaker/dispatch-token.js';
 import { PurgeSweeper } from '../../../src/purge/purge-sweeper.service.js';
 import type { PurgeClaim } from '../../../src/purge/purge-claim.js';
+import { JobRunner } from '../../../src/scheduler/job-runner.service.js';
 import {
   connectionSource,
   executorThatMustNotRun,
@@ -18,6 +20,7 @@ import {
   T0,
   unreadableProbe,
 } from '../../support/breaker-harness.js';
+import { loadTestEnvironment } from '../../support/database.js';
 
 /**
  * **The trip path, executed.**
@@ -57,7 +60,11 @@ function build(percent: number): {
   const meter = new BreakerMeter(registry, probeAt(percent), scheduler);
   const gate = new BreakerGate(registry, ENV, scheduler);
   const pool = connectionSource();
-  const sweeper = new PurgeSweeper(ENV, gate, pool.source, executorThatMustNotRun(), scheduler);
+  // The REAL `JobRunner`, from the same harness the retention specs use, over the
+  // registry above. It opens no connection here: the sweeper's `sweep()` is called
+  // directly below, and only the interval goes through the lock.
+  const jobs = new JobRunner(new ConfigService({ environment: loadTestEnvironment() }), scheduler);
+  const sweeper = new PurgeSweeper(ENV, gate, pool.source, executorThatMustNotRun(), jobs);
   return { registry, meter, gate, sweeper, connects: pool.connects };
 }
 

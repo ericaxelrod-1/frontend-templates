@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BreakerModule } from '../breaker/breaker.module.js';
 import { DatabasePoolModule } from '../common/database-pool.module.js';
+import { SchedulerModule } from '../scheduler/scheduler.module.js';
 import { PurgeEnqueuer } from './purge-enqueuer.service.js';
 import { PurgeSweeper } from './purge-sweeper.service.js';
 import { SqlPurgeExecutor } from './purge-executor.js';
@@ -50,7 +51,7 @@ export const APP_RETENTION_ENVIRONMENT = loadRetentionEnvironment(process.env);
  * could be registered through outside a test file (§2.2).
  */
 @Module({
-  imports: [BreakerModule, DatabasePoolModule],
+  imports: [BreakerModule, DatabasePoolModule, SchedulerModule],
   providers: [
     { provide: PURGE_EXECUTOR, useClass: SqlPurgeExecutor },
     { provide: RETENTION_ENV, useValue: APP_RETENTION_ENVIRONMENT },

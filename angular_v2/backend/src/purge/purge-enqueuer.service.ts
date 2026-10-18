@@ -1,5 +1,4 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
-import { SchedulerRegistry } from '@nestjs/schedule';
 import type { PoolClient } from 'pg';
 import { BreakerGate } from '../breaker/breaker-gate.js';
 import { PURGE_ENQUEUER } from '../breaker/dispatch-token.js';
@@ -10,21 +9,7 @@ import type { DatabaseConnectionSource } from '../common/database-pool.js';
 import { SharedDatabasePool } from '../common/database-pool.js';
 import { RETENTION_ENV } from './retention-environment.js';
 import type { RetentionEnvironment } from './retention-environment.js';
-
-/**
- * How often the scan runs.
- *
- * **A constant, not a configuration key, and that is a deliberate reversal of the
- * sibling job's treatment.** `PURGE_POLL_SECONDS` is configurable because it
- * changes how fast the queue DRAINS, which an operator tunes against a backlog.
- * This number changes neither what is due nor what happens to it: the window is
- * in DAYS, and the scan is idempotent by construction — the partial UNIQUE index
- * from `0011` means a second sweep inside one window enqueues nothing and changes
- * nothing. An hourly scan against a window measured in days is already two orders
- * of magnitude finer than the thing it measures, so a key here would be a second
- * number to get wrong and a config nobody has a reason to change.
- */
-export const RETENTION_ENQUEUE_INTERVAL_SECONDS = 3600;
+import { JobRunner } from '../scheduler/job-runner.service.js';
 
 /**
  * The producer half of retention. The sweeper is the consumer.
@@ -74,7 +59,7 @@ export const RETENTION_ENQUEUE_INTERVAL_SECONDS = 3600;
  * leave. Wiring a legal request to an unattended hourly scan would be the opposite
  * of the separation `0011` exists to keep.
  *
- * ## The two windows are required, and they are checked before this job can run
+ * ## The windows are required, and they are checked before this job can run
  *
  * `RETENTION_TOMBSTONE_DAYS` and `RETENTION_INACTIVE_ACCOUNT_DAYS` are read and
  * bounded at module-evaluation time (`retention-environment.ts`, wired in
@@ -82,6 +67,13 @@ export const RETENTION_ENQUEUE_INTERVAL_SECONDS = 3600;
  * floors — 1825 days and 1095 — **refuses to boot** rather than booting a
  * retention job with a window it invented. There is no default anywhere on this
  * path: not here, not in the SQL, not in the functions.
+ *
+ * **The interval is the one exception, and it is a different kind of key.** This
+ * job used to carry `RETENTION_ENQUEUE_INTERVAL_SECONDS = 3600` as a source
+ * constant: an interval is a scheduling fact rather than a decision about whose
+ * data ends, so a default is allowed — and the value is still read through the
+ * same loader, refused at boot when malformed, because a job that never runs
+ * because `1h` became `NaN` is retention that is silently off.
  *
  * ## The gate: named, sheddable, stoppable
  *
@@ -127,52 +119,36 @@ export const RETENTION_ENQUEUE_INTERVAL_SECONDS = 3600;
 @Injectable()
 export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(PurgeEnqueuer.name);
-  private timer: NodeJS.Timeout | undefined;
   private ticking = false;
 
   constructor(
     @Inject(RETENTION_ENV) private readonly env: RetentionEnvironment,
     private readonly gate: BreakerGate,
     @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
-    private readonly scheduler: SchedulerRegistry,
+    private readonly jobs: JobRunner,
   ) {}
 
   onApplicationBootstrap(): void {
-    const periodMs = RETENTION_ENQUEUE_INTERVAL_SECONDS * 1000;
-    const timer = setInterval(() => {
-      // The scheduler boundary is where a rejection becomes a log line rather than
-      // an unhandled one, and it is the last place the error is still attributable
-      // to a job.
-      void this.tick().catch((error: unknown) => {
-        this.logger.error(
-          `purge.enqueuer sweep failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      });
-    }, periodMs);
-    timer.unref();
-    this.timer = timer;
+    // Registered through the runner, which is the only thing in `src/` that owns a
+    // `setInterval`: the interval therefore cannot reach a tick without the tick
+    // having taken this job's advisory lock first, on a dedicated connection. A
+    // second instance logs the skip instead of running a second scan.
+    //
     // The DISPATCH TOKEN is the registry key too, exactly as `PurgeSweeper` does
     // it. This file previously exported a second name for the same job
     // (`RETENTION_ENQUEUER = 'retention.enqueuer'`), which meant the gate refused
     // `purge.enqueuer` in one vocabulary while the scheduler listed
     // `retention.enqueuer` in another and the log line said a third thing. One
     // job, one name, and `onModuleDestroy` can find the entry it registered.
-    this.scheduler.addInterval(PURGE_ENQUEUER, timer);
+    this.jobs.schedule(PURGE_ENQUEUER, this.env.enqueueIntervalSeconds, () => this.tick());
     this.logger.log(
-      `purge.enqueuer sweeps every ${RETENTION_ENQUEUE_INTERVAL_SECONDS}s for tombstones older than ` +
-        `${String(this.env.tombstoneDays)} day(s) and accounts unobserved for ${String(this.env.inactiveAccountDays)} day(s)`,
+      `purge.enqueuer sweeps for tombstones older than ${String(this.env.tombstoneDays)} day(s) ` +
+        `and accounts unobserved for ${String(this.env.inactiveAccountDays)} day(s)`,
     );
   }
 
   onModuleDestroy(): void {
-    const timer = this.timer;
-    this.timer = undefined;
-    if (timer !== undefined) {
-      clearInterval(timer);
-    }
-    if (this.scheduler.doesExist('interval', PURGE_ENQUEUER)) {
-      this.scheduler.deleteInterval(PURGE_ENQUEUER);
-    }
+    this.jobs.stop(PURGE_ENQUEUER);
   }
 
   /**

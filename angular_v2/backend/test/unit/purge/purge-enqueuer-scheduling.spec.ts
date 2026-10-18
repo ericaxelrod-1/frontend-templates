@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { KNOWN_DISPATCH_TOKENS, PURGE_ENQUEUER } from '../../../src/breaker/dispatch-token.js';
-import { PurgeEnqueuer, RETENTION_ENQUEUE_INTERVAL_SECONDS } from '../../../src/purge/purge-enqueuer.service.js';
+import { PurgeEnqueuer } from '../../../src/purge/purge-enqueuer.service.js';
 import type { RetentionEnvironment } from '../../../src/purge/retention-environment.js';
 import { gate, scriptedPool, TRIP_ENV, T0, tripHarness } from '../../support/breaker-harness.js';
 import { BACKEND_ROOT } from '../../support/paths.js';
@@ -37,8 +37,18 @@ import type { ScriptedPool, TripHarness } from '../../support/breaker-harness.js
  * | an aborted probe re-opens the breaker | the half-open probe reporting success for work that did not happen |
  */
 
-/** The window is a decision; this suite asserts scheduling, not its value. */
-const ENV: RetentionEnvironment = { tombstoneDays: 1825, inactiveAccountDays: 1095 };
+/**
+ * The windows are a decision and the interval is a scheduling fact; this suite
+ * asserts scheduling, and neither of their values. The interval used to be a
+ * constant in the service (`RETENTION_ENQUEUE_INTERVAL_SECONDS`); it is read from
+ * configuration now, and the same number here keeps the tick-staleness arithmetic in
+ * the latch test below honest.
+ */
+const ENV: RetentionEnvironment = {
+  tombstoneDays: 1825,
+  inactiveAccountDays: 1095,
+  enqueueIntervalSeconds: 3600,
+};
 
 const USER_A = '00000000-0000-0000-0000-0000000000a1';
 const USER_B = '00000000-0000-0000-0000-0000000000a2';
@@ -91,7 +101,7 @@ const NOTHING_DUE: readonly Answer[] = [
 async function armed(percent: number, pool: ScriptedPool): Promise<{ readonly harness: TripHarness; readonly enqueuer: PurgeEnqueuer }> {
   const harness = tripHarness(TRIP_ENV);
   await harness.meterAt(percent).tick(T0);
-  return { harness, enqueuer: new PurgeEnqueuer(ENV, harness.gate, pool.source, harness.scheduler) };
+  return { harness, enqueuer: new PurgeEnqueuer(ENV, harness.gate, pool.source, harness.jobs) };
 }
 
 /** Index of the first statement containing `fragment`, or -1. */
@@ -158,7 +168,7 @@ describe('the latch: one sweep at a time', () => {
     const held = poolHeldAtTheScan();
     const harness = tripHarness(TRIP_ENV);
     await harness.meterAt(10).tick(T0);
-    const enqueuer = new PurgeEnqueuer(ENV, harness.gate, held.pool.source, harness.scheduler);
+    const enqueuer = new PurgeEnqueuer(ENV, harness.gate, held.pool.source, harness.jobs);
 
     const first = enqueuer.tick(T0);
     await held.scanned;
@@ -168,7 +178,7 @@ describe('the latch: one sweep at a time', () => {
     // second tick as STALE — which would make this test pass with no latch at all,
     // for the wrong reason. The tick under test must be ADMISSIBLE, so that the
     // only thing stopping it is the latch.
-    const intervalMs = RETENTION_ENQUEUE_INTERVAL_SECONDS * 1000;
+    const intervalMs = ENV.enqueueIntervalSeconds * 1000;
     await harness.meterAt(10).tick(T0 + intervalMs);
     expect(harness.registry.get().mode).toBe('closed');
 
@@ -316,7 +326,7 @@ describe('the half-open probe interaction', () => {
     const harness = tripHarness(TRIP_ENV);
     await harness.meterAt(99).tick(T0);
     expect(harness.registry.get().mode).toBe('open');
-    const enqueuer = new PurgeEnqueuer(ENV, harness.gate, held.pool.source, harness.scheduler);
+    const enqueuer = new PurgeEnqueuer(ENV, harness.gate, held.pool.source, harness.jobs);
 
     expect(harness.gate.acquire(PURGE_ENQUEUER, true, T0).admit).toBe(false);
 
@@ -347,7 +357,7 @@ describe('the half-open probe interaction', () => {
     const harness = tripHarness(TRIP_ENV);
     await harness.meterAt(99).tick(T0);
     await harness.meterAt(20).tick(T0 + 200_000);
-    const enqueuer = new PurgeEnqueuer(ENV, harness.gate, scriptedPool(TWO_DUE).source, harness.scheduler);
+    const enqueuer = new PurgeEnqueuer(ENV, harness.gate, scriptedPool(TWO_DUE).source, harness.jobs);
 
     await expect(enqueuer.sweep(T0 + 200_000)).resolves.toMatchObject({ enqueued: 2 });
     expect(harness.registry.get().mode).toBe('closed');
