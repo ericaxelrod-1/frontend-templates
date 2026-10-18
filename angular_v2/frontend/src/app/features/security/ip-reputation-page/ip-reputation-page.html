@@ -27,7 +27,6 @@
             <th scope="col">Reputation score</th>
             <th scope="col">Failed attempts</th>
             <th scope="col">Block state</th>
-            <th scope="col">Geo &amp; metadata</th>
           </tr>
         </thead>
         <tbody>
@@ -35,12 +34,6 @@
             <tr>
               <th scope="row">
                 <code>{{ row.ip_normalized }}</code>
-                @if (row.showRawIp) {
-                  <span class="sub">raw: <code>{{ row.ip }}</code></span>
-                }
-                @if (row.ip_subnet; as subnet) {
-                  <span class="sub">subnet: <code>{{ subnet }}</code></span>
-                }
                 @if (row.is_mock) {
                   <span class="badge badge--mock">synthetic test row</span>
                 }
@@ -72,18 +65,10 @@
                   <span>Not blocked</span>
                 }
               </td>
-              <td>
-                @for (entry of row.geo_location | jsonbEntries; track entry.key) {
-                  <span class="sub">{{ entry.key }}: {{ entry.value }}</span>
-                }
-                @for (entry of row.metadata | jsonbEntries; track entry.key) {
-                  <span class="sub">{{ entry.key }}: {{ entry.value }}</span>
-                }
-              </td>
             </tr>
           } @empty {
             <tr>
-              <td class="empty" colspan="6">
+              <td class="empty" colspan="5">
                 No IP reputation rows were returned (live rows only by default).
               </td>
             </tr>
@@ -91,5 +76,74 @@
         </tbody>
       </table>
     </div>
+
+    @if (rows().length > 0) {
+      <mat-accordion class="rep__details" multi>
+        @for (row of rows(); track row.id; let first = $first) {
+          <mat-expansion-panel class="rep__detail-panel" [expanded]="first">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                <code>{{ row.ip_normalized }}</code>
+              </mat-panel-title>
+              <mat-panel-description>
+                {{ row.status | codeLabel: statusLabels }} · Score {{ row.reputation_score }}/100 ·
+                @if (row.is_blocked) {
+                  Blocked
+                } @else {
+                  Not blocked
+                }
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <dl class="rep__detail-grid">
+              <div class="rep__detail-item">
+                <dt>Record ID</dt>
+                <dd><code>{{ row.id }}</code></dd>
+              </div>
+
+              @if (row.showRawIp) {
+                <div class="rep__detail-item">
+                  <dt>Raw address</dt>
+                  <dd>raw: <code>{{ row.ip }}</code></dd>
+                </div>
+              }
+
+              @if (row.ip_subnet; as subnet) {
+                <div class="rep__detail-item">
+                  <dt>Subnet bucket</dt>
+                  <dd>subnet: <code>{{ subnet }}</code></dd>
+                </div>
+              }
+
+              <div class="rep__detail-item">
+                <dt>Geo &amp; metadata</dt>
+                <dd>
+                  @for (entry of row.geo_location | jsonbEntries; track entry.key) {
+                    <span class="sub">{{ entry.key }}: {{ entry.value }}</span>
+                  }
+                  @for (entry of row.metadata | jsonbEntries; track entry.key) {
+                    <span class="sub">{{ entry.key }}: {{ entry.value }}</span>
+                  }
+                </dd>
+              </div>
+
+              @if (row.is_blocked) {
+                <div class="rep__detail-item">
+                  <dt>Block details</dt>
+                  <dd>
+                    <strong>Blocked</strong>
+                    @if (row.blocked_until; as until) {
+                      <span class="sub">until {{ until | date: 'medium' }}</span>
+                    } @else {
+                      <span class="sub">indefinite (no expiry set)</span>
+                    }
+                  </dd>
+                </div>
+              }
+            </dl>
+          </mat-expansion-panel>
+        }
+      </mat-accordion>
+    }
   </mat-card-content>
 </mat-card>

@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { MatCardModule } from '@angular/material/card';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { CodeLabelPipe } from '../../../shared/code-label';
 import { MockFilterBar } from '../mock-filter-bar';
@@ -32,7 +33,14 @@ interface AttemptViewModel extends LoginAttemptWithMock {
 @Component({
   selector: 'app-login-attempts-page',
   standalone: true,
-  imports: [CodeLabelPipe, DatePipe, MatCardModule, MatProgressBarModule, MockFilterBar],
+  imports: [
+    CodeLabelPipe,
+    DatePipe,
+    MatCardModule,
+    MatExpansionModule,
+    MatProgressBarModule,
+    MockFilterBar,
+  ],
   templateUrl: './login-attempts-page.html',
   styles: `
     :host {
@@ -118,6 +126,33 @@ interface AttemptViewModel extends LoginAttemptWithMock {
 
     .empty {
       color: var(--mat-sys-on-surface-variant);
+    }
+
+    .attempts__details {
+      display: block;
+      margin-top: 1rem;
+    }
+
+    .attempts__detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+      gap: 0.75rem 1.25rem;
+      margin: 0;
+    }
+
+    .attempts__detail-item {
+      margin: 0;
+    }
+
+    .attempts__detail-item dt {
+      font: var(--mat-sys-label-medium);
+      color: var(--mat-sys-on-surface-variant);
+      margin-bottom: 0.15rem;
+    }
+
+    .attempts__detail-item dd {
+      margin: 0;
+      font: var(--mat-sys-body-medium);
     }
 
     code {

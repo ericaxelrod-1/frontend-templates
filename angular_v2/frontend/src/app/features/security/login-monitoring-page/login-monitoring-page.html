@@ -45,7 +45,6 @@
             <th scope="col">Budget / kind</th>
             <th scope="col">Status</th>
             <th scope="col">Observed at</th>
-            <th scope="col">Alerts raised</th>
           </tr>
         </thead>
         <tbody>
@@ -53,10 +52,6 @@
             <tr>
               <th scope="row">
                 <code>{{ row.ip_normalized }}</code>
-                @if (row.showRawIp) {
-                  <span class="sub">raw: <code>{{ row.ip }}</code></span>
-                }
-                <span class="sub">subnet: <code>{{ row.ip_subnet }}</code></span>
               </th>
               <td>
                 {{ row.username }}
@@ -71,17 +66,10 @@
                 </span>
               </td>
               <td>{{ row.created_at | date: 'medium' }}</td>
-              <td>
-                @if (row.relatedAlertTitles.length > 0) {
-                  <span>{{ row.relatedAlertTitles.join('; ') }}</span>
-                } @else {
-                  <span class="sub">no correlated alerts</span>
-                }
-              </td>
             </tr>
           } @empty {
             <tr>
-              <td class="empty" colspan="6">
+              <td class="empty" colspan="5">
                 No login monitoring rows were returned (live rows only by default).
               </td>
             </tr>
@@ -89,5 +77,76 @@
         </tbody>
       </table>
     </div>
+
+    @if (rows().length > 0) {
+      <mat-accordion class="mon__details" multi>
+        @for (row of rows(); track row.id; let first = $first) {
+          <mat-expansion-panel class="mon__detail-panel" [expanded]="first">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                {{ row.username }}
+              </mat-panel-title>
+              <mat-panel-description>
+                <code>{{ row.ip_normalized }}</code> ·
+                {{ row.attempt_kind | codeLabel: attemptKindLabels }} ·
+                {{ row.status | codeLabel: statusLabels }}
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <dl class="mon__detail-grid">
+              <div class="mon__detail-item">
+                <dt>Attempt ID</dt>
+                <dd><code>#{{ row.id }}</code></dd>
+              </div>
+
+              <div class="mon__detail-item">
+                <dt>Observed at</dt>
+                <dd>{{ row.created_at | date: 'medium' }}</dd>
+              </div>
+
+              <div class="mon__detail-item">
+                <dt>Address details</dt>
+                <dd>
+                  <code>{{ row.ip_normalized }}</code>
+                  @if (row.showRawIp) {
+                    <span class="sub">raw: <code>{{ row.ip }}</code></span>
+                  }
+                  <span class="sub">subnet: <code>{{ row.ip_subnet }}</code></span>
+                </dd>
+              </div>
+
+              <div class="mon__detail-item">
+                <dt>Budget / kind</dt>
+                <dd>{{ row.attempt_kind | codeLabel: attemptKindLabels }}</dd>
+              </div>
+
+              <div class="mon__detail-item">
+                <dt>Status</dt>
+                <dd>
+                  <span class="badge" [class.badge--failed]="row.status === 'failed'">
+                    {{ row.status | codeLabel: statusLabels }}
+                  </span>
+                </dd>
+              </div>
+
+              <div class="mon__detail-item">
+                <dt>Alerts raised</dt>
+                <dd>
+                  @if (row.relatedAlertTitles.length > 0) {
+                    <ul class="mon__alerts-list">
+                      @for (title of row.relatedAlertTitles; track title) {
+                        <li>{{ title }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <span class="sub">no correlated alerts</span>
+                  }
+                </dd>
+              </div>
+            </dl>
+          </mat-expansion-panel>
+        }
+      </mat-accordion>
+    }
   </mat-card-content>
 </mat-card>

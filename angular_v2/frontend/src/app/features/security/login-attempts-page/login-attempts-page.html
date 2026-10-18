@@ -42,10 +42,8 @@
       <table class="attempts-table">
         <thead>
           <tr>
-            <th scope="col">ID</th>
             <th scope="col">Username</th>
             <th scope="col">Canonical address</th>
-            <th scope="col">Subnet bucket</th>
             <th scope="col">Attempt kind</th>
             <th scope="col">Status</th>
             <th scope="col">Recorded at</th>
@@ -55,21 +53,14 @@
           @for (row of filteredRows(); track row.id) {
             <tr>
               <th scope="row">
-                <code>#{{ row.id }}</code>
-              </th>
-              <td>
                 {{ row.username }}
                 @if (row.is_mock) {
                   <span class="badge badge--mock">synthetic test row</span>
                 }
-              </td>
+              </th>
               <td>
                 <code>{{ row.ip_normalized }}</code>
-                @if (row.showRawIp) {
-                  <span class="sub">raw: <code>{{ row.ip }}</code></span>
-                }
               </td>
-              <td><code>{{ row.ip_subnet }}</code></td>
               <td>{{ row.attempt_kind | codeLabel: attemptKindLabels }}</td>
               <td>
                 <span class="badge" [class.badge--failed]="row.status === 'failed'">
@@ -80,7 +71,7 @@
             </tr>
           } @empty {
             <tr>
-              <td class="empty" colspan="7">
+              <td class="empty" colspan="5">
                 No login attempts matched the current filters (live rows only by default).
               </td>
             </tr>
@@ -88,5 +79,65 @@
         </tbody>
       </table>
     </div>
+
+    @if (filteredRows().length > 0) {
+      <mat-accordion class="attempts__details" multi>
+        @for (row of filteredRows(); track row.id; let first = $first) {
+          <mat-expansion-panel class="attempts__detail-panel" [expanded]="first">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                {{ row.username }}
+              </mat-panel-title>
+              <mat-panel-description>
+                <code>{{ row.ip_normalized }}</code> ·
+                {{ row.status | codeLabel: statusLabels }} ·
+                {{ row.attempt_kind | codeLabel: attemptKindLabels }}
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <dl class="attempts__detail-grid">
+              <div class="attempts__detail-item">
+                <dt>Attempt ID</dt>
+                <dd><code>#{{ row.id }}</code></dd>
+              </div>
+
+              <div class="attempts__detail-item">
+                <dt>Recorded at</dt>
+                <dd>{{ row.created_at | date: 'medium' }}</dd>
+              </div>
+
+              <div class="attempts__detail-item">
+                <dt>Address details</dt>
+                <dd>
+                  <code>{{ row.ip_normalized }}</code>
+                  @if (row.showRawIp) {
+                    <span class="sub">raw: <code>{{ row.ip }}</code></span>
+                  }
+                </dd>
+              </div>
+
+              <div class="attempts__detail-item">
+                <dt>Subnet bucket</dt>
+                <dd><code>{{ row.ip_subnet }}</code></dd>
+              </div>
+
+              <div class="attempts__detail-item">
+                <dt>Attempt kind</dt>
+                <dd>{{ row.attempt_kind | codeLabel: attemptKindLabels }}</dd>
+              </div>
+
+              <div class="attempts__detail-item">
+                <dt>Outcome</dt>
+                <dd>
+                  <span class="badge" [class.badge--failed]="row.status === 'failed'">
+                    {{ row.status | codeLabel: statusLabels }}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+          </mat-expansion-panel>
+        }
+      </mat-accordion>
+    }
   </mat-card-content>
 </mat-card>
