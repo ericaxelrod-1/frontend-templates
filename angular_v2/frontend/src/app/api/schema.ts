@@ -3899,6 +3899,7 @@ export interface paths {
                     ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
                     ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
                     attempt_kind?: components["parameters"]["rowFilter.login_attempts.attempt_kind"];
+                    is_mock?: components["parameters"]["rowFilter.login_attempts.is_mock"];
                     /** @description Filtering Columns */
                     select?: components["parameters"]["select"];
                     /** @description Ordering */
@@ -3978,6 +3979,7 @@ export interface paths {
                     ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
                     ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
                     attempt_kind?: components["parameters"]["rowFilter.login_attempts.attempt_kind"];
+                    is_mock?: components["parameters"]["rowFilter.login_attempts.is_mock"];
                 };
                 header?: {
                     /** @description Preference */
@@ -4010,6 +4012,7 @@ export interface paths {
                     ip_normalized?: components["parameters"]["rowFilter.login_attempts.ip_normalized"];
                     ip_subnet?: components["parameters"]["rowFilter.login_attempts.ip_subnet"];
                     attempt_kind?: components["parameters"]["rowFilter.login_attempts.attempt_kind"];
+                    is_mock?: components["parameters"]["rowFilter.login_attempts.is_mock"];
                 };
                 header?: {
                     /** @description Preference */
@@ -5112,6 +5115,11 @@ export interface components {
              * @default login
              */
             attempt_kind: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_mock: boolean;
         };
     };
     responses: never;
@@ -5377,6 +5385,7 @@ export interface components {
         "rowFilter.login_attempts.ip_normalized": string;
         "rowFilter.login_attempts.ip_subnet": string;
         "rowFilter.login_attempts.attempt_kind": string;
+        "rowFilter.login_attempts.is_mock": string;
     };
     requestBodies: {
         /** @description pattern_login_attempts */

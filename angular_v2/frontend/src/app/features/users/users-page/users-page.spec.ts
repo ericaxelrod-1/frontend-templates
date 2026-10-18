@@ -102,10 +102,22 @@ describe('UsersPage', () => {
     return (fixture.nativeElement as HTMLElement).textContent?.replace(/\s+/g, ' ').trim() ?? '';
   }
 
+  function headerTexts(): string[] {
+    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('thead th')).map(
+      (header) => header.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+    );
+  }
+
   function rowTexts(): string[] {
     return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr')).map(
       (row) => row.textContent?.replace(/\s+/g, ' ').trim() ?? '',
     );
+  }
+
+  function detailTexts(): string[] {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.users__detail-panel'),
+    ).map((panel) => panel.textContent?.replace(/\s+/g, ' ').trim() ?? '');
   }
 
   /** Push the three reads and let the resource settle. */
@@ -132,6 +144,20 @@ describe('UsersPage', () => {
       expect(api.scopes).toEqual(['admin']);
     });
 
+    it('keeps the primary table to the seven operator scan columns', async () => {
+      await settle([adminRow()]);
+
+      expect(headerTexts()).toEqual([
+        'Account',
+        'Name',
+        'Email',
+        'Created',
+        'Account state',
+        'Roles',
+        'Groups',
+      ]);
+    });
+
     it('renders a row for every user the database returned', async () => {
       await settle([
         adminRow(),
@@ -139,6 +165,7 @@ describe('UsersPage', () => {
       ]);
 
       expect(rowTexts()).toHaveLength(2);
+      expect(detailTexts()).toHaveLength(2);
       expect(text()).toContain('ada');
       expect(text()).toContain('grace@example.org');
       expect(text()).toContain('2 users returned to app_admin.');
@@ -152,17 +179,19 @@ describe('UsersPage', () => {
     it('labels the credential check and the observed activity differently, and says what NULL means', async () => {
       await settle([adminRow({ last_login_at: undefined, last_activity_at: undefined })]);
 
-      const row = rowTexts()[0] ?? '';
-      expect(row).toContain('never recorded');
-      expect(row).toContain('never observed');
+      const detail = detailTexts()[0] ?? '';
+      expect(detail).toContain('Last credential check');
+      expect(detail).toContain('never recorded');
+      expect(detail).toContain('Last observed activity');
+      expect(detail).toContain('never observed');
     });
 
     it('shows the place with the radius that bounds it, not the city alone', async () => {
       await settle([adminRow({ geo_accuracy_km: 0.012 })]);
 
-      const row = rowTexts()[0] ?? '';
-      expect(row).toContain('Berlin, BE, DE');
-      expect(row).toContain('within 12 m');
+      const detail = detailTexts()[0] ?? '';
+      expect(detail).toContain('Berlin, BE, DE');
+      expect(detail).toContain('within 12 m');
     });
 
     it('shows the erasure and disable evidence beside the account', async () => {
@@ -179,10 +208,13 @@ describe('UsersPage', () => {
       ]);
 
       const row = rowTexts()[0] ?? '';
-      expect(row).toContain("erased at the member's request");
-      expect(row).toContain('email address was anonymized');
-      expect(row).toContain('automated security block');
-      expect(row).toContain('Temporary');
+      expect(row).toContain('Erased · Disabled');
+
+      const detail = detailTexts()[0] ?? '';
+      expect(detail).toContain("erased at the member's request");
+      expect(detail).toContain('email address was anonymized');
+      expect(detail).toContain('automated security block');
+      expect(detail).toContain('Temporary');
     });
 
     it('says a name nobody has stated is unstated', async () => {
@@ -199,9 +231,9 @@ describe('UsersPage', () => {
     it('renders the verification column as a timestamp rather than as a flag', async () => {
       await settle([adminRow({ email_verified_at: undefined })]);
 
-      const row = rowTexts()[0] ?? '';
-      expect(row).toContain('not verified');
-      expect(row).not.toMatch(/\bverified\b\s*$/);
+      const detail = detailTexts()[0] ?? '';
+      expect(detail).toContain('not verified');
+      expect(detail).not.toMatch(/\bverified\b\s*$/);
     });
 
     it('shows role names, and says an unreadable table rather than showing a blank cell', async () => {
@@ -262,8 +294,10 @@ describe('UsersPage', () => {
       await settle([adminRow({ last_login_at: undefined })]);
 
       const row = rowTexts()[0] ?? '';
+      const detail = detailTexts()[0] ?? '';
       expect(row).toContain('not readable for this role');
-      expect(row).not.toContain('never recorded');
+      expect(detail).toContain('not readable for this role');
+      expect(detail).not.toContain('never recorded');
       expect(text()).toContain('grant on users is twelve columns');
     });
 
@@ -278,17 +312,20 @@ describe('UsersPage', () => {
       ]);
 
       const row = rowTexts()[0] ?? '';
+      const detail = detailTexts()[0] ?? '';
       expect(row).toContain('not readable for this role');
-      expect(row).not.toContain('No erasure and no disable recorded');
+      expect(detail).toContain('not readable for this role');
+      expect(detail).not.toContain('No erasure and no disable recorded');
     });
 
     it('still shows the twelve columns it is granted', async () => {
       await settle([adminRow()]);
 
       const row = rowTexts()[0] ?? '';
-      expect(row).toContain('Berlin, BE, DE');
-      expect(row).toContain('within 12 km');
+      const detail = detailTexts()[0] ?? '';
       expect(row).toContain('ada@example.org');
+      expect(detail).toContain('Berlin, BE, DE');
+      expect(detail).toContain('within 12 km');
     });
   });
 

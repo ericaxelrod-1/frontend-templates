@@ -120,19 +120,32 @@ describe('AppShell', () => {
    * `/users` to a member or hides it from an administrator, which no route-resolution
    * test would catch.
    */
-  it('offers the administrator both destinations', () => {
-    expect(hrefs()).toEqual(['/profile', '/users']);
+  it('offers the administrator every member and administrator destination', () => {
+    expect(hrefs()).toEqual([
+      '/profile',
+      '/users',
+      '/admin/security-alerts',
+      '/admin/ip-reputation',
+      '/admin/pattern-detection',
+      '/admin/login-monitoring',
+      '/admin/login-attempts',
+    ]);
   });
 
-  it('offers a member only their own profile, and keeps the route itself reachable', () => {
+  it('offers a member only their own profile, and keeps the admin routes themselves reachable', () => {
     session.databaseRole.set('app_member');
     fixture.detectChanges();
 
-    // Hidden from the nav because it answers an administrator's question...
+    // Hidden from the nav because they answer an administrator's question...
     expect(hrefs()).toEqual(['/profile']);
-    // ...and still a real route, because a hidden link is not access control and the
+    // ...and still real routes, because a hidden link is not access control and the
     // database is the authority (AGENTS.md §F7).
     expect(pagePaths(routes)).toContain('/users');
+    expect(pagePaths(routes)).toContain('/admin/security-alerts');
+    expect(pagePaths(routes)).toContain('/admin/ip-reputation');
+    expect(pagePaths(routes)).toContain('/admin/pattern-detection');
+    expect(pagePaths(routes)).toContain('/admin/login-monitoring');
+    expect(pagePaths(routes)).toContain('/admin/login-attempts');
   });
 
   /**

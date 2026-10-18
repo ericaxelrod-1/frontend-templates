@@ -1,0 +1,93 @@
+<mat-card class="page">
+  <mat-card-header>
+    <mat-card-title>Login monitoring</mat-card-title>
+    <mat-card-subtitle>{{ summary() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <app-mock-filter-bar
+      [includeMock]="includeMock()"
+      (includeMockChange)="setIncludeMock($event)"
+    />
+
+    <div class="budgets" role="region" aria-label="Rate-limit budgets">
+      <div class="budget-box">
+        <h3 class="budget-box__title">Interactive sign-in budget (<code>login</code>)</h3>
+        <p class="budget-box__stats">{{ loginBudgetStats() }}</p>
+        <p class="budget-box__sub">Password and credential checks recorded in login_attempts.</p>
+      </div>
+
+      <div class="budget-box">
+        <h3 class="budget-box__title">
+          Token-issuance budget (<code>token_request</code>)
+        </h3>
+        <p class="budget-box__stats">{{ tokenBudgetStats() }}</p>
+        <p class="budget-box__sub">
+          Unauthenticated password-reset and verification token requests (0019).
+        </p>
+      </div>
+    </div>
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading login monitoring" />
+    }
+
+    @if (failureReason(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+
+    <div class="table-scroll">
+      <table class="mon-table">
+        <thead>
+          <tr>
+            <th scope="col">Address</th>
+            <th scope="col">Username</th>
+            <th scope="col">Budget / kind</th>
+            <th scope="col">Status</th>
+            <th scope="col">Observed at</th>
+            <th scope="col">Alerts raised</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.id) {
+            <tr>
+              <th scope="row">
+                <code>{{ row.ip_normalized }}</code>
+                @if (row.showRawIp) {
+                  <span class="sub">raw: <code>{{ row.ip }}</code></span>
+                }
+                <span class="sub">subnet: <code>{{ row.ip_subnet }}</code></span>
+              </th>
+              <td>
+                {{ row.username }}
+                @if (row.is_mock) {
+                  <span class="badge badge--mock">synthetic test row</span>
+                }
+              </td>
+              <td>{{ row.attempt_kind | codeLabel: attemptKindLabels }}</td>
+              <td>
+                <span class="badge" [class.badge--failed]="row.status === 'failed'">
+                  {{ row.status | codeLabel: statusLabels }}
+                </span>
+              </td>
+              <td>{{ row.created_at | date: 'medium' }}</td>
+              <td>
+                @if (row.relatedAlertTitles.length > 0) {
+                  <span>{{ row.relatedAlertTitles.join('; ') }}</span>
+                } @else {
+                  <span class="sub">no correlated alerts</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td class="empty" colspan="6">
+                No login monitoring rows were returned (live rows only by default).
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </mat-card-content>
+</mat-card>

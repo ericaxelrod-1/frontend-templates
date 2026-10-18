@@ -45,10 +45,6 @@
             <th scope="col">Name</th>
             <th scope="col">Email</th>
             <th scope="col">Created</th>
-            <th scope="col">Email verified</th>
-            <th scope="col">Last credential check</th>
-            <th scope="col">Last observed activity</th>
-            <th scope="col">Place</th>
             <th scope="col">Account state</th>
             <th scope="col">Roles</th>
             <th scope="col">Groups</th>
@@ -59,7 +55,7 @@
             <tr>
               <th scope="row">
                 {{ row.username }}
-                <span class="users__id">{{ row.id }}</span>
+                <span class="users__id" [title]="row.id">{{ row.id }}</span>
               </th>
               <td>
                 @if (row.firstName !== null || row.lastName !== null) {
@@ -77,49 +73,10 @@
               </td>
               <td>
                 @if (adminColumnsReadable()) {
-                  <app-optional-stamp
-                    [value]="row.emailVerifiedAt"
-                    absentLabel="not verified"
-                  />
+                  <span class="users__state-summary">{{ row.accountStateSummary }}</span>
                 } @else {
                   <span class="users__absent">not readable for this role</span>
                 }
-              </td>
-              <td>
-                @if (adminColumnsReadable()) {
-                  <app-optional-stamp
-                    [value]="row.lastLoginAt"
-                    absentLabel="never recorded"
-                  />
-                } @else {
-                  <span class="users__absent">not readable for this role</span>
-                }
-              </td>
-              <td>
-                @if (adminColumnsReadable()) {
-                  <app-optional-stamp
-                    [value]="row.lastActivityAt"
-                    absentLabel="never observed"
-                  />
-                } @else {
-                  <span class="users__absent">not readable for this role</span>
-                }
-              </td>
-              <td>
-                <app-geo-place
-                  [city]="row.city"
-                  [regionCode]="row.regionCode"
-                  [countryCode]="row.countryCode"
-                  [source]="row.geoSource"
-                  [accuracyKm]="row.geoAccuracyKm"
-                  [updatedAt]="row.geoUpdatedAt"
-                />
-              </td>
-              <td>
-                <app-user-account-state
-                  [record]="row"
-                  [blocked]="!adminColumnsReadable()"
-                />
               </td>
               <td>
                 <app-name-list [names]="row.roleNames" [blocked]="rolesBlocked()" />
@@ -130,7 +87,7 @@
             </tr>
           } @empty {
             <tr>
-              <td class="users__empty" colspan="11">
+              <td class="users__empty" colspan="7">
                 No user rows were returned to this role.
               </td>
             </tr>
@@ -138,5 +95,98 @@
         </tbody>
       </table>
     </div>
+
+    @if (rows().length > 0) {
+      <mat-accordion class="users__details" multi>
+        @for (row of rows(); track row.id; let first = $first) {
+          <mat-expansion-panel class="users__detail-panel" [expanded]="first">
+            <mat-expansion-panel-header>
+              <mat-panel-title>{{ row.username }}</mat-panel-title>
+              <mat-panel-description>
+                {{ row.email }} ·
+                @if (adminColumnsReadable()) {
+                  {{ row.accountStateSummary }}
+                } @else {
+                  not readable for this role
+                }
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <dl class="users__detail-grid">
+              <div class="users__detail-item">
+                <dt>Account ID</dt>
+                <dd><code>{{ row.id }}</code></dd>
+              </div>
+
+              <div class="users__detail-item">
+                <dt>Email verified</dt>
+                <dd>
+                  @if (adminColumnsReadable()) {
+                    <app-optional-stamp
+                      [value]="row.emailVerifiedAt"
+                      absentLabel="not verified"
+                    />
+                  } @else {
+                    <span class="users__absent">not readable for this role</span>
+                  }
+                </dd>
+              </div>
+
+              <div class="users__detail-item">
+                <dt>Last credential check</dt>
+                <dd>
+                  @if (adminColumnsReadable()) {
+                    <app-optional-stamp
+                      [value]="row.lastLoginAt"
+                      absentLabel="never recorded"
+                    />
+                  } @else {
+                    <span class="users__absent">not readable for this role</span>
+                  }
+                </dd>
+              </div>
+
+              <div class="users__detail-item">
+                <dt>Last observed activity</dt>
+                <dd>
+                  @if (adminColumnsReadable()) {
+                    <app-optional-stamp
+                      [value]="row.lastActivityAt"
+                      absentLabel="never observed"
+                    />
+                  } @else {
+                    <span class="users__absent">not readable for this role</span>
+                  }
+                </dd>
+              </div>
+
+              <div class="users__detail-item">
+                <dt>Place</dt>
+                <dd>
+                  <app-geo-place
+                    [city]="row.city"
+                    [regionCode]="row.regionCode"
+                    [countryCode]="row.countryCode"
+                    [source]="row.geoSource"
+                    [accuracyKm]="row.geoAccuracyKm"
+                    [updatedAt]="row.geoUpdatedAt"
+                  />
+                </dd>
+              </div>
+
+              <div class="users__detail-item">
+                <dt>Account state detail</dt>
+                <dd>
+                  <app-user-account-state
+                    [record]="row"
+                    [blocked]="!adminColumnsReadable()"
+                  />
+                </dd>
+              </div>
+            </dl>
+          </mat-expansion-panel>
+        }
+      </mat-accordion>
+    }
   </mat-card-content>
 </mat-card>

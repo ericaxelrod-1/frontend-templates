@@ -1,0 +1,92 @@
+<mat-card class="page">
+  <mat-card-header>
+    <mat-card-title>Login attempts</mat-card-title>
+    <mat-card-subtitle>{{ summary() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <app-mock-filter-bar
+      [includeMock]="includeMock()"
+      (includeMockChange)="setIncludeMock($event)"
+    />
+
+    <div class="filters" role="group" aria-label="Login attempt filters">
+      <label class="filters__field">
+        <span>Attempt kind</span>
+        <select class="filters__select" [value]="kindFilter()" (change)="onKindChange($event)">
+          <option value="all">All kinds</option>
+          <option value="login">Credential check (login)</option>
+          <option value="token_request">Reset/verification token (token_request)</option>
+        </select>
+      </label>
+
+      <label class="filters__field">
+        <span>Status</span>
+        <select class="filters__select" [value]="statusFilter()" (change)="onStatusChange($event)">
+          <option value="all">All statuses</option>
+          <option value="failed">Failed</option>
+          <option value="succeeded">Succeeded</option>
+        </select>
+      </label>
+    </div>
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading login attempts" />
+    }
+
+    @if (failureReason(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+
+    <div class="table-scroll">
+      <table class="attempts-table">
+        <thead>
+          <tr>
+            <th scope="col">ID</th>
+            <th scope="col">Username</th>
+            <th scope="col">Canonical address</th>
+            <th scope="col">Subnet bucket</th>
+            <th scope="col">Attempt kind</th>
+            <th scope="col">Status</th>
+            <th scope="col">Recorded at</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of filteredRows(); track row.id) {
+            <tr>
+              <th scope="row">
+                <code>#{{ row.id }}</code>
+              </th>
+              <td>
+                {{ row.username }}
+                @if (row.is_mock) {
+                  <span class="badge badge--mock">synthetic test row</span>
+                }
+              </td>
+              <td>
+                <code>{{ row.ip_normalized }}</code>
+                @if (row.showRawIp) {
+                  <span class="sub">raw: <code>{{ row.ip }}</code></span>
+                }
+              </td>
+              <td><code>{{ row.ip_subnet }}</code></td>
+              <td>{{ row.attempt_kind | codeLabel: attemptKindLabels }}</td>
+              <td>
+                <span class="badge" [class.badge--failed]="row.status === 'failed'">
+                  {{ row.status | codeLabel: statusLabels }}
+                </span>
+              </td>
+              <td>{{ row.created_at | date: 'medium' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td class="empty" colspan="7">
+                No login attempts matched the current filters (live rows only by default).
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </mat-card-content>
+</mat-card>

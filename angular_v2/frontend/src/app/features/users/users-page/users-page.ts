@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { MatCardModule } from '@angular/material/card';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Session } from '../../../core/auth/session.service';
 import { GeoPlace } from '../../../shared/geo-place';
@@ -14,9 +15,23 @@ import type { UserListRow } from '../user-list-row';
 /** Shared so `computed` does not allocate a `Map` on every re-evaluation. */
 const NO_NAMES: ReadonlyMap<string, readonly string[]> = new Map();
 
+interface UserPageRow extends UserListRow {
+  readonly accountStateSummary: string;
+}
+
 /**
  * The Users page: every `users` column that means something to an operator, for
  * every account the signed-in role may read.
+ *
+ * ## Primary table vs row expansion
+ *
+ * The primary table keeps the seven columns an operator scans first (`Account`,
+ * `Name`, `Email`, `Created`, `Account state`, `Roles`, `Groups`) so all seven
+ * remain visible in a 1024px viewport without horizontal scrolling and without
+ * wrapping the UUID across four lines. The long-tail audit evidence —
+ * `email_verified_at`, `last_login_at`, `last_activity_at`, coarse `Place` with
+ * provenance (`geo_source`, `geo_accuracy_km`, `geo_updated_at`), and the full
+ * erasure/disable record — lives in an expandable per-account panel directly below.
  *
  * ## Three independent loads, because the grants are three different things
  *
@@ -69,6 +84,7 @@ const NO_NAMES: ReadonlyMap<string, readonly string[]> = new Map();
   imports: [
     GeoPlace,
     MatCardModule,
+    MatExpansionModule,
     MatProgressBarModule,
     NameList,
     OptionalStamp,
@@ -92,7 +108,6 @@ const NO_NAMES: ReadonlyMap<string, readonly string[]> = new Map();
       color: var(--mat-sys-on-surface-variant);
     }
 
-    /* Eleven columns of audit data do not fit a laptop; the card scrolls. */
     .users__scroll {
       overflow-x: auto;
     }
@@ -105,7 +120,7 @@ const NO_NAMES: ReadonlyMap<string, readonly string[]> = new Map();
     .users th,
     .users td {
       text-align: left;
-      padding: 0.5rem 0.75rem 0.5rem 0;
+      padding: 0.5rem 0.5rem 0.5rem 0;
       border-bottom: 1px solid var(--mat-sys-outline-variant);
       vertical-align: top;
     }
@@ -122,18 +137,56 @@ const NO_NAMES: ReadonlyMap<string, readonly string[]> = new Map();
 
     .users__id {
       display: block;
+      max-width: 8rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       color: var(--mat-sys-on-surface-variant);
       font: var(--mat-sys-body-small);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
     .users__name {
       display: flex;
       gap: 0.35rem;
+      white-space: nowrap;
+    }
+
+    .users__state-summary {
+      font: var(--mat-sys-body-small);
+      white-space: nowrap;
     }
 
     .users__absent,
     .users__empty {
       color: var(--mat-sys-on-surface-variant);
+    }
+
+    .users__details {
+      display: block;
+      margin-top: 1rem;
+    }
+
+    .users__detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+      gap: 0.75rem 1.25rem;
+      margin: 0;
+    }
+
+    .users__detail-item {
+      margin: 0;
+    }
+
+    .users__detail-item dt {
+      font: var(--mat-sys-label-medium);
+      color: var(--mat-sys-on-surface-variant);
+      margin-bottom: 0.15rem;
+    }
+
+    .users__detail-item dd {
+      margin: 0;
+      font: var(--mat-sys-body-medium);
     }
 
     .notice {
@@ -179,7 +232,7 @@ export class UsersPage {
    */
   protected readonly adminColumnsReadable = computed(() => this.columnScope() === 'admin');
 
-  protected readonly rows = computed<readonly UserListRow[]>(() => {
+  protected readonly rows = computed<readonly UserPageRow[]>(() => {
     // `hasValue()` first, not `value() !== undefined`: reading `.value()` on a
     // resource that is in an ERROR state THROWS rather than returning undefined, and
     // this computed runs on the page precisely when a read has failed. The empty
@@ -192,32 +245,38 @@ export class UsersPage {
     // take the user list down with it, and it must not take the page down either.
     const roleNames = this.rolesResource.hasValue() ? this.rolesResource.value() : NO_NAMES;
     const groupNames = this.groupsResource.hasValue() ? this.groupsResource.value() : NO_NAMES;
-    return users.map((user) => ({
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      createdAt: user.created_at,
-      firstName: nullable(user.first_name),
-      lastName: nullable(user.last_name),
-      lastLoginAt: nullable(user.last_login_at),
-      lastActivityAt: nullable(user.last_activity_at),
-      emailVerifiedAt: nullable(user.email_verified_at),
-      deletedAt: nullable(user.deleted_at),
-      deletionReason: nullable(user.deletion_reason),
-      emailAnonymized: nullable(user.email_anonymized),
-      countryCode: nullable(user.country_code),
-      regionCode: nullable(user.region_code),
-      city: nullable(user.city),
-      geoSource: nullable(user.geo_source),
-      geoAccuracyKm: nullable(user.geo_accuracy_km),
-      geoUpdatedAt: nullable(user.geo_updated_at),
-      disabledAt: nullable(user.disabled_at),
-      disabledBy: nullable(user.disabled_by),
-      disabledReason: nullable(user.disabled_reason),
-      disabledUntil: nullable(user.disabled_until),
-      roleNames: roleNames.get(user.id) ?? [],
-      groupNames: groupNames.get(user.id) ?? [],
-    }));
+    return users.map((user) => {
+      const deletedAt = nullable(user.deleted_at);
+      const disabledAt = nullable(user.disabled_at);
+      const disabledUntil = nullable(user.disabled_until);
+      return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        createdAt: user.created_at,
+        firstName: nullable(user.first_name),
+        lastName: nullable(user.last_name),
+        lastLoginAt: nullable(user.last_login_at),
+        lastActivityAt: nullable(user.last_activity_at),
+        emailVerifiedAt: nullable(user.email_verified_at),
+        deletedAt,
+        deletionReason: nullable(user.deletion_reason),
+        emailAnonymized: nullable(user.email_anonymized),
+        countryCode: nullable(user.country_code),
+        regionCode: nullable(user.region_code),
+        city: nullable(user.city),
+        geoSource: nullable(user.geo_source),
+        geoAccuracyKm: nullable(user.geo_accuracy_km),
+        geoUpdatedAt: nullable(user.geo_updated_at),
+        disabledAt,
+        disabledBy: nullable(user.disabled_by),
+        disabledReason: nullable(user.disabled_reason),
+        disabledUntil,
+        roleNames: roleNames.get(user.id) ?? [],
+        groupNames: groupNames.get(user.id) ?? [],
+        accountStateSummary: summarizeAccountState(deletedAt, disabledAt, disabledUntil),
+      };
+    });
   });
 
   protected readonly rolesBlocked = computed(() => isForbidden(this.rolesResource.error()));
@@ -239,6 +298,23 @@ export class UsersPage {
     }
     return `The request failed: ${statusOf(error)}`;
   });
+}
+
+function summarizeAccountState(
+  deletedAt: string | null,
+  disabledAt: string | null,
+  disabledUntil: string | null,
+): string {
+  if (deletedAt !== null && disabledAt !== null) {
+    return 'Erased · Disabled';
+  }
+  if (deletedAt !== null) {
+    return 'Erased';
+  }
+  if (disabledAt !== null) {
+    return disabledUntil !== null ? 'Disabled (temporary)' : 'Disabled (permanent)';
+  }
+  return 'Active';
 }
 
 /**

@@ -36,6 +36,11 @@ type NavAudience = 'every-member' | 'app_admin';
 const NAV_ITEMS: readonly NavItem[] = [
   { label: 'My profile', path: '/profile', audience: 'every-member' },
   { label: 'Users', path: '/users', audience: 'app_admin' },
+  { label: 'Security alerts', path: '/admin/security-alerts', audience: 'app_admin' },
+  { label: 'IP reputation', path: '/admin/ip-reputation', audience: 'app_admin' },
+  { label: 'Pattern detection', path: '/admin/pattern-detection', audience: 'app_admin' },
+  { label: 'Login monitoring', path: '/admin/login-monitoring', audience: 'app_admin' },
+  { label: 'Login attempts', path: '/admin/login-attempts', audience: 'app_admin' },
 ];
 
 /** One destination in the sidenav. */

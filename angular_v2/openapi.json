@@ -5213,6 +5213,9 @@
                         "$ref": "#/components/parameters/rowFilter.login_attempts.attempt_kind"
                     },
                     {
+                        "$ref": "#/components/parameters/rowFilter.login_attempts.is_mock"
+                    },
+                    {
                         "$ref": "#/components/parameters/select"
                     },
                     {
@@ -5328,6 +5331,9 @@
                         "$ref": "#/components/parameters/rowFilter.login_attempts.attempt_kind"
                     },
                     {
+                        "$ref": "#/components/parameters/rowFilter.login_attempts.is_mock"
+                    },
+                    {
                         "$ref": "#/components/parameters/preferReturn"
                     }
                 ],
@@ -5365,6 +5371,9 @@
                     },
                     {
                         "$ref": "#/components/parameters/rowFilter.login_attempts.attempt_kind"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.login_attempts.is_mock"
                     },
                     {
                         "$ref": "#/components/parameters/preferReturn"
@@ -7581,6 +7590,14 @@
                 "schema": {
                     "type": "string"
                 }
+            },
+            "rowFilter.login_attempts.is_mock": {
+                "name": "is_mock",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
             }
         },
         "requestBodies": {
@@ -9575,7 +9592,8 @@
                     "username",
                     "status",
                     "created_at",
-                    "attempt_kind"
+                    "attempt_kind",
+                    "is_mock"
                 ],
                 "properties": {
                     "id": {
@@ -9613,6 +9631,11 @@
                         "default": "login",
                         "format": "text",
                         "type": "string"
+                    },
+                    "is_mock": {
+                        "default": false,
+                        "format": "boolean",
+                        "type": "boolean"
                     }
                 },
                 "type": "object"

@@ -1,0 +1,126 @@
+<mat-card class="page">
+  <mat-card-header>
+    <mat-card-title>Pattern detection</mat-card-title>
+    <mat-card-subtitle>{{ summary() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <app-mock-filter-bar
+      [includeMock]="includeMock()"
+      (includeMockChange)="setIncludeMock($event)"
+    />
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading detected patterns" />
+    }
+
+    @if (failureReason(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+
+    <div class="patterns">
+      @for (row of rows(); track row.id) {
+        <article class="pattern-card">
+          <div class="pattern-card__header">
+            <h3 class="pattern-card__title">
+              <code>{{ row.pattern_type }}</code>
+            </h3>
+            <div class="badges">
+              <span class="badge">{{ row.severity | codeLabel: severityLabels }}</span>
+              <span class="badge">{{ row.status | codeLabel: statusLabels }}</span>
+              @if (row.is_mock) {
+                <span class="badge badge--mock">synthetic test row</span>
+              }
+            </div>
+          </div>
+
+          <dl class="meta-grid">
+            <div>
+              <dt>Observation window</dt>
+              <dd>
+                {{ row.time_window_start | date: 'medium' }} –
+                {{ row.time_window_end | date: 'medium' }}
+              </dd>
+            </div>
+
+            <div>
+              <dt>Attempt count</dt>
+              <dd>{{ row.attempt_count }}</dd>
+            </div>
+
+            <div>
+              <dt>Unique email count</dt>
+              <dd>{{ row.unique_email_count }}</dd>
+            </div>
+
+            <div>
+              <dt>Canonical address</dt>
+              <dd>
+                @if (row.ip_normalized; as ipNorm) {
+                  <code>{{ ipNorm }}</code>
+                } @else {
+                  none recorded
+                }
+                @if (row.ip_subnet; as subnet) {
+                  (subnet: <code>{{ subnet }}</code>)
+                }
+              </dd>
+            </div>
+
+            <div>
+              <dt>Resolution</dt>
+              <dd>
+                @if (row.resolved_at; as resAt) {
+                  {{ resAt | date: 'medium' }}
+                  @if (row.resolution_notes; as notes) {
+                    — {{ notes }}
+                  }
+                } @else {
+                  unresolved
+                }
+              </dd>
+            </div>
+          </dl>
+
+          @if ((row.evidence | jsonbEntries).length > 0) {
+            <div class="section">
+              <h4 class="section__heading">Evidence</h4>
+              <dl class="evidence-list">
+                @for (entry of row.evidence | jsonbEntries; track entry.key) {
+                  <div>
+                    <dt>{{ entry.key }}</dt>
+                    <dd>{{ entry.value }}</dd>
+                  </div>
+                }
+              </dl>
+            </div>
+          }
+
+          <div class="section">
+            <h4 class="section__heading">
+              Correlated login attempts ({{ row.linkedAttempts.length }})
+            </h4>
+            @if (row.linkedAttempts.length > 0) {
+              <ul class="attempts-list">
+                @for (attempt of row.linkedAttempts; track attempt.id) {
+                  <li>
+                    <strong>{{ attempt.username }}</strong> from
+                    <code>{{ attempt.ip_normalized }}</code> —
+                    {{ attempt.status }} ({{ attempt.attempt_kind | codeLabel: attemptKindLabels }})
+                    at {{ attempt.created_at | date: 'medium' }}
+                  </li>
+                }
+              </ul>
+            } @else {
+              <span class="empty">No correlated login attempts linked to this pattern.</span>
+            }
+          </div>
+        </article>
+      } @empty {
+        <p class="empty">
+          No detected patterns were returned (live rows only by default).
+        </p>
+      }
+    </div>
+  </mat-card-content>
+</mat-card>

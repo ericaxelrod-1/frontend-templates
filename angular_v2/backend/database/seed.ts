@@ -767,6 +767,398 @@ async function seed(): Promise<number> {
       [euId, now],
     );
 
+    // Synthetic security telemetry (`0022_security_telemetry.sql`) so the five
+    // admin security pages have realistic rows to render when the operator toggles
+    // `is_mock` test rows on.
+    //
+    // Every `0022` row carries `is_mock = true` so the pages hide them by default
+    // behind the explicit test-row toggle. Every synthetic attempt below carries
+    // `is_mock = true` on the ROW — `0025` gave `login_attempts` the column, so
+    // its synthetic-ness is a property of the attempt rather than of a join to a
+    // pattern — uses RFC 5737 / RFC 3849 documentation addresses
+    // (`198.51.100.0/24`, `203.0.113.0/24`, `2001:db8::/32`) and fixed historical
+    // timestamps outside any live throttle window, and never names the `admin`
+    // account. Every statement uses `ON
+    // CONFLICT DO NOTHING` or `WHERE NOT EXISTS` so a second seed run is a no-op
+    // and leaves row counts identical (`test/rls/seed.spec.ts`).
+    await q(
+      'security/ip_reputation',
+      `
+      INSERT INTO ip_reputation (
+        ip, ip_normalized, ip_subnet, status, reputation_score,
+        failed_attempts, captcha_required_count, is_blocked, blocked_until,
+        geo_location, statistics, block_history, metadata, is_mock,
+        created_at, updated_at
+      )
+      VALUES
+        (
+          '::ffff:198.51.100.44', '198.51.100.44', '198.51.100.44', 'bad', 12,
+          18, 4, true, '2026-10-18T06:00:00.000Z'::timestamptz,
+          '{"country_code":"DE","city":"Frankfurt"}'::jsonb,
+          '{"window_minutes":15,"distinct_usernames":14}'::jsonb,
+          '[{"reason":"credential_stuffing","blocked_at":"2026-03-15T14:15:00.000Z"}]'::jsonb,
+          '{"asn":64496,"org":"Example Transit DE"}'::jsonb,
+          true,
+          '2026-03-15T14:00:00.000Z'::timestamptz,
+          '2026-03-15T14:15:00.000Z'::timestamptz
+        ),
+        (
+          '2001:db8:42:10::a', '2001:db8:42:10::a', '2001:db8:42:10::/64', 'suspicious', 48,
+          6, 2, false, NULL,
+          '{"country_code":"FR","city":"Paris"}'::jsonb,
+          '{"window_minutes":15,"token_requests":6}'::jsonb,
+          '[]'::jsonb,
+          '{"asn":64497,"org":"Example Cloud FR"}'::jsonb,
+          true,
+          '2026-03-15T14:05:00.000Z'::timestamptz,
+          '2026-03-15T14:16:00.000Z'::timestamptz
+        ),
+        (
+          '203.0.113.19', '203.0.113.19', '203.0.113.19', 'good', 96,
+          1, 0, false, NULL,
+          '{"country_code":"GB","city":"London"}'::jsonb,
+          '{"window_minutes":60,"succeeded_logins":4}'::jsonb,
+          '[]'::jsonb,
+          '{"asn":64498,"org":"Audit Egress UK"}'::jsonb,
+          true,
+          '2026-03-15T14:18:00.000Z'::timestamptz,
+          '2026-03-15T14:20:00.000Z'::timestamptz
+        )
+      ON CONFLICT (ip_normalized) DO NOTHING
+      `,
+    );
+
+    const ensureSyntheticAttempt = async (
+      label: string,
+      username: string,
+      ip: string,
+      ipNormalized: string,
+      ipSubnet: string,
+      status: 'failed' | 'succeeded',
+      attemptKind: 'login' | 'token_request',
+      createdAt: string,
+    ): Promise<string> => {
+      await q(
+        `security/login_attempts/${label}/insert`,
+        `
+        INSERT INTO login_attempts (
+          username, ip, ip_normalized, ip_subnet, status, attempt_kind, created_at, is_mock
+        )
+        SELECT $1, $2, $3, $4, $5, $6, $7::timestamptz, true
+        WHERE NOT EXISTS (
+          SELECT 1 FROM login_attempts la
+          WHERE la.username = $1 AND la.ip = $2 AND la.created_at = $7::timestamptz
+        )
+        `,
+        [username, ip, ipNormalized, ipSubnet, status, attemptKind, createdAt],
+      );
+      const found = await q(
+        `security/login_attempts/${label}/select`,
+        `
+        SELECT id FROM login_attempts
+        WHERE username = $1 AND ip = $2 AND created_at = $3::timestamptz
+        `,
+        [username, ip, createdAt],
+      );
+      return found.rows[0].id;
+    };
+
+    const attempt1Id = await ensureSyntheticAttempt(
+      'stuffing-1',
+      'finance.ops',
+      '::ffff:198.51.100.44',
+      '198.51.100.44',
+      '198.51.100.44',
+      'failed',
+      'login',
+      '2026-03-15T14:10:05.000Z',
+    );
+    const attempt2Id = await ensureSyntheticAttempt(
+      'stuffing-2',
+      'payroll.admin',
+      '198.51.100.44',
+      '198.51.100.44',
+      '198.51.100.44',
+      'failed',
+      'login',
+      '2026-03-15T14:11:22.000Z',
+    );
+    const attempt3Id = await ensureSyntheticAttempt(
+      'token-sweep-1',
+      'treasury.lead',
+      '2001:db8:42:10::a',
+      '2001:db8:42:10::a',
+      '2001:db8:42:10::/64',
+      'failed',
+      'token_request',
+      '2026-03-15T14:14:00.000Z',
+    );
+    const attempt4Id = await ensureSyntheticAttempt(
+      'audit-login-1',
+      'auditor.eu',
+      '203.0.113.19',
+      '203.0.113.19',
+      '203.0.113.19',
+      'succeeded',
+      'login',
+      '2026-03-15T14:20:00.000Z',
+    );
+
+    const ensureSyntheticPattern = async (
+      patternType: string,
+      severity: 'low' | 'medium' | 'high' | 'critical',
+      ip: string,
+      ipNormalized: string,
+      ipSubnet: string,
+      detectionTimestamp: string,
+      windowStart: string,
+      windowEnd: string,
+      attemptCount: number,
+      uniqueEmailCount: number,
+      evidenceJson: string,
+      status: 'active' | 'resolved' | 'dismissed',
+      resolvedAt: string | null,
+      resolvedBy: string | null,
+      resolutionNotes: string | null,
+    ): Promise<string> => {
+      await q(
+        `security/patterns/${patternType}/insert`,
+        `
+        INSERT INTO security_detected_patterns (
+          pattern_type, severity, ip, ip_normalized, ip_subnet,
+          detection_timestamp, time_window_start, time_window_end,
+          attempt_count, unique_email_count, evidence, status,
+          resolved_at, resolved_by, resolution_notes, is_mock,
+          created_at, updated_at
+        )
+        SELECT
+          $1, $2, $3, $4, $5,
+          $6::timestamptz, $7::timestamptz, $8::timestamptz,
+          $9::int, $10::int, $11::jsonb, $12,
+          $13::timestamptz, $14::uuid, $15, true,
+          $6::timestamptz, $6::timestamptz
+        WHERE NOT EXISTS (
+          SELECT 1 FROM security_detected_patterns p
+          WHERE p.pattern_type = $1
+            AND p.ip_normalized = $4
+            AND p.time_window_start = $7::timestamptz
+        )
+        `,
+        [
+          patternType,
+          severity,
+          ip,
+          ipNormalized,
+          ipSubnet,
+          detectionTimestamp,
+          windowStart,
+          windowEnd,
+          attemptCount,
+          uniqueEmailCount,
+          evidenceJson,
+          status,
+          resolvedAt,
+          resolvedBy,
+          resolutionNotes,
+        ],
+      );
+      const found = await q(
+        `security/patterns/${patternType}/select`,
+        `
+        SELECT id FROM security_detected_patterns
+        WHERE pattern_type = $1
+          AND ip_normalized = $2
+          AND time_window_start = $3::timestamptz
+        `,
+        [patternType, ipNormalized, windowStart],
+      );
+      return found.rows[0].id;
+    };
+
+    const pattern1Id = await ensureSyntheticPattern(
+      'credential_stuffing',
+      'high',
+      '::ffff:198.51.100.44',
+      '198.51.100.44',
+      '198.51.100.44',
+      '2026-03-15T14:15:00.000Z',
+      '2026-03-15T14:00:00.000Z',
+      '2026-03-15T14:15:00.000Z',
+      18,
+      14,
+      JSON.stringify({
+        target_accounts: ['finance.ops', 'payroll.admin'],
+        median_interval_ms: 420,
+        user_agent_family: 'python-httpx/0.27',
+        canonical_host: '198.51.100.44',
+      }),
+      'active',
+      null,
+      null,
+      null,
+    );
+
+    const pattern2Id = await ensureSyntheticPattern(
+      'reset_token_enumeration',
+      'medium',
+      '2001:db8:42:10::a',
+      '2001:db8:42:10::a',
+      '2001:db8:42:10::/64',
+      '2026-03-15T14:16:00.000Z',
+      '2026-03-15T14:05:00.000Z',
+      '2026-03-15T14:16:00.000Z',
+      6,
+      5,
+      JSON.stringify({
+        endpoint: '/api/auth/password-reset/request',
+        attempt_kind: 'token_request',
+        subnet: '2001:db8:42:10::/64',
+      }),
+      'resolved',
+      '2026-03-15T15:00:00.000Z',
+      adminId,
+      'Rate-limited at the token_request budget; no valid token was redeemed.',
+    );
+
+    await q(
+      'security/pattern_login_attempts',
+      `
+      INSERT INTO pattern_login_attempts (
+        pattern_id, login_attempt_id, is_primary_evidence, is_mock, created_at
+      )
+      VALUES
+        ($1::uuid, $3::uuid, true, true, '2026-03-15T14:15:00.000Z'::timestamptz),
+        ($1::uuid, $4::uuid, true, true, '2026-03-15T14:15:00.000Z'::timestamptz),
+        ($2::uuid, $5::uuid, true, true, '2026-03-15T14:16:00.000Z'::timestamptz),
+        ($1::uuid, $6::uuid, false, true, '2026-03-15T14:20:00.000Z'::timestamptz)
+      ON CONFLICT (pattern_id, login_attempt_id) DO NOTHING
+      `,
+      [pattern1Id, pattern2Id, attempt1Id, attempt2Id, attempt3Id, attempt4Id],
+    );
+
+    await q(
+      'security/security_alerts',
+      `
+      INSERT INTO security_alerts (
+        alert_type, severity, title, message, source, pattern_id,
+        ip, ip_normalized, ip_subnet, status,
+        acknowledged_at, acknowledged_by,
+        resolved_at, resolved_by, resolution_notes,
+        alert_data, is_mock, created_at, updated_at
+      )
+      SELECT
+        v.alert_type,
+        v.severity,
+        v.title,
+        v.message,
+        v.source,
+        v.pattern_id::uuid,
+        v.ip,
+        v.ip_normalized,
+        v.ip_subnet,
+        v.status,
+        v.acknowledged_at::timestamptz,
+        v.acknowledged_by::uuid,
+        v.resolved_at::timestamptz,
+        v.resolved_by::uuid,
+        v.resolution_notes,
+        v.alert_data::jsonb,
+        true,
+        v.created_at::timestamptz,
+        v.created_at::timestamptz
+      FROM (
+        VALUES
+          (
+            'brute_force',
+            'critical',
+            'Sustained credential stuffing from 198.51.100.44',
+            '18 failed sign-in attempts across 14 distinct usernames within 15 minutes from IPv4-mapped host ::ffff:198.51.100.44.',
+            'system',
+            $1::text,
+            '::ffff:198.51.100.44',
+            '198.51.100.44',
+            '198.51.100.44',
+            'active',
+            NULL::text,
+            NULL::text,
+            NULL::text,
+            NULL::text,
+            NULL::text,
+            '{"window_minutes":15,"failed_attempts":18}',
+            '2026-03-15T14:15:05.000Z'
+          ),
+          (
+            'token_exhaustion',
+            'high',
+            'Repeated one-time token requests from 2001:db8:42:10::/64',
+            '6 password-reset token requests from subnet 2001:db8:42:10::/64 tripped the token_request throttle budget.',
+            'system',
+            $2::text,
+            '2001:db8:42:10::a',
+            '2001:db8:42:10::a',
+            '2001:db8:42:10::/64',
+            'acknowledged',
+            '2026-03-15T14:22:00.000Z',
+            $3::text,
+            NULL::text,
+            NULL::text,
+            NULL::text,
+            '{"budget":"token_request","requests_in_window":6}',
+            '2026-03-15T14:16:10.000Z'
+          ),
+          (
+            'ip_block',
+            'medium',
+            'Temporary reputation block applied to 198.51.100.44',
+            'Host reputation score fell to 12 after repeated failed credential checks.',
+            'system',
+            $1::text,
+            '198.51.100.44',
+            '198.51.100.44',
+            '198.51.100.44',
+            'resolved',
+            '2026-03-15T14:18:00.000Z',
+            $3::text,
+            '2026-03-15T15:05:00.000Z',
+            $3::text,
+            'Upstream transit block confirmed; host remains quarantined until window expiry.',
+            '{"reputation_score":12,"blocked_until":"2026-10-18T06:00:00.000Z"}',
+            '2026-03-15T14:17:00.000Z'
+          ),
+          (
+            'new_location',
+            'low',
+            'Sign-in from new address 203.0.113.19',
+            'Single failed password entry followed by a valid credential check from 203.0.113.19.',
+            'manual',
+            NULL::text,
+            '203.0.113.19',
+            '203.0.113.19',
+            '203.0.113.19',
+            'dismissed',
+            NULL::text,
+            NULL::text,
+            '2026-03-15T14:30:00.000Z',
+            $3::text,
+            'Verified with European audit team as scheduled VPN egress rotation.',
+            '{"verified_team":"EU-Audit"}',
+            '2026-03-15T14:21:00.000Z'
+          )
+      ) AS v(
+        alert_type, severity, title, message, source, pattern_id,
+        ip, ip_normalized, ip_subnet, status,
+        acknowledged_at, acknowledged_by,
+        resolved_at, resolved_by, resolution_notes,
+        alert_data, created_at
+      )
+      WHERE NOT EXISTS (
+        SELECT 1 FROM security_alerts sa
+        WHERE sa.title = v.title AND sa.created_at = v.created_at::timestamptz
+      )
+      `,
+      [pattern1Id, pattern2Id, adminId],
+    );
+
     await client.query('COMMIT');
     await client.end();
     if (adminPasswordApplied) {

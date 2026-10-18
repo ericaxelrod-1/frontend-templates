@@ -1,0 +1,139 @@
+<mat-card class="page">
+  <mat-card-header>
+    <mat-card-title>Security alerts</mat-card-title>
+    <mat-card-subtitle>{{ summary() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <app-mock-filter-bar
+      [includeMock]="includeMock()"
+      (includeMockChange)="setIncludeMock($event)"
+    />
+
+    <div class="filters" role="group" aria-label="Alert filters">
+      <label class="filters__field">
+        <span>Status</span>
+        <select class="filters__select" [value]="statusFilter()" (change)="onStatusChange($event)">
+          <option value="all">All statuses</option>
+          <option value="active">Active (unacknowledged)</option>
+          <option value="acknowledged">Acknowledged</option>
+          <option value="resolved">Resolved</option>
+          <option value="dismissed">Dismissed</option>
+        </select>
+      </label>
+
+      <label class="filters__field">
+        <span>Severity</span>
+        <select
+          class="filters__select"
+          [value]="severityFilter()"
+          (change)="onSeverityChange($event)"
+        >
+          <option value="all">All severities</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </label>
+
+      <label class="filters__field">
+        <span>Alert type</span>
+        <select class="filters__select" [value]="typeFilter()" (change)="onTypeChange($event)">
+          <option value="all">All types</option>
+          @for (type of alertTypes(); track type) {
+            <option [value]="type">{{ type }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading security alerts" />
+    }
+
+    @if (failureReason(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+
+    <div class="alerts">
+      @for (row of filteredRows(); track row.id) {
+        <article class="alert-card" [class.alert-card--urgent]="row.urgent">
+          <div class="alert-card__header">
+            <h3 class="alert-card__title">{{ row.title }}</h3>
+            <div class="alert-card__badges">
+              @if (row.urgent) {
+                <span class="badge badge--urgent">Unacknowledged {{ row.severity }}</span>
+              }
+              <span class="badge">{{ row.severity | codeLabel: severityLabels }}</span>
+              <span class="badge">{{ row.status | codeLabel: statusLabels }}</span>
+              <span class="badge"><code>{{ row.alert_type }}</code></span>
+              @if (row.is_mock) {
+                <span class="badge badge--mock">synthetic test row</span>
+              }
+            </div>
+          </div>
+
+          <p class="alert-card__desc">{{ row.message }}</p>
+
+          <dl class="meta-grid">
+            <div>
+              <dt>Raised</dt>
+              <dd>{{ row.created_at | date: 'medium' }} (source: <code>{{ row.source }}</code>)</dd>
+            </div>
+
+            <div>
+              <dt>Canonical IP</dt>
+              <dd>
+                @if (row.ip_normalized; as ipNorm) {
+                  <code>{{ ipNorm }}</code>
+                } @else {
+                  not recorded
+                }
+              </dd>
+            </div>
+
+            <div>
+              <dt>Acknowledged</dt>
+              <dd>
+                @if (row.acknowledged_at; as ackAt) {
+                  {{ ackAt | date: 'medium' }}
+                } @else {
+                  not acknowledged
+                }
+              </dd>
+            </div>
+
+            <div>
+              <dt>Resolved</dt>
+              <dd>
+                @if (row.resolved_at; as resAt) {
+                  {{ resAt | date: 'medium' }}
+                  @if (row.resolution_notes; as notes) {
+                    — {{ notes }}
+                  }
+                } @else {
+                  unresolved
+                }
+              </dd>
+            </div>
+          </dl>
+
+          @if ((row.alert_data | jsonbEntries).length > 0) {
+            <div class="kv-list" aria-label="Alert evidence">
+              @for (entry of row.alert_data | jsonbEntries; track entry.key) {
+                <span>
+                  <strong>{{ entry.key }}:</strong> {{ entry.value }}
+                </span>
+              }
+            </div>
+          }
+        </article>
+      } @empty {
+        <p class="empty">
+          No security alerts matched the current filters (live rows only by default).
+        </p>
+      }
+    </div>
+  </mat-card-content>
+</mat-card>

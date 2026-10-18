@@ -62,6 +62,46 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/users/users-page/users-page').then((m) => m.UsersPage),
       },
+      {
+        path: 'admin/security-alerts',
+        title: 'Security alerts',
+        loadComponent: () =>
+          import('./features/security/security-alerts-page/security-alerts-page').then(
+            (m) => m.SecurityAlertsPage,
+          ),
+      },
+      {
+        path: 'admin/ip-reputation',
+        title: 'IP reputation',
+        loadComponent: () =>
+          import('./features/security/ip-reputation-page/ip-reputation-page').then(
+            (m) => m.IpReputationPage,
+          ),
+      },
+      {
+        path: 'admin/pattern-detection',
+        title: 'Pattern detection',
+        loadComponent: () =>
+          import('./features/security/pattern-detection-page/pattern-detection-page').then(
+            (m) => m.PatternDetectionPage,
+          ),
+      },
+      {
+        path: 'admin/login-monitoring',
+        title: 'Login monitoring',
+        loadComponent: () =>
+          import('./features/security/login-monitoring-page/login-monitoring-page').then(
+            (m) => m.LoginMonitoringPage,
+          ),
+      },
+      {
+        path: 'admin/login-attempts',
+        title: 'Login attempts',
+        loadComponent: () =>
+          import('./features/security/login-attempts-page/login-attempts-page').then(
+            (m) => m.LoginAttemptsPage,
+          ),
+      },
     ],
   },
   {

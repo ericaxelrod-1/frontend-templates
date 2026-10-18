@@ -1,0 +1,95 @@
+<mat-card class="page">
+  <mat-card-header>
+    <mat-card-title>IP reputation</mat-card-title>
+    <mat-card-subtitle>{{ summary() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <app-mock-filter-bar
+      [includeMock]="includeMock()"
+      (includeMockChange)="setIncludeMock($event)"
+    />
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading IP reputation" />
+    }
+
+    @if (failureReason(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+
+    <div class="table-scroll">
+      <table class="rep-table">
+        <thead>
+          <tr>
+            <th scope="col">Canonical address</th>
+            <th scope="col">Status</th>
+            <th scope="col">Reputation score</th>
+            <th scope="col">Failed attempts</th>
+            <th scope="col">Block state</th>
+            <th scope="col">Geo &amp; metadata</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.id) {
+            <tr>
+              <th scope="row">
+                <code>{{ row.ip_normalized }}</code>
+                @if (row.showRawIp) {
+                  <span class="sub">raw: <code>{{ row.ip }}</code></span>
+                }
+                @if (row.ip_subnet; as subnet) {
+                  <span class="sub">subnet: <code>{{ subnet }}</code></span>
+                }
+                @if (row.is_mock) {
+                  <span class="badge badge--mock">synthetic test row</span>
+                }
+              </th>
+              <td>
+                <span class="badge" [class.badge--bad]="row.status === 'bad'">
+                  {{ row.status | codeLabel: statusLabels }}
+                </span>
+              </td>
+              <td>
+                <strong>{{ row.reputation_score }}</strong> / 100
+                <span class="sub">
+                  {{ row.captcha_required_count }} captcha challenges
+                </span>
+              </td>
+              <td>
+                {{ row.failed_attempts }}
+                <span class="sub">updated {{ row.updated_at | date: 'mediumDate' }}</span>
+              </td>
+              <td>
+                @if (row.is_blocked) {
+                  <strong>Blocked</strong>
+                  @if (row.blocked_until; as until) {
+                    <span class="sub">until {{ until | date: 'medium' }}</span>
+                  } @else {
+                    <span class="sub">indefinite (no expiry set)</span>
+                  }
+                } @else {
+                  <span>Not blocked</span>
+                }
+              </td>
+              <td>
+                @for (entry of row.geo_location | jsonbEntries; track entry.key) {
+                  <span class="sub">{{ entry.key }}: {{ entry.value }}</span>
+                }
+                @for (entry of row.metadata | jsonbEntries; track entry.key) {
+                  <span class="sub">{{ entry.key }}: {{ entry.value }}</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td class="empty" colspan="6">
+                No IP reputation rows were returned (live rows only by default).
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </mat-card-content>
+</mat-card>
