@@ -511,6 +511,153 @@ base URL wired up yet (no environment file, no HTTP client), and when you add
 one keep it **relative**; an absolute `http://localhost:3000` baked into the
 bundle breaks every browser that is not the build machine.
 
+### Host header validation and proxy headers (`NG_ALLOWED_HOSTS`, `NG_TRUST_PROXY_HEADERS`)
+
+When you put the Angular SSR server behind a reverse proxy, visitor requests
+arrive carrying the public hostname — `app.example.com`. By default, the server
+refuses every such request with **HTTP 400 Bad Request** and an empty body:
+
+```
+ERROR: Bad Request ("https://app.example.com/").
+URL with hostname "app.example.com" is not allowed.
+```
+
+Developers never see this locally because `frontend/angular.json` sets:
+
+```json
+"security": {
+  "allowedHosts": ["localhost", "127.0.0.1"]
+}
+```
+
+Local requests arrive at `localhost` or `127.0.0.1`, which are on that compiled
+list. A public hostname is not.
+
+#### Why the allowlist exists (SSRF and DNS rebinding)
+
+The allowlist is not developer friction to be worked around: it is a core
+Server-Side Request Forgery (SSRF) and DNS-rebinding protection built into
+`@angular/ssr`. Because SSR executes on the server and renders markup or fetches
+assets in response to incoming request headers, accepting arbitrary `Host` or
+`X-Forwarded-Host` values lets an external attacker trick the server into
+accessing internal loopback services or injecting malicious origins into rendered
+content.
+
+Do not "fix" this by deleting the security block from `angular.json` or trying to
+disable host checks. The allowlist must stay; it simply needs to name the host the
+application is reached on.
+
+#### The two environment variables
+
+Both variables come from `@angular/ssr` and are confirmed in
+`node_modules/@angular/ssr`:
+
+- `NG_ALLOWED_HOSTS` — comma-separated list of permitted hostnames. Read by
+  `getAllowedHostsFromEnv()`.
+- `NG_TRUST_PROXY_HEADERS` — comma-separated list of proxy headers to trust (such
+  as `x-forwarded-proto,x-forwarded-host,x-forwarded-port`). Read by
+  `getTrustProxyHeadersFromEnv()`.
+
+In `frontend/src/server.ts`, the engine is instantiated with no options:
+
+```typescript
+const angularApp = new AngularNodeAppEngine();
+```
+
+With no options passed, `AngularNodeAppEngine` resolves `allowedHosts` as
+`options?.allowedHosts ?? getAllowedHostsFromEnv()` and `trustProxyHeaders` as
+`options?.trustProxyHeaders ?? getTrustProxyHeadersFromEnv()`. The environment
+variables are read automatically at startup. **No code change is needed in
+`server.ts`**, and you must not add one.
+
+#### Why `NG_TRUST_PROXY_HEADERS` is needed
+
+All three processes bind plain HTTP on loopback and expect a reverse proxy in
+front of them to terminate TLS. Without `NG_TRUST_PROXY_HEADERS`, the Angular
+server only sees the proxy's local HTTP connection and ignores
+`X-Forwarded-Proto`. It cannot tell that the client arrived over HTTPS rather
+than plain HTTP, which breaks anything in SSR that generates an absolute URL
+(producing `http://` links instead of `https://`).
+
+Setting `NG_TRUST_PROXY_HEADERS=x-forwarded-proto,x-forwarded-host,x-forwarded-port`
+enables `@angular/ssr` to reconstruct the true incoming protocol and port.
+
+#### Precedence: additive, and verified against the shipped source
+
+`NG_ALLOWED_HOSTS` **adds to** the compiled `angular.json` list; it does not
+replace it. From `@angular/ssr`'s `AngularAppEngine`:
+
+```js
+getAllowedHosts(options) {
+  const allowedHosts = new Set([...(options?.allowedHosts ?? []), ...this.manifest.allowedHosts]);
+  // ...
+  return allowedHosts;
+}
+```
+
+`options.allowedHosts` is what `NG_ALLOWED_HOSTS` populates, and
+`this.manifest.allowedHosts` is `["localhost", "127.0.0.1"]` compiled from
+`angular.json`. The result is a **union**, so with
+`NG_ALLOWED_HOSTS=app.example.com` the effective allowlist is all three:
+
+```
+Set(3) { 'app.example.com', 'localhost', '127.0.0.1' }
+```
+
+This is worth stating because the replacement behaviour is real but belongs to
+a different, **deprecated** engine: `CommonEngine` does
+`new Set(getAllowedHostsFromEnv() ?? this.options?.allowedHosts ?? [])`, which
+is a plain substitution. This template uses `AngularNodeAppEngine`, not
+`CommonEngine`, so that path is not the one in play. Anyone who reads the
+`CommonEngine` source and concludes the variable replaces the list is reading
+code this application never executes.
+
+Because the union holds, the production value needs to name only the production
+hostname — listing loopback again is harmless but redundant:
+
+```ini
+NG_ALLOWED_HOSTS=app.example.com
+NG_TRUST_PROXY_HEADERS=x-forwarded-proto,x-forwarded-host,x-forwarded-port
+```
+
+#### Where the variables must be written
+
+This is genuinely counter-intuitive and must be stated plainly:
+
+- The Angular SSR server has no `.env` loader of its own — Angular does not load
+  an environment file.
+- The stack launchers do: `backend/scripts/prod.mjs` (line 42) and
+  `backend/scripts/dev.mjs` (line 70) each call `process.loadEnvFile(...)`, and
+  then spawn the SSR server child with `ssrChildEnv(process.env, stackPorts)`
+  (preserving `process.env`).
+- Therefore, `NG_ALLOWED_HOSTS` and `NG_TRUST_PROXY_HEADERS` placed in
+  **`backend/.env.production`** (loaded by `prod.mjs`) reach the SSR server.
+
+This is a frontend concern living in the backend's environment file, and that is
+why: it is the only environment file the SSR process inherits. Do not invent a
+`frontend/.env` mechanism that does not exist.
+
+#### Why Nginx `Host` rewriting does not solve it
+
+By default, Nginx forwards the visitor's original `Host` header
+(`proxy_set_header Host $host;`), so the SSR server sees `app.example.com` and
+refuses with 400.
+
+The tempting workaround — rewriting `Host` to loopback before proxying:
+
+```nginx
+# DO NOT DO THIS
+proxy_set_header Host 127.0.0.1;
+```
+
+silently breaks every absolute URL the application generates. The password-reset
+and email-verification links are the concrete examples: an email would be sent
+containing a link like `http://127.0.0.1:4000/reset-password?token=...`, which
+cannot work off-box.
+
+The app must be told its real hostname via `NG_ALLOWED_HOSTS`, not tricked into
+believing it is loopback.
+
 ---
 
 ## Memory tuning (`--max-old-space-size`)
@@ -559,6 +706,8 @@ The full key set, and where the values come from:
 | `SECURITY_DELAY_CAP_SECONDS` | no (30) | Ceiling on any scheduled entry. |
 | `SECURITY_BLOCK_THRESHOLD` | no (5) | Failures before a refusal, before any credential check. |
 | `APP_BASE_URL` | **yes, in every mode** | The application's public origin. Every email template carries an absolute link, so there is no default to fall back to. Must be `https:` in production. |
+| `NG_ALLOWED_HOSTS` | **yes, in production** | Comma-separated allowed hostnames for Angular SSR (e.g. `localhost,127.0.0.1,app.example.com`). Configured in `backend/.env.production` (SSR inherits it via `prod.mjs`). Replaces the `angular.json` allowlist. |
+| `NG_TRUST_PROXY_HEADERS` | **yes, behind a reverse proxy** | Comma-separated proxy headers Angular SSR trusts (`x-forwarded-proto,x-forwarded-host,x-forwarded-port`). Configured in `backend/.env.production`. Allows SSR to detect HTTPS behind TLS termination. |
 | `EMAIL_HOST` `EMAIL_PORT` `EMAIL_USER` `EMAIL_PASSWORD` `EMAIL_FROM` | **yes, in production** | The SMTP submission endpoint. Required with no defaults and **not read at all** outside production, so no mode needs a credential it cannot use. |
 | `EMAIL_SECURE` | no (from the port) | Implicit TLS. Defaults to `true` on port 465, `false` otherwise (STARTTLS on 587). |
 | `APP_NAME` | no (the `APP_BASE_URL` hostname) | The product name used in message subjects. |
@@ -613,6 +762,10 @@ database file ever belongs in the repository.
       with any of them missing throws at bootstrap naming the key.
 - [ ] SPF, DKIM and DMARC published on the sending domain and verified with
       `dig` — see §Transactional email in production.
+- [ ] `NG_ALLOWED_HOSTS` and `NG_TRUST_PROXY_HEADERS` configured in
+      `backend/.env.production` naming `localhost,127.0.0.1` alongside the
+      production hostname, so Angular SSR accepts public traffic and detects TLS
+      from the reverse proxy.
 
 ---
 

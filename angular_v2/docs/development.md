@@ -205,6 +205,42 @@ developer intent was silently ignored. `angular_v2/` documents one canonical set
 short. A missing config value must stop the process, not produce a working app
 signed with a committed string.
 
+### `NG_ALLOWED_HOSTS` in development
+
+A development machine needs no `NG_ALLOWED_HOSTS`. `frontend/angular.json`
+already covers both names a developer uses:
+
+```json
+"security": {
+  "allowedHosts": ["localhost", "127.0.0.1"]
+}
+```
+
+Setting it is **harmless to loopback**, which is the question that comes up when
+someone copies a production `.env` into development. `@angular/ssr`'s
+`AngularAppEngine` unions the two rather than substituting:
+
+```js
+new Set([...(options?.allowedHosts ?? []), ...this.manifest.allowedHosts])
+```
+
+so `NG_ALLOWED_HOSTS=app.example.com` yields an allowlist of
+`app.example.com`, `localhost`, and `127.0.0.1` together, and
+`http://localhost:4000` keeps working.
+
+It is still worth *not* setting, for one reason: it is one more value that has to
+stay consistent between `backend/.env` and the hostname a developer is actually
+using, and nothing enforces it. A developer who sets it once and later renames
+their local host has a stale value that does nothing useful. Leaving it unset
+means `angular.json` is the single place that answers the question.
+
+This corrects a claim that was in an earlier draft of this document, and it is
+recorded here because the wrong version is the intuitive one: the **deprecated**
+`CommonEngine` really does substitute
+(`new Set(getAllowedHostsFromEnv() ?? this.options?.allowedHosts ?? [])`), so
+the replacement behaviour exists in `@angular/ssr` and is easy to find. This
+template does not use that engine.
+
 ---
 
 ## The verification gate
@@ -413,6 +449,8 @@ add CI on top; the template does not need any.
 | **`verify` fails at a frontend step with an Angular CLI version error, not a Node error** | **An unsupported Node, reported confusingly.** The frontend requires `^22.22.3 \|\| ^24.15.0 \|\| >=26` and `frontend/.npmrc` sets `engine-strict=true`. **Run `verify` from a login shell** — `bash -lc 'npm run verify'` — so nvm is sourced by `.bashrc`. A **non-login** shell does not read `.bashrc`, resolves to an older Node below the floor, and the failure surfaces as an Angular CLI version mismatch rather than "unsupported Node". Check with `bash -lc 'node --version'` before debugging anything else. |
 | `verify` fails at the smoke step | Postgres unreachable or migrations not applied. |
 | **`POST /auth/login` → HTTP 500**, `password authentication failed for user "pgrst_authenticator"`, after a green `verify` | **`AUTHENTICATOR_PASSWORD` diverged between `.env` and `.env.test`.** `ALTER ROLE … PASSWORD` is cluster-scoped, so the test-mode run left the cluster on `.env.test`'s value while `npm run dev` authenticates with `.env`'s. Re-sync with `cd backend && npm run db:seed`. See §`AUTHENTICATOR_PASSWORD` must agree. |
+| **`GET /` on `http://localhost:4000` → HTTP 400 Bad Request**, blank page (`URL with hostname "localhost" is not allowed`) | **The manifest does not contain `localhost`, which means `allowedHosts` is being overridden somewhere.** `frontend/angular.json` compiles `["localhost","127.0.0.1"]` into the SSR manifest, and `AngularNodeAppEngine` unions any `NG_ALLOWED_HOSTS` value *with* it rather than substituting for it — so neither the presence nor the absence of that variable can remove `localhost`. Find what is setting `allowedHosts` on the `AngularNodeAppEngine` constructor, or whether `angular.json` was edited and the app not rebuilt. |
+| **`GET /` on `http://192.168.x.x:4000` (or a machine hostname, or a hosts-file alias) → HTTP 400**, `URL with hostname "..." is not allowed` | **Expected, and not a bug.** `angular.json` allows only `localhost` and `127.0.0.1`, so any other name is refused. To browse the dev server from another machine, add the name to `security.allowedHosts` in `frontend/angular.json` and rebuild, or set `NG_ALLOWED_HOSTS=192.168.x.x` for the running process — which is additive, so it will not cost you loopback. See §`NG_ALLOWED_HOSTS` in development. |
 | Prerender throws `ReferenceError: localStorage` | A browser global on a server-executed path. Guard it or remove it. |
 | Frontend types out of sync | Run `npm run generate:client`. |
 | RLS test returns zero rows unexpectedly | Check identity and the policy's `USING` clause. Identity is the token's `sub` read through the claims setting — **not** `SET LOCAL app.user_id`, which no policy here reads, and not a `site_id` claim. Scope is `user_groups` membership joined to `org_closure`, so zero rows usually means no membership rows rather than a missing identity setting. |
