@@ -42,7 +42,30 @@ app.use((req, res, next) => {
 });
 
 if (isMainModule(import.meta.url) || process.env['pm_id']) {
-  const port = Number.parseInt(process.env['PORT'] ?? '4000', 10);
+  /**
+   * `SSR_PORT`, and never `PORT`.
+   *
+   * `PORT` is the thin Nest app's key and it arrives in this process by
+   * accident: `backend/scripts/dev.mjs` and `prod.mjs` load `backend/.env`, which
+   * sets `PORT=3000`, and used to hand the whole environment to this server
+   * unchanged — so both listeners inherited one key and competed for one port. The
+   * launchers now strip `PORT` from this child's environment and set `SSR_PORT`,
+   * so the two ports cannot move together (§2.4: one key, one concern).
+   *
+   * The value is validated rather than parsed-and-hoped, because
+   * `Number.parseInt('abc')` is `NaN` and `app.listen(NaN)` binds a port the
+   * kernel picks — the process reports "listening" on a number nobody configured
+   * and the readiness probe in the launcher waits out its 120 seconds for a
+   * listener that is not on the port either of them chose (§2.3).
+   */
+  const configuredPort = process.env['SSR_PORT'] ?? '4000';
+  const port = Number.parseInt(configuredPort, 10);
+  if (!/^\d+$/.test(configuredPort) || port < 1 || port > 65535) {
+    throw new Error(
+      `SSR_PORT must be an integer between 1 and 65535, received '${configuredPort}'. ` +
+        'It is this server\'s own key: the thin app listens on PORT, and the two must be set separately.',
+    );
+  }
   app.listen(port, '127.0.0.1', (error) => {
     if (error) {
       throw error;

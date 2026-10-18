@@ -1,18 +1,27 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { postgrestChildEnv } from './postgrest-connection.ts';
+import { resolveStackPorts, ssrChildEnv } from './stack-ports.ts';
 import { SMTP_SINK_LOOPBACK_ADDRESS, startSmtpSink } from './smtp-sink.ts';
 import { parseSmtpMessage } from './smtp-message.ts';
 
 /**
  * Development orchestrator (`npm run dev`). Boots the three processes the app
- * is made of — PostgREST (:3001), the thin Nest app (:3000), and the Angular
- * SSR server (:4000) — and drives them as one lifecycle: any child dying
- * takes the stack down, and shutdown (Ctrl+C, SIGTERM, a child crash) leaves
- * no orphans.
+ * is made of — PostgREST, the thin Nest app, and the Angular SSR server — and
+ * drives them as one lifecycle: any child dying takes the stack down, and
+ * shutdown (Ctrl+C, SIGTERM, a child crash) leaves no orphans.
+ *
+ * **The ports are configuration, and this command reads them rather than
+ * assuming them.** `PORT` and `SSR_PORT` come from the env file loaded below and
+ * the PostgREST port from `server-port` in `postgrest.conf`, all through
+ * `scripts/stack-ports.ts`, which refuses anything unusable before a child is
+ * spawned. The readiness probes and the banner below are built from that
+ * resolution; there is no port literal left in this file. Two ports configured to
+ * the same number is refused by name, because the alternative was a child dying
+ * of `EADDRINUSE` and a shutdown message that named neither key.
  *
  * **The local SMTP sink is not a fourth process.** It is hosted here, in this
  * process, by `startSmtpSink` from `scripts/smtp-sink.ts` — the same
@@ -76,6 +85,30 @@ for (const name of ['.env', '.env.development']) {
 let postgrestEnv;
 try {
   postgrestEnv = postgrestChildEnv(process.env);
+} catch (error) {
+  console.error(`[dev] ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+
+/**
+ * The three ports, resolved from the configuration this command already has, for
+ * the same reason and with the same bargain: a probe aimed at a port nobody
+ * configured is not a failed readiness check, it is a 120-second wait followed by
+ * a shutdown whose message names the probe instead of the value that was wrong.
+ *
+ * Nothing below this point carries a port literal. The probes, the banner and the
+ * SSR child's environment all read `stackPorts`, which is the resolution of
+ * `PORT` and `SSR_PORT` from the env file loaded above against `server-port` in
+ * `postgrest.conf`. `test/unit/stack-ports.spec.ts` fails if a literal comes back.
+ */
+const postgrestConfPath = join(repositoryRoot, 'postgrest.conf');
+
+let stackPorts;
+try {
+  stackPorts = resolveStackPorts({
+    env: process.env,
+    postgrestConf: readFileSync(postgrestConfPath, 'utf8'),
+  });
 } catch (error) {
   console.error(`[dev] ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
@@ -283,18 +316,21 @@ if (!existsSync(ssrBundle)) {
   }
 }
 
-start('postgrest', 'postgrest', [join(repositoryRoot, 'postgrest.conf')], {
+start('postgrest', 'postgrest', [postgrestConfPath], {
   cwd: repositoryRoot,
   env: postgrestEnv,
 });
 start('api', 'npm', ['run', 'start:dev'], { cwd: backendRoot, env: { ...process.env, NODE_ENV: 'development' } });
-start('ssr', 'npm', ['run', 'serve:ssr:frontend'], { cwd: frontendRoot, env: { ...process.env } });
+// Not `{ ...process.env }`: the SSR server is given the stack's resolved ports
+// and loses the backend's `PORT`, which is the collision that let one key move two
+// listeners. See `ssrChildEnv`.
+start('ssr', 'npm', ['run', 'serve:ssr:frontend'], { cwd: frontendRoot, env: ssrChildEnv(process.env, stackPorts) });
 
 try {
   await waitForTcp(sink.port, 'the local SMTP sink');
-  await waitFor('http://127.0.0.1:3001/', 'postgrest', children.get('postgrest'));
-  await waitFor('http://127.0.0.1:3000/', 'api', children.get('api'));
-  await waitFor('http://127.0.0.1:4000/', 'ssr', children.get('ssr'));
+  await waitFor(`${stackPorts.postgrestOrigin}/`, 'postgrest', children.get('postgrest'));
+  await waitFor(`${stackPorts.apiOrigin}/`, 'api', children.get('api'));
+  await waitFor(`${stackPorts.ssrOrigin}/`, 'ssr', children.get('ssr'));
 } catch (error) {
   console.error(`[dev] readiness check failed: ${error instanceof Error ? error.message : String(error)}`);
   await shutdown(1);
@@ -307,8 +343,8 @@ sinkReport.unref();
 
 console.log(`
 [dev] stack ready:
-  [postgrest] http://127.0.0.1:3001
-  [api]       http://localhost:3000
-  [ssr]       http://localhost:4000
+  [postgrest] ${stackPorts.postgrestOrigin}
+  [api]       ${stackPorts.apiOrigin}
+  [ssr]       ${stackPorts.ssrOrigin}
   [smtp-sink] ${sink.host}:${sink.port} (relay is not a real relay — this listener stores and never sends onward)
 `);

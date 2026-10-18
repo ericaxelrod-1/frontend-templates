@@ -13,21 +13,42 @@ Conventions the fork inherits are in [`AGENTS.md`](../AGENTS.md).
 
 ## What you are actually deploying
 
-Three processes, and knowing which is which is most of the deployment work:
+Three processes, and knowing which is which is most of the deployment work. The
+ports are the defaults; §Ports below is how to move them.
 
 | Process | Port | Role |
 |---|---|---|
 | **PostgREST** | `127.0.0.1:3001` | The API layer. Serves the base tables directly from PostgreSQL and enforces row-level security. Every CRUD request goes here, not through Nest. |
-| **Thin Nest app** | `0.0.0.0:3000` | Only what PostgREST cannot do: JWT issuance, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, brute-force delay. Default deny — every other route needs a token. |
-| **Angular SSR server** | `:4000` | Serves the app. Reads `PORT`, defaults to 4000. |
+| **Thin Nest app** | `127.0.0.1:3000` | Only what PostgREST cannot do: JWT issuance, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, brute-force delay. Default deny — every other route needs a token. |
+| **Angular SSR server** | `127.0.0.1:4000` | Serves the app. Reads `SSR_PORT`, defaults to 4000. |
 
 Both PostgREST and the thin app verify the **same** JWT secret, and the thin
 app refuses to boot if `PGRST_JWT_SECRET` and `JWT_SECRET` differ.
 
-**Ports are not a deployment decision to make later.** `server-port = 3001` and
-`server-host = "127.0.0.1"` are in [`postgrest.conf`](../postgrest.conf); the
-SSR port comes from `PORT`; `PORT=3000` for the thin app. Reverse-proxy onto
-them.
+## Ports
+
+Ports are configuration, and all three are moved by editing two files.
+
+| Port | Where it is configured | Default |
+|---|---|---|
+| PostgREST | `server-port` in [`postgrest.conf`](../postgrest.conf) | 3001 |
+| Thin Nest app | `PORT` in the backend env file (`.env` / `.env.production`) | 3000 |
+| Angular SSR server | `SSR_PORT` in the same env file | 4000 |
+
+`npm run dev` and `npm run prod` resolve all three through
+`backend/scripts/stack-ports.ts` before spawning anything, and **refuse to start
+if any of them is unusable**, naming the keys — a value that is not a port, two
+listeners on one port, or a `POSTGREST_URL` that does not name the port
+`postgrest.conf` binds. That last one matters: the thin app calls PostgREST on
+`POSTGREST_URL`, so moving PostgREST without moving that URL used to produce a
+stack that reported itself ready and then failed every account-scoped request.
+
+To move the whole stack, in `postgrest.conf` change `server-port`, and in the
+env file change `POSTGREST_URL` to the same port, plus `PORT` and `SSR_PORT` as
+wanted. Nothing else — the launchers pass the resolved origins to the SSR
+server's proxy, so no rebuild is needed. `server-host` and the two loopback bind
+addresses are **not** configuration and stay as they are; the reverse proxy in
+front of the stack is what is reachable from elsewhere.
 
 ---
 
@@ -411,8 +432,11 @@ Both static options below depend on that file.
 cd frontend && npm run serve:ssr:frontend    # node dist/frontend/server/server.mjs
 ```
 
-`PORT` selects the port, 4000 by default; `npm run prod` sets `PORT=4000` for
-that child explicitly. The same server serves `dist/frontend/browser/` as static
+`SSR_PORT` selects the port, 4000 by default; `npm run prod` sets it in that
+child's environment explicitly, from the same resolution the launcher uses for
+its readiness probes. **Not** `PORT`: that key belongs to the thin app, and the
+launcher strips it from this child's environment so one key cannot move two
+listeners. The same server serves `dist/frontend/browser/` as static
 assets, so you do not need Nginx to serve hashed bundles itself.
 
 Pick this when the app is the product, which is the case here: every row a user
@@ -524,7 +548,9 @@ The full key set, and where the values come from:
 | — | — | **There is no `PGRST_DB_URI`.** PostgREST's connection is composed by `scripts/dev.mjs` / `scripts/prod.mjs` from `DB_HOST`, `DB_PORT`, `DB_NAME` and `AUTHENTICATOR_PASSWORD`, always as `pgrst_authenticator`. A committed file must not carry a credential, and two copies of one password drift apart; the earlier hand-written key pointed at the owner role, which owns every table — exempt from its own RLS, silently — and cannot `SET ROLE` at all, so every request failed with `42501 permission denied to set role "app_anon"` while `GET /` still answered 200. |
 | `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | **yes** | The thin app's and the migration runner's connection, as the owner role. No defaults: a guess writes into whatever database answers. `DB_HOST`, `DB_PORT` and `DB_NAME` are also half of PostgREST's composed URI; `DB_USER`/`DB_PASSWORD` are deliberately **not**. |
 | `AUTHENTICATOR_PASSWORD` | **yes** | `pgrst_authenticator`'s `LOGIN` password — used by the login path **and** by PostgREST, which is why it is the single source for both. Must match what was set out of band. |
-| `PORT` | no (3000) | Thin app listen port. The SSR server reads the same variable, defaulting to 4000. |
+| `PORT` | no (3000) | Thin app listen port. **This key is the thin app's only** — the SSR server reads `SSR_PORT`. |
+| `SSR_PORT` | no (4000) | Angular SSR server listen port. `npm run dev` / `npm run prod` set it in that child's environment from their own resolution. |
+| — | — | **The PostgREST port is not an env key.** It is `server-port` in `postgrest.conf`, and the launchers refuse to start when it disagrees with `POSTGREST_URL`. |
 | `JWT_ACCESS_TOKEN_TTL_SECONDS` | no (900) | Access token lifetime. |
 | `JWT_REFRESH_TOKEN_TTL_SECONDS` | no (2592000) | Refresh token lifetime, 30 days. |
 | `SECURITY_IP_ALLOWLIST` | no (empty) | Comma-separated addresses, normalised before comparison. |

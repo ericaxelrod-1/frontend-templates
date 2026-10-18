@@ -18,14 +18,17 @@ import type { Express, Request, Response } from 'express';
  *
  * ## Configuration
  *
- * `API_ORIGIN` and `POSTGREST_ORIGIN` override the targets. The defaults are the
- * loopback ports this repository's own development stack uses — `PORT=3000` and
- * `POSTGREST_URL=http://127.0.0.1:3001` in `backend/.env.development.example` —
- * and `backend/scripts/dev.mjs` forwards the backend's environment to this
- * process, so pointing the pair at a different deployment is two variables and no
- * rebuild. Neither value is a credential and neither is security-critical
- * configuration, which is why these are the only defaulted values in the
- * frontend; nothing secret is defaulted anywhere.
+ * `API_ORIGIN` and `POSTGREST_ORIGIN` name the two upstreams. The values below
+ * are the fallback for running this server on its own; `backend/scripts/dev.mjs`
+ * and `prod.mjs` set both from the stack they start, so the three ports of a
+ * running stack are decided in one place and no rebuild is needed to move them.
+ * The fallback is this repository's own development stack — `PORT=3000` and
+ * `POSTGREST_URL=http://127.0.0.1:3001` in `backend/.env.development.example`
+ * and `server-port = 3001` in `postgrest.conf` — which is why the two numbers
+ * here are held to those files by `backend/test/unit/stack-ports.spec.ts`
+ * instead of being left to drift. Neither value is a credential and neither is
+ * security-critical configuration, which is why these are the only defaulted
+ * values in the frontend; nothing secret is defaulted anywhere.
  */
 
 /** Headers that describe the hop, not the payload. Forwarding them corrupts both. */

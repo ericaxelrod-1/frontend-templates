@@ -96,15 +96,25 @@ One command once the above is done — from the repo root, or from `backend/`:
 npm run dev
 ```
 
-`npm run dev` boots the whole stack: PostgREST on `http://127.0.0.1:3001`, the
-thin app on `http://localhost:3000`, and the Angular SSR server on
-`http://localhost:4000`. It runs the frontend build once if
+`npm run dev` boots the whole stack: PostgREST, the thin app, and the Angular SSR
+server — by default `http://127.0.0.1:3001`, `http://127.0.0.1:3000` and
+`http://127.0.0.1:4000`, but the banner prints whatever was actually configured.
+It runs the frontend build once if
 `frontend/dist/frontend/server/server.mjs` is missing, waits for each process
 to answer its port, prints a readiness banner, and on Ctrl+C (or if any child
 dies) shuts the rest down — no orphans. A PostgREST boot failure surfaces here,
 not in a silently dead API. To iterate on SSR alone, `cd frontend &&
 npm run dev`; to run everything against production config, build both projects
 (`npm run build` in `backend/` and `frontend/`) and then `npm run prod`.
+
+**The ports are configuration, and they are resolved once, before anything is
+spawned.** `PORT` (thin app) and `SSR_PORT` (SSR server) come from the env file
+above; the PostgREST port comes from `server-port` in `postgrest.conf`.
+`backend/scripts/stack-ports.ts` resolves the three, refuses anything unusable
+naming the keys, and hands the SSR child its own `SSR_PORT` — so the SSR server
+no longer reads the thin app's `PORT`, which is how one key used to move two
+listeners into one `EADDRINUSE`. Move the ports by editing those two files; see
+[`deployment-guide.md` §Ports](./deployment-guide.md#ports).
 
 `npm run prod` requires `backend/.env.production` (copy
 `backend/.env.production.example` and fill in real secrets) and existing build
@@ -144,8 +154,10 @@ DB_USER=app
 DB_PASSWORD=app
 DB_NAME=app_dev
 
-# Optional
+# Optional. Two separate keys for two separate listeners, so moving one never
+# moves the other (the SSR server used to read this one too).
 PORT=3000
+SSR_PORT=4000
 
 # Required. The login password of `pgrst_authenticator` — the role BOTH
 # the thin app's login path and PostgREST connect as

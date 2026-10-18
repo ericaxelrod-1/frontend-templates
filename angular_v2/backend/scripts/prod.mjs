@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { postgrestChildEnv } from './postgrest-connection.ts';
+import { resolveStackPorts, ssrChildEnv } from './stack-ports.ts';
 
 /**
  * Production orchestrator (`npm run prod`). Same lifecycle discipline as
@@ -19,6 +20,10 @@ import { postgrestChildEnv } from './postgrest-connection.ts';
  * one: that role is a member of exactly the three serving roles, and logging in
  * as anything else is either a dead data layer (`permission denied to set role`)
  * or a silent RLS bypass (the table owner). One mechanism, both orchestrators.
+ *
+ * The three ports come from `scripts/stack-ports.ts` — the same module
+ * development uses, so a port that works under `npm run dev` and not under
+ * `npm run prod` is not a thing that can be configured into existence.
  */
 
 const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -45,6 +50,28 @@ process.loadEnvFile(productionEnvFile);
 let postgrestEnv;
 try {
   postgrestEnv = postgrestChildEnv(process.env);
+} catch (error) {
+  console.error(`[prod] ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+
+/**
+ * The three ports, from the same module `dev.mjs` uses and for the same reason:
+ * a probe pointed at a port nobody configured is a 120-second wait and a
+ * shutdown, not a diagnosis. `PORT` and `SSR_PORT` come from the
+ * `.env.production` loaded above, the PostgREST port from `server-port` in
+ * `postgrest.conf`, and a value that is not a port — or two values on one port —
+ * stops the command here, naming the keys, rather than after a build and three
+ * spawns.
+ */
+const postgrestConfPath = join(repositoryRoot, 'postgrest.conf');
+
+let stackPorts;
+try {
+  stackPorts = resolveStackPorts({
+    env: process.env,
+    postgrestConf: readFileSync(postgrestConfPath, 'utf8'),
+  });
 } catch (error) {
   console.error(`[prod] ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
@@ -173,17 +200,17 @@ async function waitFor(url, name, child) {
   throw new Error(`${name} did not answer ${url} within 120 s`);
 }
 
-start('postgrest', 'postgrest', [join(repositoryRoot, 'postgrest.conf')], {
+start('postgrest', 'postgrest', [postgrestConfPath], {
   cwd: repositoryRoot,
   env: postgrestEnv,
 });
 start('api', 'npm', ['run', 'start:prod'], { cwd: backendRoot, env: { ...process.env, NODE_ENV: 'production' } });
-start('ssr', 'npm', ['run', 'serve:ssr:frontend'], { cwd: frontendRoot, env: { ...process.env } });
+start('ssr', 'npm', ['run', 'serve:ssr:frontend'], { cwd: frontendRoot, env: ssrChildEnv(process.env, stackPorts) });
 
 try {
-  await waitFor('http://127.0.0.1:3001/', 'postgrest', children.get('postgrest'));
-  await waitFor('http://127.0.0.1:3000/', 'api', children.get('api'));
-  await waitFor('http://127.0.0.1:4000/', 'ssr', children.get('ssr'));
+  await waitFor(`${stackPorts.postgrestOrigin}/`, 'postgrest', children.get('postgrest'));
+  await waitFor(`${stackPorts.apiOrigin}/`, 'api', children.get('api'));
+  await waitFor(`${stackPorts.ssrOrigin}/`, 'ssr', children.get('ssr'));
 } catch (error) {
   console.error(`[prod] readiness check failed: ${error instanceof Error ? error.message : String(error)}`);
   await shutdown(1);
@@ -191,7 +218,7 @@ try {
 
 console.log(`
 [prod] stack ready:
-  [postgrest] http://127.0.0.1:3001
-  [api]       http://localhost:3000
-  [ssr]       http://localhost:4000
+  [postgrest] ${stackPorts.postgrestOrigin}
+  [api]       ${stackPorts.apiOrigin}
+  [ssr]       ${stackPorts.ssrOrigin}
 `);
