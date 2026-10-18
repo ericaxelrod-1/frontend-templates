@@ -122,13 +122,21 @@ backend/
 │   │   ├── breaker-state.ts   the state machine, pure
 │   │   ├── breaker.interceptor.ts  the APP_INTERCEPTOR: GATE for thin-app routes
 │   │   └── dispatch-token.ts  service.method, the one vocabulary §9B.1 shares
-│   └── purge/             retention — see docs/rebase.md §9A
-│       ├── purge-sweeper.service.ts  purge.sweeper — claims, deletes, marks done
-│       ├── purge-enqueuer.service.ts  the producer; scans tombstones hourly
-│       ├── purge-claim.ts           the four SQL statements, one text per operation
-│       ├── purge-enqueue.ts         the scan's two statements, one text each
-│       ├── retention-environment.ts  the window, required, no default
-│       └── purge-executor.ts        the closed reason dispatch; the one executor
+│   ├── privacy/           self-service erasure and compliance audit
+│   │   ├── erasure.service.ts      erasure — anonymises user, revokes sessions, records audit
+│   │   ├── privacy.controller.ts   POST /privacy/erase-me
+│   │   └── erasure-environment.ts  pepper and tombstone domain, validated at boot
+│   ├── purge/             retention — see docs/rebase.md §9A
+│   │   ├── purge-sweeper.service.ts  purge.sweeper — claims, deletes, marks done
+│   │   ├── purge-enqueuer.service.ts  the producer; scans tombstones hourly
+│   │   ├── purge-claim.ts           the four SQL statements, one text per operation
+│   │   ├── purge-enqueue.ts         the scan's two statements, one text each
+│   │   ├── retention-environment.ts  the window, required, no default
+│   │   └── purge-executor.ts        the closed reason dispatch; the one executor
+│   └── scheduler/         scheduled job execution under Postgres advisory locks
+│       ├── advisory-lock-key.ts     the 2-argument SHA-256 derivation (SCHD classid)
+│       ├── job-runner.service.ts    JobRunner — exclusive execution under dedicated client lock
+│       └── scheduler.module.ts      ScheduleModule.forRoot() and exports JobRunner
 ├── database/
 │   ├── migrations/        ONE directory, ONE table, plain SQL
 │   ├── bootstrap/         role creation, once, as a superuser
@@ -138,8 +146,10 @@ backend/
 ```
 
 Later W11 slices add `security/` (rate limiting, IP reputation, pattern
-detection, cron) and `captcha/` (the previous self-rolled challenge, which was
+detection) and `captcha/` (the previous self-rolled challenge, which was
 correct and is kept). They are named here so the shape is predictable.
+Scheduled jobs are not cron and not deferred: they run through `src/scheduler/`
+via `@nestjs/schedule` intervals guarded by Postgres advisory locks.
 
 **The storage arrived before the modules, and that is worth being precise
 about.** `0022_security_telemetry.sql` creates `ip_reputation`,
@@ -165,26 +175,32 @@ distinction is recorded in the deployment guide's gap ledger and enforced by
 `backend/test/unit/docs/deployment-gaps.spec.ts`, so this paragraph cannot go
 stale the way the version above it did.
 
-**There is no `src/privacy/`, and that is the design rather than a gap.** The
-privacy/DSAR feature (`docs/rebase.md` §9, ADR-0029, ADR-0030) is **migrations and
-two jobs**: `0009`–`0016` create `privacy_requests`,
-`privacy_request_regulations`, `privacy_request_audits`, `privacy_purge_queue`, the
-`users` anonymisation and geo columns, the company profile, and the RLS policies and
-grants that carry them. Every table is CRUD over rows, so PostgREST serves it and
-PostgREST is the API layer (§B1/ADR-0004).
+**`src/privacy/` and `src/purge/` separate account erasure from retention
+enforcement.** The privacy and retention features (`docs/rebase.md` §9, ADR-0029,
+ADR-0030, ADR-0031, ADR-0033) combine migrations, application endpoints, and
+background jobs:
 
-**Which of them has an application path is now a mixed answer, and it is worth
-getting right rather than rounding down.** Three tables are written **only** by
-migrations and fixtures — there is no erasure route and no cancel route, so
-nothing in `src/` writes `privacy_request_audits` or `privacy_requests`, and
-neither exists (`docs/rebase.md` §9.8.4, W42/W44). **`privacy_purge_queue` does
-have two application paths**: `PurgeEnqueuer` fills it (hourly, through
-`authz.enqueue_inactive_purges`, `0016`) and `PurgeSweeper` drains it. That is the
-whole of what justifies `src/purge/`, and it is why the retention part of this
-feature is application code while the DSAR part is not. **`src/breaker/`** exists
-for the third reason — a measurement and a decision, neither of which is CRUD.
-ADR-0031 records how the machine reaches the queue without setting
-`request.jwt.claims`.
+- **Self-service erasure lives in `src/privacy/`.** `PrivacyController` exposes
+  `POST /privacy/erase-me` (`JwtAuthGuard`), delegating to `ErasureService`.
+  Erasure anonymises the subject in `users`, neutralises usernames in
+  `login_attempts`, revokes active `refresh_tokens`, and appends statutory compliance
+  records to `privacy_request_audits` via `authz.record_erasure_audit`. There is no
+  arbitrary admin cancel or DSAR request workflow route; `privacy_requests` remains
+  table-driven.
+- **Retention scanning and queue draining live in `src/purge/`.** `PurgeEnqueuer`
+  scans for due tombstones and dormant accounts hourly, enqueuing them via
+  `authz.enqueue_inactive_purges`, while `PurgeSweeper` claims and executes due
+  purges in single atomic transactions. Previously, the sweep was configured,
+  asserted on, and never executed. It is now executed by `JobRunner` in
+  `src/scheduler/`.
+- **Scheduled execution lives in `src/scheduler/`.** Background jobs do not use
+  cron or config flags. `JobRunner` registers `@nestjs/schedule` intervals and runs
+  each tick inside a session-scoped PostgreSQL advisory lock (`pg_try_advisory_lock`)
+  on a dedicated `pg.Client`. ADR-0033 records the single-box mechanism, the
+  connection lifecycle, and the idempotency requirement.
+- **`src/breaker/`** guards stoppable background execution against memory pressure
+  (ADR-0027). ADR-0031 records how the machine reaches the queue without setting
+  `request.jwt.claims`.
 
 **TypeORM, Passport and `@nestjs/swagger` are not dependencies.** That removes
 `entityManager.query()` and `createQueryBuilder()` from application code

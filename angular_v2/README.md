@@ -4,8 +4,9 @@
 forked and built upon.
 
 PostgREST is the API layer, sitting on PostgreSQL. A thin NestJS app beside it
-handles what PostgREST cannot: JWT issuance, login, email, CAPTCHA, rate limiting
-and scheduled jobs.
+handles what PostgREST cannot: JWT issuance, session management, transactional
+email, self-service privacy erasure, and scheduled retention jobs under Postgres
+advisory locks.
 
 This is the rebuild of `../angular`. The old tree is left untouched as a reference
 and rollback point. What changed and why is in
@@ -17,14 +18,15 @@ and rollback point. What changed and why is in
 ## What this is
 
 A starting point for a web application: authentication, roles and permissions,
-group membership, data scoping, email, and an Angular SSR frontend — with **zero
+group membership, data scoping, email, self-service privacy erasure, scheduled
+retention purge under advisory locks, and an Angular SSR frontend — with **zero
 third-party accounts or API keys**. Every feature works on a fresh clone.
 
 ## What makes it different
 
 | | |
 |---|---|
-| **No accounts to create** | Self-hosted everything. CAPTCHA, email and geo-IP are all local-first. |
+| **No accounts to create** | Self-hosted everything. Email with local SMTP sink, privacy erasure, and database-backed services are local-first. |
 | **Enforced, not documented** | Every convention in `AGENTS.md` has an ESLint rule. Rules before refactors. |
 | **Generated contract** | DTOs → OpenAPI → typed Angular client. Drift is a compile error. |
 | **Enforcement in the database** | Row-level security via `CREATE POLICY`, keyed on group membership. A forgotten decorator cannot bypass it. |
@@ -209,7 +211,7 @@ angular_v2/
 ├── GEMINI.md            imports AGENTS.md
 ├── openapi.json         generated contract, committed
 ├── postgrest.conf       PostgREST configuration, committed, secret-free
-├── backend/             thin NestJS app — JWT issuance and workflows
+├── backend/             thin NestJS app — JWT issuance, email, privacy, scheduler
 │   ├── src/             main.ts · app.module.ts · config/
 │   ├── test/            unit · e2e · smoke
 │   └── .env.example

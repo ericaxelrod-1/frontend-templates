@@ -43,6 +43,7 @@ Status key: **Accepted** — settled, to be implemented as written.
 | [0030](#adr-0030) | **`privacy_request_audits` carries no FK to `users`**, and append-only is enforced by the absence of grants | Accepted (shipped; the subject half of the append gate corrected by `0014`) |
 | [0031](#adr-0031) | **The retention machine reaches `privacy_purge_queue` through narrowly-granted `SECURITY DEFINER` functions in `authz`** — never `request.jwt.claims`, never a `current_user` branch on the policy | Accepted (shipped in `0016`) |
 | [0032](#adr-0032) | **`email_messages` is cascade-deleted with its subject**, and the 24-month obligation keeps its home in `privacy_request_audits` | Accepted (shipped in `0015`) |
+| [0033](#adr-0033) | **Scheduled jobs run through Postgres advisory locks on dedicated connections** — single-instance guarantee, no configuration flag, dedicated connection lifecycle, idempotent bodies | Accepted (shipped) |
 
 ---
 
@@ -3805,3 +3806,63 @@ outcome the whole module exists to prevent.
   added later as `NO ACTION` fails the gate rather than waiting to be discovered by
   the next real erasure. That gate is the difference between fixing this instance
   and fixing the family.
+
+---
+
+<a id="adr-0033"></a>
+## ADR-0033: Scheduled jobs run through Postgres advisory locks on dedicated connections
+
+**Status:** Accepted, and **shipped** — `backend/src/scheduler/{advisory-lock-key.ts,job-runner.service.ts,scheduler.module.ts}`, proven in `backend/test/unit/scheduler/job-runner.spec.ts` and `backend/test/unit/scheduler/advisory-lock-key.spec.ts`.
+
+**Context.** `angular_v2` requires background jobs: `purge.sweeper` drains the privacy purge queue, `purge.enqueuer` scans tombstones and dormant accounts hourly, and future units add notification materializers. The previous tree state had configured and asserted on the retention sweep, but never actually executed it — there was no runner driving the registered intervals.
+
+In a single-box deployment running multiple processes (or any deployment scaled across multiple instances behind a reverse proxy), uncoordinated execution is disastrous: two sweepers racing for queue rows recreate the concurrency hazards of the legacy tree, two enqueuers run duplicate batch scans, and overlapping executions exhaust connection and memory limits.
+
+### The single-box decision and database-level coordination
+
+The architecture deliberately avoids adding external distributed coordination components — no Redis lock, no Celery/RabbitMQ worker queue, no ZooKeeper, and no Kubernetes CronJob dependencies.
+
+The single authority that the entire stack already shares is **PostgreSQL**. Coordination is pushed into the database itself, ensuring that whether one process, two processes, or ten instances are booted, exactly one instance executes any given job at any given tick.
+
+### The advisory-lock mechanism (`pg_try_advisory_lock`)
+
+Job exclusivity is enforced via PostgreSQL session-scoped advisory locks using the two-argument form `pg_try_advisory_lock(classid, objid)`:
+
+- **`classid` (`SCHEDULER_LOCK_NAMESPACE = 0x5343_4844`):** ASCII `SCHD` read big-endian. This is a constant forever. It claims one entire 32-bit half of the 64-bit lock namespace for this application's scheduler. Any other advisory lock user on the cluster (such as a migration or backup script) picks its own `classid`, guaranteeing zero collisions. It is never configurable and never derived.
+- **`objid` (`schedulerLockKeyFor(jobName)`):** Derived deterministically as the first 4 bytes (read big-endian as a signed 32-bit integer) of `sha256('angular_v2.scheduler.job:' + jobName)`. Derivation from the dispatch token (`purge.sweeper`, `purge.enqueuer`) eliminates manual lock constant maintenance and ensures key consistency across processes and restarts. `backend/test/unit/scheduler/advisory-lock-key.spec.ts` asserts that no two shipped jobs collide.
+- **Non-blocking try (`pg_try_advisory_lock`):** The statement returns a boolean immediately. If another instance holds the lock, the runner skips execution and returns `{ ran: false, skipReason }` with a structured log warning. Competing instances do not block, queue, or throw.
+- **Release in `finally`:** The lock is explicitly released with `pg_advisory_unlock` in a `finally` block on every execution path, including when the body throws an error.
+
+### Why not a configuration flag (`SCHEDULER_ENABLED`)
+
+A configuration flag was rejected because it introduces silent failure modes:
+
+- An operator or developer disables the flag to test something, checks it in or deploys it, and forgets. A retention sweep that has silently stopped is far worse than a service that is visibly down.
+- In multi-instance deployments, a flag creates deployment coupling: instances must disagree about configuration (only one set to `true`), requiring specialized deployment roles.
+- The advisory lock is **self-enforcing**: all instances run identical code and identical configurations. If instance A dies or is taken down for deployment, instance B automatically acquires the lock on the next scheduled tick without manual intervention.
+
+### Why a dedicated connection (`pg.Client`) rather than PostgREST or the shared pool
+
+PostgreSQL advisory locks are **session-scoped**, which dictates the connection lifecycle:
+
+- **Not PostgREST:** PostgREST is an external HTTP API that manages its own internal pool. It closes transactions and cycles connections at HTTP request boundaries. An advisory lock acquired through PostgREST would be released within microseconds when the request ends, completely defeating mutual exclusion. PostgREST has no session-pinning mechanism.
+- **Not the shared pool (`SharedDatabasePool`):** Borrowing a `PoolClient` from `SharedDatabasePool` and returning it via `release()` leaves the underlying session and its advisory lock intact in the pool. The lock would outlive the job and block subsequent runs until the idle connection timeout eventually recycles the socket.
+- **Dedicated `pg.Client` per run:** `JobRunner.runExclusive` connects a dedicated `Client` for the duration of the execution, holds it exclusively while the job body runs, releases the lock, and closes the connection (`client.end()`) in a `finally` block.
+- **Crash safety:** Because advisory locks are session-scoped, if a node crashes, encounters an OOM, or receives a `SIGKILL`, the TCP socket is closed and PostgreSQL automatically releases the lock immediately. There are no lease timeouts, no `locked_at` columns, and no reaper processes needed to recover from dead instances.
+
+### The idempotency constraint on job bodies
+
+`JobRunner` deliberately maintains **no persistent ledger table** recording completed runs:
+
+- A database bookkeeping table (e.g. `job_runs`) would introduce a second mechanism for determining whether a job is running, which can drift and disagree with the lock after an ungraceful crash (row says `running`, lock says free).
+- Consequently, **every scheduled job body must be strictly idempotent**: a run terminated mid-body will be re-executed from the start by the next process that acquires the lock.
+- Writes must use idempotent operations (`INSERT … ON CONFLICT DO NOTHING`, idempotent `DELETE … WHERE`, or unique constraints).
+- `PurgeSweeper` satisfies this because claim, delete, and completion occur within a single transaction; an aborted execution unwinds completely, leaving the queue row `pending`.
+- Materializers must use cursor watermarks with overlap windows rather than raw timestamps to survive downtime without skipping backdated records.
+
+### Consequences
+
+- **Documentation integrity:** There is no `job_runs` table in the database and no schema migration was required for this unit.
+- **Resource budget:** Exactly one dedicated connection is held per active running job, bounded by the small number of scheduled jobs and charged against PostgreSQL's connection ceiling only while actively running.
+- **Clean teardown:** Intervals are `unref()`'d so the scheduler does not prevent process exit, and `JobRunner.onModuleDestroy()` clears all intervals upon shutdown.
+
