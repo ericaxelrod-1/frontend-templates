@@ -1,0 +1,53 @@
+<main class="page">
+  <mat-card class="card">
+    <mat-card-header>
+      <mat-card-title>Confirm email change</mat-card-title>
+      <mat-card-subtitle>Updating your account email address</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      @switch (state()) {
+        @case ('verifying') {
+          <p class="notice" role="status">Confirming your new email address…</p>
+        }
+        @case ('ssr_rendering') {
+          <p class="notice" role="status">Confirming your new email address…</p>
+        }
+        @case ('confirmed') {
+          <p class="notice notice--success" role="status">
+            Your email address has been updated.
+          </p>
+          <p class="notice">
+            If you are currently signed in, please sign in again with your new email address.
+          </p>
+          <div class="actions">
+            <a matButton="filled" routerLink="/login">Sign in</a>
+          </div>
+        }
+        @case ('missing_token') {
+          <p class="notice notice--error" role="alert">
+            This confirmation link is incomplete — no confirmation token was provided.
+          </p>
+          <p class="notice">
+            Please check the link in the email sent to your new address, or request a new address change from your account profile.
+          </p>
+          <div class="actions">
+            <a matButton="filled" routerLink="/login">Go to sign in</a>
+          </div>
+        }
+        @case ('refused') {
+          @if (failureReason(); as reason) {
+            <p class="notice notice--error" role="alert">{{ reason }}</p>
+          }
+          <p class="notice">
+            The link may have already been used or has expired, or the requested address is no longer available.
+            Email change links are single-use and time-limited. If your address was not changed, please sign in and request a new change.
+          </p>
+          <div class="actions">
+            <a matButton="filled" routerLink="/login">Go to sign in</a>
+          </div>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</main>

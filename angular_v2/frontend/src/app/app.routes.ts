@@ -45,6 +45,28 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'verify-email',
+    title: 'Verify email',
+    loadComponent: () =>
+      import('./features/auth/verify-email-page/verify-email-page').then((m) => m.VerifyEmailPage),
+  },
+  {
+    path: 'reset-password',
+    title: 'Reset password',
+    loadComponent: () =>
+      import('./features/auth/reset-password-page/reset-password-page').then(
+        (m) => m.ResetPasswordPage,
+      ),
+  },
+  {
+    path: 'verify-email-change',
+    title: 'Verify email change',
+    loadComponent: () =>
+      import('./features/auth/verify-email-change-page/verify-email-change-page').then(
+        (m) => m.VerifyEmailChangePage,
+      ),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () => import('./layouts/app-shell/app-shell').then((m) => m.AppShell),

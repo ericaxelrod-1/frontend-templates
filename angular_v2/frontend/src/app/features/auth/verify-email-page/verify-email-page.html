@@ -1,0 +1,50 @@
+<main class="page">
+  <mat-card class="card">
+    <mat-card-header>
+      <mat-card-title>Email verification</mat-card-title>
+      <mat-card-subtitle>Confirming your email address</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      @switch (state()) {
+        @case ('verifying') {
+          <p class="notice" role="status">Verifying your email address…</p>
+        }
+        @case ('ssr_rendering') {
+          <p class="notice" role="status">Verifying your email address…</p>
+        }
+        @case ('confirmed') {
+          <p class="notice notice--success" role="status">
+            Your email address has been verified. You can now sign in to your account.
+          </p>
+          <div class="actions">
+            <a matButton="filled" routerLink="/login">Sign in</a>
+          </div>
+        }
+        @case ('missing_token') {
+          <p class="notice notice--error" role="alert">
+            This verification link is incomplete — no verification token was provided.
+          </p>
+          <p class="notice">
+            Please check the link in your verification email or request a new one from your account profile.
+          </p>
+          <div class="actions">
+            <a matButton="filled" routerLink="/login">Go to sign in</a>
+          </div>
+        }
+        @case ('refused') {
+          @if (failureReason(); as reason) {
+            <p class="notice notice--error" role="alert">{{ reason }}</p>
+          }
+          <p class="notice">
+            The link may have already been used or has expired. Verification links are single-use and time-limited.
+            If you have already verified your email, you can sign in. Otherwise, please request a new verification link.
+          </p>
+          <div class="actions">
+            <a matButton="filled" routerLink="/login">Go to sign in</a>
+          </div>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</main>
