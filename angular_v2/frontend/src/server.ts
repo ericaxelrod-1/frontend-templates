@@ -43,7 +43,7 @@ app.use((req, res, next) => {
 
 if (isMainModule(import.meta.url) || process.env['pm_id']) {
   const port = Number.parseInt(process.env['PORT'] ?? '4000', 10);
-  app.listen(port, (error) => {
+  app.listen(port, '127.0.0.1', (error) => {
     if (error) {
       throw error;
     }

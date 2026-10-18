@@ -178,7 +178,7 @@ start('postgrest', 'postgrest', [join(repositoryRoot, 'postgrest.conf')], {
   env: postgrestEnv,
 });
 start('api', 'npm', ['run', 'start:prod'], { cwd: backendRoot, env: { ...process.env, NODE_ENV: 'production' } });
-start('ssr', 'npm', ['run', 'serve:ssr:frontend'], { cwd: frontendRoot, env: { ...process.env, PORT: '4000' } });
+start('ssr', 'npm', ['run', 'serve:ssr:frontend'], { cwd: frontendRoot, env: { ...process.env } });
 
 try {
   await waitFor('http://127.0.0.1:3001/', 'postgrest', children.get('postgrest'));

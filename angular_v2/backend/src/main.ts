@@ -14,7 +14,7 @@ async function bootstrap(): Promise<void> {
 
   const { server } = app.get(ConfigService).getOrThrow<Environment>('environment');
 
-  await app.listen({ host: '0.0.0.0', port: server.port });
+  await app.listen({ host: '127.0.0.1', port: server.port });
 }
 
 await bootstrap();

@@ -288,7 +288,7 @@ start('postgrest', 'postgrest', [join(repositoryRoot, 'postgrest.conf')], {
   env: postgrestEnv,
 });
 start('api', 'npm', ['run', 'start:dev'], { cwd: backendRoot, env: { ...process.env, NODE_ENV: 'development' } });
-start('ssr', 'npm', ['run', 'serve:ssr:frontend'], { cwd: frontendRoot, env: { ...process.env, PORT: '4000' } });
+start('ssr', 'npm', ['run', 'serve:ssr:frontend'], { cwd: frontendRoot, env: { ...process.env } });
 
 try {
   await waitForTcp(sink.port, 'the local SMTP sink');
