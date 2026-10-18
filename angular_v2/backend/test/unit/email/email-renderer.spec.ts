@@ -60,13 +60,19 @@ function hrefsOf(html: string): readonly string[] {
 }
 
 describe('EmailRenderer', () => {
-  it('ships exactly the two live templates and nothing else', () => {
+  it('ships exactly the three live templates and nothing else', () => {
     // A template with no caller is a maintenance surface that rots: the
     // previous tree shipped nine, six of which nothing referenced.
+    //
+    // The third is `email-change`, which has one caller
+    // (`EmailService.sendEmailChangeEmail`). It is NOT the verification template with a
+    // different URL: the copy has to say that nothing has changed yet and that the old
+    // address is still the one in force, because the human reading the mail is part of the
+    // anti-takeover control.
     const shipped = readdirSync(new URL('../../../src/email/templates/', import.meta.url))
       .filter((entry) => entry.endsWith('.html'))
       .sort();
-    expect(shipped).toEqual(['password-reset.html', 'verify-email.html']);
+    expect(shipped).toEqual(['email-change.html', 'password-reset.html', 'verify-email.html']);
   });
 
   it('substitutes the verification link, the recipient and the lifetime', () => {
@@ -173,7 +179,7 @@ describe('EmailRenderer fails loudly', () => {
     }
   });
 
-  it('names the template that failed, so the log identifies which of the two it was', () => {
+  it('names the template that failed, so the log identifies which of the live ones it was', () => {
     const directory = mkdtempSync(join(tmpdir(), 'email-templates-'));
     try {
       const isolated = new EmailRenderer(pathToFileURL(`${directory}/`));
@@ -192,9 +198,9 @@ describe('EmailRenderer fails loudly', () => {
   });
 });
 
-describe('the template name type is the two live flows, not a free string', () => {
+describe('the template name type is the live flows, not a free string', () => {
   it('accepts exactly the names that exist', () => {
-    const names: readonly EmailTemplateName[] = ['verify-email', 'password-reset'];
-    expect(names).toEqual(['verify-email', 'password-reset']);
+    const names: readonly EmailTemplateName[] = ['verify-email', 'password-reset', 'email-change'];
+    expect(names).toEqual(['verify-email', 'password-reset', 'email-change']);
   });
 });

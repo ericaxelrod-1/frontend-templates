@@ -116,6 +116,41 @@ export const PURGE_ENQUEUER: DispatchToken = 'purge.enqueuer';
 export const PRIVACY_ERASE: DispatchToken = 'privacy.erase';
 
 /**
+ * The seven member-profile routes (`UsersController`), named so `RouteCensus` admits
+ * them at boot.
+ *
+ * ## NOT IN `BREAKER_PROTECTED`, AND WHICH OF THE SEVEN THAT MATTERS
+ *
+ * The default is STOP, so an omission means **sheddable**, and for six of these seven
+ * that is correct for the same reason the four token routes are sheddable: nothing is
+ * half-done. A read, a name write and a history read are complete or not attempted; a
+ * gated request did not happen and the member's next attempt works.
+ *
+ * The one that needs the argument is `users.confirm_email_change`. A gated confirm is
+ * refused **before the handler runs**, so no token is consumed and the link is still
+ * live when the member retries — which is exactly the property `auth.
+ * password_reset_confirm` is sheddable on, and the reason it is not "a partially
+ * applied address change".
+ *
+ * `users.change_password` and `users.create` are the two that would be worth
+ * reconsidering if an operator ever needed to recover an account during a memory
+ * crisis: neither is on the protected list, so under `red` both are sheddable and a
+ * member cannot rotate a compromised password or an administrator cannot create the
+ * account that the recovery needs. They are left off deliberately because the counter-
+ * argument for the token routes — "an operator must be able to log in and fix the
+ * machine" — is answered by `auth.login` and `auth.refresh` already being protected, and
+ * adding two more permanently-exempt routes to buy a capability nobody has asked for is
+ * the trade `auth.password_reset_confirm` explicitly rejects.
+ */
+export const USERS_ME: DispatchToken = 'users.me';
+export const USERS_UPDATE_ME: DispatchToken = 'users.update_me';
+export const USERS_REQUEST_EMAIL_CHANGE: DispatchToken = 'users.request_email_change';
+export const USERS_CONFIRM_EMAIL_CHANGE: DispatchToken = 'users.confirm_email_change';
+export const USERS_CHANGE_PASSWORD: DispatchToken = 'users.change_password';
+export const USERS_LOGIN_ATTEMPTS: DispatchToken = 'users.login_attempts';
+export const USERS_CREATE: DispatchToken = 'users.create';
+
+/**
  * Every dispatch site this build knows about.
  *
  * The interceptor derives a token from `AuthController` + method name, and the
@@ -171,6 +206,13 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   PURGE_SWEEPER,
   PURGE_ENQUEUER,
   PRIVACY_ERASE,
+  USERS_ME,
+  USERS_UPDATE_ME,
+  USERS_REQUEST_EMAIL_CHANGE,
+  USERS_CONFIRM_EMAIL_CHANGE,
+  USERS_CHANGE_PASSWORD,
+  USERS_LOGIN_ATTEMPTS,
+  USERS_CREATE,
 ]);
 
 /**

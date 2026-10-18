@@ -8,6 +8,7 @@ import { BreakerModule } from './breaker/breaker.module.js';
 import { PurgeModule } from './purge/purge.module.js';
 import { ErasureModule } from './privacy/erasure.module.js';
 import { TokenModule } from './token/token.module.js';
+import { UsersModule } from './users/users.module.js';
 import { PostgrestModule } from './postgrest/postgrest.module.js';
 import { loadEnvironment } from './config/environment.js';
 
@@ -55,9 +56,15 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
     // The shared one-time token primitive (mint, store, deliver, redeem, expire)
     // with no HTTP routes mounted directly.
     TokenModule,
+    // The member's own profile (`GET|PATCH /users/me`, the two-phase address change,
+    // the password change, the member's own login history) and the administrator's
+    // `POST /users`. Seven routes, dispatch tokens `users.*`.
+    UsersModule,
     // The identity seam: replaying a caller's verified bearer token into
-    // PostgREST so the database resolves `authz.actor()` to that caller. No
-    // route consumes it yet — `test/rls/identity-seam.spec.ts` is its proof.
+    // PostgREST so the database resolves `authz.actor()` to that caller.
+    // `UsersService.me` is its first production consumer — the one read that has to be
+    // answered with the CALLER's privileges rather than a claimless admin session, and
+    // so is bounded by their column grant and by `users_read_scope`.
     PostgrestModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

@@ -9,6 +9,7 @@ import { SharedDatabasePool } from '../common/database-pool.js';
 import type { Environment } from '../config/environment.js';
 import { TokenService } from '../token/token.service.js';
 import type { TokenPurpose } from '../token/token.types.js';
+import { UNUSABLE_TOKEN_MESSAGE } from '../token/unusable-token-message.js';
 import { ipSubnetKey, normalizeIpAddress } from './ip-address.js';
 import { recordActivity } from './last-activity.js';
 import { delayForFailures, isBlocked } from './throttle.js';
@@ -74,21 +75,23 @@ const UNKNOWN_USER_PASSWORD_HASH = bcrypt.hashSync('username-oracle-canary', BCR
 export type AttemptKind = 'login' | 'token_request';
 
 /**
- * The single message every failed redemption gets.
+ * The single message every failed redemption gets now lives in
+ * `src/token/unusable-token-message.ts`, beside the primitive, because there are three
+ * redemption routes and the property that makes them safe is that all three spend the
+ * SAME string on all four failure modes. See that file for the full argument.
  *
- * **One string, four failures.** Expired, already-redeemed, presented for the
- * wrong purpose, and never issued at all all reach the same `400` with this text,
- * because `TokenService.redeem` returns one `invalid_or_expired` for all four and
- * anything that branched on which one it was would hand back the distinction the
- * primitive spent its single-use design to remove. A caller who learns *which*
- * reason their link failed has learned whether the link ever existed.
+ * **One string, four failures.** Expired, already-redeemed, presented for the wrong
+ * purpose, and never issued at all all reach the same `400` with
+ * `UNUSABLE_TOKEN_MESSAGE`, because `TokenService.redeem` returns one
+ * `invalid_or_expired` for all four and anything that branched on which one it was
+ * would hand back the distinction the primitive spent its single-use design to remove.
+ * A caller who learns *which* reason their link failed has learned whether the link
+ * ever existed.
  *
  * It also says nothing about the account: a valid token does not get a friendlier
  * message either, because "that link worked" is itself the answer an attacker is
  * after and they already have it.
  */
-const UNUSABLE_TOKEN_MESSAGE =
-  'this link is not valid, has already been used, or has expired — request a new one';
 
 /** A redemption that carries no user cannot reset anything, and saying so is this application's bug. */
 function unusableTokenWithoutSubject(purpose: TokenPurpose): Error {

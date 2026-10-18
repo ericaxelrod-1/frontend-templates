@@ -11,6 +11,14 @@ import {
  *
  * Cross-purpose confusion is refused at the type level, the application level,
  * and the database constraint layer.
+ *
+ * **`email_change` is deliberately NOT a fourth member**, and the reason is in
+ * `email-change-token.ts`: the CHECK and `authz.mint_auth_token`'s own guard both
+ * enumerate this vocabulary, so adding a kind is a migration to two places in the
+ * schema. The email-change flow therefore mints under `email_verification` and is
+ * separated from the verification flow by its token FORMAT and by a
+ * domain-separated subject — which `email-change-token.ts` states in full, because
+ * "it reuses a purpose" is the sentence a reviewer needs to interrogate.
  */
 export const TOKEN_PURPOSES = [
   'password_reset',
@@ -79,3 +87,33 @@ export interface DeliverTokenInput {
 export interface DeliveryResult {
   readonly status: 'accepted';
 }
+
+/**
+ * What the email-change flow mints: the member's id (the subject the link belongs
+ * to) and the address they asked for.
+ *
+ * `pendingEmail` is carried into the token and nowhere else — see
+ * `email-change-token.ts` for why it is not a column on `users` and not a column on
+ * `auth_tokens` either.
+ */
+export interface MintEmailChangeInput {
+  readonly userId: string;
+  readonly pendingEmail: string;
+}
+
+/**
+ * A redeemed email-change link: WHO it moves the address FOR, and the address it
+ * moves it TO.
+ *
+ * Both halves come from the same authenticated token, and neither can be supplied
+ * by the caller — the confirm DTO carries the token and nothing else.
+ */
+export type RedeemEmailChangeResult =
+  | {
+      readonly status: 'success';
+      readonly userId: string;
+      readonly pendingEmail: string;
+    }
+  | {
+      readonly status: 'invalid_or_expired';
+    };

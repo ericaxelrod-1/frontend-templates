@@ -141,6 +141,17 @@ describe('the census enumerates the routes Nest actually mounted', () => {
         'POST /auth/email-verification/confirm',
         'GET /auth/me',
         'POST /privacy/erase',
+        // `UsersController`, mounted by `UsersModule` after `ErasureModule` in
+        // `AppModule`'s import list — which is the order `DiscoveryService` reports the
+        // controllers in. The seven are in DECLARATION order within the class, which is
+        // the order `handlerNames()` reads them off the prototype.
+        'GET /users/me',
+        'PATCH /users/me',
+        'POST /users/me/email',
+        'POST /users/me/email/confirm',
+        'POST /users/me/password',
+        'GET /users/me/login-attempts',
+        'POST /users',
       ]);
 
       const verdict = assertRouteCoverage(routes);
@@ -154,6 +165,13 @@ describe('the census enumerates the routes Nest actually mounted', () => {
         'auth.email_verification_confirm',
         'auth.me',
         'privacy.erase',
+        'users.me',
+        'users.update_me',
+        'users.request_email_change',
+        'users.confirm_email_change',
+        'users.change_password',
+        'users.login_attempts',
+        'users.create',
       ]);
       // The graph mounts no fixture, so nothing is exempt — and a gate that only passed
       // because of its exemption table would pass here while the table covered a route

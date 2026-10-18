@@ -1,11 +1,11 @@
 /**
  * Which templates may have their rendered body persisted, and which may not.
  *
- * **The rule.** `password_reset` and `email_verification` carry a bearer token
- * in the body — the reset and verification links ARE the credential. Storing the
- * body would put a working token in a table that an admin reads over HTTP, in
- * backups, and in every replica, turning a leak of the email history into a leak
- * of live account takeover. So those two templates are forced to
+ * **The rule.** `password_reset`, `email_verification` and `email_change` carry a
+ * bearer token in the body — the reset, verification and address-change links ARE the
+ * credential. Storing the body would put a working token in a table that an admin
+ * reads over HTTP, in backups, and in every replica, turning a leak of the email
+ * history into a leak of live account takeover. So those templates are forced to
  * `content_class = 'metadata_only'` with `body` NULL, and this module is the only
  * thing that decides it.
  *
@@ -27,13 +27,26 @@
  * The templates whose rendered body contains a bearer credential.
  *
  * Named after the STORED `template` column value, which is why these are
- * `password_reset` / `email_verification` and not the renderer's `password-reset`
- * / `verify-email` file names. Two different vocabularies for two different
- * concerns, and the mapping is a deliberate edit rather than a coincidence.
+ * `password_reset` / `email_verification` / `email_change` and not the renderer's
+ * `password-reset` / `verify-email` / `email-change` file names. Two different
+ * vocabularies for two different concerns, and the mapping is a deliberate edit
+ * rather than a coincidence.
+ *
+ * **`email_change` is here for the ordinary reason and one extra one.** The ordinary
+ * reason is that its body carries the confirmation link, which IS the credential —
+ * anyone holding it can move the account's address, and a stored body would put a
+ * working credential in `email_messages`, a table an admin reads over HTTP, in every
+ * backup and in every replica. The extra reason is that `auth_tokens.purpose` cannot
+ * name a fourth kind, so the row this template's token writes is an
+ * `email_verification` row: the stored `template` value is currently the ONLY place
+ * the audit trail distinguishes an address-change message from a first-time
+ * verification message. Widening the body rule is not a defensible place to lose
+ * that distinction.
  */
 export const CREDENTIAL_BEARING_TEMPLATES: readonly string[] = [
   'password_reset',
   'email_verification',
+  'email_change',
 ];
 
 /** How much of a message this application is willing to keep. */

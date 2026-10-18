@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
+import { NewPassword } from '../common/password-policy.js';
 
 /**
  * `POST /auth/password-reset/confirm` — the token from the mail and the password
@@ -15,23 +16,17 @@ import { IsString, MaxLength, MinLength } from 'class-validator';
  * while a DTO that *rejected* a valid 43-character base64url token at 400 would
  * turn a uniform "that link is no good" into a distinguishable outcome for a
  * malformed-only caller. The bounds are asserted from the primitive's own constant
- * in `test/unit/auth/reset-confirm.spec.ts`.
+ * in `test/unit/auth/token-routes.spec.ts`.
  *
- * ## No password policy is invented here
+ * ## The password field is `@NewPassword()`, and that is a MOVE rather than a NEW RULE
  *
- * `@MinLength(1)` mirrors `LoginRequestDto` exactly, deliberately. This repository
- * has no password-length rule anywhere — not at registration (there is no
- * registration route), not at login, not in `security.md` — so introducing one on
- * the reset path alone would make a weak password *harder* to set by forgetting
- * than to set by attacking, and would be a policy with no matching rule on the
- * path that actually sets most passwords. A policy belongs in one place that all
- * three paths read; that place does not exist yet, and building it is not this
- * change.
- *
- * `@MaxLength(1024)` matches `LoginRequestDto`. bcrypt considers only the first
- * 72 bytes, so anything past that is discarded — which is a reason to reject
- * rather than truncate silently, and a reason to reject at 1024 rather than
- * somewhere further out.
+ * This DTO used to spell `@IsString() @MinLength(1) @MaxLength(1024)` itself, and its
+ * own comment said the rule belonged "in one place that all the paths read; that place
+ * does not exist yet, and building it is not this change". Two routes now set a
+ * password — this one and `POST /users/me/password` — so the place exists and this
+ * field reads from it. The numbers are unchanged; see `src/common/password-policy.ts`
+ * for why they are what they are and why that is still not a policy in the
+ * "must contain a digit" sense.
  */
 export class PasswordResetConfirmDto {
   @ApiProperty()
@@ -41,8 +36,6 @@ export class PasswordResetConfirmDto {
   token: string;
 
   @ApiProperty()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(1024)
+  @NewPassword()
   password: string;
 }

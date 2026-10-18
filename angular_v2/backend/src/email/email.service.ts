@@ -19,6 +19,8 @@ import {
 } from './email.provider.js';
 import { EmailRenderer } from './email.renderer.js';
 import {
+  EMAIL_CHANGE_LINK_LIFETIME_HOURS,
+  EMAIL_CHANGE_PATH,
   PASSWORD_RESET_LINK_LIFETIME_MINUTES,
   PASSWORD_RESET_PATH,
   VERIFICATION_LINK_LIFETIME_HOURS,
@@ -26,15 +28,16 @@ import {
 } from './email.template-context.js';
 
 /**
- * The two flows' stored `template` values.
+ * The three flows' stored `template` values.
  *
- * These are NOT the renderer's file names (`password-reset`, `verify-email`).
- * The column records what KIND of message this was, for filtering and for the
- * credential-suppression rule, and the rule has to key on a value that renaming a
- * file cannot change. Two vocabularies, mapped explicitly, in one place.
+ * These are NOT the renderer's file names (`password-reset`, `verify-email`,
+ * `email-change`). The column records what KIND of message this was, for filtering
+ * and for the credential-suppression rule, and the rule has to key on a value that
+ * renaming a file cannot change. Two vocabularies, mapped explicitly, in one place.
  */
 export const PASSWORD_RESET_TEMPLATE = 'password_reset';
 export const EMAIL_VERIFICATION_TEMPLATE = 'email_verification';
+export const EMAIL_CHANGE_TEMPLATE = 'email_change';
 
 /**
  * The erasure receipt.
@@ -57,18 +60,23 @@ export const ERASURE_RECEIPT_TEMPLATE = 'erasure_receipt';
 const REDACTED_RECIPIENT = '<rejected-recipient>';
 
 /**
- * The two live transactional flows, and nothing else.
+ * The three live transactional flows, and nothing else.
  *
  * `sendWelcomeEmail`, `sendGenericEmail` and the five privacy-ticket methods of
  * the previous tree are gone: none of them had a single caller, and a send
  * method with no caller is a promise nobody is keeping (§2.1). What remains is
- * what an auth surface needs and what the next W11 slices — registration and
- * password reset — will call.
+ * what an auth surface needs — address verification, address change, and
+ * password reset.
  *
- * **Failure policy.** Both methods reject with `EmailDeliveryError` when the
- * transport refuses. Neither returns a boolean, and neither swallows a failure
+ * **Failure policy.** All three methods reject with `EmailDeliveryError` when
+ * the transport refuses. None returns a boolean, and none swallows a failure
  * into a success-shaped value. The caller decides what the user is told; this
  * service's job is to make the failure impossible to mistake for a success.
+ *
+ * `UsersService.requestEmailChange` is the reason that matters for the new one:
+ * its caller is authenticated and knows its own account, so there is no
+ * enumeration argument for hiding a delivery failure, and it lets the error
+ * propagate rather than answering `202` for a mail that was never sent.
  *
  * **URLs.** Every link is absolute, built from `EmailConfig.baseUrl`, which is
  * asserted at bootstrap in every mode and has no default. A relative link in a
@@ -211,6 +219,84 @@ export class EmailService {
         // Metadata only, and the reason is the erasure itself: this body carries the
         // person's name and address, and `email_messages` is a table the erased
         // person's record will outlive.
+        body: null,
+      },
+    );
+  }
+
+  /**
+   * Move an account to a new address — PHASE ONE OF TWO, and this mail is the whole
+   * of phase one.
+   *
+   * ## `recipient` IS THE NEW ADDRESS, AND IT IS NOT THE ONE ON FILE
+   *
+   * Every other send in this service mails the address `users` currently holds. This
+   * one deliberately does not: it is delivered to the address the member has just
+   * asked for, and at the moment this runs `users.email` still holds the OLD one. That
+   * is the anti-takeover ordering, and it is why the recipient cannot be read out of
+   * the account row here — the caller passes it because the caller is the one who
+   * supplied it, and `UsersService` has already checked it against the account.
+   *
+   * ## `recipient` AND `pendingEmail` ARE THE SAME STRING, AND IT IS TWO PARAMETERS
+   *
+   * That looks like a mistake and is not: `recipient` is the ENVELOPE and `pendingEmail`
+   * is what the body says the account is being moved to. Keeping them separate is what
+   * lets a future caller mail the confirmation to one place and *display* another — which
+   * is the shape the old-address notification wants — without this method having to change
+   * meaning. Collapsing them into one parameter would make that change a silent semantic
+   * flip.
+   *
+   * **The `text/plain` body states the ordering in words**, because the human reading
+   * the mail is part of this control: "nothing has changed yet", "your account still
+   * uses your previous address", "the address on file changes only when you open this
+   * link". A mail that only said "confirm this address" would be the message an
+   * attacker sends, and would leave the recipient unable to tell the two apart.
+   *
+   * ## `token` IS A BEARER CREDENTIAL FOR EXACTLY THIS LINK
+   *
+   * Never logged here, never stored in `email_messages` (`body: null` below, which is
+   * the credential-suppression rule applied at the call site as well as in the writer),
+   * and never logged by the production transport at any level — see
+   * `nodemailer-email.provider.ts`.
+   */
+  async sendEmailChangeEmail(
+    recipient: string,
+    recipientName: string,
+    pendingEmail: string,
+    token: string,
+    userId?: string,
+  ): Promise<SentEmail> {
+    const confirmationUrl = this.absoluteUrl(EMAIL_CHANGE_PATH, token);
+    const subject = `Confirm your new ${this.env.email.appName} email address`;
+    return this.send(
+      {
+        to: recipient,
+        subject,
+        html: this.renderer.render('email-change', {
+          appName: this.env.email.appName,
+          recipientName,
+          pendingEmail,
+          confirmationUrl,
+          expiresInHours: EMAIL_CHANGE_LINK_LIFETIME_HOURS,
+        }),
+        text:
+          `Hello ${recipientName},\n\n` +
+          `Use this link to move your ${this.env.email.appName} account to ${pendingEmail}:\n` +
+          `${confirmationUrl}\n\n` +
+          'Nothing has changed yet. Your account still uses your previous address, and mail —\n' +
+          'including any password reset — still goes there. The address on file changes only\n' +
+          `when you open this link, and the link works once and expires in ${String(EMAIL_CHANGE_LINK_LIFETIME_HOURS)} hours.\n\n` +
+          `You are receiving this because someone signed in as ${recipientName} and asked for this\n` +
+          'address to become the account\'s. If that was not you, ignore this message and nothing\n' +
+          'happens — the account keeps its previous address.\n',
+      },
+      {
+        userId,
+        template: EMAIL_CHANGE_TEMPLATE,
+        recipient,
+        subject,
+        // Not offered, for the same reason the other two credential-bearing templates
+        // do not offer one. See `contentClassFor`.
         body: null,
       },
     );

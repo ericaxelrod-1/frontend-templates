@@ -29,7 +29,17 @@ const BUILD_TIMEOUT_MS = 300_000;
 const DIST_TEMPLATES = join(BACKEND_ROOT, 'dist', 'email', 'templates');
 const SOURCE_TEMPLATES = join(BACKEND_ROOT, 'src', 'email', 'templates');
 
-const EXPECTED_TEMPLATES = ['password-reset.html', 'verify-email.html'];
+/**
+ * The three templates that ship, sorted.
+ *
+ * **A THIRD ENTRY, `email-change.html`, and the two assertions below are exhaustive on
+ * purpose.** `email-assets.spec.ts` exists because the previous tree shipped nine
+ * templates, six of which nothing rendered, and "a template with no caller is a
+ * maintenance surface that silently rots". So the list is not allowed to grow quietly:
+ * adding a renderer means adding it here, which is the moment somebody confirms it has a
+ * caller (`EmailService.sendEmailChangeEmail`).
+ */
+const EXPECTED_TEMPLATES = ['email-change.html', 'password-reset.html', 'verify-email.html'];
 
 let buildOutput = '';
 
@@ -57,7 +67,7 @@ describe('the email templates reach dist/', () => {
     expect(existsSync(join(BACKEND_ROOT, 'dist', 'app.module.js'))).toBe(true);
   });
 
-  it('copies both live templates into dist/email/templates/', () => {
+  it('copies every live template into dist/email/templates/', () => {
     // Without the "assets" entry in nest-cli.json this directory does not
     // exist, and this is the assertion that says so.
     expect(existsSync(DIST_TEMPLATES)).toBe(true);

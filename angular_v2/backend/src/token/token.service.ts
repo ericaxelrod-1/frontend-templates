@@ -4,22 +4,62 @@ import type { PoolClient } from 'pg';
 import type { DatabaseConnectionSource } from '../common/database-pool.js';
 import { SharedDatabasePool } from '../common/database-pool.js';
 import { EmailService } from '../email/email.service.js';
+import {
+  emailChangeSubject,
+  encodeEmailChangeToken,
+  isCompositeToken,
+  normalizePendingEmail,
+  readEmailChangeToken,
+} from './email-change-token.js';
 import { TOKEN_ENV, type TokenEnvironment } from './token-environment.js';
 import {
   DEFAULT_TOKEN_TTL_SECONDS,
   isTokenPurpose,
   type DeliverTokenInput,
   type DeliveryResult,
+  type MintEmailChangeInput,
   type MintTokenInput,
   type MintedToken,
+  type RedeemEmailChangeResult,
   type RedeemTokenInput,
   type RedeemTokenResult,
+  type RedeemedToken,
   type TokenPurpose,
 } from './token.types.js';
 
 const SUBJECT_DOMAIN_LABEL = 'auth.token.subject.v1';
 const TOKEN_HASH_DOMAIN_LABEL = 'auth.token.hash.v1';
 const DUMMY_HASH = Buffer.alloc(32, 0);
+
+/**
+ * The redemption window for a BARE token: `16 … 256`.
+ *
+ * 32 random bytes is 43 base64url characters and the window is a sanity bound, not a
+ * format check — it exists so a megabyte of caller-supplied text is refused before it
+ * is HMAC'd. A composite token is a different shape with a different ceiling
+ * (`EMAIL_CHANGE_TOKEN_MAX_LENGTH`), which is why the bound is a parameter of the
+ * lookup rather than a constant buried in it. These numbers are mirrored by
+ * `EmailVerificationConfirmDto` and `PasswordResetConfirmDto`, and the two windows
+ * must not drift: a DTO narrower than the primitive turns one uniform "that link is
+ * no good" into two distinguishable answers.
+ */
+const BARE_TOKEN_MIN_LENGTH = 16;
+const BARE_TOKEN_MAX_LENGTH = 256;
+
+/**
+ * A mint whose raw token value the CALLER has already composed.
+ *
+ * The three bare flows let `mint` generate the 32 random bytes, because the value is
+ * nothing but entropy. The email-change flow cannot: its raw value also carries the
+ * pending address, so it is built by `encodeEmailChangeToken` before the row is
+ * written, and the row's `token_hash` has to be the HMAC of the WHOLE thing including
+ * that payload. One private method takes both shapes, so the insert, the
+ * `authz.mint_auth_token` call, the TTL default and the returned id have exactly one
+ * implementation.
+ */
+interface PersistMintInput extends MintTokenInput {
+  readonly rawToken: string;
+}
 
 type RedeemSqlRow = {
   readonly id: string;
@@ -36,6 +76,16 @@ type UserLookupRow = {
   readonly username: string;
   readonly email: string;
 };
+
+/**
+ * `pg` returns `bytea` as a `Buffer`, but the same row read through any other path
+ * can arrive as the hex string, and `Buffer.from(x, 'hex')` on a Buffer is a silent
+ * identity — so the two shapes are named once here instead of at each call site,
+ * where one of the two would eventually be forgotten.
+ */
+function decodeSubjectHmac(subjectHmac: Buffer | string): Buffer {
+  return Buffer.isBuffer(subjectHmac) ? subjectHmac : Buffer.from(subjectHmac, 'hex');
+}
 
 @Injectable()
 export class TokenService {
@@ -127,6 +177,17 @@ export class TokenService {
    * Returns the rawToken exactly once to the caller.
    */
   async mint(input: MintTokenInput): Promise<MintedToken> {
+    return this.persistMint({ ...input, rawToken: randomBytes(32).toString('base64url') });
+  }
+
+  /**
+   * The one insert, for both a bare token and a composite one.
+   *
+   * Every validation `mint` performs lives here, so a future flow that composes its
+   * own raw value gets the same refusal on an empty subject, a bad purpose and a
+   * non-positive TTL rather than a laxer copy of this method.
+   */
+  private async persistMint(input: PersistMintInput): Promise<MintedToken> {
     if (!isTokenPurpose(input.purpose)) {
       throw new Error(`Invalid token purpose: '${String(input.purpose)}'`);
     }
@@ -143,8 +204,7 @@ export class TokenService {
       throw new Error(`ttlSeconds must be a positive finite number, received ${String(ttlSeconds)}`);
     }
 
-    const rawToken = randomBytes(32).toString('base64url');
-    const tokenHash = this.hashToken(rawToken);
+    const tokenHash = this.hashToken(input.rawToken);
     const subjectHmac = this.hashSubject(input.subjectIdentifier);
 
     const id = await this.asAppAdmin(async (client) => {
@@ -170,10 +230,57 @@ export class TokenService {
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
     return {
       id,
-      rawToken,
+      rawToken: input.rawToken,
       purpose: input.purpose,
       expiresAt,
     };
+  }
+
+  /**
+   * Mint a link that moves this member's address, and carries the address it would
+   * move it to.
+   *
+   * ## The two-phase ordering, and why it is the WHOLE of the control
+   *
+   * Nothing about `users` is written here. The row written is an `auth_tokens` row,
+   * and `users.email` still holds the address mail is delivered to — so a password
+   * reset requested between this call and the redemption still reaches the real
+   * owner. Writing `users.email` here and mailing the new address would be an account
+   * takeover in two requests: repoint the account at a mailbox the attacker controls,
+   * then ask for a reset, and the reset link arrives at the attacker.
+   *
+   * ## Why the subject is the user and not the address
+   *
+   * `emailChangeSubject` — read that module. In one line: the supersede below has to
+   * find every outstanding link for this member WITHOUT knowing which address any of
+   * them asked for, and the address is deliberately stored nowhere.
+   *
+   * ## Why the purpose is `email_verification` and not a fourth kind
+   *
+   * `auth_tokens.purpose` is a three-value CHECK and `authz.mint_auth_token` raises
+   * on anything else. Naming a fourth kind is a migration to the schema, which this
+   * unit does not write. The flow is separated from address verification by its token
+   * FORMAT (a bare `redeem` refuses a value carrying `ec1.`, and `redeemEmailChange`
+   * refuses one that does not) and by this subject, so the two cannot consume each
+   * other's links. `test/unit/users/email-change-token.spec.ts` proves both halves,
+   * and `test/unit/token/token.service.spec.ts`'s window assertions still hold because
+   * `redeem`'s bare-token window is unchanged.
+   */
+  async mintEmailChange(input: MintEmailChangeInput): Promise<MintedToken> {
+    const pendingEmail = normalizePendingEmail(input.pendingEmail);
+    if (pendingEmail === '') {
+      throw new Error('an email-change token needs a non-empty pending address');
+    }
+    if (typeof input.userId !== 'string' || input.userId.trim() === '') {
+      throw new Error('an email-change token needs the user id it is bound to');
+    }
+
+    return this.persistMint({
+      purpose: 'email_verification',
+      subjectIdentifier: emailChangeSubject(input.userId),
+      userId: input.userId,
+      rawToken: encodeEmailChangeToken(pendingEmail, randomBytes(32).toString('base64url')),
+    });
   }
 
   /**
@@ -184,17 +291,25 @@ export class TokenService {
    *
    * Expired, already-consumed, cross-purpose, malformed, or non-existent tokens
    * all return the uniform `{ status: 'invalid_or_expired' }`.
+   *
+   * ## WHY A COMPOSITE TOKEN IS REFUSED HERE, BEFORE ANY HASH
+   *
+   * Because `purpose` cannot name `email_change` without a migration, an
+   * email-change link IS an `email_verification` row as far as
+   * `authz.redeem_auth_token` is concerned. Without the check below, presenting one
+   * to `POST /auth/email-verification/confirm` would consume it, stamp
+   * `email_verified_at`, and answer `200 { status: 'verified' }` — silently destroying
+   * the pending change while reporting a success that describes a different fact.
+   * `isCompositeToken` refuses the shape before the digest is computed, so a bare
+   * redemption cannot reach a composite row at all, and the caller's link survives to
+   * be presented at the route that understands it.
    */
   async redeem(input: RedeemTokenInput): Promise<RedeemTokenResult> {
     if (!isTokenPurpose(input.expectedPurpose)) {
       return { status: 'invalid_or_expired' };
     }
 
-    if (
-      typeof input.rawToken !== 'string' ||
-      input.rawToken.length < 16 ||
-      input.rawToken.length > 256
-    ) {
+    if (!this.isPlausibleRawToken(input.rawToken, BARE_TOKEN_MIN_LENGTH, BARE_TOKEN_MAX_LENGTH)) {
       // Execute constant-time dummy equality to eliminate timing channels
       timingSafeEqual(DUMMY_HASH, DUMMY_HASH);
       return { status: 'invalid_or_expired' };
@@ -202,37 +317,149 @@ export class TokenService {
 
     const presentedHash = this.hashToken(input.rawToken);
 
-    const row = await this.asAppAdmin(async (client) => {
-      const result = await client.query<RedeemSqlRow>(
-        'SELECT id, user_id, subject_hmac, pepper_kid, purpose, created_at, expires_at FROM authz.redeem_auth_token($1, $2)',
-        [presentedHash, input.expectedPurpose],
-      );
-      return result.rows[0];
-    });
-
-    if (row === undefined) {
-      timingSafeEqual(presentedHash, presentedHash);
-      return { status: 'invalid_or_expired' };
-    }
+    const row = await this.consumeToken(presentedHash, input.expectedPurpose);
 
     // Constant-time confirmation
     timingSafeEqual(presentedHash, presentedHash);
 
-    const subjectHmac = Buffer.isBuffer(row.subject_hmac)
-      ? row.subject_hmac
-      : Buffer.from(row.subject_hmac, 'hex');
+    if (row === undefined) {
+      return { status: 'invalid_or_expired' };
+    }
 
+    return { status: 'success', token: this.toRedeemedToken(row, input.expectedPurpose) };
+  }
+
+  /**
+   * Redeem an email-change link, and recover the address it moves the account to.
+   *
+   * ## THE ORDER IS THE PROPERTY, AND IT IS TWO REFUSALS IN ONE LINE
+   *
+   * The payload is read from the presented value FIRST, and a value that is not an
+   * email-change token never reaches the database. That is what stops this route
+   * consuming somebody's live address-verification link: the check that recognises
+   * the wrong shape is also the check that keeps the token alive.
+   *
+   * A bare `redeem` gets the mirror image of that guarantee from `isCompositeToken`,
+   * so neither route can reach the other's row.
+   *
+   * ## WHAT IS AUTHENTICATED, AND BY WHAT
+   *
+   * `hashToken` covers the WHOLE raw token, payload included, so the address that
+   * comes back out is the address that was minted — a caller cannot present a token
+   * for `victim@example.test` and have this hand back `attacker@example.test`, because
+   * changing one character changes the digest and the digest is the lookup key. The
+   * `subject_hmac` comparison below is a second, local assertion of a property the
+   * arithmetic already has: it says "this row is one of THIS member's change links"
+   * rather than leaving it to be inferred, and a mismatch is refused with the same
+   * uniform answer as everything else.
+   */
+  async redeemEmailChange(rawToken: string): Promise<RedeemEmailChangeResult> {
+    const pendingEmail = readEmailChangeToken(rawToken);
+    if (pendingEmail === null) {
+      timingSafeEqual(DUMMY_HASH, DUMMY_HASH);
+      return { status: 'invalid_or_expired' };
+    }
+
+    const presentedHash = this.hashToken(rawToken);
+    const row = await this.consumeToken(presentedHash, 'email_verification');
+    timingSafeEqual(presentedHash, presentedHash);
+
+    if (row === undefined) {
+      return { status: 'invalid_or_expired' };
+    }
+
+    const userId = row.user_id;
+    if (userId === null) {
+      throw new Error(
+        'an email-change token was redeemed with no subject: mintEmailChange always binds one, so this ' +
+          'is not reachable from an HTTP request and must not be treated as a bad link',
+      );
+    }
+    if (!this.isChangeSubjectFor(row.subject_hmac, userId)) {
+      return { status: 'invalid_or_expired' };
+    }
+
+    return { status: 'success', userId, pendingEmail };
+  }
+
+  /**
+   * Close every outstanding email-change link for this member.
+   *
+   * **This is what "a new request supersedes an outstanding one" means here.** The
+   * alternative — two live links for two different addresses, both redeemable — means
+   * the second one silently wins for a reason nobody can reconstruct afterwards, and
+   * the member who opened the newer mail gets an account on the older address with no
+   * error anywhere. Single-use is a statement about ONE link; superseding is the
+   * statement about the set.
+   *
+   * @returns how many links it closed. Zero is the ordinary case: the token just
+   *   redeemed is the only live one, and `authz.invalidate_auth_tokens` only touches
+   *   rows with `consumed_at IS NULL`.
+   */
+  async invalidateEmailChangeTokens(userId: string): Promise<number> {
+    return this.invalidateSubjectTokens(emailChangeSubject(userId), 'email_verification');
+  }
+
+  /**
+   * The window check, in one place so the bare and composite flows cannot drift into
+   * two different definitions of "long enough to be worth hashing".
+   *
+   * A composite token is refused outright: this method is the BARE path, and the
+   * reason it says so is `redeem`'s.
+   */
+  private isPlausibleRawToken(rawToken: string, minLength: number, maxLength: number): boolean {
+    if (typeof rawToken !== 'string' || rawToken.length < minLength || rawToken.length > maxLength) {
+      return false;
+    }
+    return !isCompositeToken(rawToken);
+  }
+
+  /** Constant-time comparison of a row's subject against this member's change namespace. */
+  private isChangeSubjectFor(subjectHmac: Buffer | string, userId: string): boolean {
+    return timingSafeEqual(decodeSubjectHmac(subjectHmac), this.hashSubject(emailChangeSubject(userId)));
+  }
+
+  /**
+   * The ONE redemption statement: `authz.redeem_auth_token`, which is a single
+   * indexed, atomic, purpose-scoped UPDATE that consumes the token or matches
+   * nothing.
+   *
+   * Extracted so the composite flow reaches the same statement rather than writing
+   * its own (§2.4). Hashing before this would spend work on every forged link and
+   * would make "is my token valid" observable as a latency difference before the
+   * answer is even given.
+   */
+  private async consumeToken(
+    presentedHash: Buffer,
+    purpose: TokenPurpose,
+  ): Promise<RedeemSqlRow | undefined> {
+    return this.asAppAdmin(async (client) => {
+      const result = await client.query<RedeemSqlRow>(
+        'SELECT id, user_id, subject_hmac, pepper_kid, purpose, created_at, expires_at FROM authz.redeem_auth_token($1, $2)',
+        [presentedHash, purpose],
+      );
+      return result.rows[0];
+    });
+  }
+
+  /**
+   * One row to the shape the callers get back.
+   *
+   * `purpose` is the purpose the caller ASKED for rather than the column, and that is
+   * not a shortcut: `authz.redeem_auth_token` filters `WHERE t.purpose = p_purpose`, so
+   * a row that came back matched the request by construction. Re-deriving it from the
+   * column would mean falling back to *some* purpose for a value that does not parse,
+   * and the fallback would be a guess dressed as a value.
+   */
+  private toRedeemedToken(row: RedeemSqlRow, expectedPurpose: TokenPurpose): RedeemedToken {
     return {
-      status: 'success',
-      token: {
-        id: row.id,
-        userId: row.user_id,
-        subjectHmac,
-        pepperKid: row.pepper_kid,
-        purpose: input.expectedPurpose,
-        createdAt: new Date(row.created_at),
-        expiresAt: new Date(row.expires_at),
-      },
+      id: row.id,
+      userId: row.user_id,
+      subjectHmac: decodeSubjectHmac(row.subject_hmac),
+      pepperKid: row.pepper_kid,
+      purpose: expectedPurpose,
+      createdAt: new Date(row.created_at),
+      expiresAt: new Date(row.expires_at),
     };
   }
 
