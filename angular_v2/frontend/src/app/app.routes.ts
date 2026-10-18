@@ -11,9 +11,24 @@ import { authGuard } from './core/auth/auth.guard';
  * authenticated area in one place and a future child cannot be added outside it
  * by accident.
  *
- * `/` redirects to `/users` explicitly. It is not a catch-all and it does not
- * swallow a URL the application cannot serve: `**` is last, and it renders the
- * Not Found page.
+ * `/` redirects to `/profile`, and the choice is about the two pages' AUDIENCES
+ * rather than about convenience. `/profile` is the one route every signed-in
+ * member can use — `GET /api/users/me` is their own row, within their own column
+ * grant — while `/users` answers a question only an administrator is asking. Every
+ * user holds at least one role (AGENTS.md §B2), so there is no signed-in user for
+ * whom `/profile` 403s; there is one for whom `/users` shows a single row of their
+ * own and a list of columns it may not read.
+ *
+ * `/users` is NOT behind a role guard, and that is deliberate. A frontend guard
+ * would be a second authorization mechanism disagreeing with the database's own
+ * answer, and §F7 is explicit that permission checks in the frontend are a UX
+ * affordance and never access control. The page instead asks for the columns the
+ * signed-in grant can name and renders "not readable for this role" for the rest,
+ * so what a role can see is a fact on the screen rather than a redirect. The shell
+ * still hides the link from a member — see `app-shell.ts`.
+ *
+ * `/` is not a catch-all and it does not swallow a URL the application cannot
+ * serve: `**` is last, and it renders the Not Found page.
  */
 export const routes: Routes = [
   {
@@ -34,7 +49,13 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./layouts/app-shell/app-shell').then((m) => m.AppShell),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'users' },
+      { path: '', pathMatch: 'full', redirectTo: 'profile' },
+      {
+        path: 'profile',
+        title: 'My profile',
+        loadComponent: () =>
+          import('./features/profile/profile-page').then((m) => m.ProfilePage),
+      },
       {
         path: 'users',
         title: 'Users',

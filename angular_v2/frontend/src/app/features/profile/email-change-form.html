@@ -1,0 +1,39 @@
+<p class="explain">
+  Changing the address on your account takes two steps. We send a verification link to
+  the new address, and the address changes only once you confirm it — so a new address
+  is never on your account until somebody has proved they can read mail there.
+</p>
+
+@if (pendingAddress(); as pending) {
+  <p class="notice notice--pending" role="status">
+    A verification link has been sent to <strong>{{ pending }}</strong>. Your address is
+    still <strong>{{ currentEmail() }}</strong>. It changes when you open that link —
+    until then <strong>{{ pending }}</strong> is not on your account, and
+    {{ currentEmail() }} remains the address mail is delivered to.
+  </p>
+}
+
+<form class="form" [formRoot]="emailForm">
+  <mat-form-field>
+    <mat-label>New email address</mat-label>
+    <input
+      matInput
+      type="email"
+      autocomplete="email"
+      [formField]="emailForm.email"
+    />
+    @if (emailForm.email().touched() && emailForm.email().invalid()) {
+      <mat-error>A complete email address is required.</mat-error>
+    }
+  </mat-form-field>
+
+  @if (failureReason(); as reason) {
+    <p class="notice notice--error" role="alert">{{ reason }}</p>
+  }
+
+  <div>
+    <button matButton="filled" type="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Sending…' : 'Send a verification link' }}
+    </button>
+  </div>
+</form>

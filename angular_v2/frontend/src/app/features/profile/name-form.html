@@ -1,0 +1,25 @@
+<form class="form" [formRoot]="nameForm">
+  <mat-form-field>
+    <mat-label>First name</mat-label>
+    <input matInput autocomplete="given-name" [formField]="nameForm.first_name" />
+    <mat-hint>As you state it. Left empty, nobody has stated one.</mat-hint>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Family name</mat-label>
+    <input matInput autocomplete="family-name" [formField]="nameForm.last_name" />
+  </mat-form-field>
+
+  @if (failureReason(); as reason) {
+    <p class="notice notice--error" role="alert">{{ reason }}</p>
+  }
+
+  <div class="actions">
+    <button matButton="filled" type="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Saving…' : 'Save name' }}
+    </button>
+    @if (savedAtLeastOnce()) {
+      <span class="saved" role="status">Saved.</span>
+    }
+  </div>
+</form>

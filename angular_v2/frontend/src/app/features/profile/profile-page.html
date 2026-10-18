@@ -1,0 +1,98 @@
+@if (failureReason(); as reason) {
+  <p class="notice notice--error" role="alert">{{ reason }}</p>
+} @else if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Loading your profile" />
+}
+
+@if (member(); as account) {
+  <div class="page">
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Your account</mat-card-title>
+        <mat-card-subtitle>Everything here is a column your role is granted.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <dl class="identity">
+          <div>
+            <dt>Username</dt>
+            <dd>{{ account.username }}</dd>
+          </div>
+          <div>
+            <dt>Account id</dt>
+            <dd>{{ account.id }}</dd>
+          </div>
+          <div>
+            <dt>Member since</dt>
+            <dd>{{ account.created_at | date: 'mediumDate' }}</dd>
+          </div>
+          <div>
+            <dt>Email on file</dt>
+            <dd>{{ account.email }}</dd>
+          </div>
+        </dl>
+
+        <app-geo-place
+          [city]="account.city"
+          [regionCode]="account.region_code"
+          [countryCode]="account.country_code"
+          [source]="account.geo_source"
+          [accuracyKm]="account.geo_accuracy_km"
+          [updatedAt]="account.geo_updated_at"
+        />
+
+        <p class="not-shown">
+          This page cannot tell you when the address above was verified, when the
+          account last passed a sign-in, when it was last observed, or whether it is
+          disabled. Those four columns are outside a member's grant on
+          <code>users</code>, so this page does not ask for them — naming a column the
+          role cannot read fails the whole request — and it does not substitute a
+          guess. <code>email_verified_at</code> in particular is a timestamp rather
+          than a flag, so a page holding it could only say when the address was
+          verified, not that it is still verified today.
+        </p>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Your name</mat-card-title>
+        <mat-card-subtitle>As you state it. Nothing derives a name from your username.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <app-profile-name-form [member]="account" (saved)="reload()" />
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Your email address</mat-card-title>
+        <mat-card-subtitle>The address on file is {{ account.email }}.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <app-email-change-form [currentEmail]="account.email" (requested)="reload()" />
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Your password</mat-card-title>
+        <mat-card-subtitle>The current password is required, so this is not a reset.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <app-profile-password-form />
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Your sign-in history</mat-card-title>
+        <mat-card-subtitle>
+          Attempts recorded against your username, successful and not.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <app-profile-login-history />
+      </mat-card-content>
+    </mat-card>
+  </div>
+}

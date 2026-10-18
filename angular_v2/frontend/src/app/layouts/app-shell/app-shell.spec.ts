@@ -8,8 +8,9 @@ import { AppShell } from './app-shell';
 
 /**
  * A stub `Session`. Permitted here and only here (AGENTS.md §2.2): the shell needs
- * the role to display and a `logout` to call, and the real service would open an
- * HTTP resource. `Session`'s own behaviour is asserted in `session.service.spec.ts`.
+ * the role to display and to decide which destinations to offer, and a `logout` to
+ * call, and the real service would open an HTTP resource. `Session`'s own behaviour
+ * is asserted in `session.service.spec.ts`.
  */
 class SessionStub {
   readonly databaseRole = signal<string | null>('app_admin');
@@ -41,8 +42,7 @@ describe('AppShell', () => {
   let fixture: ComponentFixture<AppShell>;
   let session: SessionStub;
 
-  beforeEach(async () => {
-    session = new SessionStub();
+  async function render(): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [AppShell],
       providers: [provideRouter(routes), { provide: Session, useValue: session }],
@@ -51,6 +51,17 @@ describe('AppShell', () => {
     fixture = TestBed.createComponent(AppShell);
     fixture.detectChanges();
     await fixture.whenStable();
+  }
+
+  function hrefs(): (string | null)[] {
+    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a[mat-list-item]')).map(
+      (link) => link.getAttribute('href'),
+    );
+  }
+
+  beforeEach(async () => {
+    session = new SessionStub();
+    await render();
   });
 
   it('renders the brand, the navigation and an outlet for the routed page', () => {
@@ -101,5 +112,38 @@ describe('AppShell', () => {
     const element = fixture.nativeElement as HTMLElement;
 
     expect(element.querySelector('.shell__role')?.textContent).toBe('app_admin');
+  });
+
+  /**
+   * ONE list of destinations, filtered by audience — not two lists. A second copy is
+   * a second thing to forget to update, and the failure is a nav that offers
+   * `/users` to a member or hides it from an administrator, which no route-resolution
+   * test would catch.
+   */
+  it('offers the administrator both destinations', () => {
+    expect(hrefs()).toEqual(['/profile', '/users']);
+  });
+
+  it('offers a member only their own profile, and keeps the route itself reachable', () => {
+    session.databaseRole.set('app_member');
+    fixture.detectChanges();
+
+    // Hidden from the nav because it answers an administrator's question...
+    expect(hrefs()).toEqual(['/profile']);
+    // ...and still a real route, because a hidden link is not access control and the
+    // database is the authority (AGENTS.md §F7).
+    expect(pagePaths(routes)).toContain('/users');
+  });
+
+  /**
+   * `databaseRole()` is `null` until `/auth/me` resolves, so the first render is the
+   * same for every session — which is the reason the profile entry is the one marked
+   * for everybody rather than the Users entry.
+   */
+  it('offers the profile destination before the role is known', () => {
+    session.databaseRole.set(null);
+    fixture.detectChanges();
+
+    expect(hrefs()).toEqual(['/profile']);
   });
 });

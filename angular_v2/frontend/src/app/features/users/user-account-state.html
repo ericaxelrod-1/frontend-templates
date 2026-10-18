@@ -1,0 +1,43 @@
+@if (blocked()) {
+  <span class="blocked">not readable for this role</span>
+} @else {
+  @if (erasedAt(); as when) {
+    <span class="entry">
+      <span class="entry__headline">Erased {{ when | date: 'mediumDate' }}</span>
+      <span class="entry__detail">
+        @if (record().deletionReason | codeLabel: deletionReasons; as reason) {
+          {{ reason }}.
+        }
+        @if (record().emailAnonymized === true) {
+          The email address was anonymized.
+        }
+      </span>
+    </span>
+  }
+
+  @if (disabledAt(); as when) {
+    <span class="entry">
+      <span class="entry__headline">Disabled {{ when | date: 'mediumDate' }}</span>
+      <span class="entry__detail">
+        @if (record().disabledReason | codeLabel: disabledReasons; as reason) {
+          {{ reason }}.
+        }
+        @if (record().disabledBy; as disabledBy) {
+          Recorded against administrator {{ disabledBy }}.
+        } @else {
+          No administrator is recorded against this disable, which the reason above is
+          required to explain.
+        }
+        @if (temporary() && disabledUntil(); as until) {
+          Temporary: the suspension runs until {{ until | date: 'mediumDate' }}.
+        } @else {
+          Permanent: no end is recorded, and nothing expires it automatically.
+        }
+      </span>
+    </span>
+  }
+
+  @if (erasedAt() === null && disabledAt() === null) {
+    <span class="none">No erasure and no disable recorded.</span>
+  }
+}

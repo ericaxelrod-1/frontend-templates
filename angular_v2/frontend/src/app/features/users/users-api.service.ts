@@ -12,26 +12,79 @@ import type { components } from '../../api/schema';
  * exported: the only consumer is this service, and they exist to describe a
  * request this service makes — a narrower contract than the whole table.
  */
-type UsersRow = Pick<components['schemas']['users'], 'id' | 'username' | 'email' | 'created_at'>;
+type UsersTable = components['schemas']['users'];
 type UserGroupsRow = Pick<components['schemas']['user_groups'], 'user_id' | 'group_id'>;
 type GroupsRow = Pick<components['schemas']['groups'], 'id' | 'name'>;
 type UserRolesRow = Pick<components['schemas']['user_roles'], 'user_id' | 'role_id'>;
 type RolesRow = Pick<components['schemas']['roles'], 'id' | 'name'>;
 
 /**
- * The columns a list of users actually needs, and — the reason it is written out
- * rather than `select=*` — the columns `app_member` is granted on `users`.
+ * A `users` row as this service returns it.
  *
- * `0001_rls_foundation.sql` and `0012_user_geo.sql` grant `app_member` a
- * COLUMN-level `SELECT` on `users`, and a column-restricted role cannot use
- * `select=*` at all: the request would be refused. Naming the four columns is what
- * makes one endpoint serve both serving roles.
+ * Exported because it is the service's public return type — a consumer that cannot
+ * name it cannot type a fixture for it, and `users-page.spec.ts` needs one. It is
+ * still narrower than the table: the link and vocabulary rows above stay private,
+ * because nothing outside this file needs them.
  *
- * `password_hash` is absent from every request in this file by the same rule.
- * `app_admin` holds table-level `SELECT` on `users`, so `*` would have handed it
- * every hash in the table to render a list of names.
+ * `Exclude<keyof UsersTable, 'password_hash'>` is the whole safety argument in one
+ * clause: `password_hash` is a CREDENTIAL artifact, not data about a user, so this
+ * Pick cannot include it even by accident — dropping that clause is a type error at
+ * every use of the row, not a review question. And the two column strings below are
+ * hand-written, so `users-api.service.spec.ts` asserts them literally rather than
+ * trusting the type to have been noticed.
+ *
+ * Every admin-only column is OPTIONAL in the generated type, so a response to the
+ * MEMBER column set — which has none of those keys — satisfies this shape without a
+ * cast. The type says those columns MAY be present, not that they are: the page
+ * decides what to render from the scope it sent, never from whether a key is there.
  */
-const USER_COLUMNS = 'id,username,email,created_at';
+type UsersRow = Pick<UsersTable, Exclude<keyof UsersTable, 'password_hash'>>;
+
+export type { UsersRow };
+
+/**
+ * Which columns a `users` read may name. Not a preference — it is what makes the
+ * request legal.
+ *
+ * `app_member` holds a COLUMN-level `SELECT` on `users`
+ * (`0023_user_profile_and_disable.sql`), and a column-restricted role cannot use
+ * `select=*` at all: PostgREST refuses the request outright. Naming a column the
+ * role does not hold fails the WHOLE request with `403` — it does not quietly
+ * omit that one key — which is why the member page must not so much as NAME an
+ * admin-only column.
+ */
+export type UsersColumnScope = 'member' | 'admin';
+
+/**
+ * The member grant, in the order `0023_user_profile_and_disable.sql` grants it:
+ *
+ *     (id, username, email, created_at,
+ *      country_code, region_code, city, geo_source, geo_accuracy_km, geo_updated_at,
+ *      first_name, last_name)
+ *
+ * Every serving role holds this set, so naming it is always legal and it is the
+ * right request whenever the caller's role is not known to be `app_admin`.
+ */
+const MEMBER_USER_COLUMNS =
+  'id,username,email,created_at,country_code,region_code,city,geo_source,geo_accuracy_km,geo_updated_at,first_name,last_name';
+
+/**
+ * Every column `users` has EXCEPT `password_hash`.
+ *
+ * `app_admin` holds table-level `SELECT` on `users`, so it may name anything at
+ * all — and `*` would be the shorter way to say the same thing. It is spelled out
+ * for the opposite reason: `select=*` under a table-level grant hands back every
+ * hash in the table to render a list of names, and a list of column names is a
+ * thing a reviewer can read and a test can assert. `password_hash` is the one
+ * column absent from both strings in this file, and it is absent because it is a
+ * credential artifact: it is in no page's column list, in no `SELECT`, and in no
+ * query the browser can make.
+ */
+const ADMIN_USER_COLUMNS =
+  'id,username,email,created_at,first_name,last_name,last_login_at,last_activity_at,' +
+  'email_verified_at,deleted_at,deletion_reason,email_anonymized,' +
+  'country_code,region_code,city,geo_source,geo_accuracy_km,geo_updated_at,' +
+  'disabled_at,disabled_by,disabled_reason,disabled_until';
 
 /** Group names per user id. Readable by every serving role. */
 export type GroupNamesByUserId = ReadonlyMap<string, readonly string[]>;
@@ -40,10 +93,27 @@ export type GroupNamesByUserId = ReadonlyMap<string, readonly string[]>;
 export type RoleNamesByUserId = ReadonlyMap<string, readonly string[]>;
 
 /**
- * Reads for the Users page. This is the only file that talks to PostgREST.
+ * The column scope for a database role, defaulting to the narrowest set.
  *
- * The three methods are three loads rather than one because the grants are not
- * uniform, and that is the point of the page rather than a defect in it:
+ * The role comes from `GET /auth/me` and is a DB role name, not a capability
+ * (AGENTS.md §B5) — so this is a UX decision about which columns to ASK for, never
+ * an authorization one. `app_admin` happens to hold the wide grant; any other role,
+ * and any role this build has never heard of, gets the twelve columns every serving
+ * role holds. Getting it wrong cannot widen anything: if the token claims
+ * `app_admin` without the grant behind it, PostgREST answers `403` and the page
+ * reports that rather than showing blanks.
+ */
+export function columnScopeFor(databaseRole: string | null): UsersColumnScope {
+  return databaseRole === 'app_admin' ? 'admin' : 'member';
+}
+
+/**
+ * Reads for the Users page. This is the only file that talks to PostgREST for
+ * `users`.
+ *
+ * The three association reads are three separate loads rather than one because the
+ * grants are not uniform, and that is the point of the page rather than a defect in
+ * it:
  *
  * - `users` — every serving role may read it; `app_member` sees only its own row
  *   (`users_read_scope`, which admits `current_user = 'app_admin'` and otherwise
@@ -63,8 +133,18 @@ export type RoleNamesByUserId = ReadonlyMap<string, readonly string[]>;
 export class UsersApi {
   private readonly http = inject(HttpClient);
 
-  users(): Observable<readonly UsersRow[]> {
-    return this.table<UsersRow>('users', { select: USER_COLUMNS, order: 'created_at' });
+  /**
+   * The `users` rows this role may read, with the columns it may name.
+   *
+   * `order=created_at` is the one thing this method does impose, and it is
+   * ordering rather than filtering: which rows come back is the policy's decision,
+   * and the page says so next to the count.
+   */
+  users(scope: UsersColumnScope): Observable<readonly UsersRow[]> {
+    return this.table<UsersRow>('users', {
+      select: scope === 'admin' ? ADMIN_USER_COLUMNS : MEMBER_USER_COLUMNS,
+      order: 'created_at',
+    });
   }
 
   groupNamesByUserId(): Observable<GroupNamesByUserId> {
@@ -119,7 +199,7 @@ interface UserLink {
  */
 function namesByUserId(
   links: readonly UserLink[],
-  targets: readonly { readonly id: string; readonly name: string }[]
+  targets: readonly { readonly id: string; readonly name: string }[],
 ): GroupNamesByUserId {
   const namesById = new Map(targets.map((target) => [target.id, target.name]));
   const result = new Map<string, string[]>();

@@ -11,11 +11,39 @@ import { map } from 'rxjs/operators';
 import { Session } from '../../core/auth/session.service';
 
 /**
+ * Who an entry is FOR, not whether the route exists.
+ *
+ * `'every-member'` is for a destination every signed-in user can act on;
+ * `'app_admin'` is for one that answers a question only an administrator is asking.
+ * The route behind either exists either way — this decides who is OFFERED it, and
+ * nothing else. `UsersPage` is reachable by a member who types the URL, and it
+ * renders what their grant allows plus "not readable for this role" for the rest
+ * (AGENTS.md §F7: a hidden link is not access control, and the database is the
+ * authority).
+ */
+type NavAudience = 'every-member' | 'app_admin';
+
+/**
  * One entry per route that exists. `app-shell.spec.ts` resolves every one of
  * these against the router configuration, so a nav link to a route nobody built
  * fails a test instead of rendering an empty page (AGENTS.md §2.1).
+ *
+ * The audience is declared HERE, on the one list, rather than by maintaining two
+ * lists. A second copy is a second thing to forget to update: the failure mode is
+ * a nav that offers `/users` to a member, or hides it from an administrator, and
+ * neither is caught by a test that only checks the links resolve.
  */
-const NAV_ITEMS = [{ label: 'Users', path: '/users' }] as const;
+const NAV_ITEMS: readonly NavItem[] = [
+  { label: 'My profile', path: '/profile', audience: 'every-member' },
+  { label: 'Users', path: '/users', audience: 'app_admin' },
+];
+
+/** One destination in the sidenav. */
+interface NavItem {
+  readonly label: string;
+  readonly path: string;
+  readonly audience: NavAudience;
+}
 
 /**
  * The application shell: a sidenav holding the destinations, a toolbar, and the
@@ -85,7 +113,26 @@ export class AppShell {
   private readonly router = inject(Router);
   private readonly breakpoints = inject(BreakpointObserver);
 
+  /**
+   * The whole list. It is what `app-shell.spec.ts` checks against the route table,
+   * and it is kept complete on purpose: a nav entry is removed from here by
+   * removing its route, never by narrowing this field.
+   */
   protected readonly navItems = NAV_ITEMS;
+
+  /**
+   * The subset this session is offered, derived rather than configured.
+   *
+   * `databaseRole()` is `null` until `/auth/me` resolves, and `null` matches
+   * neither `'every-member'` by identity nor `'app_admin'`, so the sidenav starts
+   * with the one destination everyone can reach and gains the administrator's once
+   * the role is known. That ordering is the reason the profile entry is marked
+   * `'every-member'`: the first render is the same for every session.
+   */
+  protected readonly visibleNavItems = computed(() => {
+    const role = this.session.databaseRole();
+    return NAV_ITEMS.filter((item) => item.audience === 'every-member' || item.audience === role);
+  });
 
   /**
    * `toSignal` rather than a `BehaviorSubject`: the subscription is created and

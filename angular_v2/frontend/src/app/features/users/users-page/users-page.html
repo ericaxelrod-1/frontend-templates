@@ -11,7 +11,16 @@
 
     @if (failureReason(); as reason) {
       <p class="notice notice--error" role="alert">{{ reason }}</p>
-    } @else if (rolesBlocked()) {
+    } @else if (!adminColumnsReadable()) {
+      <p class="notice">
+        This role's grant on <code>users</code> is twelve columns, so the sign-in,
+        verification, erasure and disable columns are not shown. They were not asked
+        for either: a column the role cannot read fails the whole request rather than
+        being dropped from the answer.
+      </p>
+    }
+
+    @if (rolesBlocked()) {
       <p class="notice">
         Role assignments are not readable for this role, so no role names are shown. The
         capability axis is granted at table level to administrators only.
@@ -24,41 +33,110 @@
       </p>
     }
 
-    <table class="users">
-      <caption class="users__caption">
-        Rows returned by PostgREST for the signed-in database role. Nothing is filtered
-        client-side.
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col">Username</th>
-          <th scope="col">Email</th>
-          <th scope="col">Created</th>
-          <th scope="col">Roles</th>
-          <th scope="col">Groups</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (row of rows(); track row.id) {
+    <div class="users__scroll">
+      <table class="users">
+        <caption class="users__caption">
+          Rows returned by PostgREST for the signed-in database role. Nothing is
+          filtered client-side.
+        </caption>
+        <thead>
           <tr>
-            <th scope="row">{{ row.username }}</th>
-            <td>{{ row.email }}</td>
-            <td>{{ row.createdAt | date: 'medium' }}</td>
-            <td>
-              <app-name-list [names]="row.roleNames" [blocked]="rolesBlocked()" />
-            </td>
-            <td>
-              <app-name-list [names]="row.groupNames" [blocked]="groupsBlocked()" />
-            </td>
+            <th scope="col">Account</th>
+            <th scope="col">Name</th>
+            <th scope="col">Email</th>
+            <th scope="col">Created</th>
+            <th scope="col">Email verified</th>
+            <th scope="col">Last credential check</th>
+            <th scope="col">Last observed activity</th>
+            <th scope="col">Place</th>
+            <th scope="col">Account state</th>
+            <th scope="col">Roles</th>
+            <th scope="col">Groups</th>
           </tr>
-        } @empty {
-          <tr>
-            <td class="users__empty" colspan="5">
-              No user rows were returned to this role.
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.id) {
+            <tr>
+              <th scope="row">
+                {{ row.username }}
+                <span class="users__id">{{ row.id }}</span>
+              </th>
+              <td>
+                @if (row.firstName !== null || row.lastName !== null) {
+                  <span class="users__name">
+                    <span>{{ row.firstName }}</span>
+                    <span>{{ row.lastName }}</span>
+                  </span>
+                } @else {
+                  <span class="users__absent">not stated</span>
+                }
+              </td>
+              <td>{{ row.email }}</td>
+              <td>
+                <app-optional-stamp [value]="row.createdAt" />
+              </td>
+              <td>
+                @if (adminColumnsReadable()) {
+                  <app-optional-stamp
+                    [value]="row.emailVerifiedAt"
+                    absentLabel="not verified"
+                  />
+                } @else {
+                  <span class="users__absent">not readable for this role</span>
+                }
+              </td>
+              <td>
+                @if (adminColumnsReadable()) {
+                  <app-optional-stamp
+                    [value]="row.lastLoginAt"
+                    absentLabel="never recorded"
+                  />
+                } @else {
+                  <span class="users__absent">not readable for this role</span>
+                }
+              </td>
+              <td>
+                @if (adminColumnsReadable()) {
+                  <app-optional-stamp
+                    [value]="row.lastActivityAt"
+                    absentLabel="never observed"
+                  />
+                } @else {
+                  <span class="users__absent">not readable for this role</span>
+                }
+              </td>
+              <td>
+                <app-geo-place
+                  [city]="row.city"
+                  [regionCode]="row.regionCode"
+                  [countryCode]="row.countryCode"
+                  [source]="row.geoSource"
+                  [accuracyKm]="row.geoAccuracyKm"
+                  [updatedAt]="row.geoUpdatedAt"
+                />
+              </td>
+              <td>
+                <app-user-account-state
+                  [record]="row"
+                  [blocked]="!adminColumnsReadable()"
+                />
+              </td>
+              <td>
+                <app-name-list [names]="row.roleNames" [blocked]="rolesBlocked()" />
+              </td>
+              <td>
+                <app-name-list [names]="row.groupNames" [blocked]="groupsBlocked()" />
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td class="users__empty" colspan="11">
+                No user rows were returned to this role.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
   </mat-card-content>
 </mat-card>

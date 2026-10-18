@@ -1,0 +1,20 @@
+@if (hasPlace()) {
+  <span class="place">{{ placeLabel() }}</span>
+  @if (source() | codeLabel: sourceLabels; as label) {
+    <span class="provenance">{{ label }}</span>
+  } @else {
+    <span class="provenance">source not recorded</span>
+  }
+  @if (radius(); as claim) {
+    <span class="radius">{{ claim }}</span>
+  } @else {
+    <span class="radius">radius not recorded</span>
+  }
+  @if (updatedAt(); as observed) {
+    <span class="provenance">observed {{ observed | date: 'medium' }}</span>
+  } @else {
+    <span class="provenance">observation date not recorded</span>
+  }
+} @else {
+  <span class="absent">no place recorded</span>
+}

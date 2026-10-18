@@ -1,0 +1,68 @@
+@if (failureReason(); as reason) {
+  <p class="notice notice--error" role="alert">{{ reason }}</p>
+}
+
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Loading sign-in history" />
+}
+
+<div class="attempts__scroll">
+  <table class="attempts">
+    <caption class="attempts__caption">
+      The rows in <code>login_attempts</code> whose username is yours. The table has no
+      user id — it is deliberately text, so an attempt against a username that does not
+      exist is still recorded. Your username is immutable, so this history does not
+      fragment if anything else about the account changes.
+    </caption>
+    <thead>
+      <tr>
+        <th scope="col">When</th>
+        <th scope="col">Kind</th>
+        <th scope="col">Outcome</th>
+        <th scope="col">Address</th>
+        <th scope="col">Subnet</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (attempt of attempts(); track attempt.id) {
+        <tr>
+          <td>{{ attempt.created_at | date: 'medium' }}</td>
+          <td>
+            @if (attempt.attempt_kind | codeLabel: attemptKinds; as kind) {
+              {{ kind }}
+            } @else {
+              <span class="attempts__absent">not recorded</span>
+            }
+          </td>
+          <td>
+            @if (attempt.status === 'failed') {
+              <span class="attempts__failed">{{ attempt.status | codeLabel: statuses }}</span>
+            } @else {
+              {{ attempt.status | codeLabel: statuses }}
+            }
+          </td>
+          <td>
+            @if (attempt.ip; as ip) {
+              {{ ip }}
+            } @else {
+              <span class="attempts__absent">not recorded</span>
+            }
+          </td>
+          <td>
+            @if (attempt.ip_subnet; as subnet) {
+              {{ subnet }}
+            } @else {
+              <span class="attempts__absent">not recorded</span>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr>
+          <td class="attempts__empty" colspan="5">
+            No attempt rows were returned for your username.
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

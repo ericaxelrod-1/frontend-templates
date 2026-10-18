@@ -27,9 +27,10 @@ import { Router, RouterLink } from '@angular/router';
           <mat-card-subtitle>Nothing is mapped to <code>{{ attemptedPath }}</code>.</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
-          <p>These are the pages that exist:</p>
-          <a matButton="filled" routerLink="/users">Users</a>
-          <a matButton routerLink="/login">Sign in</a>
+<p>These are the pages that exist:</p>
+        <a matButton="filled" routerLink="/profile">My profile</a>
+        <a matButton routerLink="/users">Users</a>
+        <a matButton routerLink="/login">Sign in</a>
         </mat-card-content>
       </mat-card>
     </main>

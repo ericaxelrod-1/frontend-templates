@@ -107,7 +107,10 @@ export class LoginPage {
     try {
       const { username, password } = this.credentials();
       await lastValueFrom(this.session.login({ username, password }));
-      await this.router.navigateByUrl('/users');
+      // `/profile`, matching the shell's `/` redirect: it is the one route every
+      // signed-in user can act on, so an administrator lands there and is one click
+      // from the Users page and a member is not shown a page they cannot use.
+      await this.router.navigateByUrl('/profile');
     } catch (error) {
       // Nothing is swallowed: the reason reaches the page, and the cause is on
       // the wire in the network tab.

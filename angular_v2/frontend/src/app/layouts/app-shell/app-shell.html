@@ -3,7 +3,7 @@
     <div class="shell__brand">angular_v2</div>
     <mat-divider />
     <mat-nav-list>
-      @for (item of navItems; track item.path) {
+      @for (item of visibleNavItems(); track item.path) {
         <a
           mat-list-item
           [routerLink]="item.path"
