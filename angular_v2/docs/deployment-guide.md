@@ -19,7 +19,7 @@ ports are the defaults; §Ports below is how to move them.
 | Process | Port | Role |
 |---|---|---|
 | **PostgREST** | `127.0.0.1:3001` | The API layer. Serves the base tables directly from PostgreSQL and enforces row-level security. Every CRUD request goes here, not through Nest. |
-| **Thin Nest app** | `127.0.0.1:3000` | Only what PostgREST cannot do: JWT issuance, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, brute-force delay, self-service privacy erasure, and scheduled retention jobs under Postgres advisory locks. Default deny — every other route needs a token. |
+| **Thin Nest app** | `127.0.0.1:3000` | Only what PostgREST cannot do: JWT issuance, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, brute-force delay, authenticated privacy erasure API, and scheduled retention jobs under Postgres advisory locks. Default deny — every other route needs a token. |
 | **Angular SSR server** | `127.0.0.1:4000` | Serves the app. Reads `SSR_PORT`, defaults to 4000. |
 
 Both PostgREST and the thin app verify the **same** JWT secret, and the thin

@@ -173,11 +173,12 @@ one that was found **after** the docs claimed it was handled:
      with a timeout. The resolver's recursive term must use `UNION`, not `UNION ALL`;
      the `UNION ALL` form is **non-terminating** and hangs.
 
-### Two of the above are not implemented, and a test for them cannot pass yet
+### Implementation and test status of the controls above
 
-- **Item 6 (the grant-subset rule) has nothing to test.** No trigger exists; the
-  migration grants `app_admin` full `INSERT` on `role_permissions` and `user_roles`
-  and records no gap. Write the failing test when **W08b** lands. `rebase.md`.
+- **Item 6 (the grant-subset rule) is enforced and tested.** `0004_grant_subset.sql`
+  implements `role_permissions_grant_subset` and `user_roles_grant_subset` triggers
+  via `assert_grant_subset()`, raising `42501` when conferring permissions or roles
+  exceeding the grantor's closure. Tested in `backend/test/rls/grant-subset.spec.ts`.
 - **Item 9's companion — `is_system_role` as the administrative floor — is now
   enforced** by a `BEFORE` row trigger on both `roles` and `groups`. Assert a
   `DELETE` and an `UPDATE` of a floor row are refused as `app_admin`, that the same

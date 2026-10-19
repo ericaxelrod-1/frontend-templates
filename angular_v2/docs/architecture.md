@@ -122,9 +122,9 @@ backend/
 │   │   ├── breaker-state.ts   the state machine, pure
 │   │   ├── breaker.interceptor.ts  the APP_INTERCEPTOR: GATE for thin-app routes
 │   │   └── dispatch-token.ts  service.method, the one vocabulary §9B.1 shares
-│   ├── privacy/           self-service erasure and compliance audit
+│   ├── privacy/           authenticated erasure and compliance audit
 │   │   ├── erasure.service.ts      erasure — anonymises user, revokes sessions, records audit
-│   │   ├── privacy.controller.ts   POST /privacy/erase-me
+│   │   ├── privacy.controller.ts   POST /privacy/erase
 │   │   └── erasure-environment.ts  pepper and tombstone domain, validated at boot
 │   ├── purge/             retention — see docs/rebase.md §9A
 │   │   ├── purge-sweeper.service.ts  purge.sweeper — claims, deletes, marks done
@@ -180,13 +180,13 @@ enforcement.** The privacy and retention features (`docs/rebase.md` §9, ADR-002
 ADR-0030, ADR-0031, ADR-0033) combine migrations, application endpoints, and
 background jobs:
 
-- **Self-service erasure lives in `src/privacy/`.** `PrivacyController` exposes
-  `POST /privacy/erase-me` (`JwtAuthGuard`), delegating to `ErasureService`.
+- **Authenticated erasure lives in `src/privacy/`.** `PrivacyController` exposes
+  `POST /privacy/erase` (`JwtAuthGuard`), delegating to `ErasureService`.
   Erasure anonymises the subject in `users`, neutralises usernames in
   `login_attempts`, revokes active `refresh_tokens`, and appends statutory compliance
   records to `privacy_request_audits` via `authz.record_erasure_audit`. There is no
   arbitrary admin cancel or DSAR request workflow route; `privacy_requests` remains
-  table-driven.
+  table-driven. Note that this is an API route with no UI surface.
 - **Retention scanning and queue draining live in `src/purge/`.** `PurgeEnqueuer`
   scans for due tombstones and dormant accounts hourly, enqueuing them via
   `authz.enqueue_inactive_purges`, while `PurgeSweeper` claims and executes due
@@ -323,8 +323,9 @@ it. Both are asserted in a test.
 > `verify`. `groups`, `user_groups`, `org_closure`, `actions`, `permissions`,
 > `roles`, `role_permissions`, `user_roles` and `has_permission()` are all in the
 > tree; the superseded `sites` / `site_id`-claim design is gone. Two things to keep
-> in view: the **grant-subset trigger** is **not implemented**
-> (`rebase.md` W08b), so least privilege is half-enforced; and — most importantly —
+> in view: the **grant-subset trigger** is **enforced**
+> (`0004_grant_subset.sql`, raising `42501`), closing the capability side of
+> least privilege; and — most importantly —
 > **the identity source is a caller-writable GUC**. `request.jwt.claims` can be
 > `SET` by any role; the only control is that no request-reachable SQL path can reach
 > the `SET`, and `db-pre-request` is a planned one. ADR-0023 §F1.

@@ -220,18 +220,19 @@ three are meaningless on a plain-HTTP loopback listener.
 
 ## Cookies and consent
 
-**This template sets no cookie, reads no cookie, stores no consent, and loads no
-tracker.** That is a checked absence, not an observation: the §`Not yet present`
-ledger in [`deployment-guide.md`](./deployment-guide.md) greps application code,
-the migrations and the environment files for the cookie API, a `cookie_consent`
-table and a fixed list of analytics vendors, so adding one without deciding what
-to do about consent turns `verify` red.
+**This template sets no cookie, reads no cookie, and loads no tracker.** That
+is a checked absence, not an observation: the §`Not yet present` ledger in
+[`deployment-guide.md`](./deployment-guide.md) greps application code and the
+migrations for the cookie API, a `cookie_consent` table and a fixed list of
+analytics vendors, so adding one without deciding what to do about consent
+turns `verify` red.
 
-It is also a deliberate position rather than a gap, and the argument is short: **a
-consent banner is only meaningful once something consumes the consent.** A banner
-over an empty set of cookies is a compliance-shaped artifact with no compliance
-behind it — it is worse than its absence, because it reads as evidence during the
-exact review it was meant to satisfy.
+The consent data model (`0028_consent_model.sql`) and consent controls have
+shipped — a universal widget on public pages, a settings surface inside the app
+— and a decision is stored (in the browser for an anonymous visitor and in
+`consent_records` for a signed-in user). What remains absent is anything the
+consent would have to gate: this tree sets no cookie, reads no cookie, and loads
+no tracker.
 
 The session token is in `localStorage`, not a cookie, and that choice is
 deliberate and documented in `session.service.ts`. `localStorage` is not
@@ -243,10 +244,10 @@ out of reach of injected script entirely, and it is the change a fork that wants
 cookie-based sessions should make first.
 
 **The obligation attaches the moment a fork adds a tracker or any non-essential
-cookie.** At that point GDPR and UK GDPR consent requirements apply to it, and the
-template will not supply a banner: the consent mechanism belongs to the thing that
-needs consent, and it is written knowing what is being gated. Two obligations
-survive that fork and neither is optional:
+cookie.** At that point GDPR and UK GDPR consent requirements apply to it, and
+the tag machinery — `consent_tags`, `consent_page_groups`, and the generic
+injector that runs a vendor's snippet verbatim — is what gates it. Two
+obligations survive that fork and neither is optional:
 
 1. **The banner has to be wired, not merely rendered.** A consent record nobody
    reads is the artifact-without-compliance case again, one layer up.
@@ -454,22 +455,21 @@ policies are **OR**ed, so they always **widen** access.
 > - **Denial tests could never have caught this.** Assert the **positive** case: an
 >   actor that *holds* a permission *passes*.
 
-**Least privilege runs in both directions — and only one of them is enforced.**
+**Least privilege runs in both directions — and both are enforced.**
 
 - **"An account manager cannot create a user outside their own RLS scope"** is
   enforced — the `user_groups` insert is a scoped write, and the policy's
   `WITH CHECK` rejects a `group_id` outside the actor's closure, in the database.
-- **"They cannot grant a capability they themselves do not have"** needs a trigger,
-  because a `role_permissions` write is **unscoped** and RLS has no group dimension
-  to filter it by. A `BEFORE INSERT OR UPDATE` trigger on `role_permissions` **and**
-  `user_roles` is supposed to check that the actor's effective permission set is a
-  **superset** of what is being conferred and raise `42501` otherwise.
-  **It does not exist.** `app_admin` holds full `INSERT`/`UPDATE`/`DELETE` on both
-  tables with nothing filtering them, so today any account manager confers any
-  capability. The invariant is **not met**, and the sketch is vacuous in any case for
-  a caller who already holds the permission being conferred — `roles.admin` confers
-  everything its holder has. Sketch: ADR-0023 §Least privilege. Tracked: `rebase.md`
-  **W08b**.
+- **"They cannot grant a capability they themselves do not have"** is enforced
+  by the grant-subset trigger (`0004_grant_subset.sql`), because a `role_permissions`
+  write is **unscoped** and RLS has no group dimension to filter it by. A `BEFORE
+  INSERT OR UPDATE` trigger on `role_permissions` **and** `user_roles`
+  (`assert_grant_subset()`) checks that the actor's effective permission set is a
+  **superset** of what is being conferred and raises `42501` otherwise (asserted by
+  `backend/test/rls/grant-subset.spec.ts`). Two residual properties are documented
+  in ADR-0023 and the migration: the check is defense in depth (vacuous for a
+  grantor conferring exactly what it holds, pending separation of duty) and reads
+  the actor from `authz.actor()`.
 
 **`is_system_role` / `is_system_group` are the administrative floor, and they are
 enforced.** A row that *is* a floor row may not be `UPDATE`d or `DELETE`d except

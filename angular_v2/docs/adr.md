@@ -786,9 +786,10 @@ stripping (ADR-0024).
 ## ADR-0023: Two orthogonal authorization axes — scope in RLS, capability in OLS
 
 **Status:** Accepted, and **shipped**. `backend/database/migrations/0001_rls_foundation.sql`
-implements this design and `backend/test/rls/rls.spec.ts` proves it with **68**
-tests run by `npm run verify`. One clause is **not** enforced yet and is marked where
-it appears: the grant-subset rule (§Least privilege). The superseded claim-keyed design
+implements this design and `backend/test/rls/rls.spec.ts` proves it with tests
+run by `npm run verify`. The grant-subset rule (§Least privilege), initially noted
+as unenforced, was implemented by `0004_grant_subset.sql` (`assert_grant_subset()`
+raising `42501`, proven in `grant-subset.spec.ts`). The superseded claim-keyed design
 is recorded below, labelled, because a decision record that deletes its own
 reversals is not a record.
 
@@ -1054,14 +1055,14 @@ CREATE POLICY row_scope ON projects USING (
 ```
 
 > **Migration status, stated plainly.** `0001_rls_foundation.sql` **has** been
-> rewritten to this design and the RLS suite has been rewritten against it: **68
-> tests**, green, run by `verify`. `grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids|claim_site_id|request_claims)\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/`
+> rewritten to this design and the RLS suite has been rewritten against it,
+> green, run by `verify`. `grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids|claim_site_id|request_claims)\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/`
 > returns nothing — it asserts on the **executable construct**, not on the bare
 > word, because the SUPERSEDED NOTE quotes `sites`, `claim_site_id()` and
 > `site_tree_ids()` in order to explain the withdrawal, so a substring gate returns
 > lines and reads as a failure. A green `test:rls` **is** evidence for this
-> ADR, with two stated exceptions: the **grant-subset trigger** is **not** enforced
-> (§Least privilege) and the whole scope axis rests on a caller-writable GUC (§F1).
+> ADR: the **grant-subset trigger** is enforced by `0004_grant_subset.sql`
+> (raising `42501`), while the scope axis rests on a caller-writable GUC (§F1).
 
 | Input | Result |
 |---|---|
@@ -2495,7 +2496,7 @@ The claims that replaced it, each directly checkable:
 ### Migration status, and what is still not built
 
 **The design in this ADR is shipped.** `backend/database/migrations/0001_rls_foundation.sql`
-implements it and `backend/test/rls/rls.spec.ts` proves it with **68** tests run by
+implements it and `backend/test/rls/rls.spec.ts` proves it with tests run by
 `npm run verify`. `grep -rnE 'CREATE[[:space:]]+(TEMP(ORARY)?[[:space:]]+)?TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?sites\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?FUNCTION[[:space:]]+[^[:space:]]*(site_tree_ids|claim_site_id|request_claims)\b|CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?VIEW' backend/database/`
 returns nothing — it asserts on the **executable construct**, not on the bare
 word, because the SUPERSEDED NOTE quotes `sites`, `claim_site_id()` and
@@ -2505,7 +2506,7 @@ which it was not before the W26/W27 rewrite.
 
 | Claim | Status |
 |---|---|
-| the grant-subset rule — a caller cannot grant a capability it does not hold | **NOT IMPLEMENTED.** `app_admin` holds full `INSERT` on `role_permissions` and `user_roles` with nothing filtering them. §Least privilege. **W08b** |
+| the grant-subset rule — a caller cannot grant a capability it does not hold | **ENFORCED.** Shipped in `0004_grant_subset.sql`; `BEFORE INSERT OR UPDATE` triggers on `role_permissions` and `user_roles` raise `42501` via `assert_grant_subset()`. Proven in `grant-subset.spec.ts`. Residuals: defense in depth and actor from `authz.actor()`. §Least privilege. **W08b** |
 | scope is keyed on something the caller cannot forge | **IT IS NOT, AND CANNOT BE.** `request.jwt.claims` is a caller-writable GUC; the control is the absence of a request-reachable `SET` path. §F1. **P0 if that surface appears** |
 
 One control that was decorative and is now enforced, and one trade that is not a
@@ -2531,6 +2532,11 @@ defect but is easy to mistake for one:
 (9 tests) prove it, both run by `npm run verify`. **Decision 2 was rewritten**:
 the mode-driven three-transport table it originally carried is superseded by the
 one-transport/two-destination shape below, and the rest of the ADR stands.
+**Note on callers (overtaken):** The initial consequence that `EmailService` had
+no production caller was overtaken when token-based flows, privacy erasure, and
+email changes shipped. `EmailService` now has five production callers across
+`TokenService` (password reset, email verification, erasure receipt),
+`ErasureService` (erasure receipt), and `UsersService` (email change).
 
 **Context.** `angular/` had two email implementations and both were wrong in
 ways that compounded:
@@ -2718,7 +2724,9 @@ mail configuration booted happily and mailed nobody.
   stripping. That is not a preference: the alternative was a second, hand-written
   copy of the sink in plain JavaScript, and two copies of one sink is precisely
   the failure this slice exists to remove.
-- `EmailService` currently has **no production caller**. That is stated, not
+- `EmailService` currently has **no production caller** *(overtaken: five
+  production callers subsequently shipped across `TokenService`, `ErasureService`,
+  and `UsersService`)*. That is stated, not
   stubbed: the routes that will call it — registration and password reset — need
   a token table, and `backend/database/**` is not this slice's to touch.
   `AuthModule` imports `EmailModule` so the provider is configured and the
@@ -2946,10 +2954,11 @@ stored by default.**
   deliberately opens no connection. A required fourth parameter would not compile it
   and an unconditional write would fail it for a reason unrelated to what it tests.
   So when `userId` is absent nothing is written **and a warning names exactly what was
-  missing** — a hole in the trail, reported rather than swallowed. There is no
-  production caller yet (ADR-0024 §Consequences), so it costs nothing today and
-  closes when the registration and reset routes land, since they already hold the
-  user row they are mailing. **Every production caller must pass `userId`.**
+  missing** — a hole in the trail, reported rather than swallowed. There was no
+  production caller yet when drafted (ADR-0024 §Consequences; *overtaken: five production
+  callers subsequently landed across `TokenService`, `ErasureService`, and `UsersService`*),
+  so it cost nothing then and closed when the token and privacy routes landed,
+  since they hold the user row they are mailing. **Every production caller must pass `userId`.**
 - **The migration disables `role_permissions`' grant-subset trigger for one
   statement**, because `assert_grant_subset()` (0004) refuses a write with no caller
   identity that is not the superset principal — which is exactly what a migration is,

@@ -447,10 +447,10 @@ migrations. Every policy gets a test (per `AGENTS.md` B8).
 > returns **nothing**. The bare-substring gate that gate replaced did **not**
 > reproduce — it returned three lines, all of them the SUPERSEDED NOTE explaining
 > the withdrawal, which §6.0.1 scores as a failure. The suite was rewritten with
-> the migration and now runs **68** tests.
-> **Three clauses are declared and not enforced** — the grant-subset trigger
-> (W08b) and the caller-writable identity GUC (W37). A green
-> `test:rls` is evidence for the shape, with those three exceptions.
+> the migration and runs green in `verify`.
+> The **grant-subset trigger** (`0004_grant_subset.sql`, W08b) is now enforced,
+> raising `42501`. The remaining clause to keep in view is the caller-writable
+> identity GUC (W37). A green `test:rls` is evidence for the shape.
 >
 > The rewritten baseline must also declare **every table in one of FOUR
 > scoping categories**, because the primary key follows from the category and
@@ -681,7 +681,7 @@ it is deliberately narrower than it looks — see §6.0.1.
 | W07 | N2 | **SUPERSEDED (not done).** Native RLS policies per ADR-0023. It was implemented and proved, and the proof is real: **one composed policy per operation**, fail-closed, `FORCE ROW LEVEL SECURITY`, and the identity read from `request.jwt.claims`. **The scope key, the hierarchy mechanism, and the capability model are all withdrawn**: it keys scope on a `site_id` claim, evaluates a recursive `site_tree_ids()` walk **per candidate row**, and carries capability in a table keyed on a PostgreSQL role name. See W26/W27 — neither is a rewrite of this item, they are this item re-specified | Permitted returns rows; denied returns none; per access path; **and the policy still applies when run as the owner role**. Plus: no `(relid, cmd)` pair carries two `polpermissive` rows. **All of it must be re-executed against the closure-join schema**: the 33 green tests are the superseded design's |
 | W08 | N2 | Column + table grants; `REVOKE ALL FROM PUBLIC` first, then `REVOKE SELECT` **at table level** before the column list | Assert `SELECT` is **denied**, not merely omitted. The column-revoke-only order fails **open** — verified |
 | W08a | N2 | **Capability as `resource` + `action` over a table, resolved by `has_permission()` from `user_roles`.** Recorded by executed design testing, not by argument. **CORRECTED:** the closure table was listed here among the rejected hierarchy alternatives — that rejection was of *incremental repair*, and closure refreshed wholesale is now the design (§6.6.4). `ltree` and the per-session scope cache remain rejected, each with evidence. **Also corrected:** this item originally specified `role_capability(db_role, capability)`, which left the `roles` table referenced by nothing; `role_permissions.role_id` is now a real FK | Five permissions need **31** roles as grants; a new permission in an existing role is **one inserted row**; the hierarchy alternatives (scope cache, `ltree`) each rejected with evidence and the **closure table reversed**, with the surviving rule being *compare membership, not counts* — §6.6.2, §6.6.4 |
-| W08b | N2 | **NOT IMPLEMENTED — and the ADR's least-privilege invariant is therefore half-met.** The grant-subset rule: a `BEFORE INSERT OR UPDATE` trigger on `role_permissions` **and** `user_roles` raises `42501` unless the actor's effective permission set is a **superset** of what is being conferred. Needed because a `role_permissions` write is **unscoped** — there is no group dimension for RLS to filter, so the scope half ("an account manager cannot create a user outside their own RLS scope") is free via `WITH CHECK` while this half has no policy to fall back on. **The shipped migration grants `app_admin` full `INSERT` on both tables and records no gap**, so today any account manager confers any capability. **Two defects in the sketch itself, which is why it cannot simply be pasted in:** (i) it is **vacuous for a caller who already holds the permission conferred** — if the grantor holds `roles.admin`, conferring `roles.admin` confers everything the grantor has; it needs a separation-of-duty rule pinned to a row that is not grantable; (ii) it reads the grantor from a caller-writable GUC, reproducing the very hole it exists to close (ADR-0023 §F1). Sketch: ADR-0023 §Least privilege | Writing a `role_permissions` row for a permission the caller lacks raises `42501`; same for a `user_roles` row conferring a role whose effective set exceeds the caller's; a caller who **does** hold it succeeds. Removing the trigger makes the first two succeed, so the test **proves it can fail**. **There is nothing to assert today** — write the failing test when this lands |
+| W08b | N2 | **DONE — shipped in `0004_grant_subset.sql`.** The grant-subset rule: a `BEFORE INSERT OR UPDATE` trigger on `role_permissions` **and** `user_roles` raises `42501` unless the actor's effective permission set is a **superset** of what is being conferred. Closes the unscoped write gap on both tables. Two documented residuals: (i) defense in depth (vacuous for a grantor conferring what it holds, pending separation of duty); (ii) reads the actor from `authz.actor()`. Sketch: ADR-0023 §Least privilege | **Executed and passing.** `backend/test/rls/grant-subset.spec.ts` proves that writing a `role_permissions` row for a permission the caller lacks raises `42501` and the row is absent; conferring an exceeding role raises `42501`; and removing the trigger causes both to succeed, proving the control can fail |
 | W09 | N2 | Plain-SQL migrations, one directory, one table; `NOTIFY pgrst, 'reload schema'` after commit | Every migrated table is reachable at its endpoint |
 | W10 | N2 | `seed.ts` using PostgREST or `psql`, never TypeORM; seeds the three DB roles and an admin user. Must seed **through** the boundary: connect as `pgrst_authenticator`, `SET LOCAL ROLE app_admin` | A fresh `setup` reaches a logged-in state |
 | W11 | N2 | Thin Nest app: JWT issuance, login orchestration, password reset, email, CAPTCHA, cron | Each route has a test; the six security tests in W13 |
@@ -1408,19 +1408,17 @@ three-argument form.
 >   `CREATE VIEW`) returns **nothing**. The bare-substring gate that gate replaced
 >   did **not** reproduce — it returned `0001_rls_foundation.sql:19` and `:21`,
 >   which are the SUPERSEDED NOTE explaining the withdrawal, so under §6.0.1 it
->   read as a failure.
-> - `backend/test/rls/` **has been rewritten too** (**W27, done**). It runs **68**
->   tests against the closure-join schema and `verify` is green at step 7 of 8. So
+> - `backend/test/rls/` **has been rewritten too** (**W27, done**). It runs
+>   against the closure-join schema and `verify` is green at step 7 of 8. So
 >   items 1–8 above are now **evidence for the shipped design**, which they were not
 >   when they were written.
 > - **The §6.6.1 tamper table has now been re-measured** (**W33**, 2026-10-07). Its
 >   `12 / 2 / 3 of 33` figures belonged to the superseded suite and are superseded;
 >   the current table sits in §6.6.1 with real failing-test counts against the
 >   73-test suite.
-> - **Three clauses of the shipped design are declared and not enforced**, and every
->   item above that depends on them inherits the gap: the **grant-subset trigger**
->   (**W08b**) and the
->   **identity source itself** — `request.jwt.claims` is a caller-writable GUC and
+> - The **grant-subset trigger** (**W08b**) is now enforced (`0004_grant_subset.sql`,
+>   raising `42501`). The remaining clause declared and not enforced to keep in view
+>   is the **identity source itself** — `request.jwt.claims` is a caller-writable GUC and
 >   the only control is the absence of a request-reachable `SET`, which
 >   `db-pre-request` would remove (**W37**).
 > - W06 and W07 remain **superseded, not done** (§6.0.1). Their machinery stands;

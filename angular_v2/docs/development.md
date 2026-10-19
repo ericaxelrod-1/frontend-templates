@@ -357,17 +357,17 @@ never touches the other PostgREST instance on 3002.
 > ### ⚠ The tamper figures below are from the superseded suite
 >
 > The migration **has** been rewritten to the closure-join design (**W26, done**) and
-> so has this suite (**W27, done**) — **68 tests**, green, run by `verify` step 7 of 8.
+> so has this suite (**W27, done**), green, run by `verify` step 7 of 8.
 > `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `groups`,
 > `user_groups`, `authz.org_closure` and `has_permission()` are all in the tree; the
 > superseded `sites` / `site_id`-claim shape is gone. So a green `test:rls` **is**
 > evidence for the shipped design now, which it was not when this text was written.
 >
-> **Three clauses of that design are declared and not enforced**, and this section
-> must not imply otherwise: the **grant-subset trigger** (`rebase.md` W08b),
-> **`is_system_role`** as the administrative floor (W34), and the **identity source**
-> — `request.jwt.claims` is a **caller-writable GUC**, verified exploitable by a
-> member, whose only control is the absence of a request-reachable `SET` (W37).
+> Two clauses originally declared as gaps are now enforced: the **grant-subset trigger**
+> (`0004_grant_subset.sql` raising `42501`, W08b) and **`is_system_role`** as the
+> administrative floor (W34). The remaining clause to keep in view is the **identity
+> source** — `request.jwt.claims` is a **caller-writable GUC**, verified exploitable
+> by a member, whose only control is the absence of a request-reachable `SET` (W37).
 >
 > The tamper table was measured against the **old** file and the **old** suite, so
 > read it as a **method** — remove a control, confirm the gate goes red at step 7 of
