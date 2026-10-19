@@ -1,25 +1,24 @@
 /**
- * Same-origin base paths for the two backends, and the reason they are paths
- * and not hosts.
+ * The two HTTP origins this application talks to, written down once each.
  *
- * The browser cannot call either server directly:
+ * `AGENTS.md` §B4: never hand-write a URL. These are the two places a prefix is written
+ * down at all, so every service composes its own path from one of them plus a table
+ * name and a set of query parameters, rather than a URL somebody assembled by hand.
  *
- * - the thin Nest app (`backend/src/main.ts`) registers no CORS policy, so a
- *   cross-origin `POST /auth/login` from `http://localhost:4000` is refused by
- *   the browser before it leaves the page;
- * - `postgrest.conf` sets no `cors-allowed-origins`, so the same is true of the
- *   CRUD layer.
- *
- * Both are loopback services of the Node host, and the host is already in the
- * request path: `src/server.ts` serves the application. So the SSR server proxies
- * these two prefixes to them, and `proxy.conf.json` does the same for `ng serve`.
- * Every request the browser makes is then same-origin, which is also why no
- * token is ever exposed to a third-party origin (AGENTS.md §F6: a relative path,
- * never a hard-coded `localhost` in an environment file).
+ * `proxy.conf.json` forwards both in development — `/api` to the thin Nest app on
+ * `:3000` and `/rest` to PostgREST on `:3001` — and in production the SSR server serves
+ * them from the same origin, which is why neither is an absolute URL (`AGENTS.md` §F6:
+ * `environment.production.ts` must not point at `localhost`).
  */
 
-/** The thin Nest app: authentication and the operations that are not plain CRUD. */
+/** The thin NestJS app: auth, users, privacy and token routes. */
 export const NEST_BASE_URL = '/api';
 
-/** PostgREST: the CRUD API layer described by `src/app/api/schema.ts`. */
+/**
+ * PostgREST, which serves every base table directly.
+ *
+ * `AGENTS.md` §B1 makes PostgREST the API layer for CRUD over a table, so this is where
+ * every table read and write goes — including the generic notification panel, which is
+ * served by the same rule as every other table and needs no controller of its own.
+ */
 export const POSTGREST_BASE_URL = '/rest';

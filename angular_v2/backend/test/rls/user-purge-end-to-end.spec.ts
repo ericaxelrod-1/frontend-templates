@@ -815,6 +815,16 @@ describe('no foreign key naming users can block a purge again', () => {
           String(a[0]).localeCompare(String(b[0])),
         ),
       ).toEqual([
+        // The actor pointers, again: an administrator acknowledging or resolving a
+        // notification must not have their erasure destroy it.
+        ['admin_notifications_acknowledged_by_fkey', 'n'],
+        ['admin_notifications_resolved_by_fkey', 'n'],
+        // `0027`. A notification addressed to a person stands or falls with them, for
+        // the same reason `0024` gave `security_alerts`: the `data` payload carries the
+        // subject's own material — an IP, a pattern hit, an address — so `SET NULL`
+        // would null the link and leave the personal data sitting in a row nothing
+        // points at. The exact defect `0024` closed, arriving through a new door. `c`.
+        ['admin_notifications_user_id_fkey', 'c'],
         ['auth_tokens_user_id_fkey', 'c'],
         ['email_messages_user_id_fkey', 'c'],
         ['privacy_requests_user_id_fkey', 'c'],

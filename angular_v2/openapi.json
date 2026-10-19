@@ -5600,6 +5600,284 @@
                     "(rpc) has_permission"
                 ]
             }
+        },
+        "/admin_notifications": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/range"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/components/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "items": {
+                                "$ref": "#/definitions/admin_notifications"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "admin_notifications"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferPost"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/admin_notifications"
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "admin_notifications"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "admin_notifications"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/admin_notifications"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "admin_notifications"
+                ]
+            }
         }
     },
     "externalDocs": {
@@ -7598,6 +7876,166 @@
                 "schema": {
                     "type": "string"
                 }
+            },
+            "rowFilter.admin_notifications.id": {
+                "name": "id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.source": {
+                "name": "source",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.kind": {
+                "name": "kind",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.severity": {
+                "name": "severity",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.title": {
+                "name": "title",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.message": {
+                "name": "message",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.data": {
+                "name": "data",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.source_ref": {
+                "name": "source_ref",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.audience": {
+                "name": "audience",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.user_id": {
+                "name": "user_id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.acknowledged_at": {
+                "name": "acknowledged_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.acknowledged_by": {
+                "name": "acknowledged_by",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.resolved_at": {
+                "name": "resolved_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.resolved_by": {
+                "name": "resolved_by",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.resolution_notes": {
+                "name": "resolution_notes",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.dismissed_at": {
+                "name": "dismissed_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.is_mock": {
+                "name": "is_mock",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.created_at": {
+                "name": "created_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.updated_at": {
+                "name": "updated_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.expires_at": {
+                "name": "expires_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
             }
         },
         "requestBodies": {
@@ -8250,6 +8688,31 @@
                     }
                 },
                 "description": "migrations"
+            },
+            "admin_notifications": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/admin_notifications"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json;nulls=stripped": {
+                        "schema": {
+                            "$ref": "#/components/schemas/admin_notifications"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/admin_notifications"
+                        }
+                    },
+                    "text/csv": {
+                        "schema": {
+                            "$ref": "#/components/schemas/admin_notifications"
+                        }
+                    }
+                },
+                "description": "admin_notifications"
             }
         },
         "schemas": {
@@ -9636,6 +10099,115 @@
                         "default": false,
                         "format": "boolean",
                         "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "admin_notifications": {
+                "required": [
+                    "id",
+                    "source",
+                    "kind",
+                    "severity",
+                    "title",
+                    "message",
+                    "data",
+                    "source_ref",
+                    "audience",
+                    "is_mock",
+                    "created_at",
+                    "updated_at",
+                    "expires_at"
+                ],
+                "properties": {
+                    "id": {
+                        "default": "uuidv7()",
+                        "description": "Note:\nThis is a Primary Key.<pk/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "source": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "severity": {
+                        "default": "medium",
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "title": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "message": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "data": {
+                        "format": "jsonb"
+                    },
+                    "source_ref": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "audience": {
+                        "default": "all",
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "acknowledged_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "acknowledged_by": {
+                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "resolved_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "resolved_by": {
+                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "resolution_notes": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "dismissed_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "is_mock": {
+                        "default": false,
+                        "format": "boolean",
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
                     }
                 },
                 "type": "object"

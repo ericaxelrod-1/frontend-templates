@@ -85,11 +85,17 @@ export const routes: Routes = [
           import('./features/users/users-page/users-page').then((m) => m.UsersPage),
       },
       {
+        // The route keeps its name and its place — `/admin/security-alerts` is where
+        // operators are sent — but the component behind it is the GENERIC panel over
+        // `admin_notifications`, in `features/notifications/`. `security_alerts` is now
+        // one source among several, materialised into the shared substrate rather than
+        // read directly, so the page that renders a source stopped living inside that
+        // source's feature.
         path: 'admin/security-alerts',
         title: 'Security alerts',
         loadComponent: () =>
-          import('./features/security/security-alerts-page/security-alerts-page').then(
-            (m) => m.SecurityAlertsPage,
+          import('./features/notifications/notifications-page/notifications-page').then(
+            (m) => m.NotificationsPage,
           ),
       },
       {

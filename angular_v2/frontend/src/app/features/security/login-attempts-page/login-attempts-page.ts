@@ -6,7 +6,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { CodeLabelPipe } from '../../../shared/code-label';
-import { MockFilterBar } from '../mock-filter-bar';
+import { MockFilterBar } from '../../../shared/mock-filter-bar';
 import { SecurityTelemetryApi } from '../security-telemetry-api.service';
 import type { LoginAttemptWithMock } from '../security-telemetry.types';
 

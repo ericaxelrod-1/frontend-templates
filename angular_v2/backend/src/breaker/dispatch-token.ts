@@ -116,6 +116,29 @@ export const PURGE_ENQUEUER: DispatchToken = 'purge.enqueuer';
 export const PRIVACY_ERASE: DispatchToken = 'privacy.erase';
 
 /**
+ * `NotificationMaterializer` — the job that turns a source row into a row in
+ * `public.admin_notifications`.
+ *
+ * ## Why it is NOT in `BREAKER_PROTECTED`
+ *
+ * The same argument `PURGE_ENQUEUER` makes, and it is worth repeating here because a
+ * new token is exactly where that omission gets "fixed" by someone who reads the list
+ * as a backlog. The default is STOP, so an omission means SHEDDABLE, and shedding this
+ * job under memory pressure is correct rather than a gap: it is batch work with nobody
+ * waiting, its output is a row nobody has been told about yet, and **the next pass's
+ * overlap window covers everything a skipped pass would have written** — the whole
+ * point of a cursor that reads back behind itself. `auth.login` and `auth.refresh`
+ * already answer "an operator must be able to log in and fix the machine".
+ *
+ * It takes a NON-stoppable lease (`gate.acquire(NOTIFICATIONS_MATERIALIZE, false)`),
+ * so the gate may refuse the pass but will not abort one in flight. Every pass is one
+ * transaction over every source, which already makes it all-or-nothing; an abort
+ * would only add a second mechanism for the same property, at the price of a partial
+ * pass being representable at all.
+ */
+export const NOTIFICATIONS_MATERIALIZE: DispatchToken = 'notifications.materialize';
+
+/**
  * The seven member-profile routes (`UsersController`), named so `RouteCensus` admits
  * them at boot.
  *
@@ -206,6 +229,7 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   PURGE_SWEEPER,
   PURGE_ENQUEUER,
   PRIVACY_ERASE,
+  NOTIFICATIONS_MATERIALIZE,
   USERS_ME,
   USERS_UPDATE_ME,
   USERS_REQUEST_EMAIL_CHANGE,

@@ -4186,6 +4186,187 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin_notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
+                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
+                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
+                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
+                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
+                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
+                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
+                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
+                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
+                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
+                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
+                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
+                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
+                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["admin_notifications"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
+                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
+                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
+                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
+                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
+                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
+                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
+                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
+                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
+                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
+                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
+                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
+                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
+                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
+                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
+                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
+                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
+                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
+                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
+                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
+                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
+                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
+                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
+                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
+                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
+                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
+                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["admin_notifications"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5121,6 +5302,80 @@ export interface components {
              */
             is_mock: boolean;
         };
+        admin_notifications: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            source: string;
+            /** Format: text */
+            kind: string;
+            /**
+             * Format: text
+             * @default medium
+             */
+            severity: string;
+            /** Format: text */
+            title: string;
+            /** Format: text */
+            message: string;
+            /** Format: jsonb */
+            data: unknown;
+            /** Format: text */
+            source_ref: string;
+            /**
+             * Format: text
+             * @default all
+             */
+            audience: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id?: string;
+            /** Format: timestamp with time zone */
+            acknowledged_at?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            acknowledged_by?: string;
+            /** Format: timestamp with time zone */
+            resolved_at?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            resolved_by?: string;
+            /** Format: text */
+            resolution_notes?: string;
+            /** Format: timestamp with time zone */
+            dismissed_at?: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_mock: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
+            /** Format: timestamp with time zone */
+            expires_at: string;
+        };
     };
     responses: never;
     parameters: {
@@ -5386,6 +5641,26 @@ export interface components {
         "rowFilter.login_attempts.ip_subnet": string;
         "rowFilter.login_attempts.attempt_kind": string;
         "rowFilter.login_attempts.is_mock": string;
+        "rowFilter.admin_notifications.id": string;
+        "rowFilter.admin_notifications.source": string;
+        "rowFilter.admin_notifications.kind": string;
+        "rowFilter.admin_notifications.severity": string;
+        "rowFilter.admin_notifications.title": string;
+        "rowFilter.admin_notifications.message": string;
+        "rowFilter.admin_notifications.data": string;
+        "rowFilter.admin_notifications.source_ref": string;
+        "rowFilter.admin_notifications.audience": string;
+        "rowFilter.admin_notifications.user_id": string;
+        "rowFilter.admin_notifications.acknowledged_at": string;
+        "rowFilter.admin_notifications.acknowledged_by": string;
+        "rowFilter.admin_notifications.resolved_at": string;
+        "rowFilter.admin_notifications.resolved_by": string;
+        "rowFilter.admin_notifications.resolution_notes": string;
+        "rowFilter.admin_notifications.dismissed_at": string;
+        "rowFilter.admin_notifications.is_mock": string;
+        "rowFilter.admin_notifications.created_at": string;
+        "rowFilter.admin_notifications.updated_at": string;
+        "rowFilter.admin_notifications.expires_at": string;
     };
     requestBodies: {
         /** @description pattern_login_attempts */
@@ -5620,6 +5895,15 @@ export interface components {
                 "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["migrations"];
                 "application/vnd.pgrst.object+json": components["schemas"]["migrations"];
                 "text/csv": components["schemas"]["migrations"];
+            };
+        };
+        /** @description admin_notifications */
+        admin_notifications: {
+            content: {
+                "application/json": components["schemas"]["admin_notifications"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["admin_notifications"];
+                "application/vnd.pgrst.object+json": components["schemas"]["admin_notifications"];
+                "text/csv": components["schemas"]["admin_notifications"];
             };
         };
     };

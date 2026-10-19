@@ -8,6 +8,7 @@ import { BreakerModule } from './breaker/breaker.module.js';
 import { PurgeModule } from './purge/purge.module.js';
 import { ErasureModule } from './privacy/erasure.module.js';
 import { TokenModule } from './token/token.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { UsersModule } from './users/users.module.js';
 import { PostgrestModule } from './postgrest/postgrest.module.js';
 import { loadEnvironment } from './config/environment.js';
@@ -49,6 +50,10 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
     // would hand an unauthenticated prober a capacity verdict.
     BreakerModule,
     PurgeModule,
+    // `notifications.materialize`: the scheduled job that renders each registered
+    // source into `public.admin_notifications`. No routes — the panel it feeds is
+    // PostgREST serving that table directly (§B1).
+    NotificationsModule,
     // The erasure operation and authenticated route (`POST /privacy/erase`),
     // dispatch token `privacy.erase` (named in KNOWN_DISPATCH_TOKENS and checked
     // by RouteCensus). NOT yet on the identity seam — see `privacy.controller.ts`.

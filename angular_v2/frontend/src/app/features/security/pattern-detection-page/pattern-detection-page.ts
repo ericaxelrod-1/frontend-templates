@@ -5,8 +5,8 @@ import { rxResource } from '@angular/core/rxjs-interop';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { CodeLabelPipe } from '../../../shared/code-label';
-import { JsonbEntriesPipe } from '../jsonb-entries.pipe';
-import { MockFilterBar } from '../mock-filter-bar';
+import { JsonbEntriesPipe } from '../../../shared/jsonb-entries.pipe';
+import { MockFilterBar } from '../../../shared/mock-filter-bar';
 import { SecurityTelemetryApi } from '../security-telemetry-api.service';
 import type { DetectedPatternWithAttempts } from '../security-telemetry.types';
 

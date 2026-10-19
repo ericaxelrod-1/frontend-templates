@@ -25,6 +25,9 @@ function quoteSqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+/** The cluster superuser every cluster-scoped statement here runs as. */
+export const CLUSTER_SUPERUSER = 'postgres';
+
 /**
  * Runs `sql` as the cluster superuser against `database` and returns its
  * unaligned output, throwing on failure.
@@ -32,11 +35,39 @@ function quoteSqlLiteral(value: string): string {
  * `psql` continues past an error and still exits 0 by default, so
  * `ON_ERROR_STOP=1` is not optional: without it a failed statement in the
  * middle is indistinguishable from success.
+ *
+ * ## Why the invocation is platform-dependent and the SQL is not
+ *
+ * `sudo -u postgres psql` is the Linux answer and works there because the
+ * superuser authenticates by peer. Windows has neither `sudo` nor a `postgres`
+ * OS account, and its `pg_hba.conf` trusts local connections, so the same
+ * statement is issued as `psql -U postgres` against the configured host.
+ *
+ * It is one function with a branch rather than two functions, on purpose (§2.4):
+ * "run one statement as the cluster superuser" has exactly one implementation
+ * here, and a second one beside it is a second place for the quoting, the
+ * `ON_ERROR_STOP` and the failure handling to diverge.
  */
 export function psqlAsSuperuser(sql: string, database: string): string {
-  const result = spawnSync('sudo', ['-u', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-q', '-d', database, '-c', sql], {
-    encoding: 'utf8',
-  });
+  const config = loadTestEnvironment().database;
+  const common = [
+    '-v',
+    'ON_ERROR_STOP=1',
+    '-q',
+    '-h',
+    config.host,
+    '-p',
+    String(config.port),
+    '-U',
+    CLUSTER_SUPERUSER,
+    '-d',
+    database,
+    '-c',
+    sql,
+  ];
+  const [command, args] =
+    process.platform === 'win32' ? ['psql', common] : ['sudo', ['-u', CLUSTER_SUPERUSER, 'psql', ...common]];
+  const result = spawnSync(command, args, { encoding: 'utf8' });
   if (result.status !== 0) {
     throw new Error(`superuser psql failed against ${database}:\n${result.stderr}`);
   }

@@ -99,8 +99,3 @@ export type LoginAttemptWithMock = LoginAttemptRow;
 export interface DetectedPatternWithAttempts extends DetectedPatternRow {
   readonly linkedAttempts: readonly LoginAttemptWithMock[];
 }
-
-export interface JsonbEntry {
-  readonly key: string;
-  readonly value: string;
-}
