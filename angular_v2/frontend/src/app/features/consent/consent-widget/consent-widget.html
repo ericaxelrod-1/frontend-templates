@@ -9,6 +9,14 @@
     Cookie & Consent Choices
   </button>
 
+  @if (!isOpen()) {
+    @if (failureMessages().length > 0) {
+      <div class="consent-failures">
+        <app-failure-notice [messages]="failureMessages()" />
+      </div>
+    }
+  }
+
   @if (isOpen()) {
     <div class="consent-modal" role="dialog" aria-modal="true" aria-labelledby="consent-title">
       <mat-card class="consent-card">
@@ -21,48 +29,54 @@
         </mat-card-header>
 
         <mat-card-content>
-          <div class="purpose-list">
-            @for (item of purposeItems(); track item.purpose.key) {
-              <div class="purpose-item">
-                <div class="purpose-header">
-                  <span class="purpose-title">{{ item.purpose.label }}</span>
-                  <div class="decision-actions">
-                    <button
-                      mat-button
-                      type="button"
-                      [color]="item.isGranted ? 'primary' : undefined"
-                      (click)="setStaged(item.purpose.key, true)"
-                    >
-                      Allow
-                    </button>
-                    <button
-                      mat-button
-                      type="button"
-                      [color]="!item.isGranted ? 'warn' : undefined"
-                      (click)="setStaged(item.purpose.key, false)"
-                    >
-                      Deny
-                    </button>
+          @if (failureMessages().length > 0) {
+            <app-failure-notice [messages]="failureMessages()" />
+          }
+
+          @if (!configFailure()) {
+            <div class="purpose-list">
+              @for (item of purposeItems(); track item.purpose.key) {
+                <div class="purpose-item">
+                  <div class="purpose-header">
+                    <span class="purpose-title">{{ item.purpose.label }}</span>
+                    <div class="decision-actions">
+                      <button
+                        mat-button
+                        type="button"
+                        [color]="item.isGranted ? 'primary' : undefined"
+                        (click)="setStaged(item.purpose.key, true)"
+                      >
+                        Allow
+                      </button>
+                      <button
+                        mat-button
+                        type="button"
+                        [color]="!item.isGranted ? 'warn' : undefined"
+                        (click)="setStaged(item.purpose.key, false)"
+                      >
+                        Deny
+                      </button>
+                    </div>
                   </div>
+                  <p class="purpose-desc">{{ item.purpose.description }}</p>
                 </div>
-                <p class="purpose-desc">{{ item.purpose.description }}</p>
-              </div>
-            }
-          </div>
+              }
+            </div>
 
-          <mat-divider />
+            <mat-divider />
 
-          <div class="global-actions">
-            <button mat-button type="button" (click)="rejectAll()">
-              Reject all
-            </button>
-            <button mat-button type="button" (click)="acceptAll()">
-              Accept all
-            </button>
-            <button mat-flat-button color="primary" type="button" (click)="saveChoices()">
-              Save choices
-            </button>
-          </div>
+            <div class="global-actions">
+              <button mat-button type="button" (click)="rejectAll()">
+                Reject all
+              </button>
+              <button mat-button type="button" (click)="acceptAll()">
+                Accept all
+              </button>
+              <button mat-flat-button color="primary" type="button" (click)="saveChoices()">
+                Save choices
+              </button>
+            </div>
+          }
         </mat-card-content>
       </mat-card>
     </div>

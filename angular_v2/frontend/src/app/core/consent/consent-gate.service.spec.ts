@@ -5,10 +5,13 @@ import {
   type EnvironmentProviders,
   type Provider,
 } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { NavigationEnd, provideRouter, Router } from '@angular/router';
 import { filter, firstValueFrom, of, take, throwError } from 'rxjs';
 import type { MockInstance } from 'vitest';
+import { POSTGREST_BASE_URL } from '../api/api-base-urls';
 import { Session } from '../auth/session.service';
 import { ConsentApi } from './consent-api.service';
 import { ConsentGate, matchPathGlob } from './consent-gate.service';
@@ -127,6 +130,13 @@ const TAG_GROUPS: ConsentTagGroup[] = [
  * implementation would follow it silently.
  */
 const ANON_STORAGE_KEY = 'angular_v2.consent.anon.v1';
+
+/**
+ * The key the gate keeps the signed-in decisions under.
+ *
+ * Written out for the same reason as `ANON_STORAGE_KEY`.
+ */
+const USER_STORAGE_KEY = 'angular_v2.consent.user.v1';
 
 interface GateStubs {
   injector: { inject: ReturnType<typeof vi.fn> };
@@ -544,5 +554,178 @@ describe('ConsentGate — stored decisions that cannot be read or written', () =
 
     expect(gate.storageFailure(), 'the decision that was not stored was not reported').not.toBeNull();
     expect(gate.decisions().get('analytics')?.granted).toBe(true);
+  });
+});
+
+/**
+ * THE THIRD STATE.
+ *
+ * "What does the server hold for this person?" has three answers:
+ *
+ * 1. it holds records, and they win;
+ * 2. it holds none, and the browser's decision is adopted and recorded;
+ * 3. it did not answer, and NOTHING is written.
+ *
+ * States 2 and 3 used to be the same state, because the read used to answer
+ * a failed request with an empty list. The difference between them is a row
+ * in an append-only log, so the two must not be the same: state 2 adds a
+ * record, state 3 must not, and a record added because a read failed can
+ * never be taken back.
+ */
+describe('ConsentGate — a read of the server records that fails', () => {
+  let stubs: GateStubs;
+  let gate: ConsentGate;
+
+  /** The decision the person made in this browser, before signing in. */
+  const BROWSER_DECISION = {
+    purposeKey: 'analytics',
+    granted: true,
+    policyVersion: 1,
+    mechanism: 'consent_widget_save',
+    recordedAt: '2026-10-19T08:00:00Z',
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(ANON_STORAGE_KEY, JSON.stringify([BROWSER_DECISION]));
+
+    stubs = createStubs();
+    configureGate(stubs);
+    // The gate is constructed while the visitor is anonymous, so the
+    // constructor's restore is the read that picks up the browser's decision.
+    gate = TestBed.inject(ConsentGate);
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('writes nothing to the server when the read did not answer', () => {
+    stubs.session.isAuthenticated.mockReturnValue(true);
+    stubs.session.userId.mockReturnValue('user-uuid');
+    stubs.api.effectiveConsent.mockReturnValue(throwError(() => new Error('the server did not answer')));
+
+    gate.onSignIn('user-uuid');
+
+    expect(
+      stubs.api.recordConsentDecision,
+      'a failed read wrote the browser decision to the server',
+    ).not.toHaveBeenCalled();
+    expect(
+      localStorage.getItem(USER_STORAGE_KEY),
+      'a failed read wrote to the signed-in cache',
+    ).toBeNull();
+  });
+
+  it('leaves the effective state on the browser decision and surfaces the failure', () => {
+    stubs.session.isAuthenticated.mockReturnValue(true);
+    stubs.session.userId.mockReturnValue('user-uuid');
+    stubs.api.effectiveConsent.mockReturnValue(throwError(() => new Error('the server did not answer')));
+
+    gate.onSignIn('user-uuid');
+
+    expect(
+      gate.decisions().get('analytics')?.granted,
+      'the browser decision stopped being the effective state',
+    ).toBe(true);
+    expect(gate.serverReadFailure(), 'the failed read was not surfaced').not.toBeNull();
+    expect(stubs.errorHandler.handleError, 'the failed read was not reported').toHaveBeenCalled();
+  });
+
+  it('writes the browser decision when the server answered that it holds no records', () => {
+    // The contrast: the same setup, the same browser decision, and the one
+    // difference that matters — the server answered. Then the browser's
+    // decision IS recorded, and the difference between the two states is
+    // exactly the write.
+    stubs.session.isAuthenticated.mockReturnValue(true);
+    stubs.session.userId.mockReturnValue('user-uuid');
+    stubs.api.effectiveConsent.mockReturnValue(of([]));
+
+    gate.onSignIn('user-uuid');
+
+    expect(
+      stubs.api.recordConsentDecision,
+      'the browser decision was not recorded on the server',
+    ).toHaveBeenCalledWith('analytics', true, 'consent_widget_save');
+    expect(localStorage.getItem(USER_STORAGE_KEY), 'the signed-in cache was not written').not.toBeNull();
+    expect(gate.serverReadFailure(), 'a successful read was reported as a failure').toBeNull();
+  });
+});
+
+/**
+ * THE WHOLE CHAIN, OVER A MOCKED TRANSPORT.
+ *
+ * The two halves of this defect are one defect. The API service turned a
+ * failed read into an empty list; the sign-in path reads an empty list as
+ * "the server holds no records for this person"; and the rule for that is
+ * "adopt the browser's decision AND WRITE IT TO THE SERVER". So the test
+ * below uses the REAL API service over a mocked transport and asserts that
+ * not one write is even attempted — because the log is append-only, and a
+ * record written because a read failed could never be taken back.
+ */
+describe('ConsentGate — a failed read over the real API service', () => {
+  let stubs: GateStubs;
+  let gate: ConsentGate;
+  let httpMock: HttpTestingController;
+
+  /** The decision the person made in this browser, before signing in. */
+  const BROWSER_DECISION = {
+    purposeKey: 'analytics',
+    granted: true,
+    policyVersion: 1,
+    mechanism: 'consent_widget_save',
+    recordedAt: '2026-10-19T08:00:00Z',
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(ANON_STORAGE_KEY, JSON.stringify([BROWSER_DECISION]));
+
+    stubs = createStubs();
+
+    TestBed.configureTestingModule({
+      providers: [
+        ConsentGate,
+        { provide: SnippetInjector, useValue: stubs.injector },
+        { provide: Session, useValue: stubs.session },
+        { provide: ErrorHandler, useValue: stubs.errorHandler },
+        { provide: PLATFORM_ID, useValue: 'browser' },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    });
+
+    httpMock = TestBed.inject(HttpTestingController);
+    gate = TestBed.inject(ConsentGate);
+    // The catalogue is already loaded, so the only request this test has to
+    // answer is the read of the subject's own records.
+    gate.setMockConfig({ purposes: [PURPOSE_ANALYTICS] });
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('does not attempt a single write when the read did not answer', () => {
+    stubs.session.isAuthenticated.mockReturnValue(true);
+    stubs.session.userId.mockReturnValue('user-uuid');
+
+    gate.onSignIn('user-uuid');
+
+    const read = httpMock.expectOne((r) => r.url === `${POSTGREST_BASE_URL}/consent_records`);
+    read.flush('unavailable', { status: 503, statusText: 'Service Unavailable' });
+
+    httpMock.expectNone(
+      (r) => r.url === `${POSTGREST_BASE_URL}/rpc/record_consent_decision`,
+    );
+    expect(
+      localStorage.getItem(USER_STORAGE_KEY),
+      'a failed read wrote to the signed-in cache',
+    ).toBeNull();
+    expect(
+      gate.decisions().get('analytics')?.granted,
+      'the browser decision stopped being the effective state',
+    ).toBe(true);
+    expect(gate.serverReadFailure(), 'the failed read was not surfaced').not.toBeNull();
   });
 });

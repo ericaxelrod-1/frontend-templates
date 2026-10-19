@@ -11,6 +11,8 @@ describe('ConsentWidget', () => {
     consentRequiredPurposes: ReturnType<typeof signal<readonly ConsentPurpose[]>>;
     decisions: ReturnType<typeof signal<ReadonlyMap<string, { purposeKey: string; granted: boolean }>>>;
     needsReprompt: ReturnType<typeof signal<boolean>>;
+    configFailure: ReturnType<typeof signal<string | null>>;
+    storageFailure: ReturnType<typeof signal<string | null>>;
     setDecisions: ReturnType<typeof vi.fn>;
   };
 
@@ -50,6 +52,8 @@ describe('ConsentWidget', () => {
       consentRequiredPurposes: signal<readonly ConsentPurpose[]>(MOCK_PURPOSES),
       decisions: signal(new Map()),
       needsReprompt: signal(false),
+      configFailure: signal<string | null>(null),
+      storageFailure: signal<string | null>(null),
       setDecisions: vi.fn(),
     };
 
@@ -113,5 +117,46 @@ describe('ConsentWidget', () => {
       ],
       'consent_widget_accept_all',
     );
+  });
+
+  it('states a catalogue that could not be loaded, and offers no choice it cannot record', () => {
+    // A widget that quietly shows an empty list reads as "you have no
+    // choices" — the opposite of the truth. So the failure is stated on the
+    // widget, and the "Accept all" that would record nothing is not offered.
+    gateStub.configFailure.set(
+      'The list of purposes this site would ask you about could not be loaded, so your choices cannot be shown or saved.',
+    );
+    gateStub.consentRequiredPurposes.set([]);
+
+    const fixture = TestBed.createComponent(ConsentWidget);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+
+    // Stated without the visitor having to open anything.
+    expect(root.textContent).toContain('could not be loaded');
+    expect(root.querySelector('[role="alert"]'), 'the failure was not announced').not.toBeNull();
+
+    // And the modal does not present an empty list with buttons that record
+    // nothing.
+    const trigger = root.querySelector<HTMLButtonElement>('.consent-trigger');
+    trigger?.click();
+    fixture.detectChanges();
+
+    expect(root.textContent).toContain('could not be loaded');
+    const actions = root.querySelectorAll('.global-actions button');
+    expect(actions.length, 'the widget offered choices it cannot record').toBe(0);
+  });
+
+  it('states a choice that could not be saved in this browser', () => {
+    gateStub.storageFailure.set(
+      'Your privacy choice could not be saved in this browser, so it will not be remembered on this device.',
+    );
+
+    const fixture = TestBed.createComponent(ConsentWidget);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('could not be saved in this browser');
   });
 });

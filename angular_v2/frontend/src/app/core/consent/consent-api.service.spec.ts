@@ -134,4 +134,32 @@ describe('ConsentApi', () => {
     expect(failure, 'the failed catalogue read was swallowed').toBeInstanceOf(HttpErrorResponse);
     expect(emitted, 'a failed catalogue read emitted an empty catalogue').toEqual([]);
   });
+
+  it('surfaces a failed read of the records instead of resolving to an empty list', () => {
+    // THE DEFECT THIS UNIT FIXES. The read of the subject's own records used
+    // to end in `catchError(() => of([]))`, which answered a request that
+    // FAILED with "the server holds no records for this person" — and the
+    // sign-in path reads that answer as "adopt the browser's decision AND
+    // WRITE IT TO THE SERVER". So a transient error, a 500 or a timeout
+    // added a row to an append-only log, under the browser's `mechanism` and
+    // `source`, saying the person chose something when nobody chose anything.
+    //
+    // The three answers are now three different things: the records, an
+    // empty list, and an error. The caller has to tell them apart.
+    const emitted: unknown[] = [];
+    let failure: unknown = null;
+
+    api.effectiveConsent('user-123').subscribe({
+      next: (value: unknown) => emitted.push(value),
+      error: (reason: unknown) => {
+        failure = reason;
+      },
+    });
+
+    const req = httpMock.expectOne((r) => r.url === `${POSTGREST_BASE_URL}/consent_records`);
+    req.flush('unavailable', { status: 503, statusText: 'Service Unavailable' });
+
+    expect(failure, 'the failed read of the records was swallowed').toBeInstanceOf(HttpErrorResponse);
+    expect(emitted, 'a failed read of the records emitted an empty list').toEqual([]);
+  });
 });

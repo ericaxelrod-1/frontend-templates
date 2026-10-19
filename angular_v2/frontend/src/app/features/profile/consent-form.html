@@ -1,55 +1,61 @@
 <div class="consent-form">
-  @for (item of items(); track item.purpose.key) {
-    <div class="purpose-item">
-      <div class="purpose-header">
-        <span class="purpose-title">{{ item.purpose.label }}</span>
-        <div class="purpose-actions">
-          <button
-            mat-button
-            type="button"
-            [color]="item.isGranted ? 'primary' : undefined"
-            (click)="setChoice(item.purpose.key, true)"
-          >
-            Grant
-          </button>
-          <button
-            mat-button
-            type="button"
-            [color]="!item.isGranted ? 'warn' : undefined"
-            (click)="setChoice(item.purpose.key, false)"
-          >
-            Withdraw
-          </button>
-        </div>
-      </div>
-
-      <p class="purpose-desc">{{ item.purpose.description }}</p>
-
-      <div class="purpose-meta">
-        <span>Legal basis: <code>{{ item.purpose.legal_basis }}</code></span>
-        @if (item.mechanism) {
-          <span> · Set via {{ item.mechanism }}</span>
-        }
-      </div>
-
-      @if (item.needsReprompt) {
-        <p class="reprompt-notice" role="alert">
-          The policy for this processing was updated to version {{ item.purpose.policy_version }}. Please review and re-confirm your choice.
-        </p>
-      }
-    </div>
+  @if (failureMessages().length > 0) {
+    <app-failure-notice [messages]="failureMessages()" />
   }
 
-  <mat-divider />
+  @if (!configFailure()) {
+    @for (item of items(); track item.purpose.key) {
+      <div class="purpose-item">
+        <div class="purpose-header">
+          <span class="purpose-title">{{ item.purpose.label }}</span>
+          <div class="purpose-actions">
+            <button
+              mat-button
+              type="button"
+              [color]="item.isGranted ? 'primary' : undefined"
+              (click)="setChoice(item.purpose.key, true)"
+            >
+              Grant
+            </button>
+            <button
+              mat-button
+              type="button"
+              [color]="!item.isGranted ? 'warn' : undefined"
+              (click)="setChoice(item.purpose.key, false)"
+            >
+              Withdraw
+            </button>
+          </div>
+        </div>
 
-  <div class="global-actions">
-    <button mat-button type="button" (click)="withdrawAll()">
-      Withdraw all
-    </button>
-    <button mat-flat-button color="primary" type="button" (click)="grantAll()">
-      Grant all
-    </button>
-  </div>
+        <p class="purpose-desc">{{ item.purpose.description }}</p>
+
+        <div class="purpose-meta">
+          <span>Legal basis: <code>{{ item.purpose.legal_basis }}</code></span>
+          @if (item.mechanism) {
+            <span> · Set via {{ item.mechanism }}</span>
+          }
+        </div>
+
+        @if (item.needsReprompt) {
+          <p class="reprompt-notice" role="alert">
+            The policy for this processing was updated to version {{ item.purpose.policy_version }}. Please review and re-confirm your choice.
+          </p>
+        }
+      </div>
+    }
+
+    <mat-divider />
+
+    <div class="global-actions">
+      <button mat-button type="button" (click)="withdrawAll()">
+        Withdraw all
+      </button>
+      <button mat-flat-button color="primary" type="button" (click)="grantAll()">
+        Grant all
+      </button>
+    </div>
+  }
 
   @if (writeFailure(); as message) {
     <p class="write-failure" role="alert">{{ message }}</p>

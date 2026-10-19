@@ -4,6 +4,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { ConsentGate } from '../../core/consent/consent-gate.service';
 import type { ConsentPurpose } from '../../core/consent/consent.types';
+import { FailureNotice } from '../../shared/failure-notice';
 
 export interface ProfileConsentItemViewModel {
   readonly purpose: ConsentPurpose;
@@ -31,7 +32,7 @@ export interface ProfileConsentItemViewModel {
 @Component({
   selector: 'app-profile-consent-form',
   standalone: true,
-  imports: [MatButtonModule, MatCardModule, MatDividerModule],
+  imports: [FailureNotice, MatButtonModule, MatCardModule, MatDividerModule],
   templateUrl: './consent-form.html',
   styles: `
     .consent-form {
@@ -117,6 +118,38 @@ export class ProfileConsentForm {
    * the gate and this form is only where the outcome is shown.
    */
   protected readonly writeFailure = this.gate.writeFailure;
+
+  /**
+   * The failures about the state of this surface, in the gate's words.
+   *
+   * Three of them, and they are three different things:
+   *
+   * - the catalogue of purposes could not be loaded, so this form has no
+   *   purposes to show and nothing to grant;
+   * - the browser's copy of the decisions could not be read or written, so a
+   *   decision made here may not be remembered on this device;
+   * - the server's records could not be read, so what is shown here is the
+   *   browser's copy and not the account's own history.
+   *
+   * The write failure is not among them: it is the outcome of the action the
+   * person has just taken, so it is shown next to the buttons that caused it.
+   */
+  protected readonly failureMessages = computed<readonly string[]>(() =>
+    [
+      this.gate.configFailure(),
+      this.gate.storageFailure(),
+      this.gate.serverReadFailure(),
+    ].filter((message): message is string => message !== null),
+  );
+
+  /**
+   * Whether the catalogue of purposes could not be loaded.
+   *
+   * When it could not, the form has nothing to show and nothing to grant:
+   * "Grant all" would grant nothing. So the buttons are not rendered at all
+   * rather than rendered as buttons that do nothing.
+   */
+  protected readonly configFailure = this.gate.configFailure;
 
   protected readonly items = computed<readonly ProfileConsentItemViewModel[]>(() => {
     const purposes = this.gate.consentRequiredPurposes();

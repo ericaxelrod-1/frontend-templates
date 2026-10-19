@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, map, type Observable, of, throwError } from 'rxjs';
+import { map, type Observable, throwError } from 'rxjs';
 import { POSTGREST_BASE_URL } from '../api/api-base-urls';
 import type {
   ConsentPageGroup,
@@ -92,30 +92,44 @@ export class ConsentApi {
    * exclusively their own decisions. Derives current effective consent by
    * taking the first record for each purpose key.
    *
-   * ## WHY THIS ONE STILL ANSWERS WITH AN EMPTY LIST
+   * ## THE THREE STATES, AND WHY A FAILED READ IS NOT ONE OF THEM
    *
-   * Unlike the catalogue reads, a failed read here is not a misconfiguration
-   * of the deployment: the records are per-visitor, and the answer this
-   * function gives is "the server holds no records for this visitor", which
-   * the sign-in sync reads as "sync the browser's decision to the server".
-   * Making the failure propagate would change what the sign-in path does with
-   * it, and the sign-in semantics are out of scope for the unit that fixed
-   * the catalogue path. It is recorded here rather than left to be found.
+   * The answer to "what are this subject's records?" has three outcomes, and
+   * this function used to collapse two of them into one:
+   *
+   * 1. **the server answered and holds records** — the records are emitted;
+   * 2. **the server answered and holds none** — an empty list is emitted;
+   * 3. **the server did not answer** — the error propagates.
+   *
+   * It used to end in `catchError(() => of([]))`, which turned (3) into (2).
+   * The sign-in sync reads an empty list as "the server holds no records for
+   * this person", and its rule is "if the server holds no record, adopt the
+   * browser's decision" — so a transient network error, a 500 or a timeout
+   * made the gate conclude that the account had never consented and then
+   * **wrote the browser's anonymous decision to the server**, under the wrong
+   * `mechanism` and `source`, as though the person had chosen it.
+   *
+   * The log is append-only, so the mistaken record cannot be corrected, only
+   * added to. A decision must never be written from an unanswered question.
+   *
+   * So the failure now propagates, exactly as the catalogue reads and the
+   * write above already do: the caller has to decide what an unanswered
+   * question means, and that decision is not this function's to make.
    */
   effectiveConsent(userId: string): Observable<readonly ConsentRecord[]> {
     if (!this.http) {
-      return of([]);
+      return throwError(
+        () => new Error('no HTTP client is available, so the consent records cannot be read'),
+      );
     }
-    return this.http
-      .get<ConsentRecord[]>(`${POSTGREST_BASE_URL}/consent_records`, {
-        params: new HttpParams({
-          fromObject: {
-            user_id: `eq.${userId}`,
-            order: 'recorded_at.desc,id.desc',
-          },
-        }),
-      })
-      .pipe(catchError(() => of([])));
+    return this.http.get<ConsentRecord[]>(`${POSTGREST_BASE_URL}/consent_records`, {
+      params: new HttpParams({
+        fromObject: {
+          user_id: `eq.${userId}`,
+          order: 'recorded_at.desc,id.desc',
+        },
+      }),
+    });
   }
 
   /**

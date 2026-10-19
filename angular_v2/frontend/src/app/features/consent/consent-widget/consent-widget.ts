@@ -12,6 +12,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { Session } from '../../../core/auth/session.service';
 import { ConsentGate } from '../../../core/consent/consent-gate.service';
 import type { ConsentPurpose } from '../../../core/consent/consent.types';
+import { FailureNotice } from '../../../shared/failure-notice';
 
 export interface PurposeItemViewModel {
   readonly purpose: ConsentPurpose;
@@ -30,7 +31,7 @@ export interface PurposeItemViewModel {
 @Component({
   selector: 'app-consent-widget',
   standalone: true,
-  imports: [MatButtonModule, MatCardModule, MatDividerModule],
+  imports: [FailureNotice, MatButtonModule, MatCardModule, MatDividerModule],
   templateUrl: './consent-widget.html',
   styles: `
     .consent-trigger {
@@ -105,6 +106,19 @@ export interface PurposeItemViewModel {
       gap: 0.5rem;
       margin-top: 1rem;
     }
+
+    .consent-failures {
+      position: fixed;
+      bottom: 4.5rem;
+      left: 1rem;
+      z-index: 1000;
+      max-width: 24rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--mat-sys-outline-variant);
+      border-radius: 8px;
+      background: var(--mat-sys-surface-container-lowest);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
   `,
 })
 export class ConsentWidget {
@@ -128,6 +142,34 @@ export class ConsentWidget {
 
   /** List of purposes requiring consent. */
   protected readonly purposes = this.gate.consentRequiredPurposes;
+
+  /**
+   * The failures this widget has to state.
+   *
+   * A catalogue that could not be loaded means the widget has no purposes to
+   * ask about, and a widget that quietly shows an empty list reads as "you
+   * have no choices" — the opposite of the truth. A choice that could not be
+   * saved in this browser is the same kind of news: the person made a
+   * decision and it is not there any more.
+   *
+   * The sentences are the gate's, not this component's: the gate is where the
+   * failure happened and where the reason for the wording is written down.
+   */
+  protected readonly failureMessages = computed<readonly string[]>(() =>
+    [this.gate.configFailure(), this.gate.storageFailure()].filter(
+      (message): message is string => message !== null,
+    ),
+  );
+
+  /**
+   * Whether the catalogue of purposes could not be loaded.
+   *
+   * When it could not, the widget has nothing to ask about: the list of
+   * purposes is empty and "Accept all" would record nothing. So the failure
+   * REPLACES the list and the actions rather than sitting above an empty form
+   * whose buttons do nothing.
+   */
+  protected readonly configFailure = this.gate.configFailure;
 
   /** Purposes paired with their currently displayed grant state. */
   protected readonly purposeItems = computed<readonly PurposeItemViewModel[]>(() => {

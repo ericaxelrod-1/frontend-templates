@@ -10,6 +10,9 @@ describe('ProfileConsentForm', () => {
     decisions: ReturnType<typeof signal<ReadonlyMap<string, { purposeKey: string; granted: boolean; policyVersion: number; mechanism: string; recordedAt: string }>>>;
     repromptPurposes: ReturnType<typeof signal<readonly ConsentPurpose[]>>;
     writeFailure: ReturnType<typeof signal<string | null>>;
+    configFailure: ReturnType<typeof signal<string | null>>;
+    storageFailure: ReturnType<typeof signal<string | null>>;
+    serverReadFailure: ReturnType<typeof signal<string | null>>;
     setDecision: ReturnType<typeof vi.fn>;
     setDecisions: ReturnType<typeof vi.fn>;
   };
@@ -48,6 +51,9 @@ describe('ProfileConsentForm', () => {
       ),
       repromptPurposes: signal(MOCK_PURPOSES.slice(0, 1)),
       writeFailure: signal<string | null>(null),
+      configFailure: signal<string | null>(null),
+      storageFailure: signal<string | null>(null),
+      serverReadFailure: signal<string | null>(null),
       setDecision: vi.fn(),
       setDecisions: vi.fn(),
     };
@@ -124,5 +130,48 @@ describe('ProfileConsentForm', () => {
       alerts.some((alert) => alert.includes('not recorded')),
       'no alert tells the person their choice was not recorded',
     ).toBe(true);
+  });
+
+  it('states a catalogue that could not be loaded, and offers no grant that grants nothing', () => {
+    // The failure has to be visible HERE: this is where a signed-in person
+    // manages their consent. And a form whose "Grant all" grants nothing is
+    // a button that looks finished and is not (AGENTS.md §2.1).
+    gateStub.configFailure.set(
+      'The list of purposes this site would ask you about could not be loaded, so your choices cannot be shown or saved.',
+    );
+    gateStub.consentRequiredPurposes.set([]);
+
+    const fixture = TestBed.createComponent(ProfileConsentForm);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const text = root.textContent ?? '';
+    expect(text).toContain('could not be loaded');
+
+    const alerts = Array.from(root.querySelectorAll('[role="alert"]')).map((element) => element.textContent ?? '');
+    expect(
+      alerts.some((alert) => alert.includes('could not be loaded')),
+      'no alert states the failed catalogue load',
+    ).toBe(true);
+
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('button'));
+    expect(buttons, 'the form offered a grant that grants nothing').toHaveLength(0);
+  });
+
+  it('states a decision this browser could not keep, and a server that did not answer', () => {
+    gateStub.storageFailure.set(
+      'Your privacy choice could not be saved in this browser, so it will not be remembered on this device.',
+    );
+    gateStub.serverReadFailure.set(
+      'Your saved consent choices could not be read from the server, so the choices shown here are the ones stored in this browser.',
+    );
+
+    const fixture = TestBed.createComponent(ProfileConsentForm);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const text = root.textContent ?? '';
+    expect(text).toContain('could not be saved in this browser');
+    expect(text).toContain('could not be read from the server');
   });
 });

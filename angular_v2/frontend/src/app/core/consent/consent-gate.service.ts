@@ -34,6 +34,35 @@ const STORAGE_WRITE_FAILURE =
   'Your privacy choice could not be saved in this browser, so it will not be remembered on this device.';
 
 /**
+ * What the visitor is told when the catalogue of purposes cannot be loaded.
+ *
+ * ## THE WORDS A PERSON CAN ACT ON
+ *
+ * The catalogue is the list of things this site would ask permission for, so
+ * "the consent configuration could not be loaded" is a sentence about the
+ * implementation and not about the person's choice. The sentence below says
+ * what failed, what it means for the choice, and what can be done about it.
+ *
+ * "Nothing has been tracked in the meantime" is true, and it is the one part
+ * of the sentence that has to be earned: a gate with no catalogue has no page
+ * groups and no tags, so there is nothing it could inject. The failure and
+ * the absence of tracking are the same event.
+ */
+const CONFIG_FAILURE =
+  'The list of purposes this site would ask you about could not be loaded, so your choices cannot be shown or saved. Nothing has been tracked in the meantime — please reload the page and try again.';
+
+/**
+ * What the visitor is told when the server's records cannot be read.
+ *
+ * The subject is signed in, so the answer they are entitled to is the
+ * server's. The server did not give one, so the browser's copy is what
+ * governs — and nothing is written to the server, because a decision must
+ * never be recorded from an unanswered question.
+ */
+const SERVER_READ_FAILURE =
+  'Your saved consent choices could not be read from the server, so the choices shown here are the ones stored in this browser. Nothing has been changed or recorded.';
+
+/**
  * Matches a URL path against a glob pattern.
  *
  * Supports exact paths (`/pricing`), wildcards (`/*`, `*`, `/**`),
@@ -76,8 +105,12 @@ export function matchPathGlob(glob: string, path: string): boolean {
  * - Anonymous decisions are kept in `localStorage` under `ANON_STORAGE_KEY`.
  * - Signed-in decisions are retrieved from the server (`consent_records`).
  *   Server records override browser state.
- * - On sign-in: if the server holds no records for this user, the browser's
- *   anonymous decision is synced to the server. Otherwise server wins.
+ * - On sign-in, the server's answer has three outcomes: it holds records and
+ *   they win; it holds none, and the browser's anonymous decision is synced
+ *   to the server; or it did not answer at all, and then NOTHING is written
+ *   and the browser's decision stays the effective state. The third outcome
+ *   is not the second with different words: the log is append-only, so a
+ *   record written because a read failed can never be taken back.
  * - On sign-out: nothing is written to the server; effective state cleanly
  *   reverts to the browser's anonymous decisions so private user choices
  *   are not left behind on a shared terminal.
@@ -131,6 +164,21 @@ export class ConsentGate {
    * rows while every visitor's fetch fails. See `reportConfigurationFailure`.
    */
   readonly configFailure = signal<string | null>(null);
+
+  /**
+   * The last failure to read the signed-in subject's consent records, or
+   * `null` when the last read succeeded.
+   *
+   * ## WHY THIS IS NOT A `writeFailure` AND NOT A `configFailure`
+   *
+   * A read that did not answer is neither a failed write nor a failed
+   * catalogue: nothing was written, and the catalogue is not what could not
+   * be read. It is its own failure, and it has its own consequence — the
+   * effective state stays on the browser's decision and NOTHING is written
+   * to the server, because the log is append-only and a record written from
+   * an unanswered question cannot be taken back.
+   */
+  readonly serverReadFailure = signal<string | null>(null);
 
   /**
    * The last failure to read or write the browser's copy of the decisions, or
@@ -291,9 +339,7 @@ export class ConsentGate {
    * `configFailure` holds a sentence a UI can show.
    */
   private reportConfigurationFailure(error: unknown): void {
-    this.configFailure.set(
-      'The consent configuration could not be loaded, so no tracking tag can run on this page.',
-    );
+    this.configFailure.set(CONFIG_FAILURE);
     this.reportFailure('the consent catalogue could not be loaded', error);
   }
 
@@ -556,32 +602,112 @@ export class ConsentGate {
     const userId = this.session.userId();
 
     if (isAuthenticated && userId) {
-      // Signed in: server record wins.
-      this.api.effectiveConsent(userId).subscribe((records) => {
-        if (records.length === 0) {
-          // Server has no records: migrate browser's anonymous decision to server
-          const anonDecisions = this.readFromStorage(ANON_STORAGE_KEY);
-          if (anonDecisions.size > 0) {
-            anonDecisions.forEach((decision) => {
-              this.recordOnServer(decision.purposeKey, decision.granted, decision.mechanism);
-            });
-            this.decisions.set(anonDecisions);
-            this.writeToStorage(USER_STORAGE_KEY, anonDecisions);
-          }
-        } else {
-          // Server records exist: derive effective consent from server records
-          const serverMap = this.recordsToDecisionMap(records);
-          this.decisions.set(serverMap);
-          this.writeToStorage(USER_STORAGE_KEY, serverMap);
-        }
-        void this.evaluate();
-      });
+      // Signed in: the server's answer decides, and it has three outcomes.
+      this.readServerRecords(userId);
     } else {
       // Signed out: fall back to browser's anonymous decisions. Do NOT write to server.
       const anonMap = this.readFromStorage(ANON_STORAGE_KEY);
       this.decisions.set(anonMap);
       void this.evaluate();
     }
+  }
+
+  /**
+   * Reads the signed-in subject's records and applies the answer.
+   *
+   * ## THE THREE STATES
+   *
+   * The question "what does the server hold for this person?" has three
+   * answers, and the third one used to be missing:
+   *
+   * 1. **the server answered and holds records** — the server's records are
+   *    the effective state (last write wins);
+   * 2. **the server answered and holds none** — the browser's decision is
+   *    adopted, and it is recorded on the server;
+   * 3. **the server did not answer** — nothing is written, the browser's
+   *    decision stays the effective state, and the failure is surfaced.
+   *
+   * States 2 and 3 were one state, and the difference between them is a row
+   * in an append-only log: state 2 adds a record, state 3 must not. The
+   * failure reaches this method as an error on the observable, which is a
+   * different channel from the empty list the server sends when it has
+   * nothing — the two cannot be confused by a caller.
+   */
+  private readServerRecords(userId: string): void {
+    this.api.effectiveConsent(userId).subscribe({
+      next: (records: readonly ConsentRecord[]) => this.applyServerRecords(records),
+      error: (error: unknown) => this.handleUnreadableRecords(error),
+    });
+  }
+
+  /**
+   * Applies an answer the server actually gave.
+   */
+  private applyServerRecords(records: readonly ConsentRecord[]): void {
+    // A read that answers ends the story of the last one that did not, in the
+    // same way a successful write ends the story of the last failed one:
+    // otherwise the message would outlive the failure it describes.
+    this.serverReadFailure.set(null);
+
+    if (records.length === 0) {
+      // Server has no records: adopt the browser's anonymous decision, and
+      // record it there so the account's own history says what the person
+      // chose.
+      const browserDecisions = this.adoptBrowserDecisions();
+      if (browserDecisions) {
+        browserDecisions.forEach((decision) => {
+          this.recordOnServer(decision.purposeKey, decision.granted, decision.mechanism);
+        });
+        this.writeToStorage(USER_STORAGE_KEY, browserDecisions);
+      }
+    } else {
+      // Server records exist: derive effective consent from server records
+      const serverMap = this.recordsToDecisionMap(records);
+      this.decisions.set(serverMap);
+      this.writeToStorage(USER_STORAGE_KEY, serverMap);
+    }
+    void this.evaluate();
+  }
+
+  /**
+   * Handles the server NOT answering.
+   *
+   * ## NOTHING IS WRITTEN HERE, AND THAT IS THE WHOLE POINT
+   *
+   * A failed read used to be answered with an empty list, which the sign-in
+   * path reads as "the server holds no records for this person" — and the
+   * rule for that is "adopt the browser's decision and write it to the
+   * server". So a transient network error, a 500 or a timeout added a record
+   * to the account's append-only log, under the browser's `mechanism` and
+   * `source`, saying the person chose something when in fact nobody chose
+   * anything. The log is append-only: the record could not be corrected,
+   * only added to.
+   *
+   * So nothing is written here. The browser's decision stays the effective
+   * state — the person is not asked again, and the tags they had agreed to
+   * stop running stay stopped — and the failure is surfaced so that the
+   * state of their record is not a secret.
+   */
+  private handleUnreadableRecords(error: unknown): void {
+    this.serverReadFailure.set(SERVER_READ_FAILURE);
+    this.reportFailure('the consent records could not be read', error);
+    this.adoptBrowserDecisions();
+    void this.evaluate();
+  }
+
+  /**
+   * Adopts the decision this browser holds as the effective state.
+   *
+   * Returns the adopted decisions, or `null` when this browser holds none —
+   * in which case the effective state is left as it is.
+   */
+  private adoptBrowserDecisions(): EffectiveConsentMap | null {
+    const browserDecisions = this.readFromStorage(ANON_STORAGE_KEY);
+    if (browserDecisions.size === 0) {
+      return null;
+    }
+    this.decisions.set(browserDecisions);
+    return browserDecisions;
   }
 
   /**
@@ -602,24 +728,7 @@ export class ConsentGate {
    * Explicitly triggered when user signs in.
    */
   onSignIn(userId: string): void {
-    this.api.effectiveConsent(userId).subscribe((records) => {
-      if (records.length === 0) {
-        // Server has no records: write browser anonymous decision to server
-        const anonDecisions = this.readFromStorage(ANON_STORAGE_KEY);
-        if (anonDecisions.size > 0) {
-          anonDecisions.forEach((decision) => {
-            this.recordOnServer(decision.purposeKey, decision.granted, decision.mechanism);
-          });
-          this.decisions.set(anonDecisions);
-          this.writeToStorage(USER_STORAGE_KEY, anonDecisions);
-        }
-      } else {
-        const serverMap = this.recordsToDecisionMap(records);
-        this.decisions.set(serverMap);
-        this.writeToStorage(USER_STORAGE_KEY, serverMap);
-      }
-      void this.evaluate();
-    });
+    this.readServerRecords(userId);
   }
 
   /**
