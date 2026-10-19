@@ -111,4 +111,27 @@ describe('ConsentApi', () => {
     expect(failure, 'the failed write was swallowed').toBeInstanceOf(HttpErrorResponse);
     expect(emitted, 'a failed write emitted a success-shaped value').toEqual([]);
   });
+
+  it('surfaces a failed catalogue read instead of resolving to an empty catalogue', () => {
+    // The catalogue read used to end in `catchError(() => of([]))`, which
+    // turned a catalogue that could not be fetched into an EMPTY catalogue —
+    // indistinguishable from a deployment that has configured no purposes,
+    // and the reason the consent gate's own `catch { }` was unreachable: the
+    // failure never reached it (AGENTS.md §2.3).
+    const emitted: unknown[] = [];
+    let failure: unknown = null;
+
+    api.purposes().subscribe({
+      next: (value: unknown) => emitted.push(value),
+      error: (reason: unknown) => {
+        failure = reason;
+      },
+    });
+
+    const req = httpMock.expectOne((r) => r.url === `${POSTGREST_BASE_URL}/consent_purposes`);
+    req.flush('unavailable', { status: 503, statusText: 'Service Unavailable' });
+
+    expect(failure, 'the failed catalogue read was swallowed').toBeInstanceOf(HttpErrorResponse);
+    expect(emitted, 'a failed catalogue read emitted an empty catalogue').toEqual([]);
+  });
 });

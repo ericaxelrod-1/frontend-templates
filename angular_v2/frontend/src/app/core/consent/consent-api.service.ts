@@ -19,6 +19,21 @@ import type {
  * - `consent_tags` (tracking scripts and purpose requirements)
  * - `consent_tag_groups` (join table)
  * - `consent_records` (append-only audit log)
+ *
+ * ## THE CATALOGUE READS DO NOT SWALLOW THEIR ERROR
+ *
+ * The four catalogue reads used to end in `catchError(() => of([]))`, which
+ * turned a catalogue that could not be fetched into an EMPTY catalogue —
+ * indistinguishable from a deployment that has configured no purposes, and the
+ * reason the consent gate's own `catch { }` was unreachable: the failure never
+ * reached it. A gate with an empty catalogue has no groups and no tags, so no
+ * tag can ever load, and the application behaves exactly like a deployment
+ * with no analytics (AGENTS.md §2.3).
+ *
+ * The error therefore propagates to the consent gate, which reports it and
+ * continues with an empty catalogue — which injects nothing. The same
+ * reasoning the write path below already sets out applies here: a read that
+ * cannot be attempted fails, and it fails loudly.
  */
 @Injectable({ providedIn: 'root' })
 export class ConsentApi {
@@ -27,47 +42,47 @@ export class ConsentApi {
   /** Reads the catalogue of processing purposes, ordered by display rank. */
   purposes(): Observable<readonly ConsentPurpose[]> {
     if (!this.http) {
-      return of([]);
+      return throwError(
+        () => new Error('no HTTP client is available, so the consent catalogue cannot be read'),
+      );
     }
-    return this.http
-      .get<ConsentPurpose[]>(`${POSTGREST_BASE_URL}/consent_purposes`, {
-        params: new HttpParams({ fromObject: { order: 'sort_order.asc,key.asc' } }),
-      })
-      .pipe(catchError(() => of([])));
+    return this.http.get<ConsentPurpose[]>(`${POSTGREST_BASE_URL}/consent_purposes`, {
+      params: new HttpParams({ fromObject: { order: 'sort_order.asc,key.asc' } }),
+    });
   }
 
   /** Reads the configured page groups and their path globs. */
   pageGroups(): Observable<readonly ConsentPageGroup[]> {
     if (!this.http) {
-      return of([]);
+      return throwError(
+        () => new Error('no HTTP client is available, so the consent catalogue cannot be read'),
+      );
     }
-    return this.http
-      .get<ConsentPageGroup[]>(`${POSTGREST_BASE_URL}/consent_page_groups`, {
-        params: new HttpParams({ fromObject: { order: 'key.asc' } }),
-      })
-      .pipe(catchError(() => of([])));
+    return this.http.get<ConsentPageGroup[]>(`${POSTGREST_BASE_URL}/consent_page_groups`, {
+      params: new HttpParams({ fromObject: { order: 'key.asc' } }),
+    });
   }
 
   /** Reads active tracking tags. */
   tags(): Observable<readonly ConsentTag[]> {
     if (!this.http) {
-      return of([]);
+      return throwError(
+        () => new Error('no HTTP client is available, so the consent catalogue cannot be read'),
+      );
     }
-    return this.http
-      .get<ConsentTag[]>(`${POSTGREST_BASE_URL}/consent_tags`, {
-        params: new HttpParams({ fromObject: { enabled: 'eq.true' } }),
-      })
-      .pipe(catchError(() => of([])));
+    return this.http.get<ConsentTag[]>(`${POSTGREST_BASE_URL}/consent_tags`, {
+      params: new HttpParams({ fromObject: { enabled: 'eq.true' } }),
+    });
   }
 
   /** Reads the join mapping tags to page groups. */
   tagGroups(): Observable<readonly ConsentTagGroup[]> {
     if (!this.http) {
-      return of([]);
+      return throwError(
+        () => new Error('no HTTP client is available, so the consent catalogue cannot be read'),
+      );
     }
-    return this.http
-      .get<ConsentTagGroup[]>(`${POSTGREST_BASE_URL}/consent_tag_groups`)
-      .pipe(catchError(() => of([])));
+    return this.http.get<ConsentTagGroup[]>(`${POSTGREST_BASE_URL}/consent_tag_groups`);
   }
 
   /**
@@ -76,6 +91,16 @@ export class ConsentApi {
    * RLS restricts this table to `user_id = authz.actor()`, so a member receives
    * exclusively their own decisions. Derives current effective consent by
    * taking the first record for each purpose key.
+   *
+   * ## WHY THIS ONE STILL ANSWERS WITH AN EMPTY LIST
+   *
+   * Unlike the catalogue reads, a failed read here is not a misconfiguration
+   * of the deployment: the records are per-visitor, and the answer this
+   * function gives is "the server holds no records for this visitor", which
+   * the sign-in sync reads as "sync the browser's decision to the server".
+   * Making the failure propagate would change what the sign-in path does with
+   * it, and the sign-in semantics are out of scope for the unit that fixed
+   * the catalogue path. It is recorded here rather than left to be found.
    */
   effectiveConsent(userId: string): Observable<readonly ConsentRecord[]> {
     if (!this.http) {

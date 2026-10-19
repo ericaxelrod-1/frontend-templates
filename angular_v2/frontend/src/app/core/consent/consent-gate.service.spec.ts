@@ -1,6 +1,14 @@
-import { PLATFORM_ID } from '@angular/core';
+import {
+  Component,
+  ErrorHandler,
+  PLATFORM_ID,
+  type EnvironmentProviders,
+  type Provider,
+} from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { NavigationEnd, provideRouter, Router } from '@angular/router';
+import { filter, firstValueFrom, of, take, throwError } from 'rxjs';
+import type { MockInstance } from 'vitest';
 import { Session } from '../auth/session.service';
 import { ConsentApi } from './consent-api.service';
 import { ConsentGate, matchPathGlob } from './consent-gate.service';
@@ -110,6 +118,100 @@ const TAG_GROUPS: ConsentTagGroup[] = [
   { tag_id: 't-analytics', group_id: 'g-auth' },
 ];
 
+/**
+ * The key the gate keeps the anonymous decisions under.
+ *
+ * Written out rather than imported, because the storage keys are part of the
+ * contract this unit is not allowed to change: a change to this literal has to
+ * be a deliberate one, and a test that read the constant out of the
+ * implementation would follow it silently.
+ */
+const ANON_STORAGE_KEY = 'angular_v2.consent.anon.v1';
+
+interface GateStubs {
+  injector: { inject: ReturnType<typeof vi.fn> };
+  api: {
+    purposes: ReturnType<typeof vi.fn>;
+    pageGroups: ReturnType<typeof vi.fn>;
+    tags: ReturnType<typeof vi.fn>;
+    tagGroups: ReturnType<typeof vi.fn>;
+    effectiveConsent: ReturnType<typeof vi.fn>;
+    recordConsentDecision: ReturnType<typeof vi.fn>;
+  };
+  session: {
+    isAuthenticated: ReturnType<typeof vi.fn>;
+    userId: ReturnType<typeof vi.fn>;
+  };
+  errorHandler: { handleError: ReturnType<typeof vi.fn> };
+}
+
+function createStubs(): GateStubs {
+  return {
+    injector: {
+      inject: vi.fn().mockResolvedValue(undefined),
+    },
+    api: {
+      purposes: vi.fn().mockReturnValue(of([PURPOSE_ANALYTICS, PURPOSE_MARKETING, PURPOSE_NECESSARY])),
+      pageGroups: vi.fn().mockReturnValue(of([GROUP_PUBLIC, GROUP_AUTH_ONLY])),
+      tags: vi.fn().mockReturnValue(of([TAG_MULTI_PURPOSE, TAG_ANALYTICS_ONLY, TAG_NECESSARY_ONLY])),
+      tagGroups: vi.fn().mockReturnValue(of(TAG_GROUPS)),
+      effectiveConsent: vi.fn().mockReturnValue(of([])),
+      recordConsentDecision: vi.fn().mockReturnValue(of('rec-1')),
+    },
+    session: {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      userId: vi.fn().mockReturnValue(null),
+    },
+    errorHandler: {
+      handleError: vi.fn(),
+    },
+  };
+}
+
+function configureGate(
+  stubs: GateStubs,
+  extraProviders: Array<Provider | EnvironmentProviders> = [],
+): void {
+  TestBed.configureTestingModule({
+    providers: [
+      ConsentGate,
+      { provide: SnippetInjector, useValue: stubs.injector },
+      { provide: ConsentApi, useValue: stubs.api },
+      { provide: Session, useValue: stubs.session },
+      { provide: ErrorHandler, useValue: stubs.errorHandler },
+      { provide: PLATFORM_ID, useValue: 'browser' },
+      ...extraProviders,
+    ],
+  });
+}
+
+/** Lets every promise the gate has pending settle. */
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * Navigates, and resolves once the router has emitted the `NavigationEnd` the
+ * gate subscribes to.
+ *
+ * The event is what the router's own `navigated` flag is set from, so waiting
+ * for it is what makes "the router has already navigated" a fact rather than a
+ * hope.
+ */
+async function navigate(router: Router, url: string): Promise<void> {
+  const ended = firstValueFrom(
+    router.events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      take(1),
+    ),
+  );
+  await router.navigateByUrl(url);
+  await ended;
+}
+
+@Component({ selector: 'app-stub-page', standalone: true, template: '' })
+class StubPage {}
+
 describe('matchPathGlob', () => {
   it('matches exact paths and wildcards', () => {
     expect(matchPathGlob('/pricing', '/pricing')).toBe(true);
@@ -124,49 +226,18 @@ describe('matchPathGlob', () => {
 describe('ConsentGate', () => {
   let gate: ConsentGate;
   let injectorSpy: { inject: ReturnType<typeof vi.fn> };
-  let apiSpy: {
-    purposes: ReturnType<typeof vi.fn>;
-    pageGroups: ReturnType<typeof vi.fn>;
-    tags: ReturnType<typeof vi.fn>;
-    tagGroups: ReturnType<typeof vi.fn>;
-    effectiveConsent: ReturnType<typeof vi.fn>;
-    recordConsentDecision: ReturnType<typeof vi.fn>;
-  };
-  let sessionStub: {
-    isAuthenticated: ReturnType<typeof vi.fn>;
-    userId: ReturnType<typeof vi.fn>;
-  };
+  let apiSpy: GateStubs['api'];
+  let sessionStub: GateStubs['session'];
 
   beforeEach(() => {
     localStorage.clear();
 
-    injectorSpy = {
-      inject: vi.fn().mockResolvedValue(undefined),
-    };
+    const stubs = createStubs();
+    injectorSpy = stubs.injector;
+    apiSpy = stubs.api;
+    sessionStub = stubs.session;
 
-    apiSpy = {
-      purposes: vi.fn().mockReturnValue(of([PURPOSE_ANALYTICS, PURPOSE_MARKETING, PURPOSE_NECESSARY])),
-      pageGroups: vi.fn().mockReturnValue(of([GROUP_PUBLIC, GROUP_AUTH_ONLY])),
-      tags: vi.fn().mockReturnValue(of([TAG_MULTI_PURPOSE, TAG_ANALYTICS_ONLY, TAG_NECESSARY_ONLY])),
-      tagGroups: vi.fn().mockReturnValue(of(TAG_GROUPS)),
-      effectiveConsent: vi.fn().mockReturnValue(of([])),
-      recordConsentDecision: vi.fn().mockReturnValue(of('rec-1')),
-    };
-
-    sessionStub = {
-      isAuthenticated: vi.fn().mockReturnValue(false),
-      userId: vi.fn().mockReturnValue(null),
-    };
-
-    TestBed.configureTestingModule({
-      providers: [
-        ConsentGate,
-        { provide: SnippetInjector, useValue: injectorSpy },
-        { provide: ConsentApi, useValue: apiSpy },
-        { provide: Session, useValue: sessionStub },
-        { provide: PLATFORM_ID, useValue: 'browser' },
-      ],
-    });
+    configureGate(stubs);
 
     gate = TestBed.inject(ConsentGate);
     gate.setMockConfig({
@@ -318,5 +389,160 @@ describe('ConsentGate', () => {
     gate.setDecision('marketing', true);
 
     expect(gate.writeFailure()).toBeNull();
+  });
+});
+
+/**
+ * THE LANDING PAGE.
+ *
+ * `ConsentGate` is `providedIn: 'root'`, so it is constructed on FIRST
+ * INJECTION. When that injection happens after the router has already emitted
+ * `NavigationEnd` for the route that brought the visitor here, a gate that
+ * only subscribes to `NavigationEnd` never evaluates the page the visitor
+ * landed on — the page view analytics exists to record.
+ */
+describe('ConsentGate — the page the visitor landed on', () => {
+  let stubs: GateStubs;
+  let router: Router;
+  let evaluateSpy: MockInstance<ConsentGate['evaluate']>;
+
+  beforeEach(async () => {
+    localStorage.clear();
+    stubs = createStubs();
+
+    configureGate(stubs, [
+      provideRouter([
+        { path: 'pricing', component: StubPage },
+        { path: 'other', component: StubPage },
+      ]),
+    ]);
+
+    router = TestBed.inject(Router);
+    // The navigation that brought the visitor here happens BEFORE the gate
+    // exists — which is the whole point: the gate cannot have seen it.
+    await navigate(router, '/pricing');
+
+    evaluateSpy = vi.spyOn(ConsentGate.prototype, 'evaluate');
+    TestBed.inject(ConsentGate);
+  });
+
+  afterEach(() => {
+    evaluateSpy.mockRestore();
+    localStorage.clear();
+  });
+
+  it('evaluates the landing page, without a navigation event', async () => {
+    expect(router.navigated, 'the premise of this test is a completed navigation').toBe(true);
+
+    await flush();
+
+    expect(evaluateSpy, 'the landing page was never evaluated').toHaveBeenCalledWith('/pricing');
+    expect(
+      stubs.injector.inject,
+      'the tag configured for the landing page did not load',
+    ).toHaveBeenCalledWith(TAG_NECESSARY_ONLY.snippet);
+  });
+
+  it('evaluates a later navigation', async () => {
+    await navigate(router, '/other');
+    await flush();
+
+    expect(evaluateSpy, 'the later navigation was not evaluated').toHaveBeenCalledWith('/other');
+  });
+});
+
+describe('ConsentGate — on the server', () => {
+  it('does not evaluate, does not fetch, and does not touch a browser global', () => {
+    const stubs = createStubs();
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+    const evaluateSpy = vi.spyOn(ConsentGate.prototype, 'evaluate');
+
+    TestBed.configureTestingModule({
+      providers: [
+        ConsentGate,
+        { provide: SnippetInjector, useValue: stubs.injector },
+        { provide: ConsentApi, useValue: stubs.api },
+        { provide: Session, useValue: stubs.session },
+        { provide: ErrorHandler, useValue: stubs.errorHandler },
+        { provide: PLATFORM_ID, useValue: 'server' },
+      ],
+    });
+    TestBed.inject(ConsentGate);
+
+    expect(evaluateSpy, 'the server evaluated a route').not.toHaveBeenCalled();
+    expect(stubs.api.purposes, 'the server fetched the catalogue').not.toHaveBeenCalled();
+    expect(getItemSpy, 'the server touched localStorage').not.toHaveBeenCalled();
+    expect(stubs.injector.inject, 'the server injected a tag').not.toHaveBeenCalled();
+
+    evaluateSpy.mockRestore();
+    getItemSpy.mockRestore();
+  });
+});
+
+describe('ConsentGate — a catalogue that cannot be fetched', () => {
+  it('reports the failure instead of resolving as if it had loaded', async () => {
+    const stubs = createStubs();
+    stubs.api.purposes.mockReturnValue(throwError(() => new Error('the catalogue is unreachable')));
+    configureGate(stubs);
+    const gate = TestBed.inject(ConsentGate);
+
+    await gate.evaluate('/pricing');
+
+    expect(gate.configFailure(), 'the failed catalogue load was silent').not.toBeNull();
+    expect(stubs.errorHandler.handleError, 'the failed catalogue load was not reported').toHaveBeenCalled();
+    expect(stubs.injector.inject, 'a tag was injected without a catalogue').not.toHaveBeenCalled();
+
+    // And the failure is not hidden behind a resolved promise either: a caller
+    // that asks for the configuration is told that there is none.
+    await expect(gate.ensureConfiguration()).rejects.toThrow(/unreachable/);
+  });
+});
+
+describe('ConsentGate — stored decisions that cannot be read or written', () => {
+  it('reports a stored decision it could not read, and does not destroy it', () => {
+    const stored = [
+      {
+        purposeKey: 'analytics',
+        granted: true,
+        policyVersion: 1,
+        mechanism: 'consent_control',
+        recordedAt: '2026-10-19T08:00:00Z',
+      },
+    ];
+    localStorage.setItem(ANON_STORAGE_KEY, JSON.stringify(stored));
+
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage is disabled');
+    });
+
+    const stubs = createStubs();
+    configureGate(stubs);
+    // The constructor restores the stored decisions, and that is the read that
+    // fails.
+    const gate = TestBed.inject(ConsentGate);
+
+    getItemSpy.mockRestore();
+
+    expect(gate.storageFailure(), 'the unreadable stored decision was discarded silently').not.toBeNull();
+    expect(stubs.errorHandler.handleError, 'the unreadable stored decision was not reported').toHaveBeenCalled();
+    expect(
+      localStorage.getItem(ANON_STORAGE_KEY),
+      'the stored decision was destroyed by a failed read',
+    ).toBe(JSON.stringify(stored));
+  });
+
+  it('reports a decision it could not store', () => {
+    const stubs = createStubs();
+    configureGate(stubs);
+    const gate = TestBed.inject(ConsentGate);
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+    gate.setDecision('analytics', true);
+    setItemSpy.mockRestore();
+
+    expect(gate.storageFailure(), 'the decision that was not stored was not reported').not.toBeNull();
+    expect(gate.decisions().get('analytics')?.granted).toBe(true);
   });
 });

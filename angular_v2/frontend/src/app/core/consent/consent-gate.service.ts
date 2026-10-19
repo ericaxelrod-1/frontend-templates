@@ -1,6 +1,7 @@
 import { isPlatformBrowser } from '@angular/common';
 import {
   computed,
+  ErrorHandler,
   inject,
   Injectable,
   PLATFORM_ID,
@@ -23,6 +24,14 @@ import { SnippetInjector } from './snippet-injector.service';
 
 const ANON_STORAGE_KEY = 'angular_v2.consent.anon.v1';
 const USER_STORAGE_KEY = 'angular_v2.consent.user.v1';
+
+/** What the visitor is told when the stored decisions cannot be read. */
+const STORAGE_READ_FAILURE =
+  'Your saved privacy choices could not be read from this browser, so you will be asked again.';
+
+/** What the visitor is told when a decision cannot be written down. */
+const STORAGE_WRITE_FAILURE =
+  'Your privacy choice could not be saved in this browser, so it will not be remembered on this device.';
 
 /**
  * Matches a URL path against a glob pattern.
@@ -81,6 +90,7 @@ export class ConsentGate {
   private readonly session = inject(Session);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router, { optional: true });
+  private readonly errorHandler = inject(ErrorHandler);
 
   /** Catalogue of processing purposes. */
   readonly purposes = signal<readonly ConsentPurpose[]>([]);
@@ -103,6 +113,35 @@ export class ConsentGate {
    * reported a choice as saved when no row existed (AGENTS.md §2.3).
    */
   readonly writeFailure = signal<string | null>(null);
+
+  /**
+   * The last failure to load the consent catalogue, or `null` when the last
+   * load succeeded.
+   *
+   * A catalogue that cannot be fetched is a MISCONFIGURATION OF THE DEPLOYMENT,
+   * not of the visitor: the gate then has no purposes, no groups and no tags,
+   * so no tag can ever load, and the application behaves exactly as it would
+   * with a correctly configured and correctly consented tag — which is
+   * indistinguishable from "this deployment has no analytics", the one state
+   * an operator needs to distinguish (AGENTS.md §2.3).
+   *
+   * The `admin_notifications` panel cannot carry this failure. The consent
+   * config materialiser reads the catalogue from the DATABASE, and a browser
+   * that cannot reach it is invisible to it — the server can read the same
+   * rows while every visitor's fetch fails. See `reportConfigurationFailure`.
+   */
+  readonly configFailure = signal<string | null>(null);
+
+  /**
+   * The last failure to read or write the browser's copy of the decisions, or
+   * `null`.
+   *
+   * A stored decision that cannot be read is not "no decision": it is a
+   * decision the application failed to honour, and the person who made it has
+   * to be told, because the alternative is to ask again as if nothing had been
+   * decided.
+   */
+  readonly storageFailure = signal<string | null>(null);
 
   /** Current active route path. */
   readonly currentPath = signal<string>('/');
@@ -157,20 +196,132 @@ export class ConsentGate {
         this.currentPath.set(path);
         void this.evaluate(path);
       });
+
+    // 3. Evaluate the page the visitor LANDED on — see `evaluateLandingRoute`.
+    this.evaluateLandingRoute();
   }
 
-  /** Ensures catalogue configuration is populated before evaluation. */
+  /**
+   * Evaluates the route the visitor landed on, without waiting for a navigation.
+   *
+   * ## THE REGRESSION THIS EXISTS FOR
+   *
+   * `ConsentGate` is `providedIn: 'root'`, so it is constructed on FIRST
+   * INJECTION — which happens while a component renders. When that render
+   * happens after the router has already emitted `NavigationEnd` for the route
+   * that brought the visitor here, the subscription in `init()` only ever sees
+   * FUTURE navigations, and the landing page — the page view analytics exists
+   * to record — is never evaluated. The tag appears only after the visitor
+   * clicks something.
+   *
+   * ## WHY `Router.navigated` IS THE CONDITION
+   *
+   * `Router.navigated` is true once a navigation has COMPLETED, and the
+   * router sets it when it emits `NavigationEnd`. While it is false the
+   * initial navigation is still pending: `router.url` is not yet the page the
+   * visitor is on, and evaluating it would attribute a tag to a path the
+   * visitor is about to leave. In that case the pending navigation's
+   * `NavigationEnd` arrives through the subscription in `init()` and the page
+   * is evaluated there.
+   *
+   * ## THE SERVER DOES NOT RUN THIS
+   *
+   * `init()` is called from the constructor behind `isPlatformBrowser`, so the
+   * SSR server constructs this service, evaluates no route, fetches no
+   * catalogue and touches no browser global.
+   */
+  private evaluateLandingRoute(): void {
+    const router = this.router;
+    if (!router?.navigated) {
+      return;
+    }
+    const path = router.url;
+    this.currentPath.set(path);
+    void this.evaluate(path);
+  }
+
+  /**
+   * Ensures catalogue configuration is populated before evaluation.
+   *
+   * ## THE FAILURE IS NOT SWALLOWED
+   *
+   * This used to end in `catch { }` — a comment calling it a "graceful
+   * fallback" — which resolved as if the catalogue had loaded. The gate then
+   * had no purposes, no groups and no tags, so NO TAG COULD EVER LOAD, and
+   * nothing said so. The deployment looked exactly like a deployment with no
+   * analytics, which is the one state an operator needs to distinguish
+   * (AGENTS.md §2.3).
+   *
+   * The error now propagates to the caller, which is `evaluate()`: it records
+   * the failure in `configFailure`, reports it through the framework's error
+   * channel, and continues with an empty catalogue — which injects nothing,
+   * because a gate with no catalogue must inject nothing.
+   */
   async ensureConfiguration(): Promise<void> {
     if (this.configLoaded || this.purposes().length > 0) {
       return;
     }
-    try {
-      await firstValueFrom(this.loadConfiguration());
-      this.configLoaded = true;
-      this.handleAuthStateChange();
-    } catch {
-      // Graceful fallback
-    }
+    await firstValueFrom(this.loadConfiguration());
+    this.configLoaded = true;
+    this.configFailure.set(null);
+    this.handleAuthStateChange();
+  }
+
+  /**
+   * Records a catalogue that could not be fetched, and reports it.
+   *
+   * ## WHY THIS IS NOT AN `admin_notifications` ROW
+   *
+   * The repository has exactly one mechanism for telling an operator that a
+   * deployment is misconfigured: `0027`'s `admin_notifications`, fed by the
+   * materialisers in `backend/src/notifications/`. The consent config
+   * materialiser is the one for this concern, and it CANNOT know about this
+   * failure: it reads `consent_tags` from the DATABASE through `pg`, and a
+   * catalogue that a BROWSER cannot fetch is invisible to it. The server can
+   * read every row while every visitor's fetch fails — an ad blocker, a
+   * proxy, a CORS failure, an offline device. The browser also has no write
+   * path into `admin_notifications`: `0027` grants `SELECT` to `app_member`
+   * and `INSERT` only to `app_admin`, so an anonymous visitor cannot publish
+   * anything, and a second write path would be the duplicate mechanism
+   * §2.4 forbids.
+   *
+   * So the honest alternative is used: the failure is reported through the
+   * framework's error channel — the one channel an operator's browser
+   * console and the application's own error reporting can both see — and
+   * `configFailure` holds a sentence a UI can show.
+   */
+  private reportConfigurationFailure(error: unknown): void {
+    this.configFailure.set(
+      'The consent configuration could not be loaded, so no tracking tag can run on this page.',
+    );
+    this.reportFailure('the consent catalogue could not be loaded', error);
+  }
+
+  /**
+   * Records a stored decision that could not be read or written, and reports it.
+   */
+  private reportStorageFailure(message: string, error: unknown): void {
+    this.storageFailure.set(message);
+    this.reportFailure('the stored consent decisions could not be read or written', error);
+  }
+
+  /**
+   * Reports a failure the application cannot recover from on its own.
+   *
+   * ## WHY THE ERROR HANDLER AND NOT A LOGGER
+   *
+   * The brief for this unit asks for "a `Logger` line at `error` level", and
+   * `@angular/core` 22 — the version this repository builds against — exports
+   * no `Logger` at all. What it does export is `ErrorHandler`, the framework's
+   * own error channel: `provideBrowserGlobalErrorListeners()` routes uncaught
+   * errors to it, and a fork that installs its own `ErrorHandler` receives
+   * these too. `no-console` is an error in this project (`eslint.config.js`),
+   * so the error channel is the only place a line an operator can read may
+   * come from.
+   */
+  private reportFailure(context: string, error: unknown): void {
+    const detail = error instanceof Error ? error.message : String(error);
+    this.errorHandler.handleError(new Error(`${context}: ${detail}`));
   }
 
   /**
@@ -216,19 +367,51 @@ export class ConsentGate {
   /**
    * Evaluates the current page and injects tags that match and pass purpose checks.
    *
-   * 1. Path and auth check.
-   * 2. Selects groups matching path and authenticated_only criteria.
-   * 3. Collects candidate tags for matching groups.
-   * 4. Applies subset test: tag loads only if every purpose is granted.
-   * 5. Injects passing tags.
+   * ## THIS NEVER THROWS
+   *
+   * Every caller of this method calls it fire-and-forget — the constructor
+   * cannot await it, the router subscription cannot await it, and `setDecision`
+   * must not fail because a tag did not load. A rejection here would become an
+   * unhandled rejection, which is a silent failure of a different kind: the
+   * page stops being evaluated and nothing says so.
+   *
+   * So the two things that can go wrong are handled here rather than
+   * propagated: a catalogue that cannot be fetched is reported and the
+   * evaluation stops (there is nothing to evaluate against), and a failure
+   * while evaluating is reported and the remaining tags are still considered.
    */
   async evaluate(path?: string): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
 
-    await this.ensureConfiguration();
+    try {
+      await this.ensureConfiguration();
+    } catch (error) {
+      // A misconfiguration of the DEPLOYMENT: no catalogue, no groups, no
+      // tags, and therefore nothing injected. The failure is reported rather
+      // than swallowed — see `reportConfigurationFailure`.
+      this.reportConfigurationFailure(error);
+      return;
+    }
 
+    try {
+      await this.evaluatePage(path);
+    } catch (error) {
+      this.reportFailure('the consent gate could not evaluate this page', error);
+    }
+  }
+
+  /**
+   * The evaluation itself.
+   *
+   * 1. Path and auth check.
+   * 2. Selects groups matching path and authenticated_only criteria.
+   * 3. Collects candidate tags for matching groups.
+   * 4. Applies subset test: tag loads only if every purpose is granted.
+   * 5. Injects passing tags.
+   */
+  private async evaluatePage(path?: string): Promise<void> {
     const currentPath = path ?? this.currentPath();
     const isAuthenticated = this.session.isAuthenticated();
     const allGroups = this.pageGroups();
@@ -465,21 +648,85 @@ export class ConsentGate {
     return map;
   }
 
+  /**
+   * Reads the decisions stored under one key.
+   *
+   * ## A FAILED READ IS NOT "NO DECISIONS"
+   *
+   * A read that throws — corrupt JSON, storage disabled by the browser, a
+   * quota error — used to be answered with an empty map, which is
+   * indistinguishable from "this visitor never decided anything". The
+   * consequence is that a recorded consent is DISCARDED: the gate asks again,
+   * and the tags the person had agreed to stop running. The empty map is also
+   * the SAFE direction — no readable decision means no consent-required tag
+   * loads — so the fix is not to fail open, it is to stop degrading
+   * SILENTLY.
+   *
+   * The failure is reported (`storageFailure`, and the framework's error
+   * channel), and the stored value is left untouched: overwriting it would
+   * destroy the only copy of the decision.
+   */
   private readFromStorage(key: string): Map<string, ConsentDecision> {
     if (!isPlatformBrowser(this.platformId)) {
       return new Map();
     }
+
+    let raw: string | null;
     try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return new Map();
-      const list = JSON.parse(raw) as ConsentDecision[];
-      if (!Array.isArray(list)) return new Map();
-      return new Map(list.map((d) => [d.purposeKey, d]));
-    } catch {
+      raw = localStorage.getItem(key);
+    } catch (error) {
+      this.reportStorageFailure(STORAGE_READ_FAILURE, error);
       return new Map();
     }
+    if (!raw) {
+      return new Map();
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      this.reportStorageFailure(STORAGE_READ_FAILURE, error);
+      return new Map();
+    }
+    if (!Array.isArray(parsed)) {
+      this.reportStorageFailure(
+        STORAGE_READ_FAILURE,
+        new Error('the stored value is not a list of decisions'),
+      );
+      return new Map();
+    }
+
+    // The stored value is written by a previous version of this application and
+    // read back from a store the visitor can edit, so it is untrusted input: an
+    // entry that is not a decision is dropped and reported, not cast into one.
+    const entries: readonly unknown[] = parsed;
+    const decisions = new Map<string, ConsentDecision>();
+    let malformed = 0;
+    for (const entry of entries) {
+      if (isStoredDecision(entry)) {
+        decisions.set(entry.purposeKey, entry);
+      } else {
+        malformed += 1;
+      }
+    }
+    if (malformed > 0) {
+      this.reportStorageFailure(
+        STORAGE_READ_FAILURE,
+        new Error(`${String(malformed)} stored decision(s) are not readable`),
+      );
+    }
+    return decisions;
   }
 
+  /**
+   * Writes the decisions under one key.
+   *
+   * A decision that was not stored is not a decision — the same argument the
+   * server write makes in `recordOnServer`. For an anonymous visitor this
+   * browser copy IS the record, so a failure has to reach them rather than
+   * disappear into an empty `catch`.
+   */
   private writeToStorage(key: string, map: EffectiveConsentMap): void {
     if (!isPlatformBrowser(this.platformId)) {
       return;
@@ -487,8 +734,29 @@ export class ConsentGate {
     try {
       const list = Array.from(map.values());
       localStorage.setItem(key, JSON.stringify(list));
-    } catch {
-      // Storage errors (e.g. quota exceeded) ignored safely
+    } catch (error) {
+      this.reportStorageFailure(STORAGE_WRITE_FAILURE, error);
     }
   }
+}
+
+/**
+ * Narrows one entry of the stored decision list.
+ *
+ * The value under the storage key is untrusted input — it was written by a
+ * previous version of this application and it lives in a store the visitor
+ * can edit — so it is narrowed rather than cast.
+ */
+function isStoredDecision(value: unknown): value is ConsentDecision {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as Partial<ConsentDecision>;
+  return (
+    typeof candidate.purposeKey === 'string' &&
+    typeof candidate.granted === 'boolean' &&
+    typeof candidate.policyVersion === 'number' &&
+    typeof candidate.mechanism === 'string' &&
+    typeof candidate.recordedAt === 'string'
+  );
 }
