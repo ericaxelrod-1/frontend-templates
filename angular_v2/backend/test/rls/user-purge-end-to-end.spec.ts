@@ -826,6 +826,21 @@ describe('no foreign key naming users can block a purge again', () => {
         // points at. The exact defect `0024` closed, arriving through a new door. `c`.
         ['admin_notifications_user_id_fkey', 'c'],
         ['auth_tokens_user_id_fkey', 'c'],
+        // `0028`. A consent record is the PROOF that somebody consented, and it is
+        // keyed to a PERSON rather than to an account — so it must outlive the account
+        // exactly as `privacy_request_audits` does, which `0010` gave no foreign key at
+        // all for. `SET NULL` is how that is expressed while still holding a live
+        // reference while the person exists: the row survives, the identifier goes,
+        // and the referential action runs as the OWNER of `consent_records` — the one
+        // role `consent_records`' own append-only guard admits, verified in
+        // `test/unit/consent/consent-model.spec.ts`. CASCADE here would delete a
+        // statutory record the moment a retention window expired. `n`.
+        ['consent_records_user_id_fkey', 'n'],
+        // `0028`, and `0024`'s ACTOR case on a new table: the tag records that
+        // SOMEONE ELSE configured it, so an erasure of that administrator's account
+        // must clear the pointer and leave the tag. The `disabled_by` case in the
+        // comment above is why this must never be "harmonised" into CASCADE. `n`.
+        ['consent_tags_created_by_fkey', 'n'],
         ['email_messages_user_id_fkey', 'c'],
         ['privacy_requests_user_id_fkey', 'c'],
         ['refresh_tokens_user_id_fkey', 'c'],

@@ -33,40 +33,56 @@ import { BACKEND_ROOT } from '../../support/paths.js';
 /** Distinct from `rls_proof`, which `test:rls` owns and which may be mid-drop. */
 export const PROOF_DATABASE = 'notifications_proof';
 
+/**
+ * A second throwaway database, for the consent proof.
+ *
+ * `NOT` a second implementation: `rebuildProofDatabase` and friends take the
+ * database name as a parameter for exactly this reason. Vitest runs spec files in
+ * parallel, so two files sharing one database would have each file's `beforeAll`
+ * drop the other's schema mid-run — a failure that reads as a schema bug and is
+ * a harness bug.
+ */
+export const CONSENT_PROOF_DATABASE = 'consent_proof';
+
 /** The migration/owner role, which owns every table and never receives a request. */
 const OWNING_ROLE = 'app';
 
 const MIGRATIONS_DIR = join(BACKEND_ROOT, 'database', 'migrations');
 
 /**
- * Recreate the proof database and apply every shipped migration to it.
+ * Recreate a proof database and apply every shipped migration to it.
  *
  * Applied TWICE on purpose, for the reason `test/rls/support/fixture.ts` applies
  * `0001` twice: "applies cleanly" and "is idempotent" are different claims, and a file
  * that has only ever run once has been shown to do neither. `0027` is the migration
- * this unit added, and a second application that fails on `CREATE TABLE` would mean the
- * RLS proof and this one disagree about what the schema tolerates.
+ * that added the notifications substrate and `0028` the one that added the consent
+ * model, and a second application that failed on either would mean the RLS proof and
+ * this one disagree about what the schema tolerates.
  */
-export async function rebuildProofDatabase(): Promise<void> {
+export async function rebuildProofDatabase(database: string = PROOF_DATABASE): Promise<void> {
   psqlAsSuperuser(
-    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${PROOF_DATABASE}' AND pid <> pg_backend_pid()`,
+    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${database}' AND pid <> pg_backend_pid()`,
     'postgres',
   );
-  psqlAsSuperuser(`DROP DATABASE IF EXISTS ${PROOF_DATABASE}`, 'postgres');
-  psqlAsSuperuser(`CREATE DATABASE ${PROOF_DATABASE} OWNER ${OWNING_ROLE}`, 'postgres');
+  psqlAsSuperuser(`DROP DATABASE IF EXISTS ${database}`, 'postgres');
+  psqlAsSuperuser(`CREATE DATABASE ${database} OWNER ${OWNING_ROLE}`, 'postgres');
 
   for (const [pass, files] of [
     ['first', await migrationFiles()],
     ['second', await migrationFiles()],
   ] as const) {
-    const client = await connectAs(loadTestEnvironment().database.user, loadTestEnvironment().database.password);
+    const client = await connectAs(
+      loadTestEnvironment().database.user,
+      loadTestEnvironment().database.password,
+      database,
+    );
     try {
       for (const file of files) {
         await client.query(await readFile(file, 'utf8'));
       }
     } catch (error) {
       throw new Error(
-        `applying migrations to ${PROOF_DATABASE} failed on the ${pass} pass: ${error instanceof Error ? error.message : String(error)}`,
+        `applying migrations to ${database} failed on the ${pass} pass: ${error instanceof Error ? error.message : String(error)}`,
         { cause: error },
       );
     } finally {
@@ -76,7 +92,7 @@ export async function rebuildProofDatabase(): Promise<void> {
 }
 
 /**
- * Drop the proof database.
+ * Drop a proof database.
  *
  * `rebuildProofDatabase` creates it from nothing on every run, so without this each run
  * leaves a stale copy of a schema behind — and a leftover database is indistinguishable
@@ -84,12 +100,12 @@ export async function rebuildProofDatabase(): Promise<void> {
  * first: a leaked client makes the `DROP` fail naming a connection the operator cannot
  * see (§B8).
  */
-export function dropProofDatabase(): void {
+export function dropProofDatabase(database: string = PROOF_DATABASE): void {
   psqlAsSuperuser(
-    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${PROOF_DATABASE}' AND pid <> pg_backend_pid()`,
+    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${database}' AND pid <> pg_backend_pid()`,
     'postgres',
   );
-  psqlAsSuperuser(`DROP DATABASE IF EXISTS ${PROOF_DATABASE}`, 'postgres');
+  psqlAsSuperuser(`DROP DATABASE IF EXISTS ${database}`, 'postgres');
 }
 
 /**
@@ -105,19 +121,19 @@ export function dropProofDatabase(): void {
  * boundary rather than around it (`0022`'s grants, `AGENTS.md` §B2: "Never disable
  * `row_security` to seed").
  */
-export function authenticatorClient(): Promise<Client> {
+export function authenticatorClient(database: string = PROOF_DATABASE): Promise<Client> {
   const env = loadTestEnvironment();
-  return connectAs(env.authenticator.user, env.authenticator.password);
+  return connectAs(env.authenticator.user, env.authenticator.password, database);
 }
 
-async function connectAs(user: string, password: string): Promise<Client> {
+async function connectAs(user: string, password: string, database: string): Promise<Client> {
   const config = loadTestEnvironment().database;
   const client = new Client({
     host: config.host,
     port: config.port,
     user,
     password,
-    database: PROOF_DATABASE,
+    database,
   });
   await client.connect();
   return client;

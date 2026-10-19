@@ -352,6 +352,150 @@
                 ]
             }
         },
+        "/consent_tag_groups": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tag_groups.tag_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tag_groups.group_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/range"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/components/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_tag_groups"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json;nulls=stripped": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_tag_groups"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_tag_groups"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "text/csv": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_tag_groups"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "consent_tag_groups"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferPost"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_tag_groups"
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "consent_tag_groups"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tag_groups.tag_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tag_groups.group_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "consent_tag_groups"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tag_groups.tag_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tag_groups.group_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_tag_groups"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "consent_tag_groups"
+                ]
+            }
+        },
         "/auth_tokens": {
             "get": {
                 "parameters": [
@@ -556,6 +700,204 @@
                 },
                 "tags": [
                     "auth_tokens"
+                ]
+            }
+        },
+        "/consent_records": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.purpose_key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.granted"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.policy_version"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.mechanism"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.recorded_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/range"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/components/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_records"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json;nulls=stripped": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_records"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_records"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "text/csv": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_records"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "consent_records"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferPost"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_records"
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "consent_records"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.purpose_key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.granted"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.policy_version"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.mechanism"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.recorded_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "consent_records"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.purpose_key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.granted"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.policy_version"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.mechanism"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_records.recorded_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_records"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "consent_records"
                 ]
             }
         },
@@ -2710,6 +3052,492 @@
                 ]
             }
         },
+        "/consent_page_groups": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.path_globs"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.authenticated_only"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/range"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/components/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_page_groups"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json;nulls=stripped": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_page_groups"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_page_groups"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "text/csv": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_page_groups"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "consent_page_groups"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferPost"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_page_groups"
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "consent_page_groups"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.path_globs"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.authenticated_only"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "consent_page_groups"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.path_globs"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.authenticated_only"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_page_groups.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_page_groups"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "consent_page_groups"
+                ]
+            }
+        },
+        "/admin_notifications": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/range"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/components/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/admin_notifications"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json;nulls=stripped": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/admin_notifications"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/admin_notifications"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "text/csv": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/admin_notifications"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "admin_notifications"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferPost"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/admin_notifications"
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "admin_notifications"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "admin_notifications"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/admin_notifications"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "admin_notifications"
+                ]
+            }
+        },
         "/email_messages": {
             "get": {
                 "parameters": [
@@ -3166,6 +3994,424 @@
                 },
                 "tags": [
                     "company_addresses"
+                ]
+            }
+        },
+        "/consent_purposes": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.label"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.description"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.legal_basis"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.requires_consent"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.policy_version"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.sort_order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/range"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/components/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_purposes"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json;nulls=stripped": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_purposes"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_purposes"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "text/csv": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_purposes"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "summary": "The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users.",
+                "tags": [
+                    "consent_purposes"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferPost"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_purposes"
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "summary": "The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users.",
+                "tags": [
+                    "consent_purposes"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.label"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.description"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.legal_basis"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.requires_consent"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.policy_version"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.sort_order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "summary": "The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users.",
+                "tags": [
+                    "consent_purposes"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.label"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.description"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.legal_basis"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.requires_consent"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.policy_version"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.sort_order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_purposes.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_purposes"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "summary": "The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users.",
+                "tags": [
+                    "consent_purposes"
+                ]
+            }
+        },
+        "/consent_tags": {
+            "get": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.snippet"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.purposes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.enabled"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.created_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/order"
+                    },
+                    {
+                        "$ref": "#/components/parameters/range"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rangeUnit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/offset"
+                    },
+                    {
+                        "$ref": "#/components/parameters/limit"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferCount"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_tags"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json;nulls=stripped": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_tags"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "application/vnd.pgrst.object+json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_tags"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "text/csv": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/consent_tags"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "206": {
+                        "description": "Partial Content"
+                    }
+                },
+                "tags": [
+                    "consent_tags"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/select"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferPost"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_tags"
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    }
+                },
+                "tags": [
+                    "consent_tags"
+                ]
+            },
+            "delete": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.snippet"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.purposes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.enabled"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.created_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "consent_tags"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.snippet"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.purposes"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.enabled"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.created_by"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.created_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/rowFilter.consent_tags.updated_at"
+                    },
+                    {
+                        "$ref": "#/components/parameters/preferReturn"
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/consent_tags"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "consent_tags"
                 ]
             }
         },
@@ -5600,284 +6846,6 @@
                     "(rpc) has_permission"
                 ]
             }
-        },
-        "/admin_notifications": {
-            "get": {
-                "parameters": [
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/select"
-                    },
-                    {
-                        "$ref": "#/components/parameters/order"
-                    },
-                    {
-                        "$ref": "#/components/parameters/range"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rangeUnit"
-                    },
-                    {
-                        "$ref": "#/components/parameters/offset"
-                    },
-                    {
-                        "$ref": "#/components/parameters/limit"
-                    },
-                    {
-                        "$ref": "#/components/parameters/preferCount"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "items": {
-                                "$ref": "#/definitions/admin_notifications"
-                            },
-                            "type": "array"
-                        }
-                    },
-                    "206": {
-                        "description": "Partial Content"
-                    }
-                },
-                "tags": [
-                    "admin_notifications"
-                ]
-            },
-            "post": {
-                "parameters": [
-                    {
-                        "$ref": "#/components/parameters/select"
-                    },
-                    {
-                        "$ref": "#/components/parameters/preferPost"
-                    }
-                ],
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/admin_notifications"
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created"
-                    }
-                },
-                "tags": [
-                    "admin_notifications"
-                ]
-            },
-            "delete": {
-                "parameters": [
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/preferReturn"
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                },
-                "tags": [
-                    "admin_notifications"
-                ]
-            },
-            "patch": {
-                "parameters": [
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.id"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.kind"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.severity"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.title"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.message"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.data"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.source_ref"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.audience"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.user_id"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.acknowledged_by"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolved_by"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.resolution_notes"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.dismissed_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.is_mock"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.created_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.updated_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/rowFilter.admin_notifications.expires_at"
-                    },
-                    {
-                        "$ref": "#/components/parameters/preferReturn"
-                    }
-                ],
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/admin_notifications"
-                },
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                },
-                "tags": [
-                    "admin_notifications"
-                ]
-            }
         }
     },
     "externalDocs": {
@@ -6137,7 +7105,7 @@
             },
             "rowFilter.users.first_name": {
                 "name": "first_name",
-                "description": "The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157).",
+                "description": "The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank: ' ' is an absent answer dressed as one, and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it.",
                 "required": false,
                 "in": "query",
                 "schema": {
@@ -6155,7 +7123,7 @@
             },
             "rowFilter.users.last_login_at": {
                 "name": "last_login_at",
-                "description": "When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller.",
+                "description": "When this account last passed a CREDENTIAL check: NULL means no successful authentication has been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled, never defaulted, and written from the login path's own now() rather than from a caller.",
                 "required": false,
                 "in": "query",
                 "schema": {
@@ -6172,7 +7140,7 @@
             },
             "rowFilter.users.disabled_by": {
                 "name": "disabled_by",
-                "description": "The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason).",
+                "description": "The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. A NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason).",
                 "required": false,
                 "in": "query",
                 "schema": {
@@ -6181,7 +7149,7 @@
             },
             "rowFilter.users.disabled_reason": {
                 "name": "disabled_reason",
-                "description": "WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string.",
+                "description": "WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. A value outside the list is invisible to every reader of this column and reported by nothing, which is why it is a CHECK and not a comment.",
                 "required": false,
                 "in": "query",
                 "schema": {
@@ -6190,7 +7158,23 @@
             },
             "rowFilter.users.disabled_until": {
                 "name": "disabled_until",
-                "description": "When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered.",
+                "description": "When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically: this records when a suspension was MEANT to end, and a sweeper that acts on it is application work. users_disabled_until_after_disabled_at keeps the two timestamps ordered.",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tag_groups.tag_id": {
+                "name": "tag_id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tag_groups.group_id": {
+                "name": "group_id",
                 "required": false,
                 "in": "query",
                 "schema": {
@@ -6263,6 +7247,70 @@
             },
             "rowFilter.auth_tokens.consumed_at": {
                 "name": "consumed_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_records.id": {
+                "name": "id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_records.user_id": {
+                "name": "user_id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_records.purpose_key": {
+                "name": "purpose_key",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_records.granted": {
+                "name": "granted",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_records.policy_version": {
+                "name": "policy_version",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_records.mechanism": {
+                "name": "mechanism",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_records.source": {
+                "name": "source",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_records.recorded_at": {
+                "name": "recorded_at",
                 "required": false,
                 "in": "query",
                 "schema": {
@@ -7061,6 +8109,215 @@
                     "type": "string"
                 }
             },
+            "rowFilter.consent_page_groups.id": {
+                "name": "id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_page_groups.key": {
+                "name": "key",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_page_groups.path_globs": {
+                "name": "path_globs",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_page_groups.authenticated_only": {
+                "name": "authenticated_only",
+                "description": "TRUE for groups that only exist inside an authenticated session, so a new route is covered by being a route rather than by being listed.",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_page_groups.created_at": {
+                "name": "created_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_page_groups.updated_at": {
+                "name": "updated_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.id": {
+                "name": "id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.source": {
+                "name": "source",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.kind": {
+                "name": "kind",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.severity": {
+                "name": "severity",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.title": {
+                "name": "title",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.message": {
+                "name": "message",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.data": {
+                "name": "data",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.source_ref": {
+                "name": "source_ref",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.audience": {
+                "name": "audience",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.user_id": {
+                "name": "user_id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.acknowledged_at": {
+                "name": "acknowledged_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.acknowledged_by": {
+                "name": "acknowledged_by",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.resolved_at": {
+                "name": "resolved_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.resolved_by": {
+                "name": "resolved_by",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.resolution_notes": {
+                "name": "resolution_notes",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.dismissed_at": {
+                "name": "dismissed_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.is_mock": {
+                "name": "is_mock",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.created_at": {
+                "name": "created_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.updated_at": {
+                "name": "updated_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.admin_notifications.expires_at": {
+                "name": "expires_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
             "rowFilter.email_messages.id": {
                 "name": "id",
                 "required": false,
@@ -7239,6 +8496,151 @@
             },
             "rowFilter.company_addresses.created_at": {
                 "name": "created_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.id": {
+                "name": "id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.key": {
+                "name": "key",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.label": {
+                "name": "label",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.description": {
+                "name": "description",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.legal_basis": {
+                "name": "legal_basis",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.requires_consent": {
+                "name": "requires_consent",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.policy_version": {
+                "name": "policy_version",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.sort_order": {
+                "name": "sort_order",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.created_at": {
+                "name": "created_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_purposes.updated_at": {
+                "name": "updated_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tags.id": {
+                "name": "id",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tags.key": {
+                "name": "key",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tags.snippet": {
+                "name": "snippet",
+                "description": "Opaque to this migration. No vendor is named, recognised or hardcoded anywhere in this file.",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tags.purposes": {
+                "name": "purposes",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tags.enabled": {
+                "name": "enabled",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tags.created_by": {
+                "name": "created_by",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tags.created_at": {
+                "name": "created_at",
+                "required": false,
+                "in": "query",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "rowFilter.consent_tags.updated_at": {
+                "name": "updated_at",
                 "required": false,
                 "in": "query",
                 "schema": {
@@ -7876,169 +9278,34 @@
                 "schema": {
                     "type": "string"
                 }
-            },
-            "rowFilter.admin_notifications.id": {
-                "name": "id",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.source": {
-                "name": "source",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.kind": {
-                "name": "kind",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.severity": {
-                "name": "severity",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.title": {
-                "name": "title",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.message": {
-                "name": "message",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.data": {
-                "name": "data",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.source_ref": {
-                "name": "source_ref",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.audience": {
-                "name": "audience",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.user_id": {
-                "name": "user_id",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.acknowledged_at": {
-                "name": "acknowledged_at",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.acknowledged_by": {
-                "name": "acknowledged_by",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.resolved_at": {
-                "name": "resolved_at",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.resolved_by": {
-                "name": "resolved_by",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.resolution_notes": {
-                "name": "resolution_notes",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.dismissed_at": {
-                "name": "dismissed_at",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.is_mock": {
-                "name": "is_mock",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.created_at": {
-                "name": "created_at",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.updated_at": {
-                "name": "updated_at",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
-            },
-            "rowFilter.admin_notifications.expires_at": {
-                "name": "expires_at",
-                "required": false,
-                "in": "query",
-                "schema": {
-                    "type": "string"
-                }
             }
         },
         "requestBodies": {
+            "consent_page_groups": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_page_groups"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json;nulls=stripped": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_page_groups"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_page_groups"
+                        }
+                    },
+                    "text/csv": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_page_groups"
+                        }
+                    }
+                },
+                "description": "consent_page_groups"
+            },
             "pattern_login_attempts": {
                 "content": {
                     "application/json": {
@@ -8188,6 +9455,31 @@
                     }
                 },
                 "description": "ip_reputation"
+            },
+            "consent_records": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_records"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json;nulls=stripped": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_records"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_records"
+                        }
+                    },
+                    "text/csv": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_records"
+                        }
+                    }
+                },
+                "description": "consent_records"
             },
             "security_detected_patterns": {
                 "content": {
@@ -8364,6 +9656,31 @@
                 },
                 "description": "privacy_requests"
             },
+            "consent_tag_groups": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_tag_groups"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json;nulls=stripped": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_tag_groups"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_tag_groups"
+                        }
+                    },
+                    "text/csv": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_tag_groups"
+                        }
+                    }
+                },
+                "description": "consent_tag_groups"
+            },
             "auth_tokens": {
                 "content": {
                     "application/json": {
@@ -8464,6 +9781,31 @@
                 },
                 "description": "company_profile"
             },
+            "admin_notifications": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/admin_notifications"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json;nulls=stripped": {
+                        "schema": {
+                            "$ref": "#/components/schemas/admin_notifications"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/admin_notifications"
+                        }
+                    },
+                    "text/csv": {
+                        "schema": {
+                            "$ref": "#/components/schemas/admin_notifications"
+                        }
+                    }
+                },
+                "description": "admin_notifications"
+            },
             "email_messages": {
                 "content": {
                     "application/json": {
@@ -8513,6 +9855,56 @@
                     }
                 },
                 "description": "company_addresses"
+            },
+            "consent_purposes": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_purposes"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json;nulls=stripped": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_purposes"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_purposes"
+                        }
+                    },
+                    "text/csv": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_purposes"
+                        }
+                    }
+                },
+                "description": "consent_purposes"
+            },
+            "consent_tags": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_tags"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json;nulls=stripped": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_tags"
+                        }
+                    },
+                    "application/vnd.pgrst.object+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_tags"
+                        }
+                    },
+                    "text/csv": {
+                        "schema": {
+                            "$ref": "#/components/schemas/consent_tags"
+                        }
+                    }
+                },
+                "description": "consent_tags"
             },
             "refresh_tokens": {
                 "content": {
@@ -8688,31 +10080,6 @@
                     }
                 },
                 "description": "migrations"
-            },
-            "admin_notifications": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "$ref": "#/components/schemas/admin_notifications"
-                        }
-                    },
-                    "application/vnd.pgrst.object+json;nulls=stripped": {
-                        "schema": {
-                            "$ref": "#/components/schemas/admin_notifications"
-                        }
-                    },
-                    "application/vnd.pgrst.object+json": {
-                        "schema": {
-                            "$ref": "#/components/schemas/admin_notifications"
-                        }
-                    },
-                    "text/csv": {
-                        "schema": {
-                            "$ref": "#/components/schemas/admin_notifications"
-                        }
-                    }
-                },
-                "description": "admin_notifications"
             }
         },
         "schemas": {
@@ -8794,7 +10161,7 @@
                         "type": "string"
                     },
                     "first_name": {
-                        "description": "The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157).",
+                        "description": "The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank: ' ' is an absent answer dressed as one, and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it.",
                         "format": "text",
                         "type": "string"
                     },
@@ -8804,7 +10171,7 @@
                         "type": "string"
                     },
                     "last_login_at": {
-                        "description": "When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller.",
+                        "description": "When this account last passed a CREDENTIAL check: NULL means no successful authentication has been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled, never defaulted, and written from the login path's own now() rather than from a caller.",
                         "format": "timestamp with time zone",
                         "type": "string"
                     },
@@ -8813,18 +10180,37 @@
                         "type": "string"
                     },
                     "disabled_by": {
-                        "description": "The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason).\n\nNote:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "description": "The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. A NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason).\n\nNote:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
                         "format": "uuid",
                         "type": "string"
                     },
                     "disabled_reason": {
-                        "description": "WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string.",
+                        "description": "WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. A value outside the list is invisible to every reader of this column and reported by nothing, which is why it is a CHECK and not a comment.",
                         "format": "text",
                         "type": "string"
                     },
                     "disabled_until": {
-                        "description": "When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered.",
+                        "description": "When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically: this records when a suspension was MEANT to end, and a sweeper that acts on it is application work. users_disabled_until_after_disabled_at keeps the two timestamps ordered.",
                         "format": "timestamp with time zone",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "consent_tag_groups": {
+                "required": [
+                    "tag_id",
+                    "group_id"
+                ],
+                "properties": {
+                    "tag_id": {
+                        "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `consent_tags.id`.<fk table='consent_tags' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "group_id": {
+                        "description": "Note:\nThis is a Primary Key.<pk/>\nThis is a Foreign Key to `consent_page_groups.id`.<fk table='consent_page_groups' column='id'/>",
+                        "format": "uuid",
                         "type": "string"
                     }
                 },
@@ -8878,6 +10264,58 @@
                         "type": "string"
                     },
                     "consumed_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "consent_records": {
+                "required": [
+                    "id",
+                    "purpose_key",
+                    "granted",
+                    "policy_version",
+                    "mechanism",
+                    "source",
+                    "recorded_at"
+                ],
+                "properties": {
+                    "id": {
+                        "default": "uuidv7()",
+                        "description": "Note:\nThis is a Primary Key.<pk/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "purpose_key": {
+                        "description": "Note:\nThis is a Foreign Key to `consent_purposes.key`.<fk table='consent_purposes' column='key'/>",
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "granted": {
+                        "format": "boolean",
+                        "type": "boolean"
+                    },
+                    "policy_version": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "mechanism": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "source": {
+                        "default": "app",
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "recorded_at": {
+                        "default": "now()",
                         "format": "timestamp with time zone",
                         "type": "string"
                     }
@@ -9469,6 +10907,157 @@
                 },
                 "type": "object"
             },
+            "consent_page_groups": {
+                "required": [
+                    "id",
+                    "key",
+                    "path_globs",
+                    "authenticated_only",
+                    "created_at",
+                    "updated_at"
+                ],
+                "properties": {
+                    "id": {
+                        "default": "uuidv7()",
+                        "description": "Note:\nThis is a Primary Key.<pk/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "key": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "path_globs": {
+                        "format": "jsonb"
+                    },
+                    "authenticated_only": {
+                        "default": false,
+                        "description": "TRUE for groups that only exist inside an authenticated session, so a new route is covered by being a route rather than by being listed.",
+                        "format": "boolean",
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "admin_notifications": {
+                "required": [
+                    "id",
+                    "source",
+                    "kind",
+                    "severity",
+                    "title",
+                    "message",
+                    "data",
+                    "source_ref",
+                    "audience",
+                    "is_mock",
+                    "created_at",
+                    "updated_at",
+                    "expires_at"
+                ],
+                "properties": {
+                    "id": {
+                        "default": "uuidv7()",
+                        "description": "Note:\nThis is a Primary Key.<pk/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "source": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "severity": {
+                        "default": "medium",
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "title": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "message": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "data": {
+                        "format": "jsonb"
+                    },
+                    "source_ref": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "audience": {
+                        "default": "all",
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "acknowledged_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "acknowledged_by": {
+                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "resolved_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "resolved_by": {
+                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "resolution_notes": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "dismissed_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "is_mock": {
+                        "default": false,
+                        "format": "boolean",
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "email_messages": {
                 "required": [
                     "id",
@@ -9593,6 +11182,125 @@
                         "type": "string"
                     },
                     "created_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "consent_purposes": {
+                "description": "The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users.",
+                "required": [
+                    "id",
+                    "key",
+                    "label",
+                    "description",
+                    "legal_basis",
+                    "requires_consent",
+                    "policy_version",
+                    "sort_order",
+                    "created_at",
+                    "updated_at"
+                ],
+                "properties": {
+                    "id": {
+                        "default": "uuidv7()",
+                        "description": "Note:\nThis is a Primary Key.<pk/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "key": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "label": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "description": {
+                        "default": "",
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "legal_basis": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "requires_consent": {
+                        "default": true,
+                        "format": "boolean",
+                        "type": "boolean"
+                    },
+                    "policy_version": {
+                        "default": 1,
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "sort_order": {
+                        "default": 0,
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "consent_tags": {
+                "required": [
+                    "id",
+                    "key",
+                    "snippet",
+                    "purposes",
+                    "enabled",
+                    "created_at",
+                    "updated_at"
+                ],
+                "properties": {
+                    "id": {
+                        "default": "uuidv7()",
+                        "description": "Note:\nThis is a Primary Key.<pk/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "key": {
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "snippet": {
+                        "default": "",
+                        "description": "Opaque to this migration. No vendor is named, recognised or hardcoded anywhere in this file.",
+                        "format": "text",
+                        "type": "string"
+                    },
+                    "purposes": {
+                        "format": "jsonb"
+                    },
+                    "enabled": {
+                        "default": true,
+                        "format": "boolean",
+                        "type": "boolean"
+                    },
+                    "created_by": {
+                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "default": "now()",
+                        "format": "timestamp with time zone",
+                        "type": "string"
+                    },
+                    "updated_at": {
                         "default": "now()",
                         "format": "timestamp with time zone",
                         "type": "string"
@@ -10099,115 +11807,6 @@
                         "default": false,
                         "format": "boolean",
                         "type": "boolean"
-                    }
-                },
-                "type": "object"
-            },
-            "admin_notifications": {
-                "required": [
-                    "id",
-                    "source",
-                    "kind",
-                    "severity",
-                    "title",
-                    "message",
-                    "data",
-                    "source_ref",
-                    "audience",
-                    "is_mock",
-                    "created_at",
-                    "updated_at",
-                    "expires_at"
-                ],
-                "properties": {
-                    "id": {
-                        "default": "uuidv7()",
-                        "description": "Note:\nThis is a Primary Key.<pk/>",
-                        "format": "uuid",
-                        "type": "string"
-                    },
-                    "source": {
-                        "format": "text",
-                        "type": "string"
-                    },
-                    "kind": {
-                        "format": "text",
-                        "type": "string"
-                    },
-                    "severity": {
-                        "default": "medium",
-                        "format": "text",
-                        "type": "string"
-                    },
-                    "title": {
-                        "format": "text",
-                        "type": "string"
-                    },
-                    "message": {
-                        "format": "text",
-                        "type": "string"
-                    },
-                    "data": {
-                        "format": "jsonb"
-                    },
-                    "source_ref": {
-                        "format": "text",
-                        "type": "string"
-                    },
-                    "audience": {
-                        "default": "all",
-                        "format": "text",
-                        "type": "string"
-                    },
-                    "user_id": {
-                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
-                        "format": "uuid",
-                        "type": "string"
-                    },
-                    "acknowledged_at": {
-                        "format": "timestamp with time zone",
-                        "type": "string"
-                    },
-                    "acknowledged_by": {
-                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
-                        "format": "uuid",
-                        "type": "string"
-                    },
-                    "resolved_at": {
-                        "format": "timestamp with time zone",
-                        "type": "string"
-                    },
-                    "resolved_by": {
-                        "description": "Note:\nThis is a Foreign Key to `users.id`.<fk table='users' column='id'/>",
-                        "format": "uuid",
-                        "type": "string"
-                    },
-                    "resolution_notes": {
-                        "format": "text",
-                        "type": "string"
-                    },
-                    "dismissed_at": {
-                        "format": "timestamp with time zone",
-                        "type": "string"
-                    },
-                    "is_mock": {
-                        "default": false,
-                        "format": "boolean",
-                        "type": "boolean"
-                    },
-                    "created_at": {
-                        "default": "now()",
-                        "format": "timestamp with time zone",
-                        "type": "string"
-                    },
-                    "updated_at": {
-                        "default": "now()",
-                        "format": "timestamp with time zone",
-                        "type": "string"
-                    },
-                    "expires_at": {
-                        "format": "timestamp with time zone",
-                        "type": "string"
                     }
                 },
                 "type": "object"

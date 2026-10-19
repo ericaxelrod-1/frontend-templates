@@ -217,7 +217,23 @@ async function reset(): Promise<void> {
   });
 }
 
-/** Run one pass of the REAL job body, through the REAL materialiser, on the real pool. */
+/**
+ * Run one pass of the REAL job body, through the REAL materialiser, on the real
+ * pool, and return ONE source's summary.
+ *
+ * A pass runs every registered source, so a bare `run.summaries` carries an entry
+ * per source and every assertion in a suite about `security_alerts` would have to
+ * restate the other sources' numbers — which is the shape that makes a real change
+ * to the registry a dozen edits nobody reads. Narrowing here is not hiding it:
+ * "a pass covers every registered source" asserts the whole array, and the
+ * narrowing is the source named rather than the index chosen.
+ */
+async function passFor(source: string, nowMs: number = Date.now()): Promise<readonly MaterializeSummary[]> {
+  const summaries = await passWith(loadNotificationEnvironment({}), nowMs);
+  return summaries.filter((summary) => summary.source === source);
+}
+
+/** Run one pass and return the summary of EVERY registered source, in registry order. */
 async function pass(nowMs: number = Date.now()): Promise<readonly MaterializeSummary[]> {
   return passWith(loadNotificationEnvironment({}), nowMs);
 }
@@ -261,11 +277,19 @@ describe('the materialiser contract, against a real PostgreSQL', () => {
   });
 
   it('has exactly one registration point, and a source that is not registered cannot run', () => {
-    expect(REGISTERED_SOURCES).toEqual(['security_alerts']);
+    expect(REGISTERED_SOURCES).toEqual(['security_alerts', 'consent_config']);
     expect(materializerFor('security_alerts').source).toBe('security_alerts');
     // The refusal, not a skip. A materialiser that quietly stopped running is the
     // failure §2.3 is about, and it is indistinguishable from a source with no rows.
-    expect(() => materializerFor('consent_misconfiguration')).toThrow(/no materializer is registered/);
+    expect(() => materializerFor('a_source_that_does_not_exist')).toThrow(/no materializer is registered/);
+  });
+
+  it('a pass covers every registered source, so the registry is not a list of intentions', async () => {
+    // The whole array, which is what `passFor` narrows. Every source registered in
+    // `MATERIALIZERS` reports a summary from one pass: a source in the registry that
+    // the runner never reached would be invisible in every other assertion here.
+    await reset();
+    expect((await pass()).map((summary) => summary.source)).toEqual([...REGISTERED_SOURCES]);
   });
 
   it('reads its own source and writes one notification per source row it finds', async () => {
@@ -273,7 +297,7 @@ describe('the materialiser contract, against a real PostgreSQL', () => {
     await seedAlert({ id: '0195f0e5-0002-7000-8000-0000000000b1' });
     await seedAlert({ id: '0195f0e5-0002-7000-8000-0000000000b2' });
 
-    const summaries = await pass();
+    const summaries = await passFor('security_alerts');
     expect(summaries).toEqual([{ source: 'security_alerts', scanned: 2, created: 2 }]);
 
     const rows = await notifications();
@@ -335,7 +359,7 @@ describe('the materialiser contract, against a real PostgreSQL', () => {
     // The ceiling this does have is recorded by the next test.
     await reset();
     await seedAlert({ id: '0195f0e5-0002-7000-8000-0000000000b6', hoursOld: 24 * 30 });
-    expect(await pass()).toEqual([{ source: 'security_alerts', scanned: 0, created: 0 }]);
+    expect(await passFor('security_alerts')).toEqual([{ source: 'security_alerts', scanned: 0, created: 0 }]);
     expect(await notifications()).toHaveLength(0);
   });
 
@@ -345,8 +369,8 @@ describe('the materialiser contract, against a real PostgreSQL', () => {
     await reset();
     await seedAlert({ id: '0195f0e5-0002-7000-8000-0000000000b5' });
 
-    expect(await pass()).toEqual([{ source: 'security_alerts', scanned: 1, created: 1 }]);
-    expect(await pass()).toEqual([{ source: 'security_alerts', scanned: 1, created: 0 }]);
+    expect(await passFor('security_alerts')).toEqual([{ source: 'security_alerts', scanned: 1, created: 1 }]);
+    expect(await passFor('security_alerts')).toEqual([{ source: 'security_alerts', scanned: 1, created: 0 }]);
     expect(await notifications()).toHaveLength(1);
   });
 
@@ -375,7 +399,7 @@ describe('the materialiser contract, against a real PostgreSQL', () => {
     expect(dismissed.rowCount).toBe(1);
 
     // Re-run. This is the same call the scheduler makes every interval.
-    expect(await pass()).toEqual([{ source: 'security_alerts', scanned: 1, created: 0 }]);
+    expect(await passFor('security_alerts')).toEqual([{ source: 'security_alerts', scanned: 1, created: 0 }]);
 
     const after = await notifications();
     expect(after, 'the dismissal produced a second notification').toHaveLength(1);
@@ -415,7 +439,7 @@ describe('the materialiser contract, against a real PostgreSQL', () => {
     // The floor is `watermark - 3600s`, so it is inside the window; with no overlap the
     // floor would be the watermark itself and this row would be lost for good.
     await seedAlert({ id: '0195f0e5-0002-7000-8000-0000000000b9', hoursOld: 0.5 });
-    expect(await pass()).toEqual([{ source: 'security_alerts', scanned: 2, created: 1 }]);
+    expect(await passFor('security_alerts')).toEqual([{ source: 'security_alerts', scanned: 2, created: 1 }]);
     expect(await notifications()).toHaveLength(2);
   });
 
@@ -430,7 +454,7 @@ describe('the materialiser contract, against a real PostgreSQL', () => {
     await pass();
 
     await seedAlert({ id: '0195f0e5-0002-7000-8000-0000000000c1', hoursOld: 26 });
-    expect(await pass()).toEqual([{ source: 'security_alerts', scanned: 1, created: 0 }]);
+    expect(await passFor('security_alerts')).toEqual([{ source: 'security_alerts', scanned: 1, created: 0 }]);
     expect(await notifications()).toHaveLength(1);
   });
 
@@ -441,13 +465,13 @@ describe('the materialiser contract, against a real PostgreSQL', () => {
     // notifications the first time somebody registers a materialiser for it.
     await reset();
     await seedAlert({ id: '0195f0e5-0002-7000-8000-0000000000c2', hoursOld: 72 });
-    expect(await pass()).toEqual([{ source: 'security_alerts', scanned: 0, created: 0 }]);
+    expect(await passFor('security_alerts')).toEqual([{ source: 'security_alerts', scanned: 0, created: 0 }]);
     expect(await notifications()).toHaveLength(0);
   });
 
   it('reports an all-zero pass in the shape of a working pass, not of a dead one', async () => {
     await reset();
-    expect(await pass()).toEqual([{ source: 'security_alerts', scanned: 0, created: 0 }]);
+    expect(await passFor('security_alerts')).toEqual([{ source: 'security_alerts', scanned: 0, created: 0 }]);
   });
 });
 

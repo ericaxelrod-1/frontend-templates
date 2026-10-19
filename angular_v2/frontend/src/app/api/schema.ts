@@ -65,18 +65,18 @@ export interface paths {
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                     email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
-                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157). */
+                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank: ' ' is an absent answer dressed as one, and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it. */
                     first_name?: components["parameters"]["rowFilter.users.first_name"];
                     /** @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed. */
                     last_name?: components["parameters"]["rowFilter.users.last_name"];
-                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller. */
+                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled, never defaulted, and written from the login path's own now() rather than from a caller. */
                     last_login_at?: components["parameters"]["rowFilter.users.last_login_at"];
                     disabled_at?: components["parameters"]["rowFilter.users.disabled_at"];
-                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
+                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. A NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
                     disabled_by?: components["parameters"]["rowFilter.users.disabled_by"];
-                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string. */
+                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. A value outside the list is invisible to every reader of this column and reported by nothing, which is why it is a CHECK and not a comment. */
                     disabled_reason?: components["parameters"]["rowFilter.users.disabled_reason"];
-                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
+                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically: this records when a suspension was MEANT to end, and a sweeper that acts on it is application work. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
                     disabled_until?: components["parameters"]["rowFilter.users.disabled_until"];
                     /** @description Filtering Columns */
                     select?: components["parameters"]["select"];
@@ -166,18 +166,18 @@ export interface paths {
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                     email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
-                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157). */
+                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank: ' ' is an absent answer dressed as one, and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it. */
                     first_name?: components["parameters"]["rowFilter.users.first_name"];
                     /** @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed. */
                     last_name?: components["parameters"]["rowFilter.users.last_name"];
-                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller. */
+                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled, never defaulted, and written from the login path's own now() rather than from a caller. */
                     last_login_at?: components["parameters"]["rowFilter.users.last_login_at"];
                     disabled_at?: components["parameters"]["rowFilter.users.disabled_at"];
-                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
+                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. A NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
                     disabled_by?: components["parameters"]["rowFilter.users.disabled_by"];
-                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string. */
+                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. A value outside the list is invisible to every reader of this column and reported by nothing, which is why it is a CHECK and not a comment. */
                     disabled_reason?: components["parameters"]["rowFilter.users.disabled_reason"];
-                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
+                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically: this records when a suspension was MEANT to end, and a sweeper that acts on it is application work. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
                     disabled_until?: components["parameters"]["rowFilter.users.disabled_until"];
                 };
                 header?: {
@@ -220,18 +220,18 @@ export interface paths {
                     /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
                     last_activity_at?: components["parameters"]["rowFilter.users.last_activity_at"];
                     email_verified_at?: components["parameters"]["rowFilter.users.email_verified_at"];
-                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157). */
+                    /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank: ' ' is an absent answer dressed as one, and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it. */
                     first_name?: components["parameters"]["rowFilter.users.first_name"];
                     /** @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed. */
                     last_name?: components["parameters"]["rowFilter.users.last_name"];
-                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller. */
+                    /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled, never defaulted, and written from the login path's own now() rather than from a caller. */
                     last_login_at?: components["parameters"]["rowFilter.users.last_login_at"];
                     disabled_at?: components["parameters"]["rowFilter.users.disabled_at"];
-                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
+                    /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. A NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
                     disabled_by?: components["parameters"]["rowFilter.users.disabled_by"];
-                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string. */
+                    /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. A value outside the list is invisible to every reader of this column and reported by nothing, which is why it is a CHECK and not a comment. */
                     disabled_reason?: components["parameters"]["rowFilter.users.disabled_reason"];
-                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
+                    /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically: this records when a suspension was MEANT to end, and a sweeper that acts on it is application work. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
                     disabled_until?: components["parameters"]["rowFilter.users.disabled_until"];
                 };
                 header?: {
@@ -242,6 +242,138 @@ export interface paths {
                 cookie?: never;
             };
             requestBody?: components["requestBodies"]["users"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/consent_tag_groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    tag_id?: components["parameters"]["rowFilter.consent_tag_groups.tag_id"];
+                    group_id?: components["parameters"]["rowFilter.consent_tag_groups.group_id"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["consent_tag_groups"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_tag_groups"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["consent_tag_groups"][];
+                        "text/csv": components["schemas"]["consent_tag_groups"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_tag_groups"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    tag_id?: components["parameters"]["rowFilter.consent_tag_groups.tag_id"];
+                    group_id?: components["parameters"]["rowFilter.consent_tag_groups.group_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    tag_id?: components["parameters"]["rowFilter.consent_tag_groups.tag_id"];
+                    group_id?: components["parameters"]["rowFilter.consent_tag_groups.group_id"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_tag_groups"];
             responses: {
                 /** @description No Content */
                 204: {
@@ -395,6 +527,156 @@ export interface paths {
                 cookie?: never;
             };
             requestBody?: components["requestBodies"]["auth_tokens"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/consent_records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_records.id"];
+                    user_id?: components["parameters"]["rowFilter.consent_records.user_id"];
+                    purpose_key?: components["parameters"]["rowFilter.consent_records.purpose_key"];
+                    granted?: components["parameters"]["rowFilter.consent_records.granted"];
+                    policy_version?: components["parameters"]["rowFilter.consent_records.policy_version"];
+                    mechanism?: components["parameters"]["rowFilter.consent_records.mechanism"];
+                    source?: components["parameters"]["rowFilter.consent_records.source"];
+                    recorded_at?: components["parameters"]["rowFilter.consent_records.recorded_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["consent_records"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_records"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["consent_records"][];
+                        "text/csv": components["schemas"]["consent_records"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_records"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_records.id"];
+                    user_id?: components["parameters"]["rowFilter.consent_records.user_id"];
+                    purpose_key?: components["parameters"]["rowFilter.consent_records.purpose_key"];
+                    granted?: components["parameters"]["rowFilter.consent_records.granted"];
+                    policy_version?: components["parameters"]["rowFilter.consent_records.policy_version"];
+                    mechanism?: components["parameters"]["rowFilter.consent_records.mechanism"];
+                    source?: components["parameters"]["rowFilter.consent_records.source"];
+                    recorded_at?: components["parameters"]["rowFilter.consent_records.recorded_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_records.id"];
+                    user_id?: components["parameters"]["rowFilter.consent_records.user_id"];
+                    purpose_key?: components["parameters"]["rowFilter.consent_records.purpose_key"];
+                    granted?: components["parameters"]["rowFilter.consent_records.granted"];
+                    policy_version?: components["parameters"]["rowFilter.consent_records.policy_version"];
+                    mechanism?: components["parameters"]["rowFilter.consent_records.mechanism"];
+                    source?: components["parameters"]["rowFilter.consent_records.source"];
+                    recorded_at?: components["parameters"]["rowFilter.consent_records.recorded_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_records"];
             responses: {
                 /** @description No Content */
                 204: {
@@ -1964,6 +2246,339 @@ export interface paths {
         };
         trace?: never;
     };
+    "/consent_page_groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_page_groups.id"];
+                    key?: components["parameters"]["rowFilter.consent_page_groups.key"];
+                    path_globs?: components["parameters"]["rowFilter.consent_page_groups.path_globs"];
+                    /** @description TRUE for groups that only exist inside an authenticated session, so a new route is covered by being a route rather than by being listed. */
+                    authenticated_only?: components["parameters"]["rowFilter.consent_page_groups.authenticated_only"];
+                    created_at?: components["parameters"]["rowFilter.consent_page_groups.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_page_groups.updated_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["consent_page_groups"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_page_groups"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["consent_page_groups"][];
+                        "text/csv": components["schemas"]["consent_page_groups"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_page_groups"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_page_groups.id"];
+                    key?: components["parameters"]["rowFilter.consent_page_groups.key"];
+                    path_globs?: components["parameters"]["rowFilter.consent_page_groups.path_globs"];
+                    /** @description TRUE for groups that only exist inside an authenticated session, so a new route is covered by being a route rather than by being listed. */
+                    authenticated_only?: components["parameters"]["rowFilter.consent_page_groups.authenticated_only"];
+                    created_at?: components["parameters"]["rowFilter.consent_page_groups.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_page_groups.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_page_groups.id"];
+                    key?: components["parameters"]["rowFilter.consent_page_groups.key"];
+                    path_globs?: components["parameters"]["rowFilter.consent_page_groups.path_globs"];
+                    /** @description TRUE for groups that only exist inside an authenticated session, so a new route is covered by being a route rather than by being listed. */
+                    authenticated_only?: components["parameters"]["rowFilter.consent_page_groups.authenticated_only"];
+                    created_at?: components["parameters"]["rowFilter.consent_page_groups.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_page_groups.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_page_groups"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin_notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
+                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
+                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
+                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
+                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
+                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
+                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
+                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
+                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
+                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
+                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
+                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
+                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
+                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["admin_notifications"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["admin_notifications"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["admin_notifications"][];
+                        "text/csv": components["schemas"]["admin_notifications"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["admin_notifications"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
+                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
+                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
+                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
+                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
+                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
+                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
+                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
+                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
+                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
+                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
+                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
+                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
+                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
+                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
+                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
+                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
+                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
+                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
+                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
+                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
+                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
+                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
+                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
+                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
+                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
+                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
+                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
+                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
+                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
+                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
+                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["admin_notifications"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/email_messages": {
         parameters: {
             query?: never;
@@ -2273,6 +2888,319 @@ export interface paths {
                 cookie?: never;
             };
             requestBody?: components["requestBodies"]["company_addresses"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/consent_purposes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users. */
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_purposes.id"];
+                    key?: components["parameters"]["rowFilter.consent_purposes.key"];
+                    label?: components["parameters"]["rowFilter.consent_purposes.label"];
+                    description?: components["parameters"]["rowFilter.consent_purposes.description"];
+                    legal_basis?: components["parameters"]["rowFilter.consent_purposes.legal_basis"];
+                    requires_consent?: components["parameters"]["rowFilter.consent_purposes.requires_consent"];
+                    policy_version?: components["parameters"]["rowFilter.consent_purposes.policy_version"];
+                    sort_order?: components["parameters"]["rowFilter.consent_purposes.sort_order"];
+                    created_at?: components["parameters"]["rowFilter.consent_purposes.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_purposes.updated_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["consent_purposes"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_purposes"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["consent_purposes"][];
+                        "text/csv": components["schemas"]["consent_purposes"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users. */
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_purposes"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users. */
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_purposes.id"];
+                    key?: components["parameters"]["rowFilter.consent_purposes.key"];
+                    label?: components["parameters"]["rowFilter.consent_purposes.label"];
+                    description?: components["parameters"]["rowFilter.consent_purposes.description"];
+                    legal_basis?: components["parameters"]["rowFilter.consent_purposes.legal_basis"];
+                    requires_consent?: components["parameters"]["rowFilter.consent_purposes.requires_consent"];
+                    policy_version?: components["parameters"]["rowFilter.consent_purposes.policy_version"];
+                    sort_order?: components["parameters"]["rowFilter.consent_purposes.sort_order"];
+                    created_at?: components["parameters"]["rowFilter.consent_purposes.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_purposes.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users. */
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_purposes.id"];
+                    key?: components["parameters"]["rowFilter.consent_purposes.key"];
+                    label?: components["parameters"]["rowFilter.consent_purposes.label"];
+                    description?: components["parameters"]["rowFilter.consent_purposes.description"];
+                    legal_basis?: components["parameters"]["rowFilter.consent_purposes.legal_basis"];
+                    requires_consent?: components["parameters"]["rowFilter.consent_purposes.requires_consent"];
+                    policy_version?: components["parameters"]["rowFilter.consent_purposes.policy_version"];
+                    sort_order?: components["parameters"]["rowFilter.consent_purposes.sort_order"];
+                    created_at?: components["parameters"]["rowFilter.consent_purposes.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_purposes.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_purposes"];
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/consent_tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_tags.id"];
+                    key?: components["parameters"]["rowFilter.consent_tags.key"];
+                    /** @description Opaque to this migration. No vendor is named, recognised or hardcoded anywhere in this file. */
+                    snippet?: components["parameters"]["rowFilter.consent_tags.snippet"];
+                    purposes?: components["parameters"]["rowFilter.consent_tags.purposes"];
+                    enabled?: components["parameters"]["rowFilter.consent_tags.enabled"];
+                    created_by?: components["parameters"]["rowFilter.consent_tags.created_by"];
+                    created_at?: components["parameters"]["rowFilter.consent_tags.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_tags.updated_at"];
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                    /** @description Ordering */
+                    order?: components["parameters"]["order"];
+                    /** @description Limiting and Pagination */
+                    offset?: components["parameters"]["offset"];
+                    /** @description Limiting and Pagination */
+                    limit?: components["parameters"]["limit"];
+                };
+                header?: {
+                    /** @description Limiting and Pagination */
+                    Range?: components["parameters"]["range"];
+                    /** @description Limiting and Pagination */
+                    "Range-Unit"?: components["parameters"]["rangeUnit"];
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferCount"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["consent_tags"][];
+                        "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_tags"][];
+                        "application/vnd.pgrst.object+json": components["schemas"]["consent_tags"][];
+                        "text/csv": components["schemas"]["consent_tags"][];
+                    };
+                };
+                /** @description Partial Content */
+                206: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Filtering Columns */
+                    select?: components["parameters"]["select"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferPost"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_tags"];
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_tags.id"];
+                    key?: components["parameters"]["rowFilter.consent_tags.key"];
+                    /** @description Opaque to this migration. No vendor is named, recognised or hardcoded anywhere in this file. */
+                    snippet?: components["parameters"]["rowFilter.consent_tags.snippet"];
+                    purposes?: components["parameters"]["rowFilter.consent_tags.purposes"];
+                    enabled?: components["parameters"]["rowFilter.consent_tags.enabled"];
+                    created_by?: components["parameters"]["rowFilter.consent_tags.created_by"];
+                    created_at?: components["parameters"]["rowFilter.consent_tags.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_tags.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: {
+                    id?: components["parameters"]["rowFilter.consent_tags.id"];
+                    key?: components["parameters"]["rowFilter.consent_tags.key"];
+                    /** @description Opaque to this migration. No vendor is named, recognised or hardcoded anywhere in this file. */
+                    snippet?: components["parameters"]["rowFilter.consent_tags.snippet"];
+                    purposes?: components["parameters"]["rowFilter.consent_tags.purposes"];
+                    enabled?: components["parameters"]["rowFilter.consent_tags.enabled"];
+                    created_by?: components["parameters"]["rowFilter.consent_tags.created_by"];
+                    created_at?: components["parameters"]["rowFilter.consent_tags.created_at"];
+                    updated_at?: components["parameters"]["rowFilter.consent_tags.updated_at"];
+                };
+                header?: {
+                    /** @description Preference */
+                    Prefer?: components["parameters"]["preferReturn"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["consent_tags"];
             responses: {
                 /** @description No Content */
                 204: {
@@ -4186,187 +5114,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin_notifications": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: {
-                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
-                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
-                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
-                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
-                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
-                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
-                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
-                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
-                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
-                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
-                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
-                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
-                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
-                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
-                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
-                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
-                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
-                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
-                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
-                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
-                    /** @description Filtering Columns */
-                    select?: components["parameters"]["select"];
-                    /** @description Ordering */
-                    order?: components["parameters"]["order"];
-                    /** @description Limiting and Pagination */
-                    offset?: components["parameters"]["offset"];
-                    /** @description Limiting and Pagination */
-                    limit?: components["parameters"]["limit"];
-                };
-                header?: {
-                    /** @description Limiting and Pagination */
-                    Range?: components["parameters"]["range"];
-                    /** @description Limiting and Pagination */
-                    "Range-Unit"?: components["parameters"]["rangeUnit"];
-                    /** @description Preference */
-                    Prefer?: components["parameters"]["preferCount"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Partial Content */
-                206: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post: {
-            parameters: {
-                query?: {
-                    /** @description Filtering Columns */
-                    select?: components["parameters"]["select"];
-                };
-                header?: {
-                    /** @description Preference */
-                    Prefer?: components["parameters"]["preferPost"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: components["requestBodies"]["admin_notifications"];
-            responses: {
-                /** @description Created */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete: {
-            parameters: {
-                query?: {
-                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
-                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
-                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
-                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
-                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
-                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
-                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
-                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
-                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
-                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
-                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
-                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
-                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
-                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
-                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
-                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
-                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
-                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
-                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
-                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
-                };
-                header?: {
-                    /** @description Preference */
-                    Prefer?: components["parameters"]["preferReturn"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description No Content */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch: {
-            parameters: {
-                query?: {
-                    id?: components["parameters"]["rowFilter.admin_notifications.id"];
-                    source?: components["parameters"]["rowFilter.admin_notifications.source"];
-                    kind?: components["parameters"]["rowFilter.admin_notifications.kind"];
-                    severity?: components["parameters"]["rowFilter.admin_notifications.severity"];
-                    title?: components["parameters"]["rowFilter.admin_notifications.title"];
-                    message?: components["parameters"]["rowFilter.admin_notifications.message"];
-                    data?: components["parameters"]["rowFilter.admin_notifications.data"];
-                    source_ref?: components["parameters"]["rowFilter.admin_notifications.source_ref"];
-                    audience?: components["parameters"]["rowFilter.admin_notifications.audience"];
-                    user_id?: components["parameters"]["rowFilter.admin_notifications.user_id"];
-                    acknowledged_at?: components["parameters"]["rowFilter.admin_notifications.acknowledged_at"];
-                    acknowledged_by?: components["parameters"]["rowFilter.admin_notifications.acknowledged_by"];
-                    resolved_at?: components["parameters"]["rowFilter.admin_notifications.resolved_at"];
-                    resolved_by?: components["parameters"]["rowFilter.admin_notifications.resolved_by"];
-                    resolution_notes?: components["parameters"]["rowFilter.admin_notifications.resolution_notes"];
-                    dismissed_at?: components["parameters"]["rowFilter.admin_notifications.dismissed_at"];
-                    is_mock?: components["parameters"]["rowFilter.admin_notifications.is_mock"];
-                    created_at?: components["parameters"]["rowFilter.admin_notifications.created_at"];
-                    updated_at?: components["parameters"]["rowFilter.admin_notifications.updated_at"];
-                    expires_at?: components["parameters"]["rowFilter.admin_notifications.expires_at"];
-                };
-                header?: {
-                    /** @description Preference */
-                    Prefer?: components["parameters"]["preferReturn"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: components["requestBodies"]["admin_notifications"];
-            responses: {
-                /** @description No Content */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4417,7 +5164,7 @@ export interface components {
             email_verified_at?: string;
             /**
              * Format: text
-             * @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157).
+             * @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank: ' ' is an absent answer dressed as one, and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it.
              */
             first_name?: string;
             /**
@@ -4427,14 +5174,14 @@ export interface components {
             last_name?: string;
             /**
              * Format: timestamp with time zone
-             * @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller.
+             * @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled, never defaulted, and written from the login path's own now() rather than from a caller.
              */
             last_login_at?: string;
             /** Format: timestamp with time zone */
             disabled_at?: string;
             /**
              * Format: uuid
-             * @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason).
+             * @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. A NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason).
              *
              *     Note:
              *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
@@ -4442,14 +5189,30 @@ export interface components {
             disabled_by?: string;
             /**
              * Format: text
-             * @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string.
+             * @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. A value outside the list is invisible to every reader of this column and reported by nothing, which is why it is a CHECK and not a comment.
              */
             disabled_reason?: string;
             /**
              * Format: timestamp with time zone
-             * @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered.
+             * @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically: this records when a suspension was MEANT to end, and a sweeper that acts on it is application work. users_disabled_until_after_disabled_at keeps the two timestamps ordered.
              */
             disabled_until?: string;
+        };
+        consent_tag_groups: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `consent_tags.id`.<fk table='consent_tags' column='id'/>
+             */
+            tag_id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             *     This is a Foreign Key to `consent_page_groups.id`.<fk table='consent_page_groups' column='id'/>
+             */
+            group_id: string;
         };
         auth_tokens: {
             /**
@@ -4482,6 +5245,43 @@ export interface components {
             expires_at: string;
             /** Format: timestamp with time zone */
             consumed_at?: string;
+        };
+        consent_records: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id?: string;
+            /**
+             * Format: text
+             * @description Note:
+             *     This is a Foreign Key to `consent_purposes.key`.<fk table='consent_purposes' column='key'/>
+             */
+            purpose_key: string;
+            /** Format: boolean */
+            granted: boolean;
+            /** Format: int32 */
+            policy_version: number;
+            /** Format: text */
+            mechanism: string;
+            /**
+             * Format: text
+             * @default app
+             */
+            source: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            recorded_at: string;
         };
         privacy_request_audits: {
             /**
@@ -4875,6 +5675,109 @@ export interface components {
             /** Format: timestamp with time zone */
             closed_at?: string;
         };
+        consent_page_groups: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            key: string;
+            /** Format: jsonb */
+            path_globs: unknown;
+            /**
+             * Format: boolean
+             * @description TRUE for groups that only exist inside an authenticated session, so a new route is covered by being a route rather than by being listed.
+             * @default false
+             */
+            authenticated_only: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
+        };
+        admin_notifications: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            source: string;
+            /** Format: text */
+            kind: string;
+            /**
+             * Format: text
+             * @default medium
+             */
+            severity: string;
+            /** Format: text */
+            title: string;
+            /** Format: text */
+            message: string;
+            /** Format: jsonb */
+            data: unknown;
+            /** Format: text */
+            source_ref: string;
+            /**
+             * Format: text
+             * @default all
+             */
+            audience: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            user_id?: string;
+            /** Format: timestamp with time zone */
+            acknowledged_at?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            acknowledged_by?: string;
+            /** Format: timestamp with time zone */
+            resolved_at?: string;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            resolved_by?: string;
+            /** Format: text */
+            resolution_notes?: string;
+            /** Format: timestamp with time zone */
+            dismissed_at?: string;
+            /**
+             * Format: boolean
+             * @default false
+             */
+            is_mock: boolean;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
+            /** Format: timestamp with time zone */
+            expires_at: string;
+        };
         email_messages: {
             /**
              * Format: uuid
@@ -4951,6 +5854,92 @@ export interface components {
              * @default now()
              */
             created_at: string;
+        };
+        /** @description The catalogue of kinds of processing this application does. Shared by every visitor; no FK to users. */
+        consent_purposes: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            key: string;
+            /** Format: text */
+            label: string;
+            /**
+             * Format: text
+             * @default
+             */
+            description: string;
+            /** Format: text */
+            legal_basis: string;
+            /**
+             * Format: boolean
+             * @default true
+             */
+            requires_consent: boolean;
+            /**
+             * Format: int32
+             * @default 1
+             */
+            policy_version: number;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            sort_order: number;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
+        };
+        consent_tags: {
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Primary Key.<pk/>
+             * @default uuidv7()
+             */
+            id: string;
+            /** Format: text */
+            key: string;
+            /**
+             * Format: text
+             * @description Opaque to this migration. No vendor is named, recognised or hardcoded anywhere in this file.
+             * @default
+             */
+            snippet: string;
+            /** Format: jsonb */
+            purposes: unknown;
+            /**
+             * Format: boolean
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Format: uuid
+             * @description Note:
+             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
+             */
+            created_by?: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            created_at: string;
+            /**
+             * Format: timestamp with time zone
+             * @default now()
+             */
+            updated_at: string;
         };
         refresh_tokens: {
             /**
@@ -5302,80 +6291,6 @@ export interface components {
              */
             is_mock: boolean;
         };
-        admin_notifications: {
-            /**
-             * Format: uuid
-             * @description Note:
-             *     This is a Primary Key.<pk/>
-             * @default uuidv7()
-             */
-            id: string;
-            /** Format: text */
-            source: string;
-            /** Format: text */
-            kind: string;
-            /**
-             * Format: text
-             * @default medium
-             */
-            severity: string;
-            /** Format: text */
-            title: string;
-            /** Format: text */
-            message: string;
-            /** Format: jsonb */
-            data: unknown;
-            /** Format: text */
-            source_ref: string;
-            /**
-             * Format: text
-             * @default all
-             */
-            audience: string;
-            /**
-             * Format: uuid
-             * @description Note:
-             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
-             */
-            user_id?: string;
-            /** Format: timestamp with time zone */
-            acknowledged_at?: string;
-            /**
-             * Format: uuid
-             * @description Note:
-             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
-             */
-            acknowledged_by?: string;
-            /** Format: timestamp with time zone */
-            resolved_at?: string;
-            /**
-             * Format: uuid
-             * @description Note:
-             *     This is a Foreign Key to `users.id`.<fk table='users' column='id'/>
-             */
-            resolved_by?: string;
-            /** Format: text */
-            resolution_notes?: string;
-            /** Format: timestamp with time zone */
-            dismissed_at?: string;
-            /**
-             * Format: boolean
-             * @default false
-             */
-            is_mock: boolean;
-            /**
-             * Format: timestamp with time zone
-             * @default now()
-             */
-            created_at: string;
-            /**
-             * Format: timestamp with time zone
-             * @default now()
-             */
-            updated_at: string;
-            /** Format: timestamp with time zone */
-            expires_at: string;
-        };
     };
     responses: never;
     parameters: {
@@ -5418,19 +6333,21 @@ export interface components {
         /** @description When the application last OBSERVED activity for this account: NULL means never observed. Never backfilled and never defaulted — see 0017 §1. A NULL row is never eligible for the dormant-account purge (authz.retention_due_accounts requires IS NOT NULL), because a measurement that was never taken cannot show that an account is dormant. */
         "rowFilter.users.last_activity_at": string;
         "rowFilter.users.email_verified_at": string;
-        /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank, because ' ' is an absent answer dressed as one and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it (the users_city_not_blank argument, 0012:151-157). */
+        /** @description The member's given name as THEY state it. NULL means nobody has stated one — it is never derived from username or email and never defaulted. Blank and untrimmed values are refused by users_first_name_not_blank: ' ' is an absent answer dressed as one, and 'CA ' is a right answer that will never compare equal to 'CA' in the predicate that depends on it. */
         "rowFilter.users.first_name": string;
         /** @description The member's family name, as THEY state it. Same rules and same CHECK shape as first_name: NULL when unstated, never defaulted, never blank, never untrimmed. */
         "rowFilter.users.last_name": string;
-        /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has ever been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled and never defaulted; the writing path supplies it from its own now(), never from a caller. */
+        /** @description When this account last passed a CREDENTIAL check: NULL means no successful authentication has been recorded, which is NOT the same as never having signed in. Distinct from users.last_activity_at (0017), which is any observed activity. Never backfilled, never defaulted, and written from the login path's own now() rather than from a caller. */
         "rowFilter.users.last_login_at": string;
         "rowFilter.users.disabled_at": string;
-        /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
+        /** @description The administrator row that made this decision, or NULL for an automated block. ON DELETE SET NULL: this is a pointer AT a person, not a row owned by the disabled account, so deleting an administrator must not cascade into anybody's account — and must not be refused either, since an erasure that cannot complete leaves the erasure half-done. A NULL actor is legal only when disabled_reason explains the decision (users_disabled_requires_actor_or_reason). */
         "rowFilter.users.disabled_by": string;
-        /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. The four are distinguishable deliberately: a temporary operator action, an automated security block, a statutory obligation, and a request by the data subject are four different conversations with the account holder, and a free-text field would collapse them into one indistinguishable string. */
+        /** @description WHY the account was disabled, from the closed vocabulary ('admin', 'security', 'compliance', 'user_request') enforced by users_disabled_reason_check. A value outside the list is invisible to every reader of this column and reported by nothing, which is why it is a CHECK and not a comment. */
         "rowFilter.users.disabled_reason": string;
-        /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically — a column with a timestamp in it is a record of when a suspension was meant to end, and a sweeper that acts on it is application work this file does not pretend to do. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
+        /** @description When a TEMPORARY disable expires; NULL means the disable is not temporary and lasts until somebody lifts it. Nothing expires it automatically: this records when a suspension was MEANT to end, and a sweeper that acts on it is application work. users_disabled_until_after_disabled_at keeps the two timestamps ordered. */
         "rowFilter.users.disabled_until": string;
+        "rowFilter.consent_tag_groups.tag_id": string;
+        "rowFilter.consent_tag_groups.group_id": string;
         "rowFilter.auth_tokens.id": string;
         "rowFilter.auth_tokens.user_id": string;
         "rowFilter.auth_tokens.subject_hmac": string;
@@ -5440,6 +6357,14 @@ export interface components {
         "rowFilter.auth_tokens.created_at": string;
         "rowFilter.auth_tokens.expires_at": string;
         "rowFilter.auth_tokens.consumed_at": string;
+        "rowFilter.consent_records.id": string;
+        "rowFilter.consent_records.user_id": string;
+        "rowFilter.consent_records.purpose_key": string;
+        "rowFilter.consent_records.granted": string;
+        "rowFilter.consent_records.policy_version": string;
+        "rowFilter.consent_records.mechanism": string;
+        "rowFilter.consent_records.source": string;
+        "rowFilter.consent_records.recorded_at": string;
         "rowFilter.privacy_request_audits.id": string;
         "rowFilter.privacy_request_audits.request_key": string;
         "rowFilter.privacy_request_audits.event_type": string;
@@ -5539,6 +6464,33 @@ export interface components {
         "rowFilter.privacy_requests.requested_at": string;
         "rowFilter.privacy_requests.status": string;
         "rowFilter.privacy_requests.closed_at": string;
+        "rowFilter.consent_page_groups.id": string;
+        "rowFilter.consent_page_groups.key": string;
+        "rowFilter.consent_page_groups.path_globs": string;
+        /** @description TRUE for groups that only exist inside an authenticated session, so a new route is covered by being a route rather than by being listed. */
+        "rowFilter.consent_page_groups.authenticated_only": string;
+        "rowFilter.consent_page_groups.created_at": string;
+        "rowFilter.consent_page_groups.updated_at": string;
+        "rowFilter.admin_notifications.id": string;
+        "rowFilter.admin_notifications.source": string;
+        "rowFilter.admin_notifications.kind": string;
+        "rowFilter.admin_notifications.severity": string;
+        "rowFilter.admin_notifications.title": string;
+        "rowFilter.admin_notifications.message": string;
+        "rowFilter.admin_notifications.data": string;
+        "rowFilter.admin_notifications.source_ref": string;
+        "rowFilter.admin_notifications.audience": string;
+        "rowFilter.admin_notifications.user_id": string;
+        "rowFilter.admin_notifications.acknowledged_at": string;
+        "rowFilter.admin_notifications.acknowledged_by": string;
+        "rowFilter.admin_notifications.resolved_at": string;
+        "rowFilter.admin_notifications.resolved_by": string;
+        "rowFilter.admin_notifications.resolution_notes": string;
+        "rowFilter.admin_notifications.dismissed_at": string;
+        "rowFilter.admin_notifications.is_mock": string;
+        "rowFilter.admin_notifications.created_at": string;
+        "rowFilter.admin_notifications.updated_at": string;
+        "rowFilter.admin_notifications.expires_at": string;
         "rowFilter.email_messages.id": string;
         "rowFilter.email_messages.user_id": string;
         "rowFilter.email_messages.template": string;
@@ -5562,6 +6514,25 @@ export interface components {
         "rowFilter.company_addresses.is_registered": string;
         "rowFilter.company_addresses.kind": string;
         "rowFilter.company_addresses.created_at": string;
+        "rowFilter.consent_purposes.id": string;
+        "rowFilter.consent_purposes.key": string;
+        "rowFilter.consent_purposes.label": string;
+        "rowFilter.consent_purposes.description": string;
+        "rowFilter.consent_purposes.legal_basis": string;
+        "rowFilter.consent_purposes.requires_consent": string;
+        "rowFilter.consent_purposes.policy_version": string;
+        "rowFilter.consent_purposes.sort_order": string;
+        "rowFilter.consent_purposes.created_at": string;
+        "rowFilter.consent_purposes.updated_at": string;
+        "rowFilter.consent_tags.id": string;
+        "rowFilter.consent_tags.key": string;
+        /** @description Opaque to this migration. No vendor is named, recognised or hardcoded anywhere in this file. */
+        "rowFilter.consent_tags.snippet": string;
+        "rowFilter.consent_tags.purposes": string;
+        "rowFilter.consent_tags.enabled": string;
+        "rowFilter.consent_tags.created_by": string;
+        "rowFilter.consent_tags.created_at": string;
+        "rowFilter.consent_tags.updated_at": string;
         "rowFilter.refresh_tokens.id": string;
         "rowFilter.refresh_tokens.user_id": string;
         "rowFilter.refresh_tokens.jti": string;
@@ -5641,28 +6612,17 @@ export interface components {
         "rowFilter.login_attempts.ip_subnet": string;
         "rowFilter.login_attempts.attempt_kind": string;
         "rowFilter.login_attempts.is_mock": string;
-        "rowFilter.admin_notifications.id": string;
-        "rowFilter.admin_notifications.source": string;
-        "rowFilter.admin_notifications.kind": string;
-        "rowFilter.admin_notifications.severity": string;
-        "rowFilter.admin_notifications.title": string;
-        "rowFilter.admin_notifications.message": string;
-        "rowFilter.admin_notifications.data": string;
-        "rowFilter.admin_notifications.source_ref": string;
-        "rowFilter.admin_notifications.audience": string;
-        "rowFilter.admin_notifications.user_id": string;
-        "rowFilter.admin_notifications.acknowledged_at": string;
-        "rowFilter.admin_notifications.acknowledged_by": string;
-        "rowFilter.admin_notifications.resolved_at": string;
-        "rowFilter.admin_notifications.resolved_by": string;
-        "rowFilter.admin_notifications.resolution_notes": string;
-        "rowFilter.admin_notifications.dismissed_at": string;
-        "rowFilter.admin_notifications.is_mock": string;
-        "rowFilter.admin_notifications.created_at": string;
-        "rowFilter.admin_notifications.updated_at": string;
-        "rowFilter.admin_notifications.expires_at": string;
     };
     requestBodies: {
+        /** @description consent_page_groups */
+        consent_page_groups: {
+            content: {
+                "application/json": components["schemas"]["consent_page_groups"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_page_groups"];
+                "application/vnd.pgrst.object+json": components["schemas"]["consent_page_groups"];
+                "text/csv": components["schemas"]["consent_page_groups"];
+            };
+        };
         /** @description pattern_login_attempts */
         pattern_login_attempts: {
             content: {
@@ -5715,6 +6675,15 @@ export interface components {
                 "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["ip_reputation"];
                 "application/vnd.pgrst.object+json": components["schemas"]["ip_reputation"];
                 "text/csv": components["schemas"]["ip_reputation"];
+            };
+        };
+        /** @description consent_records */
+        consent_records: {
+            content: {
+                "application/json": components["schemas"]["consent_records"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_records"];
+                "application/vnd.pgrst.object+json": components["schemas"]["consent_records"];
+                "text/csv": components["schemas"]["consent_records"];
             };
         };
         /** @description security_detected_patterns */
@@ -5780,6 +6749,15 @@ export interface components {
                 "text/csv": components["schemas"]["privacy_requests"];
             };
         };
+        /** @description consent_tag_groups */
+        consent_tag_groups: {
+            content: {
+                "application/json": components["schemas"]["consent_tag_groups"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_tag_groups"];
+                "application/vnd.pgrst.object+json": components["schemas"]["consent_tag_groups"];
+                "text/csv": components["schemas"]["consent_tag_groups"];
+            };
+        };
         /** @description auth_tokens */
         auth_tokens: {
             content: {
@@ -5816,6 +6794,15 @@ export interface components {
                 "text/csv": components["schemas"]["company_profile"];
             };
         };
+        /** @description admin_notifications */
+        admin_notifications: {
+            content: {
+                "application/json": components["schemas"]["admin_notifications"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["admin_notifications"];
+                "application/vnd.pgrst.object+json": components["schemas"]["admin_notifications"];
+                "text/csv": components["schemas"]["admin_notifications"];
+            };
+        };
         /** @description email_messages */
         email_messages: {
             content: {
@@ -5832,6 +6819,24 @@ export interface components {
                 "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["company_addresses"];
                 "application/vnd.pgrst.object+json": components["schemas"]["company_addresses"];
                 "text/csv": components["schemas"]["company_addresses"];
+            };
+        };
+        /** @description consent_purposes */
+        consent_purposes: {
+            content: {
+                "application/json": components["schemas"]["consent_purposes"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_purposes"];
+                "application/vnd.pgrst.object+json": components["schemas"]["consent_purposes"];
+                "text/csv": components["schemas"]["consent_purposes"];
+            };
+        };
+        /** @description consent_tags */
+        consent_tags: {
+            content: {
+                "application/json": components["schemas"]["consent_tags"];
+                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["consent_tags"];
+                "application/vnd.pgrst.object+json": components["schemas"]["consent_tags"];
+                "text/csv": components["schemas"]["consent_tags"];
             };
         };
         /** @description refresh_tokens */
@@ -5895,15 +6900,6 @@ export interface components {
                 "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["migrations"];
                 "application/vnd.pgrst.object+json": components["schemas"]["migrations"];
                 "text/csv": components["schemas"]["migrations"];
-            };
-        };
-        /** @description admin_notifications */
-        admin_notifications: {
-            content: {
-                "application/json": components["schemas"]["admin_notifications"];
-                "application/vnd.pgrst.object+json;nulls=stripped": components["schemas"]["admin_notifications"];
-                "application/vnd.pgrst.object+json": components["schemas"]["admin_notifications"];
-                "text/csv": components["schemas"]["admin_notifications"];
             };
         };
     };

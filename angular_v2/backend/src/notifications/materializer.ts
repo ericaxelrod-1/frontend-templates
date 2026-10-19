@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { consentConfigMaterializer } from './consent-config-materializer.js';
 import { securityAlertsMaterializer } from './security-alert-materializer.js';
 
 /**
@@ -153,6 +154,7 @@ export const WATERMARK_SQL = `
  */
 const MATERIALIZERS: Readonly<Record<string, Materializer>> = Object.freeze({
   [securityAlertsMaterializer.source]: securityAlertsMaterializer,
+  [consentConfigMaterializer.source]: consentConfigMaterializer,
 });
 
 /** Every source that will be materialised, in a stable order. */
