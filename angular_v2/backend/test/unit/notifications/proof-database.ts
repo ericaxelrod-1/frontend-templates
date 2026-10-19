@@ -44,6 +44,15 @@ export const PROOF_DATABASE = 'notifications_proof';
  */
 export const CONSENT_PROOF_DATABASE = 'consent_proof';
 
+/**
+ * A third throwaway database, for the consent PURGE proof.
+ *
+ * The same reason as the second one: Vitest runs spec files in parallel, and a
+ * database shared by two files has each file's `beforeAll` drop the other's schema
+ * mid-run — a failure that reads as a schema bug and is a harness bug.
+ */
+export const CONSENT_PURGE_PROOF_DATABASE = 'consent_purge_proof';
+
 /** The migration/owner role, which owns every table and never receives a request. */
 const OWNING_ROLE = 'app';
 

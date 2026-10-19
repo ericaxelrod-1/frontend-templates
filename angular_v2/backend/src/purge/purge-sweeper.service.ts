@@ -105,10 +105,18 @@ export class PurgeSweeper implements OnApplicationBootstrap, OnModuleDestroy {
   ) {}
 
   onApplicationBootstrap(): void {
-    // Through the runner, which owns the only `setInterval` in `src/`: the interval
-    // cannot reach this tick without the tick having taken `PURGE_SWEEPER`'s
-    // advisory lock on a dedicated connection, so a second instance skips with a
-    // reason instead of draining the same queue beside this one.
+    // Through the runner, which owns the only `setInterval` in `src/` that runs a
+    // JOB. The other two are the breaker's per-instance instruments
+    // (`breaker-gate.ts` and `breaker-meter.ts`), and they must stay outside the
+    // lock: a breaker is SUPPOSED to run on every instance at once, so an
+    // advisory lock per poll would serialise it across instances and spend a
+    // database connection on every poll — `test/unit/scheduler/job-interval-source.spec.ts`
+    // says why, and asserts the file set.
+    //
+    // So the interval cannot reach this tick without the tick having taken
+    // `PURGE_SWEEPER`'s advisory lock on a dedicated connection, and a second
+    // instance skips with a reason instead of draining the same queue beside
+    // this one.
     this.jobs.schedule(PURGE_SWEEPER, this.env.purgePollSeconds, () => this.tick());
     this.logger.log(`purge.sweeper ticks as instance ${this.instanceId}`);
   }

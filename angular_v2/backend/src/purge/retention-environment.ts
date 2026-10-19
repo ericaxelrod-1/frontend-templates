@@ -86,6 +86,12 @@ export type RetentionEnvironment = {
    * of the line the two windows are on.
    */
   readonly enqueueIntervalSeconds: number;
+  /**
+   * How often the CONSENT purge runs. Seconds, and it HAS a default — see
+   * {@link DEFAULT_CONSENT_PURGE_INTERVAL_SECONDS} for why this key is on the other
+   * side of the line the windows are on.
+   */
+  readonly consentPurgeIntervalSeconds: number;
 };
 
 /**
@@ -152,6 +158,25 @@ export const MAXIMUM_INACTIVE_ACCOUNT_DAYS = 36500;
  * decision somebody made rather than an edit to a source file somebody forgot.
  */
 export const DEFAULT_ENQUEUE_INTERVAL_SECONDS = 3600;
+
+/**
+ * A day, and the schedule the retention window implies.
+ *
+ * `RETENTION_TOMBSTONE_DAYS` is measured in DAYS — 1825 of them at the floor — so
+ * the window a consent record is expired by is a days-granularity window, and the
+ * sweep that enforces it has to run on a days-granularity cadence. Hourly would be
+ * 43 800 times finer than the thing it measures and would buy nothing but a
+ * connection; yearly would be a window measured in years enforced by a sweep that
+ * runs once a year, and the gap between the two is how long a record outlives the
+ * policy that promised to expire it.
+ *
+ * **A day is the answer to "how often may the window be exceeded by", not to "how
+ * often is it interesting".** Nothing about the sweep depends on the cadence: it is
+ * a window comparison and a delete, so a run that finds nothing writes nothing, and
+ * the same run inside one window changes nothing (the idempotency the job runner
+ * requires of every body it runs).
+ */
+export const DEFAULT_CONSENT_PURGE_INTERVAL_SECONDS = 24 * 60 * 60;
 
 /**
  * A year, as a ceiling, and for the reason `MAXIMUM_TOMBSTONE_DAYS` exists: past
@@ -338,12 +363,27 @@ export function loadRetentionEnvironment(source: Readonly<Record<string, unknown
     problems,
     DEFAULT_ENQUEUE_INTERVAL_SECONDS,
   );
+  // The consent purge is a THIRD job in this namespace, and it gets its own
+  // interval for the reason every job in this tree gets its own: one key per job,
+  // so "how often does this run" has one answer and changing one cadence does not
+  // silently change another's.
+  const consentPurgeIntervalSeconds = readIntervalSeconds(
+    source,
+    'RETENTION_CONSENT_PURGE_INTERVAL_SECONDS',
+    problems,
+    DEFAULT_CONSENT_PURGE_INTERVAL_SECONDS,
+  );
 
-  // All three are checked before any is acted on, and every problem is reported in
+  // All of them are checked before any is acted on, and every problem is reported in
   // one error — a boot that names only the first of two bad keys sends the
   // operator round the loop a second time to discover the second.
-  if (tombstoneDays === undefined || inactiveAccountDays === undefined || enqueueIntervalSeconds === undefined) {
+  if (
+    tombstoneDays === undefined ||
+    inactiveAccountDays === undefined ||
+    enqueueIntervalSeconds === undefined ||
+    consentPurgeIntervalSeconds === undefined
+  ) {
     throw new RetentionEnvironmentError(problems);
   }
-  return { tombstoneDays, inactiveAccountDays, enqueueIntervalSeconds };
+  return { tombstoneDays, inactiveAccountDays, enqueueIntervalSeconds, consentPurgeIntervalSeconds };
 }

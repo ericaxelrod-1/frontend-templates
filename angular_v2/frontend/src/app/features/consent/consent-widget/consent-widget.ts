@@ -2,9 +2,11 @@ import { isPlatformBrowser } from '@angular/common';
 import {
   Component,
   computed,
+  effect,
   inject,
   PLATFORM_ID,
   signal,
+  untracked,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -188,10 +190,52 @@ export class ConsentWidget {
   });
 
   constructor() {
-    // If the visitor needs to be re-prompted upon landing, open the modal automatically
-    if (this.gate.needsReprompt()) {
-      this.openModal();
-    }
+    // THE RE-PROMPT, AND WHY IT IS AN EFFECT AND NOT A CONSTRUCTOR CHECK.
+    //
+    // This used to be `if (this.gate.needsReprompt()) { this.openModal(); }` in
+    // the constructor, and it could never fire — and the cause is worth writing
+    // down, because it is not a typo:
+    //
+    // **A re-prompt is a question about the CATALOGUE, and the catalogue is not
+    // there yet when the constructor runs.** The gate fetches it asynchronously
+    // (`ensureConfiguration` → `loadConfiguration` → the source), so at
+    // construction time `purposes()` is empty, `consentRequiredPurposes()` is
+    // empty, `repromptPurposes()` is empty, and `needsReprompt()` is false. The
+    // condition becomes true a moment later, when the fetch lands — and nothing
+    // was watching it. A one-shot check of a value that does not exist yet is a
+    // check that never fires.
+    //
+    // An effect watches the CONDITION instead of the moment, so it fires when
+    // the answer changes: the catalogue arrives, the version is newer than the
+    // decision, and the person is asked.
+    //
+    // **THE THREE GUARDS, and each of them is a failure mode:**
+    //
+    //   * `isVisible()` — the widget is the ANONYMOUS surface. A signed-in
+    //     visitor is asked on the account's own surface, and asking them here
+    //     as well would ask the same person the same question twice.
+    //   * `isOpen()` — a modal that is already open holds STAGED choices the
+    //     visitor has not saved yet. Re-opening it would re-stage from the
+    //     committed decisions and silently throw their work away.
+    //   * `needsReprompt()` — the rule itself: a purpose the person was never
+    //     asked about, or one whose `policy_version` is newer than the version
+    //     in their last decision, must be asked about.
+    effect(() => {
+      if (!this.isVisible()) {
+        return;
+      }
+      if (this.isOpen()) {
+        return;
+      }
+      if (!this.gate.needsReprompt()) {
+        return;
+      }
+      // Untracked, so the effect depends on the CONDITION and not on the
+      // decisions the modal reads while staging: a dependency on `decisions()`
+      // would make this effect re-run on every decision, which is noise, and
+      // `untracked` says so in one word.
+      untracked(() => this.openModal());
+    });
   }
 
   protected openModal(): void {

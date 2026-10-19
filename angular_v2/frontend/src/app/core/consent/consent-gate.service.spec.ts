@@ -9,11 +9,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { NavigationEnd, provideRouter, Router } from '@angular/router';
-import { filter, firstValueFrom, of, take, throwError } from 'rxjs';
-import type { MockInstance } from 'vitest';
+import { filter, firstValueFrom, forkJoin, of, take, throwError, type Observable } from 'rxjs';
+import type { Mock, MockInstance } from 'vitest';
 import { POSTGREST_BASE_URL } from '../api/api-base-urls';
 import { Session } from '../auth/session.service';
 import { ConsentApi } from './consent-api.service';
+import { ConsentConfigurationSource } from './consent-configuration-source';
 import { ConsentGate, matchPathGlob } from './consent-gate.service';
 import type {
   ConsentPageGroup,
@@ -138,15 +139,26 @@ const ANON_STORAGE_KEY = 'angular_v2.consent.anon.v1';
  */
 const USER_STORAGE_KEY = 'angular_v2.consent.user.v1';
 
+/**
+ * The API the gate reads, typed by what it actually calls.
+ *
+ * `Mock<Procedure>` is not callable in this Vitest, and a stub whose type does
+ * not say what it returns is a stub that can be called the wrong way — so each
+ * read carries its own signature.
+ */
+type CatalogueRead<T> = () => Observable<T>;
+
 interface GateStubs {
   injector: { inject: ReturnType<typeof vi.fn> };
   api: {
-    purposes: ReturnType<typeof vi.fn>;
-    pageGroups: ReturnType<typeof vi.fn>;
-    tags: ReturnType<typeof vi.fn>;
-    tagGroups: ReturnType<typeof vi.fn>;
-    effectiveConsent: ReturnType<typeof vi.fn>;
-    recordConsentDecision: ReturnType<typeof vi.fn>;
+    purposes: Mock<CatalogueRead<readonly ConsentPurpose[]>>;
+    pageGroups: Mock<CatalogueRead<readonly ConsentPageGroup[]>>;
+    tags: Mock<CatalogueRead<readonly ConsentTag[]>>;
+    tagGroups: Mock<CatalogueRead<readonly ConsentTagGroup[]>>;
+    effectiveConsent: Mock<(userId: string) => Observable<readonly ConsentRecord[]>>;
+    recordConsentDecision: Mock<
+      (purposeKey: string, granted: boolean, mechanism: string) => Observable<string>
+    >;
   };
   session: {
     isAuthenticated: ReturnType<typeof vi.fn>;
@@ -161,12 +173,22 @@ function createStubs(): GateStubs {
       inject: vi.fn().mockResolvedValue(undefined),
     },
     api: {
-      purposes: vi.fn().mockReturnValue(of([PURPOSE_ANALYTICS, PURPOSE_MARKETING, PURPOSE_NECESSARY])),
-      pageGroups: vi.fn().mockReturnValue(of([GROUP_PUBLIC, GROUP_AUTH_ONLY])),
-      tags: vi.fn().mockReturnValue(of([TAG_MULTI_PURPOSE, TAG_ANALYTICS_ONLY, TAG_NECESSARY_ONLY])),
-      tagGroups: vi.fn().mockReturnValue(of(TAG_GROUPS)),
-      effectiveConsent: vi.fn().mockReturnValue(of([])),
-      recordConsentDecision: vi.fn().mockReturnValue(of('rec-1')),
+      purposes: vi
+        .fn<CatalogueRead<readonly ConsentPurpose[]>>()
+        .mockReturnValue(of([PURPOSE_ANALYTICS, PURPOSE_MARKETING, PURPOSE_NECESSARY])),
+      pageGroups: vi
+        .fn<CatalogueRead<readonly ConsentPageGroup[]>>()
+        .mockReturnValue(of([GROUP_PUBLIC, GROUP_AUTH_ONLY])),
+      tags: vi
+        .fn<CatalogueRead<readonly ConsentTag[]>>()
+        .mockReturnValue(of([TAG_MULTI_PURPOSE, TAG_ANALYTICS_ONLY, TAG_NECESSARY_ONLY])),
+      tagGroups: vi.fn<CatalogueRead<readonly ConsentTagGroup[]>>().mockReturnValue(of(TAG_GROUPS)),
+      effectiveConsent: vi
+        .fn<(userId: string) => Observable<readonly ConsentRecord[]>>()
+        .mockReturnValue(of([])),
+      recordConsentDecision: vi
+        .fn<(purposeKey: string, granted: boolean, mechanism: string) => Observable<string>>()
+        .mockReturnValue(of('rec-1')),
     },
     session: {
       isAuthenticated: vi.fn().mockReturnValue(false),
@@ -175,6 +197,29 @@ function createStubs(): GateStubs {
     errorHandler: {
       handleError: vi.fn(),
     },
+  };
+}
+
+/**
+ * The catalogue, as the gate reads it.
+ *
+ * **The fake lives HERE, on the test's side of the boundary**, and it is a
+ * SOURCE rather than a gate method: the production code has no seam that exists
+ * for a test, and the gate cannot tell that this is one (`AGENTS.md` §2.2).
+ *
+ * It answers with the stubs' own API methods, so a test that makes the
+ * catalogue fail (`stubs.api.purposes.mockReturnValue(throwError(...))`) still
+ * fails the way it used to — the failure is the API's, not this file's.
+ */
+function catalogueSource(stubs: GateStubs): { readonly load: () => ReturnType<typeof forkJoin> } {
+  return {
+    load: () =>
+      forkJoin({
+        purposes: stubs.api.purposes(),
+        pageGroups: stubs.api.pageGroups(),
+        tags: stubs.api.tags(),
+        tagGroups: stubs.api.tagGroups(),
+      }),
   };
 }
 
@@ -187,6 +232,7 @@ function configureGate(
       ConsentGate,
       { provide: SnippetInjector, useValue: stubs.injector },
       { provide: ConsentApi, useValue: stubs.api },
+      { provide: ConsentConfigurationSource, useValue: catalogueSource(stubs) },
       { provide: Session, useValue: stubs.session },
       { provide: ErrorHandler, useValue: stubs.errorHandler },
       { provide: PLATFORM_ID, useValue: 'browser' },
@@ -250,12 +296,6 @@ describe('ConsentGate', () => {
     configureGate(stubs);
 
     gate = TestBed.inject(ConsentGate);
-    gate.setMockConfig({
-      purposes: [PURPOSE_ANALYTICS, PURPOSE_MARKETING, PURPOSE_NECESSARY],
-      pageGroups: [GROUP_PUBLIC, GROUP_AUTH_ONLY],
-      tags: [TAG_MULTI_PURPOSE, TAG_ANALYTICS_ONLY, TAG_NECESSARY_ONLY],
-      tagGroups: TAG_GROUPS,
-    });
   });
 
   afterEach(() => {
@@ -366,7 +406,14 @@ describe('ConsentGate', () => {
     expect(gate.decisions().get('analytics')?.granted).toBe(true);
   });
 
-  it('re-prompts when a purpose policy_version has been updated since decision was recorded', () => {
+  it('re-prompts when a purpose policy_version has been updated since decision was recorded', async () => {
+    // The catalogue is loaded FIRST, and that is the whole point of the order:
+    // a re-prompt is a question about the CATALOGUE, and a catalogue that has
+    // not arrived cannot be asked about. The decision is then taken against the
+    // version the catalogue carries, which is what the re-prompt compares.
+    await gate.ensureConfiguration();
+    expect(gate.purposes().length, 'the catalogue did not load').toBeGreaterThan(0);
+
     gate.setDecision('analytics', true);
     gate.setDecision('marketing', true);
     expect(gate.needsReprompt()).toBe(false);
@@ -690,6 +737,22 @@ describe('ConsentGate — a failed read over the real API service', () => {
         { provide: Session, useValue: stubs.session },
         { provide: ErrorHandler, useValue: stubs.errorHandler },
         { provide: PLATFORM_ID, useValue: 'browser' },
+        // The catalogue comes from a source, not from the transport: this case is
+        // about the READ OF THE SUBJECT'S OWN RECORDS, and the catalogue is not
+        // part of it. Asking the real API for the catalogue here would put four
+        // unanswered requests in front of the one this case is about.
+        {
+          provide: ConsentConfigurationSource,
+          useValue: {
+            load: () =>
+              of({
+                purposes: [PURPOSE_ANALYTICS],
+                pageGroups: [],
+                tags: [],
+                tagGroups: [],
+              }),
+          },
+        },
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
@@ -697,9 +760,6 @@ describe('ConsentGate — a failed read over the real API service', () => {
 
     httpMock = TestBed.inject(HttpTestingController);
     gate = TestBed.inject(ConsentGate);
-    // The catalogue is already loaded, so the only request this test has to
-    // answer is the read of the subject's own records.
-    gate.setMockConfig({ purposes: [PURPOSE_ANALYTICS] });
   });
 
   afterEach(() => {

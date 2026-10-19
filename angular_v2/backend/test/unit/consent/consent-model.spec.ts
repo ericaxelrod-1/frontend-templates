@@ -1,6 +1,8 @@
 import { Client, Pool } from 'pg';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { consentConfigMaterializer } from '../../../src/notifications/consent-config-materializer.js';
+import { readDownScript } from '../../../scripts/down-script.js';
 import {
   CONSENT_PROOF_DATABASE,
   authenticatorClient,
@@ -8,6 +10,7 @@ import {
   rebuildProofDatabase,
 } from '../notifications/proof-database.js';
 import { loadTestEnvironment } from '../../support/database.js';
+import { BACKEND_ROOT } from '../../support/paths.js';
 
 /**
  * The consent model against a REAL PostgreSQL, and the append-only proof.
@@ -953,5 +956,137 @@ describe('a misconfigured tag is reported to stdout and to the panel, and blocks
       (await client.query<{ readonly id: string }>('SELECT id FROM public.admin_notifications WHERE source = $1', ['consent_config'])).rows,
     );
     expect(seen).toEqual([]);
+  });
+});
+
+// =============================================================================
+// 10. THE CATALOGUE THE TEMPLATE SHIPS
+// =============================================================================
+
+/**
+ * `0028` created `consent_purposes` and left it EMPTY, and an empty catalogue is
+ * not a neutral state: the widget asks about the purposes the catalogue holds, so
+ * an empty one means the widget has nothing to ask, the settings surface renders
+ * nothing, and **no decision can be stored**. The feature was inert until
+ * somebody ran SQL by hand.
+ *
+ * `0030` seeds it. This section is the proof that the seed is there, that it is
+ * idempotent, and that the down script reverses it.
+ */
+describe('the catalogue the template ships is seeded, and the seed is a decision', () => {
+  /** The catalogue, as the browser reads it: `app_anon` may read it (`0028`). */
+  async function catalogue(): Promise<
+    readonly { readonly key: string; readonly requires_consent: boolean; readonly legal_basis: string }[]
+  > {
+    return asRole('app_anon', async (client) =>
+      (
+        await client.query<{ readonly key: string; readonly requires_consent: boolean; readonly legal_basis: string }>(
+          'SELECT key, requires_consent, legal_basis FROM public.consent_purposes ORDER BY key',
+        )
+      ).rows,
+    );
+  }
+
+  /**
+   * The rows the TEMPLATE shipped, as opposed to the ones this suite created.
+   *
+   * `newPurpose()` above inserts a fixture purpose for every case, and those are
+   * the suite's, not the template's — a fixture that requires consent is exactly
+   * what a fixture is for. So the shipped rows are the ones the suite did not
+   * make, and the exclusion is by this suite's own key format rather than by a
+   * list of the shipped keys, so a third shipped purpose would FAIL this file
+   * rather than slip past it.
+   */
+  async function shippedCatalogue(): Promise<
+    readonly { readonly key: string; readonly requires_consent: boolean; readonly legal_basis: string }[]
+  > {
+    return (await catalogue()).filter((row) => !/^p\d+_suite$/.test(row.key));
+  }
+
+  it('is not empty, so the widget has something to ask about', async () => {
+    const rows = await shippedCatalogue();
+    expect(rows.length, 'the consent catalogue shipped empty').toBeGreaterThan(0);
+    expect(rows.map((row) => row.key)).toContain('necessary');
+  });
+
+  it('ships the two purposes the template does, and no others', async () => {
+    // Exactly the two, because the catalogue is APPLICATION CONFIGURATION: a
+    // third row that nobody chose is a third thing the widget asks about, and
+    // this template asks about nothing it does not do.
+    const rows = await shippedCatalogue();
+    expect(rows.map((row) => row.key).sort()).toEqual(['consent_record', 'necessary']);
+  });
+
+  it('ships NO purpose that requires consent, because the template loads no tracker', async () => {
+    // THE decision, and the one a fork has to know about.
+    //
+    // A purpose with `requires_consent = true` makes the widget ask EVERYBODY a
+    // question about a tracker this template does not load — a question with no
+    // meaning, on the first visit, about nothing. And a fork that adds a tag
+    // MUST add a purpose in the same change, because `consent_tags.purposes` is a
+    // jsonb array of keys rather than a foreign key: a tag naming a purpose
+    // nobody declared is storable, and until the purpose exists the gate's
+    // subset test finds no purpose, asks for a decision on that key, finds
+    // none, and refuses the tag — so the tag is present, enabled, attached to a
+    // page group, and does nothing.
+    const rows = await shippedCatalogue();
+    expect(
+      rows.filter((row) => row.requires_consent).map((row) => row.key),
+      'the template asks about a tracker it does not load',
+    ).toEqual([]);
+  });
+
+  it('gives each shipped purpose the legal basis its own activity answers', async () => {
+    // The column exists so a gate can branch on it, so the two rows must not
+    // collapse onto one basis: "what is the service?" and "what do we keep to
+    // prove what you said?" are different questions.
+    const rows = await shippedCatalogue();
+    expect(rows.find((row) => row.key === 'necessary')?.legal_basis).toBe('contract');
+    expect(rows.find((row) => row.key === 'consent_record')?.legal_basis).toBe('legitimate_interests');
+  });
+
+  it('is idempotent, because the proof database applies every migration twice', async () => {
+    // "Applies cleanly" and "is idempotent" are different claims, and
+    // `rebuildProofDatabase` applies the whole set twice on purpose. The second
+    // application of `0030` must therefore have changed nothing — which is what
+    // `ON CONFLICT (key) DO NOTHING` buys, as against `DO UPDATE`, which would
+    // silently revert an operator's own edit of a label or a `policy_version`.
+    const rows = await shippedCatalogue();
+    expect(rows.filter((row) => row.key === 'necessary')).toHaveLength(1);
+    expect(rows.filter((row) => row.key === 'consent_record')).toHaveLength(1);
+  });
+
+  it('has a down script that reverses it, and that is the whole of the rollback', async () => {
+    // The down script is READ FROM DISK and EXECUTED, in a transaction that is
+    // rolled back — so this is the shipped file running, not a transcription of
+    // it. The seeded purposes carry a decision in this test, so the
+    // `ON DELETE RESTRICT` on `consent_records.purpose_key` is live: the records
+    // have to go first, and the down script says so.
+    const sub = await newUser();
+    await record(sub, 'necessary', true);
+
+    const down = await readDownScript(join(BACKEND_ROOT, 'database', 'migrations'), '0030_consent_purposes_seed.sql');
+    expect(down.statements.length, 'the down script has no executable statement').toBeGreaterThan(0);
+
+    await owner.query('BEGIN');
+    try {
+      for (const statement of down.statements) {
+        await owner.query(statement);
+      }
+      const purposes = await owner.query<{ readonly n: number }>(
+        `SELECT count(*)::int AS n FROM public.consent_purposes WHERE key IN ('necessary', 'consent_record')`,
+      );
+      expect(purposes.rows[0]?.n, 'the down script did not remove the seeded purposes').toBe(0);
+
+      const records = await owner.query<{ readonly n: number }>(
+        `SELECT count(*)::int AS n FROM public.consent_records WHERE purpose_key IN ('necessary', 'consent_record')`,
+      );
+      expect(records.rows[0]?.n, 'the down script left a record naming a purpose it removed').toBe(0);
+    } finally {
+      await owner.query('ROLLBACK');
+    }
+
+    // Rolled back, so the rest of this suite still has a catalogue to ask about.
+    expect((await catalogue()).length, 'the catalogue did not survive the rollback').toBeGreaterThan(0);
   });
 });

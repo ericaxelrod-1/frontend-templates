@@ -129,10 +129,18 @@ export class PurgeEnqueuer implements OnApplicationBootstrap, OnModuleDestroy {
   ) {}
 
   onApplicationBootstrap(): void {
-    // Registered through the runner, which is the only thing in `src/` that owns a
-    // `setInterval`: the interval therefore cannot reach a tick without the tick
-    // having taken this job's advisory lock first, on a dedicated connection. A
-    // second instance logs the skip instead of running a second scan.
+    // Registered through the runner, which owns the only `setInterval` in `src/`
+    // that runs a JOB. The other two are the breaker's per-instance instruments
+    // (`breaker-gate.ts` and `breaker-meter.ts`), and they must stay outside the
+    // lock: a breaker is SUPPOSED to run on every instance at once, so an
+    // advisory lock per poll would serialise it across instances and spend a
+    // database connection on every poll —
+    // `test/unit/scheduler/job-interval-source.spec.ts` says why, and asserts the
+    // file set.
+    //
+    // So the interval cannot reach a tick without the tick having taken this
+    // job's advisory lock first, on a dedicated connection, and a second
+    // instance logs the skip instead of running a second scan.
     //
     // The DISPATCH TOKEN is the registry key too, exactly as `PurgeSweeper` does
     // it. This file previously exported a second name for the same job

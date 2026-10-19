@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BreakerModule } from '../breaker/breaker.module.js';
 import { DatabasePoolModule } from '../common/database-pool.module.js';
 import { SchedulerModule } from '../scheduler/scheduler.module.js';
+import { ConsentPurge } from './consent-purge.service.js';
 import { PurgeEnqueuer } from './purge-enqueuer.service.js';
 import { PurgeSweeper } from './purge-sweeper.service.js';
 import { SqlPurgeExecutor } from './purge-executor.js';
@@ -57,6 +58,12 @@ export const APP_RETENTION_ENVIRONMENT = loadRetentionEnvironment(process.env);
     { provide: RETENTION_ENV, useValue: APP_RETENTION_ENVIRONMENT },
     PurgeSweeper,
     PurgeEnqueuer,
+    // `consent.purge`: the retention sweep for the consent records of erased
+    // people. It lives here rather than in a module of its own because it is a
+    // RETENTION job and this module owns the retention namespace — the same
+    // `RETENTION_TOMBSTONE_DAYS` window, read once and asserted at boot, decides
+    // what it expires.
+    ConsentPurge,
   ],
 })
 export class PurgeModule {}

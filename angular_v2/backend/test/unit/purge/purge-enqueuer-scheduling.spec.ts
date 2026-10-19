@@ -48,6 +48,7 @@ const ENV: RetentionEnvironment = {
   tombstoneDays: 1825,
   inactiveAccountDays: 1095,
   enqueueIntervalSeconds: 3600,
+  consentPurgeIntervalSeconds: 86400,
 };
 
 const USER_A = '00000000-0000-0000-0000-0000000000a1';

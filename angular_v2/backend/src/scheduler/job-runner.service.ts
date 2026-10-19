@@ -117,12 +117,16 @@ type LockAnswer = { readonly pg_advisory_unlock?: boolean; readonly acquired?: b
  *
  * ## Where intervals come from
  *
- * `schedule()` takes the interval as a required argument and holds no default, so a
- * job cannot invent one — every interval in `src/` reaches a `setInterval` as a
- * value read from configuration at module-evaluation time. The one `setInterval` in
- * `src/` is in this file, and
- * `test/unit/scheduler/job-interval-source.spec.ts` asserts that against the source
- * tree rather than trusting the sentence above it.
+   * `schedule()` takes the interval as a required argument and holds no default, so a
+   * job cannot invent one — every interval in `src/` reaches a `setInterval` as a
+   * value read from configuration at module-evaluation time. **This file owns the
+   * only `setInterval` in `src/` that runs a JOB.** The other two are the breaker's
+   * per-instance instruments in `breaker-gate.ts` and `breaker-meter.ts`, and they
+   * must stay outside the lock: a breaker is supposed to run on every instance at
+   * once, so an advisory lock per poll would serialise it across instances and
+   * spend a database connection on every poll.
+   * `test/unit/scheduler/job-interval-source.spec.ts` asserts the file set against
+   * the source tree rather than trusting the sentence above it.
  */
 @Injectable()
 export class JobRunner implements OnModuleDestroy {

@@ -150,15 +150,31 @@ export type TripHarness = {
  * `meterAt` rather than a single meter because the trip path needs **two**
  * readings in one test — one that trips and one that has cooled — over the same
  * published state.
+ *
+ * `database` is where the runner's DEDICATED connection opens. The runner takes its
+ * advisory lock on a connection of its own, and that connection goes to
+ * `environment.database.database` — so a suite that proves a job against a
+ * throwaway database has to point the runner there too. Otherwise the lock is
+ * taken in the developer's own database, which is both a connection this suite
+ * should not be opening and a lock that is not the one the proof is about.
  */
-export function tripHarness(env: BreakerEnvironment = TRIP_ENV): TripHarness {
+export function tripHarness(env: BreakerEnvironment = TRIP_ENV, database?: string): TripHarness {
   const registry = new BreakerRegistry(env);
   const scheduler = new SchedulerRegistry();
   const gate = new BreakerGate(registry, env, scheduler);
+  const environment = loadTestEnvironment();
   return {
     registry,
     scheduler,
-    jobs: new JobRunner(new ConfigService({ environment: loadTestEnvironment() }), scheduler),
+    jobs: new JobRunner(
+      new ConfigService({
+        environment:
+          database === undefined
+            ? environment
+            : { ...environment, database: { ...environment.database, database } },
+      }),
+      scheduler,
+    ),
     gate,
     meterAt: (percent: number) => new BreakerMeter(registry, probeAt(percent), scheduler),
   };

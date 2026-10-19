@@ -8,9 +8,10 @@ import {
   signal,
 } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
-import { filter, firstValueFrom, forkJoin, tap, type Observable } from 'rxjs';
+import { filter, firstValueFrom, tap, type Observable } from 'rxjs';
 import { Session } from '../auth/session.service';
 import { ConsentApi } from './consent-api.service';
+import { ConsentConfigurationSource, type ConsentConfiguration } from './consent-configuration-source';
 import type {
   ConsentDecision,
   ConsentPageGroup,
@@ -120,6 +121,7 @@ export function matchPathGlob(glob: string, path: string): boolean {
 export class ConsentGate {
   private readonly injector = inject(SnippetInjector);
   private readonly api = inject(ConsentApi);
+  private readonly source = inject(ConsentConfigurationSource);
   private readonly session = inject(Session);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router, { optional: true });
@@ -372,19 +374,14 @@ export class ConsentGate {
 
   /**
    * Loads the consent catalogue, page groups, tags, and joins.
+   *
+   * The reads themselves live in `ConsentConfigurationSource`, which is the one
+   * thing that knows what the catalogue IS; this method applies the answer to
+   * the signals the rest of the gate reads. The split is the point: a test
+   * replaces the SOURCE, and the gate never learns that a test exists.
    */
-  loadConfiguration(): Observable<{
-    purposes: readonly ConsentPurpose[];
-    pageGroups: readonly ConsentPageGroup[];
-    tags: readonly ConsentTag[];
-    tagGroups: readonly ConsentTagGroup[];
-  }> {
-    return forkJoin({
-      purposes: this.api.purposes(),
-      pageGroups: this.api.pageGroups(),
-      tags: this.api.tags(),
-      tagGroups: this.api.tagGroups(),
-    }).pipe(
+  loadConfiguration(): Observable<ConsentConfiguration> {
+    return this.source.load().pipe(
       tap((res) => {
         this.purposes.set(res.purposes);
         this.pageGroups.set(res.pageGroups);
@@ -392,22 +389,6 @@ export class ConsentGate {
         this.tagGroups.set(res.tagGroups);
       }),
     );
-  }
-
-  /**
-   * Sets manual configuration for unit testing without live network calls.
-   */
-  setMockConfig(config: {
-    purposes?: readonly ConsentPurpose[];
-    pageGroups?: readonly ConsentPageGroup[];
-    tags?: readonly ConsentTag[];
-    tagGroups?: readonly ConsentTagGroup[];
-  }): void {
-    this.configLoaded = true;
-    if (config.purposes) this.purposes.set(config.purposes);
-    if (config.pageGroups) this.pageGroups.set(config.pageGroups);
-    if (config.tags) this.tags.set(config.tags);
-    if (config.tagGroups) this.tagGroups.set(config.tagGroups);
   }
 
   /**

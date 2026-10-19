@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_CONSENT_PURGE_INTERVAL_SECONDS,
   DEFAULT_ENQUEUE_INTERVAL_SECONDS,
   MAXIMUM_ENQUEUE_INTERVAL_SECONDS,
   MAXIMUM_INACTIVE_ACCOUNT_DAYS,
@@ -146,11 +147,13 @@ describe('loadRetentionEnvironment', () => {
       tombstoneDays: MINIMUM_TOMBSTONE_DAYS,
       inactiveAccountDays: MINIMUM_INACTIVE_ACCOUNT_DAYS,
       enqueueIntervalSeconds: DEFAULT_ENQUEUE_INTERVAL_SECONDS,
+      consentPurgeIntervalSeconds: DEFAULT_CONSENT_PURGE_INTERVAL_SECONDS,
     });
     expect(loadRetentionEnvironment({ RETENTION_TOMBSTONE_DAYS: 3650, RETENTION_INACTIVE_ACCOUNT_DAYS: 2000 })).toEqual({
       tombstoneDays: 3650,
       inactiveAccountDays: 2000,
       enqueueIntervalSeconds: DEFAULT_ENQUEUE_INTERVAL_SECONDS,
+      consentPurgeIntervalSeconds: DEFAULT_CONSENT_PURGE_INTERVAL_SECONDS,
     });
   });
 
@@ -387,6 +390,83 @@ describe('the enqueue interval: a scheduling fact, so defaulted, and refused whe
     // `[object Object]` — a refusal by accident rather than by the type check.
     expect(problemsOf(withInterval({ seconds: 60 })).join('\n')).toContain(
       'must be an integer number of seconds, received object',
+    );
+  });
+});
+
+/**
+ * The THIRD key in this namespace, and the same shape as the first interval: a
+ * scheduling fact, so defaulted, and refused when malformed.
+ *
+ * It is a separate key rather than a second reader of the enqueue interval because
+ * every job in this tree owns its cadence: `consent.purge` and `purge.enqueuer` are
+ * two different jobs, and "how often does the scan run" and "how often are the
+ * consent records of erased people expired" are two different questions. One key
+ * would make them one question, and changing one cadence would silently change the
+ * other's.
+ */
+describe('the consent purge interval: a scheduling fact, so defaulted, and refused when malformed', () => {
+  /** `unknown`, not `string`: the non-string case below is one of the refusals. */
+  function withConsentInterval(value: unknown): Record<string, unknown> {
+    return {
+      RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
+      RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+      RETENTION_CONSENT_PURGE_INTERVAL_SECONDS: value,
+    };
+  }
+
+  it('is present, uncommented, and a whole number of seconds in every .env* file', () => {
+    const files = environmentFiles();
+    expect(files.length, 'the .env* files were not found; this assertion would be vacuous').toBeGreaterThanOrEqual(6);
+
+    for (const file of files) {
+      const assigned = readFileSync(join(BACKEND_ROOT, file), 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('RETENTION_CONSENT_PURGE_INTERVAL_SECONDS='));
+
+      expect(assigned, `${file} does not assign RETENTION_CONSENT_PURGE_INTERVAL_SECONDS`).toHaveLength(1);
+      expect(assigned[0], `${file} assigns a commented-out RETENTION_CONSENT_PURGE_INTERVAL_SECONDS`).not.toMatch(/^#/);
+
+      const value = Number((assigned[0] ?? '').split('=')[1]);
+      expect(Number.isInteger(value) && value > 0, `${file} sets a nonsensical interval`).toBe(true);
+      expect(
+        value <= MAXIMUM_ENQUEUE_INTERVAL_SECONDS,
+        `${file} ships an interval past the ${String(MAXIMUM_ENQUEUE_INTERVAL_SECONDS)}-second ceiling`,
+      ).toBe(true);
+    }
+  });
+
+  it('applies the documented default when the key is absent, and honours an explicit value', () => {
+    expect(
+      loadRetentionEnvironment({
+        RETENTION_TOMBSTONE_DAYS: String(MINIMUM_TOMBSTONE_DAYS),
+        RETENTION_INACTIVE_ACCOUNT_DAYS: String(MINIMUM_INACTIVE_ACCOUNT_DAYS),
+      }).consentPurgeIntervalSeconds,
+    ).toBe(DEFAULT_CONSENT_PURGE_INTERVAL_SECONDS);
+    expect(loadRetentionEnvironment(withConsentInterval('900')).consentPurgeIntervalSeconds).toBe(900);
+  });
+
+  it('refuses a malformed interval, naming the key and the value received', () => {
+    // The failure this prevents is not "the wrong cadence" — daily is fine — it is
+    // `RETENTION_CONSENT_PURGE_INTERVAL_SECONDS=1h` becoming a sweep that never runs,
+    // with the window it enforces looking entirely configured (§2.3).
+    for (const value of ['1h', 'thirty', '-60', '60.5', '3,600']) {
+      const problems = problemsOf(withConsentInterval(value)).join('\n');
+      expect(problems, `RETENTION_CONSENT_PURGE_INTERVAL_SECONDS=${value} was accepted`).toContain(
+        'RETENTION_CONSENT_PURGE_INTERVAL_SECONDS',
+      );
+      expect(problems, `RETENTION_CONSENT_PURGE_INTERVAL_SECONDS=${value} did not name what it received`).toContain(
+        `'${value}'`,
+      );
+    }
+    expect(problemsOf(withConsentInterval('1h')).join('\n')).toContain('retention sweep that never runs');
+  });
+
+  it('refuses zero and a value past the ceiling, which are units mistakes rather than schedules', () => {
+    expect(problemsOf(withConsentInterval('0')).join('\n')).toContain('must be between 1 and');
+    expect(problemsOf(withConsentInterval(String(MAXIMUM_ENQUEUE_INTERVAL_SECONDS + 1))).join('\n')).toContain(
+      'units mistake',
     );
   });
 });

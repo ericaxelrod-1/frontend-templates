@@ -34,13 +34,17 @@ export type SourceRun = {
  *
  * ## IT IS A `JobRunner` JOB AND NOTHING ELSE RUNS IT
  *
- * The interval is registered through `JobRunner.schedule`, which is the only
- * `setInterval` in `src/` outside the breaker's two per-instance instruments
- * (`test/unit/scheduler/job-interval-source.spec.ts` asserts that against the source
- * tree). So the advisory lock, the single-instance property and the dedicated
+ * The interval is registered through `JobRunner.schedule`, which owns the only
+ * `setInterval` in `src/` that runs a JOB. The other two are the breaker's
+ * per-instance instruments (`breaker-gate.ts` and `breaker-meter.ts`), and they
+ * must stay outside the lock: a breaker is SUPPOSED to run on every instance at
+ * once, so an advisory lock per poll would serialise it across instances and
+ * spend a database connection on every poll
+ * (`test/unit/scheduler/job-interval-source.spec.ts` says why, and asserts the
+ * file set). So the advisory lock, the single-instance property and the dedicated
  * connection come with the call rather than with a second mechanism built here —
- * `AGENTS.md` §2.4, and the reason this file has no `setInterval`, no `lock()` of its
- * own and no `try/catch` around the timer.
+ * `AGENTS.md` §2.4, and the reason this file has no `setInterval`, no `lock()` of
+ * its own and no `try/catch` around the timer.
  *
  * ## IDEMPOTENCE: WHAT THE BODY GUARANTEES, AND WHY THE LOCK IS NOT IT
  *

@@ -139,6 +139,28 @@ export const PRIVACY_ERASE: DispatchToken = 'privacy.erase';
 export const NOTIFICATIONS_MATERIALIZE: DispatchToken = 'notifications.materialize';
 
 /**
+ * `ConsentPurge` — the job that expires the consent records of erased people.
+ *
+ * ## Why it is NOT in `BREAKER_PROTECTED`
+ *
+ * The same argument `PURGE_ENQUEUER` makes, and for the same reason: this is batch
+ * work with nobody waiting. It deletes rows that are already past their window, on a
+ * window measured in DAYS, and a sweep that does not run today deletes them tomorrow
+ * instead — there is no request blocked on the answer and no transaction left open.
+ * Deferring it under memory pressure is therefore correct rather than a gap.
+ *
+ * ## Why the token exists at all
+ *
+ * The function it calls (`authz.purge_expired_consent_records`) is granted to
+ * `app_admin` and to nobody else, and it was granted, and its window was required at
+ * bootstrap, and **nothing called it** — so the consent record of every erased person
+ * accumulated forever and the published retention policy did not happen. The token is
+ * what makes this job a NAMED dispatch site rather than a function that exists: the
+ * gate can name it, the scheduler can lock it, and the lock key is derived from it.
+ */
+export const CONSENT_PURGE: DispatchToken = 'consent.purge';
+
+/**
  * The seven member-profile routes (`UsersController`), named so `RouteCensus` admits
  * them at boot.
  *
@@ -230,6 +252,7 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   PURGE_ENQUEUER,
   PRIVACY_ERASE,
   NOTIFICATIONS_MATERIALIZE,
+  CONSENT_PURGE,
   USERS_ME,
   USERS_UPDATE_ME,
   USERS_REQUEST_EMAIL_CHANGE,
