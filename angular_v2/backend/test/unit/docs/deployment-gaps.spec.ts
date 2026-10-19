@@ -130,7 +130,17 @@ function stripComments(text: string, path: string): string {
 function sourcesUnder(roots: readonly string[]): Source[] {
   return roots
     .flatMap((root) => walk(join(REPOSITORY_ROOT, root)))
-    .map((file) => ({ path: relativeToRepository(file), text: stripComments(readFileSync(file, 'utf8'), file) }));
+    // `relative()` returns OS-NATIVE separators, so on Windows every path arrived as
+    // `frontend\\src\\...` and `path.startsWith('frontend/src/')` matched NOTHING. The
+    // frontend half of the `consent-ui` check was therefore vacuous on the machine
+    // this suite actually runs on, and an absence it should have caught went
+    // unnoticed for exactly as long as it took to be untrue. Normalised to `/`
+    // here, at the one place paths enter the corpus, so every comparison below is
+    // platform-independent.
+    .map((file) => ({
+      path: relativeToRepository(file).split('\\').join('/'),
+      text: stripComments(readFileSync(file, 'utf8'), file),
+    }));
 }
 
 /**
@@ -309,7 +319,11 @@ const TELEMETRY_TABLES = /\b(?:security_alerts|ip_reputation|security_detected_p
 const TELEMETRY_SQL_WRITE =
   /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE)\s+(?:ONLY\s+)?(?:public\.)?(?:security_alerts|ip_reputation|security_detected_patterns|pattern_login_attempts)\b/i;
 
-const NON_GET_VERB = /\bhttp\.(?:post|put|patch|delete)\s*\(/;
+// The optional generic argument matters: the frontend calls
+// `this.http.post<string | { id?: string }>(...)`, and a pattern that required `(`
+// straight after the verb did not match it — so a real write to a consent relation
+// through the generated client was invisible to the check meant to catch it.
+const NON_GET_VERB = /\bhttp\.(?:post|put|patch|delete)\s*(?:<[^>]*>)?\s*\(/;
 
 /**
  * Two clauses, because a producer has two shapes: SQL against a named table, and
@@ -340,50 +354,7 @@ const POLICY_HEADER = /content-security-policy|contentSecurityPolicy|\bhelmet\b/
 
 const COOKIE_USE = /document\.cookie|\bSet-Cookie\b|cookie-consent|cookie_consent\b/i;
 
-/**
- * The four relations `0028` creates, as one alternation.
- *
- * The writer half is the tight part and it is the same two shapes as
- * `telemetryWriters`, for the same reason: the backend reaches Postgres through
- * SQL, and through PostgREST a read and a write are the same URL with only the
- * HTTP verb between them.
- */
-const CONSENT_TABLES = /\bconsent_(?:purposes|records|page_groups|tags|tag_groups)\b/;
 
-const CONSENT_SQL_WRITE =
-  /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE)\s+(?:ONLY\s+)?(?:public\.)?consent_records\b/i;
-
-/**
- * Three clauses, because "nothing consumes the consent model" is an absence with
- * three possible shapes and a check that only looks for one of them passes on the
- * other two.
- *
- *   - a WRITE to `consent_records` from application code or a launcher script: the
- *     injector, the gate or an endpoint, whichever arrived first;
- *   - a non-GET `HttpClient` verb in any file that NAMES the table — through
- *     PostgREST a read and a write are one URL, so only the verb separates them,
- *     and this file has no table names to match a URL against otherwise;
- *   - ANY mention of a consent relation under `frontend/src/`: the frontend half,
- *     which is where a consent control would live and which a backend-only gate
- *     cannot satisfy. It is deliberately broad — a component that READS the
- *     catalogue to render the question is the absence ending, not a narrower
- *     check for a write.
- */
-function consentConsumers(corpus: readonly Source[]): string[] {
-  const frontend = corpus.filter((source) => source.path.startsWith('frontend/src/'));
-  const found: string[] = [];
-  for (const source of corpus) {
-    if (CONSENT_TABLES.test(source.text) && (CONSENT_SQL_WRITE.test(source.text) || NON_GET_VERB.test(source.text))) {
-      found.push(`${source.path} writes to a consent table`);
-    }
-  }
-  for (const source of frontend) {
-    if (CONSENT_TABLES.test(source.text)) {
-      found.push(`${source.path} names a consent relation, so the frontend has a consent control`);
-    }
-  }
-  return found.sort();
-}
 
 const GAPS: readonly Gap[] = [
   {
@@ -473,9 +444,9 @@ const GAPS: readonly Gap[] = [
   {
     id: 'cookies',
     kind: 'behaviour-absence',
-    claim: 'no cookie is set or read, no consent DECISION is stored, and no tracker is loaded',
+    claim: 'no cookie is set or read, and no tracker is loaded',
     cannot:
-      'A cookie-API grep over application code and the migrations, plus a fixed list of tracker vendors over application code. A tracker injected by a first-party script under a name not on that list would pass. "No consent DECISION" rather than "no consent": the consent MODEL exists since the migration that added it — a catalogue, an append-only record and the tags — so the absence this entry claims is that nothing ever writes one, which is `consent-ui` below and is checked there. A banner is only meaningful once something consumes the consent, and this check is how that stays true.',
+      'A cookie-API grep over application code and the migrations, plus a fixed list of tracker vendors over application code. A tracker injected by a first-party script under a name not on that list would pass. The consent DECISION half of this entry left when the consent control shipped — a decision is now stored, in the browser for an anonymous visitor and in `consent_records` for a signed-in one — so the entry narrowed to the cookie and tracker halves, which are still true: this tree sets no cookie, reads no cookie, and loads no tracker. The session lives in `localStorage`, which GDPR does not classify as a cookie.',
     problems: () => [
       ...hits([...CODE, ...SQL], COOKIE_USE).map((path) => `${path} reads or writes a cookie`),
       ...hits(CODE, TRACKER).map((path) => `${path} loads a tracker that consent would have to gate`),
@@ -485,29 +456,6 @@ const GAPS: readonly Gap[] = [
         [{ path: 'frontend/src/index.html', text: '<script src="https://www.googletagmanager.com/gtag/js"></script>' }],
         TRACKER,
       ),
-  },
-  {
-    id: 'consent-ui',
-    kind: 'behaviour-absence',
-    claim: 'nothing in application code writes a consent record, and no frontend component names the consent model',
-    cannot:
-      'Three keyword gates over application code and the launcher scripts: a SQL `INSERT INTO` / `UPDATE` / `DELETE FROM` / `TRUNCATE` against `consent_records`; a non-GET `HttpClient` verb in any file that names a consent relation, because through PostgREST a read and a write are one URL; and ANY mention of a consent relation under `frontend/src/`, which is the broad half and is what catches a component that only READS the catalogue in order to render the question. It cannot see a write reaching the table through a name assembled by concatenation, a write issued from SQL in `database/` rather than from application code (the migration defines `authz.record_consent_decision()`, which is a schema seam and not a consumer), or a gate that keeps every decision in `localStorage` and never touches the table at all — the last of which is the browser-side design this template actually intends.',
-    problems: () => consentConsumers(CODE),
-    probe: () =>
-      consentConsumers([
-        {
-          path: 'backend/src/consent/consent-gate.service.ts',
-          text: "client.query('INSERT INTO consent_records (user_id, purpose_key, granted) VALUES ($1, $2, $3)', [sub, key, on]);",
-        },
-        {
-          path: 'frontend/src/app/features/consent/consent-banner.ts',
-          text: "this.http.post(`${POSTGREST_BASE_URL}/consent_records`, decision);",
-        },
-        {
-          path: 'frontend/src/app/features/consent/purpose-list.ts',
-          text: "readonly purposes = await toSignal(this.http.get(`${POSTGREST_BASE_URL}/consent_purposes`));",
-        },
-      ]),
   },
   {
     id: 'container',

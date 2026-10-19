@@ -6846,6 +6846,140 @@
                     "(rpc) has_permission"
                 ]
             }
+        },
+        "/rpc/record_consent_decision": {
+            "post": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/preferParams"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "p_granted": {
+                                        "format": "boolean",
+                                        "type": "boolean"
+                                    },
+                                    "p_mechanism": {
+                                        "format": "text",
+                                        "type": "string"
+                                    },
+                                    "p_purpose_key": {
+                                        "format": "text",
+                                        "type": "string"
+                                    },
+                                    "p_source": {
+                                        "format": "text",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "p_purpose_key",
+                                    "p_granted",
+                                    "p_mechanism"
+                                ],
+                                "type": "object"
+                            }
+                        },
+                        "application/vnd.pgrst.object+json;nulls=stripped": {
+                            "schema": {
+                                "properties": {
+                                    "p_granted": {
+                                        "format": "boolean",
+                                        "type": "boolean"
+                                    },
+                                    "p_mechanism": {
+                                        "format": "text",
+                                        "type": "string"
+                                    },
+                                    "p_purpose_key": {
+                                        "format": "text",
+                                        "type": "string"
+                                    },
+                                    "p_source": {
+                                        "format": "text",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "p_purpose_key",
+                                    "p_granted",
+                                    "p_mechanism"
+                                ],
+                                "type": "object"
+                            }
+                        },
+                        "application/vnd.pgrst.object+json": {
+                            "schema": {
+                                "properties": {
+                                    "p_granted": {
+                                        "format": "boolean",
+                                        "type": "boolean"
+                                    },
+                                    "p_mechanism": {
+                                        "format": "text",
+                                        "type": "string"
+                                    },
+                                    "p_purpose_key": {
+                                        "format": "text",
+                                        "type": "string"
+                                    },
+                                    "p_source": {
+                                        "format": "text",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "p_purpose_key",
+                                    "p_granted",
+                                    "p_mechanism"
+                                ],
+                                "type": "object"
+                            }
+                        },
+                        "text/csv": {
+                            "schema": {
+                                "properties": {
+                                    "p_granted": {
+                                        "format": "boolean",
+                                        "type": "boolean"
+                                    },
+                                    "p_mechanism": {
+                                        "format": "text",
+                                        "type": "string"
+                                    },
+                                    "p_purpose_key": {
+                                        "format": "text",
+                                        "type": "string"
+                                    },
+                                    "p_source": {
+                                        "format": "text",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "p_purpose_key",
+                                    "p_granted",
+                                    "p_mechanism"
+                                ],
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "(rpc) record_consent_decision"
+                ]
+            }
         }
     },
     "externalDocs": {

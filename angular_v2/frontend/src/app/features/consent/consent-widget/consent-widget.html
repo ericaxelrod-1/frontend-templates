@@ -1,0 +1,70 @@
+@if (isVisible()) {
+  <button
+    mat-stroked-button
+    type="button"
+    class="consent-trigger"
+    (click)="openModal()"
+    aria-label="Manage cookie and privacy consent choices"
+  >
+    Cookie & Consent Choices
+  </button>
+
+  @if (isOpen()) {
+    <div class="consent-modal" role="dialog" aria-modal="true" aria-labelledby="consent-title">
+      <mat-card class="consent-card">
+        <mat-card-header>
+          <mat-card-title id="consent-title">Consent Preferences</mat-card-title>
+          <mat-card-subtitle>
+            Control which third-party services and analytics scripts are allowed to run.
+            Strictly necessary processing cannot be disabled.
+          </mat-card-subtitle>
+        </mat-card-header>
+
+        <mat-card-content>
+          <div class="purpose-list">
+            @for (item of purposeItems(); track item.purpose.key) {
+              <div class="purpose-item">
+                <div class="purpose-header">
+                  <span class="purpose-title">{{ item.purpose.label }}</span>
+                  <div class="decision-actions">
+                    <button
+                      mat-button
+                      type="button"
+                      [color]="item.isGranted ? 'primary' : undefined"
+                      (click)="setStaged(item.purpose.key, true)"
+                    >
+                      Allow
+                    </button>
+                    <button
+                      mat-button
+                      type="button"
+                      [color]="!item.isGranted ? 'warn' : undefined"
+                      (click)="setStaged(item.purpose.key, false)"
+                    >
+                      Deny
+                    </button>
+                  </div>
+                </div>
+                <p class="purpose-desc">{{ item.purpose.description }}</p>
+              </div>
+            }
+          </div>
+
+          <mat-divider />
+
+          <div class="global-actions">
+            <button mat-button type="button" (click)="rejectAll()">
+              Reject all
+            </button>
+            <button mat-button type="button" (click)="acceptAll()">
+              Accept all
+            </button>
+            <button mat-flat-button color="primary" type="button" (click)="saveChoices()">
+              Save choices
+            </button>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  }
+}

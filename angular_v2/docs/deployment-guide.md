@@ -858,19 +858,23 @@ line before trusting one.
   nginx block below verbatim gets no policy at all and finds out in an audit.
   [`security.md`](./security.md) §Transport headers. <!-- gap:csp -->
 
-- **No cookie-consent banner, and no cookie for one to gate.** This is a
-  considered position, not a backlog item, and the argument is short: **a
-  consent banner is only meaningful once something consumes the consent.** This
-  tree sets no cookie, reads no cookie, stores no consent and loads no tracker —
-  the session lives in `localStorage`, which GDPR does not classify as a cookie
-  and which the session document treats as a weaker store on purpose. A banner
-  over an empty set of cookies is a compliance-shaped artifact with no compliance
-  behind it, and it is worse than its absence because it reads as evidence.
-  **The obligation attaches the moment a fork adds a tracker or a non-essential
-  cookie** — at that moment GDPR and UK GDPR consent requirements apply, and the
-  template will not supply a banner for it. The substantive privacy work in v2 is
-  elsewhere and is real: erasure, retention windows, the purge queue, tombstones
-  and the statutory compliance record. See [`security.md`](./security.md).
+- **No cookie is set or read, and no tracker is loaded.** The consent control
+  shipped — a universal widget on public pages, a settings surface inside the
+  app — and a decision is stored, in the browser for an anonymous visitor and in
+  `consent_records` for a signed-in one. What is still absent is anything the
+  consent would have to *gate*: this tree sets no cookie, reads no cookie, and
+  loads no tracker. The session lives in `localStorage`, which GDPR does not
+  classify as a cookie and which the session document treats as a weaker store on
+  purpose.
+
+  So the widget has nothing to switch on until a fork adds a tag, and **the
+  obligation attaches at that moment**: the first tracker or non-essential cookie
+  a fork introduces is the thing GDPR and UK GDPR consent applies to, and the tag
+  machinery — `consent_tags`, `consent_page_groups`, and the generic injector that
+  runs a vendor's snippet verbatim — is what gates it. The substantive privacy
+  work in v2 is elsewhere and is real: erasure, retention windows, the purge
+  queue, tombstones and the statutory compliance record. See
+  [`security.md`](./security.md).
   <!-- gap:cookies -->
 
 - **No container, systemd, or process-supervisor configuration**, and no

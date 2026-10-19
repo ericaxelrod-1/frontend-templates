@@ -1,10 +1,58 @@
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
-const POSTGREST_BINARY = '/usr/local/bin/postgrest';
+/**
+ * The PostgREST binary, RESOLVED rather than hard-coded.
+ *
+ * The suites that need the real API layer run on more than one machine, and the
+ * install path is not the same everywhere: the Linux proofs keep it at
+ * `/usr/local/bin/postgrest`, and a Windows install puts it somewhere else
+ * entirely. The hard-coded path made this launcher report "not installed" on a
+ * machine where it plainly was, so the suite that needed it could not run at all
+ * — and the failure named the wrong thing.
+ *
+ * `PGRST_BINARY` wins when it is set, then the POSIX path, then the first
+ * `postgrest` on `PATH`. A name that is not found is an error, never a guess.
+ */
+function resolvePostgrestBinary(): string {
+  const configured = process.env['PGRST_BINARY'];
+  if (configured !== undefined && configured !== '') {
+    if (!existsSync(configured)) {
+      throw new Error(`PGRST_BINARY names ${configured}, which does not exist on this machine`);
+    }
+    return configured;
+  }
+
+  const posixPath = '/usr/local/bin/postgrest';
+  if (existsSync(posixPath)) {
+    return posixPath;
+  }
+
+  const pathVariable = process.env['PATH'] ?? '';
+  for (const directory of pathVariable.split(delimiter)) {
+    if (directory === '') {
+      continue;
+    }
+    // Windows resolves a bare name to the `.exe` beside it; the extension is
+    // added here rather than left to `spawn`, because the guard below has to
+    // know whether the binary is there at all.
+    for (const name of process.platform === 'win32' ? ['postgrest.exe', 'postgrest'] : ['postgrest']) {
+      const candidate = join(directory, name);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  throw new Error(
+    'PostgREST is not installed: it is not at /usr/local/bin/postgrest, it is not named by PGRST_BINARY, ' +
+      'and it is not on PATH. A suite that needs the real API layer cannot run without it, and asserting ' +
+      'against a stand-in would be testing a mock (AGENTS.md §2.2).',
+  );
+}
 
 /** What `startPostgrestProcess` returns, and what `stop` is for. */
 export interface PostgrestProcess {
@@ -24,6 +72,18 @@ async function probePort(port: number): Promise<string | undefined> {
     server.once('listening', () => server.close(() => resolve(undefined)));
     server.listen(port, '127.0.0.1');
   });
+}
+
+/**
+ * A blocking sleep, from the standard library.
+ *
+ * `sleep` is a POSIX utility and is not on a Windows PATH, so the previous
+ * `spawnSync('sleep', …)` was a no-op there — the wait loop spun at full speed
+ * for its whole deadline instead of waiting. `Atomics.wait` is the same thing
+ * without a dependency and without a platform.
+ */
+function sleepSync(milliseconds: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
 
 export interface PostgrestProcessOptions {
@@ -80,12 +140,7 @@ export interface PostgrestProcessOptions {
 export async function startPostgrestProcess(options: PostgrestProcessOptions): Promise<PostgrestProcess> {
   const { port, database, authenticatorPassword, jwtSecret } = options;
 
-  if (!existsSync(POSTGREST_BINARY)) {
-    throw new Error(
-      `${POSTGREST_BINARY} is not installed; a suite that needs the real API layer cannot run without it. ` +
-        'Asserting this route against a stand-in would be testing a mock (AGENTS.md §2.2).',
-    );
-  }
+  const binary = resolvePostgrestBinary();
 
   const contention = await probePort(port);
   if (contention !== undefined) {
@@ -127,7 +182,7 @@ export async function startPostgrestProcess(options: PostgrestProcessOptions): P
       delete env[key];
     }
   }
-  const child: ChildProcess = spawn(POSTGREST_BINARY, [config], {
+  const child: ChildProcess = spawn(binary, [config], {
     env: {
       ...env,
       PGRST_DB_URI: `postgresql://pgrst_authenticator:${authenticatorPassword}@localhost:5432/${database}`,
@@ -152,11 +207,11 @@ export async function startPostgrestProcess(options: PostgrestProcessOptions): P
       // orphan whose next run fails the port guard above with nothing naming it.
       const deadline = Date.now() + 5_000;
       while (child.exitCode === null && Date.now() < deadline) {
-        spawnSync('sleep', ['0.1']);
+        sleepSync(100);
       }
       if (child.exitCode === null) {
         child.kill('SIGKILL');
-        spawnSync('sleep', ['0.2']);
+        sleepSync(200);
       }
     }
     rmSync(directory, { recursive: true, force: true });
@@ -190,7 +245,7 @@ export async function startPostgrestProcess(options: PostgrestProcessOptions): P
         stop,
       };
     }
-    spawnSync('sleep', ['0.2']);
+    sleepSync(200);
   }
 
   stop();

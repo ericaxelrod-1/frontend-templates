@@ -9,6 +9,7 @@ import { EmailChangeForm } from './email-change-form';
 import { ProfileLoginHistory } from './login-history';
 import { ProfileNameForm } from './name-form';
 import { ProfilePasswordForm } from './password-change-form';
+import { ProfileConsentForm } from './consent-form';
 import { ProfileApi } from './profile-api.service';
 import { describeProfileFailure } from './profile-failure';
 
@@ -55,6 +56,7 @@ import { describeProfileFailure } from './profile-failure';
     ProfileLoginHistory,
     ProfileNameForm,
     ProfilePasswordForm,
+    ProfileConsentForm,
   ],
   templateUrl: './profile-page.html',
   styles: `
