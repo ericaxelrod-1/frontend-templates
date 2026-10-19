@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, Req, UnauthorizedException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { FastifyRequest } from 'fastify';
+import { THROTTLE_POLICIES, ThrottleSkip } from '../common/throttle.js';
 import { AuthService } from './auth.service.js';
 import { EmailVerificationConfirmDto } from './email-verification-confirm.dto.js';
 import { EmailVerificationConfirmedDto } from './email-verification-confirmed.dto.js';
@@ -20,7 +22,29 @@ import { TokenRequestDto } from './token-request.dto.js';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  /**
+   * `POST /auth/login` — §B6's `login`, the route this repository's credential
+   * attack starts at.
+   *
+   * **The tightened limit is the OUTER layer, and the per-account gate behind
+   * it is the one that stops the attack.** The number here
+   * (`THROTTLE_CREDENTIAL_LIMIT`) is generous on purpose: it sheds the volume
+   * of a script — a hundred wrong passwords a minute from one address — and
+   * it must not become the thing that locks a person out of their own account
+   * on a shared address. The control that actually refuses a credential attack
+   * against ONE account is `AuthService.gate()`: five failures against the
+   * account, then a progressive delay and a block, counted in the database.
+   *
+   * **The two layers do not compound, and that is a property of the pipeline
+   * rather than of the arithmetic.** This limiter is a guard, so it runs
+   * BEFORE the handler, and the `login_attempts` row is written inside the
+   * handler. A request this limiter refuses therefore never reaches the
+   * account's budget at all: a caller who trips the address limit does not
+   * also spend five of the account's failures. `test/unit/throttle/throttler.spec.ts`
+   * proves it against the real application.
+   */
   @Public()
+  @Throttle({ default: THROTTLE_POLICIES.credential })
   @Post('login')
   @HttpCode(200)
   login(
@@ -81,7 +105,27 @@ export class AuthController {
    * request the application answers identically whether or not the mailbox exists.
    */
 
+  /**
+   * `POST /auth/password-reset/request` and
+   * `POST /auth/email-verification/request` — §B6's `forgot-password`, the
+   * route that sends a link.
+   *
+   * **The link policy (`THROTTLE_LINK_LIMIT`), and it is the tightest number
+   * in the application because each of these costs an SMTP round trip** — the
+   * most expensive thing this process does that is not a bcrypt hash — and
+   * because a request for a link is an act against a MAILBOX. The per-address
+   * budget in `login_attempts` (five requests per ten minutes, counted before
+   * any account lookup) is what stops one inbox being bombed; this limit is
+   * what stops the VOLUME from one address, which a per-address budget cannot
+   * see because the addresses differ.
+   *
+   * **It is still a number a person never reaches.** Asking for a reset link
+   * is something a person does once, not ten times a minute, and the number
+   * has to stay above the seven requests one address can make in a burst
+   * without becoming a denial of service on an office behind one NAT.
+   */
   @Public()
+  @Throttle({ default: THROTTLE_POLICIES.link })
   @Post('password-reset/request')
   @HttpCode(202)
   password_reset_request(
@@ -91,14 +135,31 @@ export class AuthController {
     return this.authService.requestToken(dto, 'password_reset', req.ip);
   }
 
+  /**
+   * `POST /auth/password-reset/confirm` — the route that MOVES a credential.
+   *
+   * **The credential policy, not the link policy, because this is the other
+   * half of the reset**: it hashes a new password at cost 12 and kills every
+   * live session, so it is the expensive end of the flow and the end where a
+   * credential actually changes hands. The token is single-use and is consumed
+   * by the first statement, so a caller cannot replay one — but the
+   * address-keyed limit still sheds the volume of a script guessing tokens.
+   */
   @Public()
+  @Throttle({ default: THROTTLE_POLICIES.credential })
   @Post('password-reset/confirm')
   @HttpCode(200)
   password_reset_confirm(@Body() dto: PasswordResetConfirmDto): Promise<PasswordResetConfirmedDto> {
     return this.authService.confirmPasswordReset(dto);
   }
 
+  /**
+   * `POST /auth/email-verification/request` — the same shape as the reset
+   * request and the same limit: one SMTP round trip, one mailbox, one link
+   * policy.
+   */
   @Public()
+  @Throttle({ default: THROTTLE_POLICIES.link })
   @Post('email-verification/request')
   @HttpCode(202)
   email_verification_request(
@@ -108,13 +169,47 @@ export class AuthController {
     return this.authService.requestToken(dto, 'email_verification', req.ip);
   }
 
+  /**
+   * `POST /auth/email-verification/confirm` — the route that CONFIRMS a
+   * credential, and the credential policy for the same reason the reset
+   * confirmation has it: it consumes a single-use token and settles the
+   * account's verified state, and a script that guesses tokens is exactly
+   * what the address-keyed limit sheds.
+   */
   @Public()
+  @Throttle({ default: THROTTLE_POLICIES.credential })
   @Post('email-verification/confirm')
   @HttpCode(200)
   email_verification_confirm(@Body() dto: EmailVerificationConfirmDto): Promise<EmailVerificationConfirmedDto> {
     return this.authService.confirmEmailVerification(dto);
   }
 
+  /**
+   * `GET /auth/me` — the session-introspection read, and the ONE route in this
+   * application that is exempt from the limiter.
+   *
+   * **Why it is exempt.** It is the only route here that does no work at all:
+   * the guard has already verified the token, and the handler reads the
+   * payload it verified and computes an expiry. No database, no SMTP, no
+   * bcrypt — there is nothing to shed. What it IS is the question a client
+   * asks to find out whether its session is still good, and a client may ask
+   * it on every navigation, from every tab, on a timer. An address-keyed limit
+   * on it converts one shared address — an office, a carrier NAT, a CI runner
+   * — into a session-check outage for every client behind it, over a route
+   * that costs nothing to serve.
+   *
+   * The application already says the same thing about this route in another
+   * place: `auth.me` is one of the four tokens in `BREAKER_PROTECTED`, the
+   * set the breaker refuses to shed under memory pressure. A route the
+ * application will not shed when the host is out of memory is not a route to
+   * refuse on a counter.
+   *
+   * **The exemption is explicit.** `@ThrottleSkip()` is the library's own
+   * `SkipThrottle` under the name §B6 documents, not a hand-rolled metadata
+   * key — a key nobody else reads is a key that stops exempting anything the
+   * day the library changes its spelling.
+   */
+  @ThrottleSkip()
   @Get('me')
   me(@Req() req: FastifyRequest & { user?: AccessTokenPayload }): MeResponseDto {
     const user = req.user;

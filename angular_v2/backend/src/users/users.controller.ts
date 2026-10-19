@@ -8,7 +8,9 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { FastifyRequest } from 'fastify';
+import { THROTTLE_POLICIES } from '../common/throttle.js';
 import type { AccessTokenPayload } from '../auth/jwt-auth.guard.js';
 import { Public } from '../auth/public.decorator.js';
 import { ChangePasswordDto } from './change-password.dto.js';
@@ -122,7 +124,16 @@ export class UsersController {
    * the account takeover this route is two-phased to prevent; the argument is in
    * `UsersService.requestEmailChange` and it is worth reading before changing anything
    * about this handler.
+   *
+   * **The link policy, and it is the link policy for the same reason the two
+   * `auth` request routes have it.** This sends a mail, so it costs an SMTP
+   * round trip, and it is an act against a MAILBOX: the per-address budget in
+   * `login_attempts` bounds the requests against one address, and the
+   * address-keyed limit bounds the requests against one source address. A
+   * member changing their address is a rare act, so the number is never in
+   * their way.
    */
+  @Throttle({ default: THROTTLE_POLICIES.link })
   @Post('me/email')
   @HttpCode(202)
   request_email_change(
@@ -147,8 +158,16 @@ export class UsersController {
    * `describeProfileFailure` renders a `422` body with the server's reason on the profile
    * page, and renders a `400` as `HTTP 400`. A member who followed a link out of their
    * new mailbox and got nothing back is better served by a sentence than by a status.
+   *
+   * **The credential policy, because this route MOVES the address a member
+   * signs in with.** The token is single-use and is consumed by the first
+   * statement, so a caller cannot replay one, and the address-keyed limit
+   * sheds the volume of a script guessing composite tokens. It is the same
+   * shape as the two `auth` confirmation routes and it carries the same
+   * number.
    */
   @Public()
+  @Throttle({ default: THROTTLE_POLICIES.credential })
   @Post('me/email/confirm')
   @HttpCode(200)
   confirm_email_change(@Body() dto: EmailChangeConfirmDto): Promise<EmailChangeConfirmedDto> {
@@ -167,7 +186,16 @@ export class UsersController {
    *
    * `204` and no body because there is nothing to report: the row is hashed, the sessions
    * are revoked, and the number revoked is in the log rather than in the response.
+   *
+   * **The credential policy, because this route MOVES a credential and it is
+   * the most expensive thing a member can ask for.** It hashes a new password
+   * at cost 12 and revokes every live session, so a script driving it costs
+   * a bcrypt per request. The route is authenticated, so the address-keyed
+   * limit is not the control that protects the credential here — the session
+   * is — but it is what stops the CPU cost of a stolen session being spent
+   * from one address.
    */
+  @Throttle({ default: THROTTLE_POLICIES.credential })
   @Post('me/password')
   @HttpCode(204)
   change_password(
@@ -214,7 +242,22 @@ export class UsersController {
    * in and gets a `404`. `UsersService.createUser` explains why the caller is asked
    * rather than the route guessing, and why the invariant has no database constraint in
    * this schema.
+   *
+   * **The credential policy, and this route is §B6's `register`.** There is no
+   * public sign-up route in this repository — `auth.module.ts` says so — and
+   * this is the only route that CREATES an account, so it is the one the
+   * §B6 sentence about `register` lands on. It hashes a password at cost 12
+   * and writes two membership rows, so it is expensive per request, and the
+   * credential policy keeps a script creating accounts from one address
+   * bounded.
+   *
+   * **It is authenticated, so the address-keyed limit is not the control that
+   * protects the account** — the administrator's session and the database's
+   * grant are — and the number is high enough that an administrator creating
+   * accounts in a batch is never refused by it. The limit is here to shed
+   * volume, not to ration an operator's work.
    */
+  @Throttle({ default: THROTTLE_POLICIES.credential })
   @Post()
   create(
     @Body() dto: CreateUserDto,

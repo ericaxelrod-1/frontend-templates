@@ -2,7 +2,9 @@ import './config/load-env-file.js';
 import { Module } from '@nestjs/common';
 import { ConfigModule, registerAs } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { THROTTLE_ERROR_MESSAGE, THROTTLE_POLICIES, throttleTracker } from './common/throttle.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BreakerModule } from './breaker/breaker.module.js';
 import { PurgeModule } from './purge/purge.module.js';
@@ -43,9 +45,36 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
       ignoreEnvFile: true,
       load: [registerAs('environment', () => APP_ENVIRONMENT)],
     }),
+    // THE RATE LIMITER, REGISTERED GLOBALLY (§B6).
+    //
+    // **One named throttler, and the guard is an APP_GUARD rather than a
+    // per-controller `@UseGuards`.** A per-controller guard is not an
+    // authorization model: a new controller that forgets the decorator is
+    // unthrottled, and the forgetting is invisible. `ThrottlerGuard` is
+    // therefore registered the way `JwtAuthGuard` is — globally, once — and
+    // the routes that need a different number say so with `@Throttle` and the
+    // routes that need none say so with `@ThrottleSkip`.
+    //
+    // **The buckets are per route, per key.** `@nestjs/throttler` keys its
+    // storage on (controller, handler, throttler name, tracker), so two routes
+    // cannot spend each other's budget and a flood on one route cannot starve
+    // another. That is the "per route and per key, not one global bucket"
+    // property, and it is why the global limit below is an ALLOWANCE rather
+    // than a shared pool.
+    //
+    // **The tracker is this repository's canonical address form**
+    // (`src/common/throttle.ts`), so the IP axis of this limiter and the IP
+    // axis of the per-account gate in `src/auth/throttle.ts` count the same
+    // host as the same host. A rotation of the SPELLING of one address would
+    // otherwise spend the account budget while splitting the address budget.
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: THROTTLE_POLICIES.global.ttl, limit: THROTTLE_POLICIES.global.limit }],
+      errorMessage: THROTTLE_ERROR_MESSAGE,
+      getTracker: throttleTracker,
+    }),
     AuthModule,
     // The gate is an APP_INTERCEPTOR (registered inside BreakerModule, beside the
-    // APP_GUARD below), so it runs AFTER JwtAuthGuard: middleware → guards →
+    // APP_GUARDs below), so it runs AFTER the guards: middleware → guards →
     // interceptors → pipes → handler. A resource gate ahead of authentication
     // would hand an unauthenticated prober a capacity verdict.
     BreakerModule,
@@ -72,6 +101,28 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
     // so is bounded by their column grant and by `users_read_scope`.
     PostgrestModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
+  providers: [
+    // THE RATE LIMITER RUNS FIRST, BEFORE AUTHENTICATION, and the order is a
+    // decision rather than an accident.
+    //
+    // The breaker's gate runs after it (it is an interceptor, and the comment
+    // above says why), and the two answers are not the same kind of thing. A
+    // `429` is a rate limit's own answer, and §B6 asks for one on routes that
+    // are public by definition — `POST /auth/login` is the first of them — so a
+    // limiter that did not see unauthenticated traffic would not limit the
+    // route §B6 names. A capacity verdict from the BREAKER is a different
+    // thing: it says this process is short of memory, which is information
+    // about the host, and it refuses a caller before it knows who they are.
+    //
+    // **A request the limiter refuses never reaches the handler, and therefore
+    // never reaches the per-account gate.** That is what keeps the two layers
+    // from compounding: the row in `login_attempts` is written inside the
+    // handler the limiter refused to call, so a caller who trips the IP limit
+    // does not also spend a unit of the account's failure budget.
+    // `test/unit/throttle/throttler.spec.ts` proves it against the real
+    // application.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}
