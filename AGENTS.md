@@ -151,6 +151,33 @@ are the main source of drift in this codebase's history.
 - No unused `ChangeDetectorRef`/`ElementRef` injections.
 - One type per file unless they are trivially coupled value objects.
 
+### 2.7 Work inside the repository, and do not leave it
+
+The shell's working directory **persists between commands**, and it starts at
+the repository root. It is the one piece of state nothing reports on, so it is
+the one piece of state that goes wrong quietly. Stay in it.
+
+- **Never `cd` outside the repository.** Not to a scratch directory, not to a
+  tool's own directory, not to a parent. A `cd` in one command changes the
+  working directory of every command after it, and the next thing you write
+  lands wherever you left it.
+- **Never `cd ..` out of the repository.** A relative path that walks upwards
+  is the most common way out, because it looks harmless in isolation.
+- **Reach other directories without moving.** `git rev-parse --show-toplevel`
+  finds the root, `git -C <dir>` operates in a subdirectory, `npm --prefix <dir>`
+  runs a subproject's scripts. None of them changes the working directory.
+- **Scratch files belong inside the repository**, in a gitignored directory —
+  and a file a **dispatched agent** must read belongs in the project, not in a
+  scratch area. A relative path to a scratch area resolves to nothing, the
+  agent cannot find its brief, and it will do the work from a brief it wrote
+  itself. That happened here: a unit was dispatched with no spec at all
+  because the spec had been written outside the project.
+- **A command that reaches outside the repository will be refused.** That
+  refusal is a report that the working directory has drifted, not an obstacle to
+  route around. Re-anchor and continue; do not work around it.
+- **`pwd` before a command whose effect matters.** It costs nothing and it is
+  the only thing that tells you where the next command will land.
+
 ---
 
 ## 3. Enforcement is the point
