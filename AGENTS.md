@@ -181,10 +181,16 @@ the one piece of state that goes wrong quietly.
 - **A command that reaches outside the repository will be refused.** That
   refusal is a report that the working directory has drifted, not an obstacle to
   route around. Re-anchor and continue; do not work around it.
-- **`pwd` is a diagnostic, not a ritual.** Run it when a command did not do
-  what you expected, and to confirm where a deliberate excursion ended. It is
-  not a prefix for every command — anchoring at the start of a command is what
-  makes the question unnecessary.
+- **Make the working directory a precondition, not a discovery.** Run `pwd`
+  first on any command that **creates artifacts** — installs, builds, writes a
+  file, generates a client, or dispatches an agent. It is a precondition
+  assertion, and it is what stops a `node_modules`, a `dist/`, or a build
+  output from landing in the wrong tree. Cheap enough to prefix most shell
+  commands with, and the one check that catches every command you did not
+  think to anchor.
+- **`pwd` is also the catch-all for a deliberate excursion.** When you have gone
+  out of the repository for a reason, `pwd` is how you confirm where you
+  actually are before the next command runs.
 
 ---
 

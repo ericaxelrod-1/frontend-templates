@@ -205,8 +205,13 @@ find.
 
 A command that reaches outside the repository will be refused; that refusal is
 a report that the working directory has drifted, not an obstacle to route
-around. Re-anchor and continue. `pwd` is the diagnostic when a command did not
-do what you expected — not a prefix for every command.
+around. Re-anchor and continue.
+
+**Make the working directory a precondition, not a discovery:** run `pwd` first
+on any command that creates artifacts — installs, builds, writes a file, or
+dispatches an agent. It is a precondition assertion, and it is what stops a
+`node_modules`, a `dist/`, or a build output from landing in the wrong tree.
+It is also the catch-all for the commands you did not think to anchor.
 
 **The full rule is [`AGENTS.md` §2.7](../../AGENTS.md) and is stated there once**,
 so there is one mechanism for it rather than two that can drift.
