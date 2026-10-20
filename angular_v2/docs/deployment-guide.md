@@ -843,9 +843,8 @@ Every top-level `- ` bullet in this section is therefore an entry, and each must
 carry a marker. The checks differ in kind and the test says which, per entry.
 *File-absence* entries — "no CI", "no container config" — are near-exhaustive,
 because the thing is a file with a conventional name. *Behaviour-absence* entries
-— "no telemetry producer", "no geo resolver" — are keyword gates over source
-files that exist, so each one prints its blind spot in the suite's log. Read that
-line before trusting one.
+— "no geo resolver" — are keyword gates over source files that exist, so each one
+prints its blind spot in the suite's log. Read that line before trusting one.
 
 - **No script creates the owner role or the database.** Step 1 above is two
   `psql` commands run as a superuser, because `CREATE ROLE` needs `CREATEROLE`,
@@ -853,22 +852,41 @@ line before trusting one.
   neither statement *can* be a migration or a seeded step. There is no
   `npm run db:create`. <!-- gap:db-create -->
 
-- **No geo-IP resolution.** `users.geo_source` / `geo_accuracy_km` /
-  `geo_updated_at` and `ip_reputation.geo_location` are columns; `shared/geo-place.ts`
-  renders them. No provider is called and no place is derived from an address, so
-  `geo_source` records where a value came from rather than a lookup this
-  application performed. Geo-blocking — B6's "off by default, correct namespace"
-  — has no key in any `.env*` file, which is what "off by default" looks like
-  when the feature is absent rather than disabled. <!-- gap:geo-resolver -->
+- **No geo-IP resolution, and therefore no geo-blocking.** `users.geo_source` /
+  `geo_accuracy_km` / `geo_updated_at` and `ip_reputation.geo_location` are
+  columns; `shared/geo-place.ts` renders them. **Nothing derives a place from an
+  address**, so `geo_source` records where a value came from rather than a lookup
+  this application performed, and `ip_reputation.geo_location` stays `NULL`: the
+  telemetry producer does not name the column at all, so it cannot fill it.
 
-- **Nothing produces the security telemetry.** Four tables —
-  `ip_reputation`, `security_detected_patterns`, `pattern_login_attempts`,
-  `security_alerts` — are created, granted, RLS-scoped to `app_admin` and read by
-  five admin routes. **No application code writes them.** The only writer is
-  `database/seed.ts`, and every row it inserts carries `is_mock = true`, which is
-  a display filter and not a fabrication guard: the alerts in a development
-  database are fixtures. Detection, scoring and the alert pipeline are owed.
-  <!-- gap:telemetry-producers -->
+  **WHY A COUNTRY CANNOT BE DERIVED HERE.** A country needs a DATA SOURCE, and
+  this template has none of the three:
+
+  - a **local GeoIP database** (`GeoLite2-City.mmdb` and its relatives) is a large
+    binary blob that cannot be committed to a template repository, needs a
+    download step, a licence and an update cadence — and no reader library is a
+    dependency here either, so there is nothing that could open one;
+  - a **hosted geo-IP API** is a third-party credential, which §0 forbids ("no
+    third-party API keys"), and no `.env*` file in this repository carries one;
+  - a **reverse proxy that already knows the country** is not in this tree either
+    (see the `container` entry below), and a country header read without a
+    trusted proxy in front of it is a control the caller disables by sending the
+    header.
+
+  **So there is no geo-blocking key, and there must not be one.** §B6: "a
+  configuration key that nothing reads is a lie in the configuration file." A key
+  consumed by a stub would be worse than no key at all, because §B6 also says an
+  `isAllowlisted`-style flag "must be consumed by a real decision, or the check
+  is deleted" — and a stub decision is not a decision.
+
+  **THE INTEGRATION POINT, for a fork that has a source.** The decision belongs at
+  the edge, in the reverse proxy, which already sees the connection: a proxy that
+  can resolve a country can refuse the request there, before this process spends
+  anything on it. If the decision is to live in the application instead, the place
+  to add it is `src/security/` beside the producer that owns `ip_reputation`, and
+  it must be a real decision on a real value — a resolver that fills
+  `geo_location` and a check that reads it, or neither.
+  <!-- gap:geo-resolver -->
 
 - **No strict CSP.** The SSR application sets a `Content-Security-Policy`
   header (`frontend/src/server.ts`), but it permits inline scripts and styles

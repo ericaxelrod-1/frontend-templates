@@ -13,6 +13,7 @@ import { TokenModule } from './token/token.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { UsersModule } from './users/users.module.js';
 import { PostgrestModule } from './postgrest/postgrest.module.js';
+import { SecurityModule } from './security/security.module.js';
 import { loadEnvironment } from './config/environment.js';
 
 /**
@@ -100,6 +101,11 @@ export const APP_ENVIRONMENT = loadEnvironment(process.env);
     // answered with the CALLER's privileges rather than a claimless admin session, and
     // so is bounded by their column grant and by `users_read_scope`.
     PostgrestModule,
+    // The security telemetry: the request-path DETECTOR (`APP_INTERCEPTOR`, beside
+    // the breaker's own) and the scheduled FLUSH that writes `ip_reputation`,
+    // `security_detected_patterns`, `pattern_login_attempts` and `security_alerts`.
+    // No routes: the admin pages read those four tables through PostgREST.
+    SecurityModule,
   ],
   providers: [
     // THE RATE LIMITER RUNS FIRST, BEFORE AUTHENTICATION, and the order is a

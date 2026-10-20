@@ -57,6 +57,9 @@ describe('the application wires the breaker into the request path', () => {
     const { AppModule } = await import('../../../src/app.module.js');
     const { ApplicationConfig } = await import('@nestjs/core');
     const { BreakerGateInterceptor } = await import('../../../src/breaker/breaker.interceptor.js');
+    const { SecurityTelemetryInterceptor } = await import(
+      '../../../src/security/security-telemetry.interceptor.js'
+    );
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     try {
@@ -64,8 +67,19 @@ describe('the application wires the breaker into the request path', () => {
 
       const applicationConfig = moduleRef.get(ApplicationConfig, { strict: false });
       const interceptors = applicationConfig.getGlobalInterceptors();
-      expect(interceptors).toHaveLength(1);
+
+      // THE GATE IS FIRST, and the order is the point.
+      //
+      // **There are two global interceptors now, and this assertion is about
+      // which comes first.** The breaker's gate refuses to dispatch when the
+      // machine is short of memory, and the telemetry detector recognises a
+      // hostile shape in a request. A gated request is not dispatched at all, so
+      // there is nothing to detect about one — and the gate has to be the outer
+      // one for that to be true.
       expect(interceptors[0]).toBeInstanceOf(BreakerGateInterceptor);
+      expect(interceptors.some((interceptor) => interceptor instanceof SecurityTelemetryInterceptor)).toBe(
+        true,
+      );
 
       // The other half of the ordering argument: the guard is global too, and it
       // runs FIRST (middleware → guards → interceptors → pipes → handler), so an

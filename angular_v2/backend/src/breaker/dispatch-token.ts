@@ -179,6 +179,29 @@ export const NOTIFICATIONS_MATERIALIZE: DispatchToken = 'notifications.materiali
 export const CONSENT_PURGE: DispatchToken = 'consent.purge';
 
 /**
+ * `SecurityTelemetryFlush` — the job that turns what the request path recognised
+ * into the four security-telemetry tables.
+ *
+ * ## Why it is NOT in `BREAKER_PROTECTED`
+ *
+ * The same argument `NOTIFICATIONS_MATERIALIZE` makes, and for the same reason:
+ * this is batch work with nobody waiting. Its output is a row nobody has been
+ * told about yet, and **the collector keeps the observations until the window
+ * closes**, so a deferred flush loses nothing at all — the next pass writes the
+ * same aggregate. It takes a NON-stoppable lease, so the gate may refuse the pass
+ * but will not abort one in flight, and the pass is already one transaction over
+ * four tables.
+ *
+ * ## Why the token exists at all
+ *
+ * The gate can name it, the scheduler can lock it, and the lock key is derived
+ * from it — the same three things every other dispatch site has. A job with no
+ * token is a job the gate cannot classify, and a site the gate cannot classify is
+ * sheddable by accident rather than by decision.
+ */
+export const SECURITY_TELEMETRY_FLUSH: DispatchToken = 'security.telemetry.flush';
+
+/**
  * The seven member-profile routes (`UsersController`), named so `RouteCensus` admits
  * them at boot.
  *
@@ -272,6 +295,7 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   PRIVACY_ERASE,
   NOTIFICATIONS_MATERIALIZE,
   CONSENT_PURGE,
+  SECURITY_TELEMETRY_FLUSH,
   USERS_ME,
   USERS_UPDATE_ME,
   USERS_REQUEST_EMAIL_CHANGE,

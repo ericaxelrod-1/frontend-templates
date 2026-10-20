@@ -138,11 +138,27 @@ Allowlisted IPs skip counting entirely and cannot be blocked. The allowlist is
 populated explicitly; it is not a loopback-only stub, and
 `normalizeIpAddress` is applied to every entry before comparison.
 
-**What does not exist is the standing reputation itself.** `ip_reputation` is a
-table with no writer: nothing scores an address and nothing consults the score, so
-the row's `reputation_score` and `is_blocked` describe nothing. The per-account
-brute-force counters above it are real; the reputation row is storage. See §
-Detection and alerting.
+**The standing reputation exists, and it is written by the telemetry producer.**
+`ip_reputation` has one row per canonical host, and `src/security/` writes it:
+`failed_attempts` is the count of failed attempts recorded for that host,
+`captcha_required_count` the count of challenges issued to it, and
+`reputation_score` a number computed from what was observed inside the
+configured window. The score is a **display**: `is_blocked` is never set and
+`blocked_until` is never written, because §B6 makes behavioural and risk scoring
+triage rather than prevention — a producer that could deny a request by writing
+a boolean would be a producer that could deny a request by accident.
+
+**The address is canonical in the producer too**, and that is the property that
+matters: the same key the per-account counters use, so `::ffff:1.2.3.4` and
+`1.2.3.4` are one row here as well as one counter there. The score is a
+**secondary** signal, and the per-account brute-force counters above it remain
+the primary control — the reputation row ranks a host for review; it does not
+gate it.
+
+**Geo-blocking is not implemented, and the reason is a missing data source, not
+a missing feature.** `ip_reputation.geo_location` is never written, and the
+deployment guide's ledger records why: a country needs a GeoIP database, a
+hosted API or a trusted proxy, and this template has none of the three.
 
 ---
 
@@ -202,10 +218,13 @@ challenge when it sees the `428` and shows it — it never asks for one on its o
 initiative, because a challenge in front of every sign-in is the blanket
 challenge the anti-pattern table names.
 
-**`ip_reputation.captcha_required_count` is still seed data.** Nothing increments
-it, because incrementing it means writing `ip_reputation`, and that table has no
-writer at all — see §Detection and alerting. The decision this mechanism makes is
-recorded where it is made: in the `login_attempts` rows the gate writes.
+**`ip_reputation.captcha_required_count` is written now.** The telemetry
+producer counts the challenges issued to each host and records it beside the
+host's other counters — which is why the count used to be seed data, and why it
+is not any more: writing it means writing `ip_reputation`, and until the
+telemetry producer landed that table had no writer at all. The decision the
+challenge makes is still recorded where it is made, in the `login_attempts` rows
+the gate writes; the reputation row carries the count, not the decision.
 
 The three previous implementations were: one correct, one self-solving
 (`challenge: solution`), and one frontend service with the answers hardcoded in
@@ -690,21 +709,53 @@ Known limits, stated so a forker is not misled:
   known to the attacker.
 
 Alerts **persist to the database** — `security_alerts` is created, granted,
-RLS-scoped to `app_admin` and read by `/admin/security-alerts`. **Nothing
-produces them.** No application code writes `security_alerts`,
-`ip_reputation`, `security_detected_patterns` or `pattern_login_attempts`; the
-only writer is `database/seed.ts`, and every row it inserts is `is_mock = true`.
-There is no scoring pipeline and no notification channel, so there is no opt-in
-config to set and no stub logging "would send" — the whole pipeline is the
-absence, which is a different thing from a pipeline with a stub in it, and is
-recorded as such in [`deployment-guide.md`](./deployment-guide.md) §
-`Not yet present`.
+RLS-scoped to `app_admin` and read by `/admin/security-alerts` — and there is a
+producer for them now. `src/security/` is the whole pipeline:
 
-So a dashboard showing live-looking rows in a development database is showing
-fixtures, and `is_mock` is the display filter that lets you exclude them. It is a
-filter and not a fabrication guard: nothing in the schema prevents application
-code from writing a row that is not what it claims to be, because a guard here
-would turn a synthetic row into a hard failure instead of an excluded one.
+| Stage | Where | What it does |
+|---|---|---|
+| **Detect** | `SecurityTelemetryInterceptor` (`APP_INTERCEPTOR`) | Recognises a hostile shape in the request URL and the top-level string fields of its body. The pattern set is `src/security/pattern-registry.ts`: SQL injection, XSS, path traversal, command injection, LDAP injection, NoSQL injection |
+| **Count** | `SecurityTelemetryCollector` | Aggregates by (pattern, canonical address) over a window. In memory, on the request path, no I/O |
+| **Persist** | `SecurityTelemetryFlush` (a `JobRunner` job) | Writes `security_detected_patterns`, `pattern_login_attempts`, `security_alerts` and `ip_reputation` in ONE transaction, through the escalation boundary every other writer crosses |
+| **Render** | the existing notification materialiser | Reads `security_alerts` and renders them onto the admin panel |
+
+**The detection is TRIAGE.** The interceptor never refuses a request, never
+throws and never changes a response; a pattern that scores badly raises a row
+for a human to read. `docs/deployment-guide.md` §`Not yet present` records the
+one thing that is still absent around it, and it is a data source rather than a
+feature: **geo-blocking**, because a country needs a GeoIP database, a hosted
+API or a trusted proxy and this template has none of the three.
+
+**A flood produces ONE row, not one row per request.** The collector counts in
+memory and the job writes the aggregate, so ten thousand matching requests
+produce one `security_detected_patterns` row carrying the count. The evidence
+rows are bounded too, and the bound is in the code rather than in the hope.
+
+**Nothing the producer writes is a credential, and nothing it writes blocks
+anyone.** The evidence is the pattern's type, the NAME of the field that
+matched, the routes, the counts and the timestamps — never a field's value, and
+never a request body. `ip_reputation.is_blocked` is never set: a producer that
+could deny a request by writing a boolean would be a producer that could deny one
+by accident.
+
+**What an erasure reaches.** The telemetry rows are about HOSTS, not about
+people: `security_alerts.user_id` is NULL, and the pattern and reputation tables
+have no user column at all. The one row in the chain that names a person is
+`login_attempts.username`, and the erasure already rewrites that to the
+tombstone — so the link from a pattern to the attempts that prove it survives
+with the name behind it gone. The ADDRESS is retained, deliberately: it is
+personal data, and a host row is the record of whoever used that host, which
+may be many people. That is the same trade `0024_alert_subject_cascade.sql`
+records for `security_alerts`, and §B6's "security alerts persist to the
+database" is about alerts being RECORDED rather than about them outliving the
+erasure of the person they describe.
+
+So a dashboard showing rows in a development database is showing either a live
+finding or a fixture, and `is_mock` is the display filter that tells them
+apart. It is a filter and not a fabrication guard: nothing in the schema
+prevents application code from writing a row that is not what it claims to be,
+because a guard here would turn a synthetic row into a hard failure instead of
+an excluded one.
 
 ---
 

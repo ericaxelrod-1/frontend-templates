@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Client } from 'pg';
-import { psqlAsSuperuser } from '../../support/cluster.js';
+import { CLUSTER_SUPERUSER, psqlAsSuperuser } from '../../support/cluster.js';
 import { loadTestEnvironment } from '../../support/database.js';
 import { BACKEND_ROOT } from '../../support/paths.js';
 
@@ -81,6 +81,15 @@ export const CAPTCHA_PROOF_DATABASE = 'captcha_proof';
  * `beforeAll` would drop the other's schema mid-run.
  */
 export const LOGIN_CAPTCHA_PROOF_DATABASE = 'login_captcha_proof';
+
+/**
+ * A seventh, for the security-telemetry proof.
+ *
+ * The same reason as the others, and one more: this suite WRITES to all four
+ * security-telemetry tables and reads them back, and it boots the real
+ * application to do it — so it must not share a database with another suite.
+ */
+export const SECURITY_TELEMETRY_PROOF_DATABASE = 'security_telemetry_proof';
 
 /** The migration/owner role, which owns every table and never receives a request. */
 const OWNING_ROLE = 'app';
@@ -183,6 +192,23 @@ export function authenticatorClient(database: string = PROOF_DATABASE): Promise<
 export function ownerClient(database: string = PROOF_DATABASE): Promise<Client> {
   const config = loadTestEnvironment().database;
   return connectAs(config.user, config.password, database);
+}
+
+/**
+ * A client for the cluster superuser.
+ *
+ * **Offered for one reason: an UNAMBIGUOUS read.** The four security-telemetry
+ * tables are `FORCE ROW LEVEL SECURITY` with a policy that admits `app_admin` and
+ * nothing else, so a read through the boundary that returned nothing would be
+ * indistinguishable from "the rows are not there" — the §B8 rule about asserting
+ * on row counts rather than on status codes, applied to a read. A superuser
+ * session bypasses the policies, so a count it reports is the count that exists.
+ *
+ * It is never used to ASSERT a refusal: a refusal witnessed through a session
+ * that bypasses the policies is not a refusal.
+ */
+export function superuserClient(database: string = PROOF_DATABASE): Promise<Client> {
+  return connectAs(CLUSTER_SUPERUSER, '', database);
 }
 
 async function connectAs(user: string, password: string, database: string): Promise<Client> {

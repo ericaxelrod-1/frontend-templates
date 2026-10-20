@@ -157,28 +157,42 @@ about.** `0022_security_telemetry.sql` creates `ip_reputation`,
 sentence that used to stand here — "nothing in the tree pretends they exist" —
 is no longer true, and was wrong in the direction of understating.
 
-What does **not** exist is the part that makes the tables mean anything:
+`backend/src/security/` exists and owns the producers of the first four:
 
-- **`backend/src/security/` does not exist.** No collector writes
-  `ip_reputation` or `security_detected_patterns` from live traffic; the rows
-  present are seeded, and the admin pages render them honestly as seeded rather
-  than implying a live pipeline.
+- **The request half** is `SecurityTelemetryInterceptor`, an `APP_INTERCEPTOR`
+  registered beside the breaker's own in the same chain. It recognises a hostile
+  shape in the request — the pattern set is `src/security/pattern-registry.ts` —
+  and hands it to `SecurityTelemetryCollector`, which counts it in memory. **It
+  never refuses a request**: §B6 makes risk scoring triage, not prevention.
+- **The write half** is `SecurityTelemetryFlush`, a `JobRunner` job that persists
+  the aggregate in one transaction, through the escalation boundary every other
+  writer crosses. A flood of matching requests produces ONE pattern row carrying
+  the count, not one row per request.
+
+What does **not** exist is the part that has no data source in this template:
+
 - **There is still no rate limiter in front of PostgREST**, for the reason §B6
   gives: PostgREST does not rate-limit and `db-pre-request` runs read-only, so
   the limiter for that surface is the reverse proxy's job
   (`docs/deployment-guide.md` §nginx). The **thin app** does have one: a global
   `@nestjs/throttler` limiter registered as an `APP_GUARD` in
   `src/app.module.ts`, with per-route policies in `src/common/throttle.ts`.
+- **There is still no geo-IP resolution**, and therefore no geo-blocking: a
+  country needs a data source this template does not have. The finding, the three
+  options that were considered and the integration point are in the deployment
+  guide's ledger, and the ledger entry is machine-checked.
 
 **`captcha` is the exception among the five.** It has both halves: the issuer
 and the verifier are `src/auth/captcha.service.ts`, the table is `0022`'s, and
 the challenge is demanded by the login gate when an account is over the failure
 threshold. `docs/security.md` §CAPTCHA has the properties and the ceiling.
 
-The five admin pages are real and tested; what they display is seed data. That
-distinction is recorded in the deployment guide's gap ledger and enforced by
-`backend/test/unit/docs/deployment-gaps.spec.ts`, so this paragraph cannot go
-stale the way the version above it did.
+The five admin pages are real and tested, and what they display is now real:
+the telemetry producer writes the four tables, and the `is_mock` filter is what
+separates a live finding from a seeded fixture. The one absence that remains
+around them is geo-blocking, and it is recorded in the deployment guide's gap
+ledger and enforced by `backend/test/unit/docs/deployment-gaps.spec.ts`, so this
+paragraph cannot go stale the way the version above it did.
 
 **`src/privacy/` and `src/purge/` separate account erasure from retention
 enforcement.** The privacy and retention features (`docs/rebase.md` §9, ADR-0029,

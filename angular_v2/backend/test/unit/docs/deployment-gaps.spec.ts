@@ -174,11 +174,25 @@ const CONFIG = ['postgrest.conf', 'frontend/angular.json'].map((path) => ({
  * idiom `erasure-environment.spec.ts` uses. A geo-blocking key cannot be added
  * without one of these carrying it, which is what makes the check meaningful;
  * the examples are committed, so it is not vacuous on a machine without a `.env`.
+ *
+ * **THE COMMENTS ARE STRIPPED, and that is the check being precise rather than
+ * lenient.** This check is about a CONFIG KEY: a file that explains WHY there is
+ * no geo-blocking key is not a file that configures one, and the shipped
+ * examples say exactly that. A key is a line of its own, `NAME=value`, and it is
+ * not a comment — so stripping the comment half of every line costs the check
+ * nothing and stops it from reporting the documentation of an absence as the
+ * absence itself.
  */
 const ENVIRONMENTS = readdirSync(join(REPOSITORY_ROOT, 'backend'))
   .filter((name) => name === '.env' || name.startsWith('.env.'))
   .sort()
-  .map((name) => ({ path: `backend/${name}`, text: readFileSync(join(REPOSITORY_ROOT, 'backend', name), 'utf8') }));
+  .map((name) => ({
+    path: `backend/${name}`,
+    text: readFileSync(join(REPOSITORY_ROOT, 'backend', name), 'utf8')
+      .split('\n')
+      .map((line) => line.replace(/#.*$/, ''))
+      .join('\n'),
+  }));
 
 type Manifest = { readonly where: string; readonly scripts: Record<string, string> };
 
@@ -298,42 +312,39 @@ const documentedIds = bullets.flatMap((bullet) => (bullet.id === undefined ? [] 
 // The ledger. One entry per `<!-- gap:… -->` marker, in the same order.
 // ---------------------------------------------------------------------------
 
-const TELEMETRY_TABLES = /\b(?:security_alerts|ip_reputation|security_detected_patterns|pattern_login_attempts)\b/;
-
 /**
- * Writing a telemetry table takes one of two shapes, and both are named here
- * because they fail in different ways. The backend reaches Postgres through SQL,
- * so a producer says `INSERT INTO` / `UPDATE` / `DELETE FROM` against the table.
- * The browser reaches it through PostgREST, where a read and a write are the
- * same URL and only the HTTP verb distinguishes them — which is why the frontend
- * half is a check on the verb in any file that names a table, not on the URL.
+ * Vendor and product names, not the word "geoip".
+ *
+ * **The list of products, and the list of libraries that read them, are two
+ * different holes and both are closed.** A hosted API needs a credential this
+ * repository does not have (§0), so the hole is the vendor name in the source. A
+ * LOCAL GeoIP database needs a reader library, and a reader library has to be a
+ * dependency — so that hole is the dependency list. Neither can be closed by
+ * refusing to spell a product's name.
  */
-const TELEMETRY_SQL_WRITE =
-  /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE)\s+(?:ONLY\s+)?(?:public\.)?(?:security_alerts|ip_reputation|security_detected_patterns|pattern_login_attempts)\b/i;
-
-// The optional generic argument matters: the frontend calls
-// `this.http.post<string | { id?: string }>(...)`, and a pattern that required `(`
-// straight after the verb did not match it — so a real write to a consent relation
-// through the generated client was invisible to the check meant to catch it.
-const NON_GET_VERB = /\bhttp\.(?:post|put|patch|delete)\s*(?:<[^>]*>)?\s*\(/;
-
-/**
- * Two clauses, because a producer has two shapes: SQL against a named table, and
- * a non-GET `HttpClient` verb in a file that names one — through PostgREST a read
- * and a write are the same URL and only the verb separates them.
- */
-function telemetryWriters(corpus: readonly Source[]): string[] {
-  return corpus
-    .filter(
-      (source) =>
-        TELEMETRY_TABLES.test(source.text) && (TELEMETRY_SQL_WRITE.test(source.text) || NON_GET_VERB.test(source.text)),
-    )
-    .map((source) => `${source.path} writes to a security-telemetry table`)
-    .sort();
-}
-
-/** Vendor and product names, not the word "geoip". */
 const GEO_PROVIDER = /maxmind|geolite2|ipinfo|ipstack|ip-?api\b|ip2location|ipgeolocation/i;
+
+/**
+ * A geolocation READER, by package name.
+ *
+ * **The list of products, and the list of libraries that read them, are two
+ * different holes and both are closed.** A hosted API needs a credential this
+ * repository does not have (§0), so the hole is the vendor name in the source. A
+ * LOCAL GeoIP database needs a reader library, and a reader library has to be a
+ * dependency — so that hole is the dependency list. Neither can be closed by
+ * refusing to spell a product's name.
+ */
+const GEO_READER_PACKAGE = /maxmind|geolite|geoip|ip2location|ipgeolocation|ipinfo|ipstack/i;
+
+/**
+ * The reputation row's place column.
+ *
+ * **Named only, in the backend, because the backend is where a WRITER would
+ * live.** The frontend reads `geo_location` to render it, and the admin page that
+ * does so is not a resolver — so the gate is scoped to the code that could fill
+ * the column.
+ */
+const GEO_PLACE_COLUMN = /\bgeo_location\b/;
 
 const TRACKER =
   /googletagmanager|google-analytics|\bgtag\(|connect\.facebook\.net|\bfbq\(|\bhotjar\b|\bmatomo\b|\bpiwik\b|plausible\.io|clarity\.ms|\bmixpanel\b/i;
@@ -345,6 +356,39 @@ const GEO_BLOCKING_KEY = /\b(?:GEO_BLOCK|GEOIP|ALLOWED_COUNTR|COUNTRY_ALLOWLIST)
 const POLICY_HEADER = /content-security-policy|contentSecurityPolicy|\bhelmet\b/i;
 
 const COOKIE_USE = /document\.cookie|\bSet-Cookie\b|cookie-consent|cookie_consent\b/i;
+
+/**
+ * The backend's dependencies, read rather than listed so a new one is covered.
+ *
+ * Narrowed through `unknown` because `JSON.parse` returns `any`, which
+ * `recommendedTypeChecked` refuses to let reach a typed binding.
+ */
+function backendDependencies(): Readonly<Record<string, string>> {
+  const manifest: unknown = JSON.parse(readFileSync(join(REPOSITORY_ROOT, 'backend', 'package.json'), 'utf8'));
+  if (typeof manifest !== 'object' || manifest === null || !('dependencies' in manifest)) {
+    throw new TypeError('backend/package.json has no dependencies object');
+  }
+  const declared: unknown = manifest.dependencies;
+  if (typeof declared !== 'object' || declared === null) {
+    throw new TypeError('backend/package.json dependencies is not an object');
+  }
+  const dependencies: Record<string, string> = {};
+  for (const [name, version] of Object.entries(declared)) {
+    if (typeof version === 'string') {
+      dependencies[name] = version;
+    }
+  }
+  return dependencies;
+}
+
+/** The dependencies that could read a GeoIP database. */
+function geoReaderDependencies(
+  dependencies: Readonly<Record<string, string>> = backendDependencies(),
+): string[] {
+  return Object.keys(dependencies)
+    .filter((name) => GEO_READER_PACKAGE.test(name))
+    .sort();
+}
 
 
 
@@ -362,37 +406,30 @@ const GAPS: readonly Gap[] = [
   {
     id: 'geo-resolver',
     kind: 'behaviour-absence',
-    claim: 'nothing derives a place from an address, and nothing can block by country',
+    claim:
+      'nothing derives a place from an address, nothing can block by country, and no key exists that would ask for it',
     cannot:
-      'Two keyword gates: a list of geolocation VENDOR names over application code, and a list of geo-blocking CONFIG KEYS over the environment files. A resolver pointed at a vendor not on the first list passes, and so does a blocklist read from anywhere but an env file. The vendor list names products rather than the bare word "geoip", because `users.geo_source` uses `geoip` as a provenance LABEL and a check that flagged it would be reporting the column this tree does read.',
+      "Four keyword gates: a list of geolocation VENDOR names over application code, a list of geo-blocking CONFIG KEYS over the environment files, a list of geolocation READER LIBRARIES over the backend's dependencies, and the reputation row's PLACE COLUMN over the backend. A resolver pointed at a vendor not on the first list passes; so does a blocklist read from anywhere but an env file; so does a local GeoIP database read through a reader library named outside the third list. The vendor list names products rather than the bare word \"geoip\", because `users.geo_source` uses `geoip` as a provenance LABEL and a check that flagged it would be reporting the column this tree does read.",
     problems: () => [
       ...hits(CODE, GEO_PROVIDER).map((path) => `${path} names a geolocation provider`),
       ...hits(ENVIRONMENTS, GEO_BLOCKING_KEY).map((path) => `${path} configures geo-blocking`),
+      ...geoReaderDependencies().map((name) => `the backend depends on ${name}, which could read a GeoIP database`),
+      ...hits(sourcesUnder(['backend/src']), GEO_PLACE_COLUMN).map(
+        (path) => `${path} names the reputation row's place column, so it could fill it`,
+      ),
     ],
-    probe: () =>
-      hits(
+    probe: () => [
+      ...hits(
         [{ path: 'backend/src/config/environment.ts', text: 'const reader = new MaxMind.GeoLite2.Reader();' }],
         GEO_PROVIDER,
       ),
-  },
-  {
-    id: 'telemetry-producers',
-    kind: 'behaviour-absence',
-    claim: 'no application code writes the four security-telemetry tables',
-    cannot:
-      'The tightest check in this file, and it is two clauses because a producer has two shapes: SQL `INSERT INTO` / `UPDATE` / `DELETE FROM` / `TRUNCATE` against a named table in application code or a launcher script, and a non-GET `HttpClient` verb in any frontend file that names one — because through PostgREST a read and a write are the same URL and only the verb separates them. It does not read `database/seed.ts`, which writes `is_mock = true` fixtures on purpose, and it cannot see a table name assembled by concatenation.',
-    problems: () => telemetryWriters(CODE),
-    probe: () =>
-      telemetryWriters([
-        {
-          path: 'backend/src/security/alert-writer.ts',
-          text: 'client.query(`INSERT INTO security_alerts (alert_type) VALUES ($1)`, [type]);',
-        },
-        {
-          path: 'frontend/src/app/features/security/alert-service.ts',
-          text: "this.http.post(`${POSTGREST_BASE_URL}/security_alerts`, row);",
-        },
-      ]),
+      ...hits([{ path: 'backend/.env.production', text: 'GEO_BLOCK_COUNTRIES=DE,FR' }], GEO_BLOCKING_KEY),
+      ...geoReaderDependencies({ 'maxmind': '4.3.0' }),
+      ...hits(
+        [{ path: 'backend/src/security/telemetry-writer.ts', text: "INSERT INTO ip_reputation (geo_location) VALUES ('{}')" }],
+        GEO_PLACE_COLUMN,
+      ),
+    ],
   },
   {
     id: 'strict-csp',
