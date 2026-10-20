@@ -192,6 +192,56 @@ the one piece of state that goes wrong quietly.
   out of the repository for a reason, `pwd` is how you confirm where you
   actually are before the next command runs.
 
+### 2.8 Delegating work: decide here, build there
+
+A delegation is a **transfer of execution, not of judgement**. What you decide
+stays with you; what you have decided is passed on.
+
+#### What a brief asserts, and what it asks
+
+- **Assert the DECISIONS.** The data model, the security posture, the
+  behaviour that was chosen, the boundary that must not move. These took
+  deliberation and no agent can re-derive them. An agent must not re-open them.
+- **Describe the CODE as a question.** "Find where the disable predicate
+  actually lives", not "the disable predicate is in `users.service.ts`".
+  **Every correction an agent has made to a brief was a fact the brief asserted
+  from memory instead of reading** — a wrong file, a seed that does not seed
+  what was claimed, a table §B2 forbids, an envelope that does not exist, a
+  diagnosis that was not the cause. An agent either trusts the assertion and
+  builds something wrong, or checks it and finds the brief wrong. Both are the
+  same defect.
+- **State the scope negatively too.** "This is the telemetry unit; the CAPTCHA
+  unit is done and must not be touched." A brief that does not say what it is
+  NOT invites the agent into the adjacent unit.
+- **Never assert the state of a tree you are not standing in.** The
+  coordinator's checkout and a remote machine's checkout are different trees,
+  and they diverge further while a dispatch is in flight. A brief that
+  describes "what is in the tree" is describing the wrong tree.
+
+#### Routing
+
+| work | who |
+|---|---|
+| deciding *what* to build — the data model, the security posture, the behaviour | **the coordinator** |
+| diagnosing *why* something is broken | **the coordinator** |
+| writing the brief that carries those decisions | **the coordinator** |
+| building to a decided brief | **a delegated agent** |
+| an independent check of the tree — an audit, a review | **a delegated agent** |
+
+**A dispatch that has to decide is a dispatch with a loose brief.** If you find
+yourself telling an agent "work out what this should do", that part belongs to
+you first, and then it belongs in the brief.
+
+**When a dispatch comes back unsatisfactory, the first move is not a bigger
+model.** It is:
+
+1. Was the brief ambiguous? Tighten it and re-dispatch.
+2. Was the task actually architecture or debugging? Do it here.
+3. Only then consider a stronger model.
+
+Re-dispatching the same brief upward burns the stronger model's tokens and
+still leaves the brief loose.
+
 ---
 
 ## 3. Enforcement is the point

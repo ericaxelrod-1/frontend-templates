@@ -216,6 +216,35 @@ It is also the catch-all for the commands you did not think to anchor.
 **The full rule is [`AGENTS.md` §2.7](../../AGENTS.md) and is stated there once**,
 so there is one mechanism for it rather than two that can drift.
 
+### 2.8 Delegating work: decide here, build there
+
+A delegation is a **transfer of execution, not of judgement**. What you decide
+stays with you; what you have decided is passed on.
+
+**A brief asserts the DECISIONS and asks about the CODE.** The data model, the
+security posture, the chosen behaviour and the boundary that must not move are
+asserted — an agent cannot re-derive them and must not re-open them. The code
+is described as a question: "find where the disable predicate actually lives",
+not "it is in `users.service.ts`". **Every correction an agent has made to a
+brief was a fact the brief asserted from memory instead of reading.** State the
+scope negatively too — "this is the telemetry unit; the CAPTCHA unit is done and
+must not be touched" — because a brief that does not say what it is NOT invites
+the agent into the adjacent unit. And never assert the state of a tree you are
+not standing in: a remote machine's checkout diverges while a dispatch is in
+flight.
+
+**Routing: decide here, build there.** Deciding *what* to build, diagnosing
+*why* something is broken, and writing the brief are the coordinator's. Building
+to a decided brief, and independently checking the tree, are a delegated
+agent's. **A dispatch that has to decide is a dispatch with a loose brief.**
+
+**When a dispatch comes back unsatisfactory, the first move is not a bigger
+model:** was the brief ambiguous (tighten it), was the task actually
+architecture or debugging (do it here), and only then consider a stronger model.
+
+**The full rule is [`AGENTS.md` §2.8](../../AGENTS.md) and is stated there once**,
+so there is one mechanism for it rather than two that can drift.
+
 ---
 
 ## 3. Enforcement is the point
