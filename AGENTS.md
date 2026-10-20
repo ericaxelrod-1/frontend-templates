@@ -178,6 +178,14 @@ the one piece of state that goes wrong quietly.
   area resolves to nothing, the agent cannot find its brief, and it will do the
   work from a brief it wrote itself. That happened here: a unit was dispatched
   with no spec at all because the spec had been written outside the project.
+- **The handoff folder follows the workspace, and the workspace is resolved
+  first.** For work in a project that has an equivalent on the target machine,
+  the brief goes in that project's `.tmp/deleg/` and the agent is launched in
+  that project root. For work that belongs to no project on the target — a set
+  of installed skills, say — the brief goes in the target's general handoff
+  folder, and the agent's reference to it must still be inside the tree the
+  agent is working in. The discriminator is *"is there an equivalent of this
+  workspace on the target?"*, not *"is this a git repository"*.
 - **A command that reaches outside the repository will be refused.** That
   refusal is a report that the working directory has drifted, not an obstacle to
   route around. Re-anchor and continue; do not work around it.
@@ -218,29 +226,55 @@ stays with you; what you have decided is passed on.
   and they diverge further while a dispatch is in flight. A brief that
   describes "what is in the tree" is describing the wrong tree.
 
-#### Routing
+#### Routing: name the kind of work, then decide the tier — before dispatching
 
-| work | who |
-|---|---|
-| deciding *what* to build — the data model, the security posture, the behaviour | **the coordinator** |
-| diagnosing *why* something is broken | **the coordinator** |
-| writing the brief that carries those decisions | **the coordinator** |
-| building to a decided brief | **a delegated agent** |
-| an independent check of the tree — an audit, a review | **a delegated agent** |
+Every dispatch is exactly one of three kinds. **Name it first**, then resolve
+the model from `model-catalog.json` rather than from judgement.
 
-**A dispatch that has to decide is a dispatch with a loose brief.** If you find
-yourself telling an agent "work out what this should do", that part belongs to
-you first, and then it belongs in the brief.
+| kind | what it is | who does it |
+|---|---|---|
+| **Planning pipeline** | the approach is **not** decided: plan, then implement, then validate independently | the roundtable: several distinct planning families, then a build task per unit, then an independent judge |
+| **Build** | the approach **is** decided and written down; the deliverable is a change | a delegated agent |
+| **Investigation** | the question is *why*; the deliverable is a **diagnosis** — the cause, the evidence, and the recommended fix; read-only, no code changes | a delegated agent, briefed with the inquiry |
 
-**When a dispatch comes back unsatisfactory, the first move is not a bigger
-model.** It is:
+**Decide from the brief alone, before the dispatch**, with no reference to how a
+previous run went. Ask in order, stop at the first yes:
+
+1. Does the brief leave **open a decision about what to build** — approach,
+   design, schema, interface, architecture? → **Planning pipeline.** Do not
+   dispatch a brief; the brief is the agenda for the roundtable.
+2. Does the brief ask for a **cause** rather than a change? → **Investigation.**
+   The coordinator states the inquiry and the evidence already gathered — a
+   delegated agent cannot diagnose from a bare symptom — and the agent returns
+   the diagnosis. If a fix is then wanted, **that fix is a build task, briefed
+   by the diagnosis.**
+3. Does the brief ask for a **change**, with the approach already fixed? →
+   **Build.** Tier below.
+
+**A build task's tier, decided before dispatching.** The default tier is
+`fast`, if and only if the brief declares all three of: the unit touches **no
+more than 3 files**; it **introduces no new module, interface or schema**;
+and the brief states an **exact acceptance command with its expected result**.
+If any of the three fails, the tier is `coding`. The cost of getting it wrong
+in each direction: too fast, and the agent half-builds and the acceptance
+command fails; too strong, and the quota is burned on work that did not need it.
+
+**Record the routing decision before dispatching, and never revise it.** A
+routing decision made after seeing the result is not a routing decision.
+
+#### When a dispatch comes back unsatisfactory
+
+The first move is **not** a bigger model.
 
 1. Was the brief ambiguous? Tighten it and re-dispatch.
-2. Was the task actually architecture or debugging? Do it here.
-3. Only then consider a stronger model.
+2. Was the task actually a kind that should have been recognised as a planning
+   pipeline or an investigation — an open design decision, or a question about
+   why something is broken? Do it here.
+3. Only then consider a stronger tier.
 
 Re-dispatching the same brief upward burns the stronger model's tokens and
-still leaves the brief loose.
+still leaves the brief loose. A dispatch that has to decide is a dispatch with
+a loose brief, and a loose brief is the cause far more often than the model is.
 
 ---
 

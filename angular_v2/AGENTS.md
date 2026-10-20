@@ -201,7 +201,10 @@ Reach other places without moving: `git rev-parse --show-toplevel`,
 repository root**, which is gitignored — and a file a dispatched agent must read
 goes in the project, not in `.tmp/`, because a relative path to a scratch area
 resolves to nothing and the agent will do the work from a brief it could not
-find.
+find. The handoff folder follows the workspace: a project with an equivalent on
+the target puts briefs in that project's `.tmp/deleg/`; work belonging to no
+project on the target uses the target's general handoff folder, and the agent's
+reference to it must still be inside the tree it is working in.
 
 A command that reaches outside the repository will be refused; that refusal is
 a report that the working directory has drifted, not an obstacle to route
@@ -233,14 +236,24 @@ the agent into the adjacent unit. And never assert the state of a tree you are
 not standing in: a remote machine's checkout diverges while a dispatch is in
 flight.
 
-**Routing: decide here, build there.** Deciding *what* to build, diagnosing
-*why* something is broken, and writing the brief are the coordinator's. Building
-to a decided brief, and independently checking the tree, are a delegated
-agent's. **A dispatch that has to decide is a dispatch with a loose brief.**
+**Routing: name the kind of work, then decide the tier — before dispatching.**
+Every dispatch is exactly one of three kinds: **Planning pipeline** (the
+approach is not decided: plan, then implement, then validate independently),
+**Build** (the approach is decided and written down; the deliverable is a
+change), or **Investigation** (the question is *why*; the deliverable is a
+read-only diagnosis, and the coordinator states the inquiry and the evidence
+rather than leaving the agent to diagnose a bare symptom). Decide from the brief
+alone, in that order, stopping at the first yes; resolve the model from
+`model-catalog.json`; and **record the decision before dispatching, because a
+routing decision made after seeing the result is not a routing decision.**
+
+**A dispatch that has to decide is a dispatch with a loose brief** — and a
+loose brief is the cause far more often than the model is.
 
 **When a dispatch comes back unsatisfactory, the first move is not a bigger
-model:** was the brief ambiguous (tighten it), was the task actually
-architecture or debugging (do it here), and only then consider a stronger model.
+model:** was the brief ambiguous (tighten it), was the task actually a kind
+that should have been recognised as a planning pipeline or an investigation (do
+it here), and only then consider a stronger tier.
 
 **The full rule is [`AGENTS.md` §2.8](../../AGENTS.md) and is stated there once**,
 so there is one mechanism for it rather than two that can drift.
