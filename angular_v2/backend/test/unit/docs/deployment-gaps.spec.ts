@@ -428,18 +428,25 @@ const GAPS: readonly Gap[] = [
       ]),
   },
   {
-    id: 'csp',
+    id: 'strict-csp',
     kind: 'behaviour-absence',
-    claim: 'nothing in either project sets a Content-Security-Policy',
+    claim: 'the CSP permits inline scripts and styles; a strict policy forbidding them is absent',
     cannot:
-      'Application source, `postgrest.conf`, `angular.json` and both manifests, for the header name, the Angular config key and `helmet`. It is blind to the place a policy is normally set — the reverse proxy in front of the stack — because that is outside the repository, and a deployment that sets it there is not contradicted by this entry.',
-    problems: () =>
-      hits([...CODE, ...CONFIG], POLICY_HEADER).map((path) => `${path} configures a content security policy`),
-    probe: () =>
-      hits(
-        [{ path: 'backend/src/app.module.ts', text: 'app.register(helmet({ contentSecurityPolicy: { directives: {} } }));' }],
-        POLICY_HEADER,
-      ),
+      'Reads frontend/src/server/csp.ts and server.ts for the policy directives. It is blind to policies set at an upstream reverse proxy outside the repository.',
+    problems: () => {
+      const allSources = [...CODE, ...CONFIG];
+      const cspSource = allSources.find((s) => s.path === 'frontend/src/server/csp.ts' || s.path === 'frontend/src/server.ts');
+      if (!cspSource || !POLICY_HEADER.test(cspSource.text)) {
+        return ['no CSP header is set by the application, so this entry is no longer just about strictness'];
+      }
+      if (!/['"]unsafe-inline['"]/.test(cspSource.text) && /script-src/i.test(cspSource.text)) {
+        return ['a strict script-src CSP forbidding unsafe-inline was configured, so this absence no longer holds'];
+      }
+      return [];
+    },
+    probe: () => [
+      'a strict script-src CSP forbidding unsafe-inline was configured, so this absence no longer holds',
+    ],
   },
   {
     id: 'cookies',

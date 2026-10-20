@@ -6,6 +6,22 @@ import { Client } from 'pg';
 import { psqlAsSuperuser } from '../../support/cluster.js';
 import { loadTestEnvironment } from '../../support/database.js';
 import { BACKEND_ROOT } from '../../support/paths.js';
+import {
+  describePostgrestStartupFailure,
+  POSTGREST_STARTUP_TIMEOUT_MS,
+  sleepSync,
+  waitForPortToBeFree,
+  waitForPostgrest,
+} from '../../support/postgrest-startup.js';
+
+/**
+ * How long the launcher waits for the port to become free before it refuses to
+ * start.
+ *
+ * Long enough for the previous suite's instance to let go of it, short enough
+ * that a genuine conflict is reported rather than waited on.
+ */
+const PORT_GUARD_TIMEOUT_MS = 10_000;
 
 /**
  * The live fixture for the two-axis authorization proof (W27).
@@ -631,6 +647,21 @@ export async function startPostgrest(): Promise<{ stop: () => void; directory: s
     );
   }
 
+  // …and WAIT for the port to be free, which is the other half of the same
+  // guard. The check above asks "is anything answering?"; this one asks "can the
+  // port be bound?", and the answer is not always the same: an instance that is
+  // still starting up holds the port without answering on it yet, and a child
+  // that tries to bind it then dies with exit code 3 and no message at all.
+  // The previous suite's instance lets go a moment after it exits, so the wait
+  // is short and the failure names the holder.
+  const held = await waitForPortToBeFree(PROOF_PORT, PORT_GUARD_TIMEOUT_MS);
+  if (held !== undefined) {
+    throw new Error(
+      `port ${PROOF_PORT} is held (${held}) and did not become free within ${String(PORT_GUARD_TIMEOUT_MS)}ms, ` +
+        'so the proof\'s own PostgREST could not bind it.',
+    );
+  }
+
   const directory = mkdtempSync(join(tmpdir(), 'w26-pgrst-'));
   const config = writeConfig(directory);
 
@@ -670,50 +701,79 @@ export async function startPostgrest(): Promise<{ stop: () => void; directory: s
 
   // Retained rather than discarded: if PostgREST dies mid-suite, this is the log
   // that says why, and a security suite that swallows it cannot be debugged.
+  // BOTH streams are captured: PostgREST writes some of its lines to stdout and
+  // some to stderr, so a stderr-only capture loses exactly the lines that
+  // explain a failure.
   let log = '';
   child.stderr?.on('data', (chunk: Buffer) => {
     log += chunk.toString('utf8');
   });
+  child.stdout?.on('data', (chunk: Buffer) => {
+    log += chunk.toString('utf8');
+  });
 
-  let owned = false;
+  // A child that could not be started at all raises an `error` event, and an
+  // unhandled one takes the test run down with an exception that names neither
+  // the binary nor the port. It is captured here, and it reaches the message.
+  let spawnError: string | undefined;
+  child.on('error', (error: Error) => {
+    spawnError = error.message;
+    log += `\n[the child could not be started: ${error.message}]\n`;
+  });
+
   const stop = (): void => {
-    if (owned && child.exitCode === null) {
+    // The child is OURS, whether or not it ever became ready: the old guard
+    // (`owned && …`) let a child that failed to start stay alive, and an
+    // orphaned PostgREST holds the port and the database connection for the
+    // next run — which then fails the port guard with nothing naming it.
+    if (child.exitCode === null) {
       child.kill('SIGTERM');
       // Wait for the port to actually free. `kill` returns immediately and the child
       // holds the socket for a few hundred ms, so a suite killed mid-run leaves an
       // orphan that makes the NEXT run fail its port guard — reported as "port is
       // already serving" with nothing pointing at the process responsible.
+      //
+      // `Atomics.wait` and not `spawnSync('sleep', …)`: `sleep` is a POSIX utility
+      // and is not on a Windows PATH, so the wait was a no-op there and the loop
+      // spun at full speed for its whole deadline.
       const deadline = Date.now() + 5_000;
       while (child.exitCode === null && Date.now() < deadline) {
-        spawnSync('sleep', ['0.1']);
+        sleepSync(100);
       }
       if (child.exitCode === null) {
         child.kill('SIGKILL');
-        spawnSync('sleep', ['0.2']);
+        sleepSync(200);
       }
     }
     rmSync(directory, { recursive: true, force: true });
   };
 
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
-      throw new Error(`PostgREST exited with ${child.exitCode} before serving:\n${log}`);
-    }
-    try {
-      const response = await fetch(`${baseUrl()}/`, { signal: AbortSignal.timeout(2000) });
-      if (response.status === 200) {
-        owned = true;
-        return { stop, directory };
-      }
-    } catch {
-      // Not listening yet. Retried until the deadline; never swallowed silently.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+  // The wait is the shared one: a generous ceiling, and a message that says
+  // what the child was doing. It used to be 30 seconds, which only fires when
+  // the machine is busy — and when it fired, every test in the file was SKIPPED
+  // and the run reported a count that did not add up.
+  const outcome = await waitForPostgrest(baseUrl(), {
+    timeoutMs: POSTGREST_STARTUP_TIMEOUT_MS,
+    childGone: () => child.exitCode !== null || spawnError !== undefined,
+  });
+
+  if (outcome.ready) {
+    return { stop, directory };
   }
 
+  // The child is killed BEFORE the error is thrown, so a failed launch leaves
+  // no orphan holding the port.
   stop();
-  throw new Error(`PostgREST did not answer on port ${PROOF_PORT} within 30s:\n${log}`);
+
+  throw new Error(
+    describePostgrestStartupFailure({
+      port: PROOF_PORT,
+      waitedMs: outcome.waitedMs,
+      timeoutMs: POSTGREST_STARTUP_TIMEOUT_MS,
+      child: { exitCode: child.exitCode, signal: child.signalCode, log, spawnError },
+      probe: outcome.probe,
+    }),
+  );
 }
 
 /**

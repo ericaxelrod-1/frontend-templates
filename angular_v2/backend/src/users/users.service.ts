@@ -1184,18 +1184,22 @@ export class UsersService {
    * `POST /users/me/password` and `POST /api/users` using "the repository's existing
    * throttle mechanism and the exported ThrottleSkip".
    *
-   * **None of that exists in this tree, and none of it can be added under this unit's
-   * constraints.** Recorded here rather than left to be discovered:
+   * **That first sentence describes the tree as it is NOW, and it used to describe a
+   * tree that did not exist.** The claim below was written when this module landed and
+   * it was true then: there was no `ThrottlerModule`, no `@Throttle`, no `ThrottleSkip`,
+   * and `@nestjs/throttler` was not a dependency. **All four of those are false today**
+   * — the limiter was registered globally afterwards (`ThrottlerModule.forRoot` and
+   * `ThrottlerGuard` as an `APP_GUARD` in `src/app.module.ts`, the policies and the
+   * exported `ThrottleSkip` in `src/common/throttle.ts`) — and both routes named here
+   * now carry `@Throttle({ default: THROTTLE_POLICIES.credential })` in
+   * `users.controller.ts`. The reason is recorded rather than deleted, because the
+   * SECOND half of it is still true and is still the reason this file writes no
+   * counter of its own:
    *
-   *   * There is NO globally registered rate limiter. No `ThrottlerModule`, no
-   *     `@Throttle`, no `ThrottleSkip`, and `@nestjs/throttler` is not a dependency —
-   *     §B6's own first clause ("registered globally") is unimplemented, so there is
-   *     nothing to TIGHTEN. `@Throttle` / `ThrottleSkip` appear nowhere in `src/` or
-   *     `test/`; `src/auth/throttle.ts` exports two PURE functions, `delayForFailures`
-   *     and `isBlocked`, which decide from a failure COUNT; and `auth.controller.ts`
-   *     carries no `@Throttle`. Adding `@nestjs/throttler` is a new dependency, which
-   *     the brief forbids.
-   *   * The one real mechanism is the `login_attempts` gate in
+   *   * The GLOBAL limiter is keyed on a source address, so it bounds VOLUME and
+   *     nothing else. A per-account failure counter is a different control, and the one
+   *     that answers "is somebody guessing THIS account's password".
+   *   * The one real per-account mechanism is the `login_attempts` gate in
    *     `AuthService.gate`, and it is keyed on `attempt_kind`, which is
    *     `CHECK (attempt_kind IN ('login', 'token_request'))` (`0019:143`). A third
    *     kind is a migration, which this unit does not write.
@@ -1213,17 +1217,18 @@ export class UsersService {
    *     self-limiting to roughly one guess per compare, and **the identical secret is
    *     already gated at `/auth/login`** with both the progressive delay and the block,
    *     on the `login` budget for that account. There is no cheaper path to the password
-   *     here than the one that already has the counter.
+   *     here than the one that already has the counter. It is ALSO throttled by source
+   *     address, at `THROTTLE_POLICIES.credential`.
    *   * `POST /api/users` is authenticated and administrator-only, and it **never
    *     compares a credential at all** — the password is hashed and stored. There is
    *     therefore no guessing surface to rate-limit. What it does have is a volume
    *     question ("how many accounts can an administrator create"), and that is an audit
-   *     question answered by the rows themselves, not a throttle.
+   *     question answered by the rows themselves, not a throttle. It is ALSO throttled
+   *     by source address, at `THROTTLE_POLICIES.credential`.
    *
-   * The two changes that would close this properly, for whoever owns them: a
-   * `@nestjs/throttler` registration with per-route overrides, or a `0025` adding
-   * `'password_change'` to the `attempt_kind` CHECK so the failure can be counted in a
-   * counter of its own without lying about what it was.
+   * The change that would close the per-account half properly, for whoever owns it: a
+   * migration adding `'password_change'` to the `attempt_kind` CHECK so the failure can
+   * be counted in a counter of its own without lying about what it was.
    */
 
   // =============================================================================

@@ -167,8 +167,12 @@ What does **not** exist is the part that makes the tables mean anything:
 - **`captcha` is a table with no issuer and no verifier.** Nothing mints a
   challenge and nothing checks an answer, so the challenge flow AGENTS.md §B6
   requires is unbuilt.
-- **There is still no rate limiter**, for the reason §B6 gives: PostgREST does
-  not rate-limit and `db-pre-request` runs read-only.
+- **There is still no rate limiter in front of PostgREST**, for the reason §B6
+  gives: PostgREST does not rate-limit and `db-pre-request` runs read-only, so
+  the limiter for that surface is the reverse proxy's job
+  (`docs/deployment-guide.md` §nginx). The **thin app** does have one: a global
+  `@nestjs/throttler` limiter registered as an `APP_GUARD` in
+  `src/app.module.ts`, with per-route policies in `src/common/throttle.ts`.
 
 The five admin pages are real and tested; what they display is seed data. That
 distinction is recorded in the deployment guide's gap ledger and enforced by

@@ -2823,16 +2823,20 @@ reads the live catalog after `db:seed` **and** after `migration:run` alone.
 
 ### 9A.3 The sweeper
 
-#### Where it runs, and `@nestjs/schedule` is **not** a dependency
+#### Where it runs, and `@nestjs/schedule` **is** a dependency
 
-`backend/package.json` dependencies are `@nestjs/common`, `@nestjs/config`,
-`@nestjs/core`, `@nestjs/jwt`, `@nestjs/platform-fastify`, `@nestjs/swagger`,
-`bcrypt`, `class-transformer`, `class-validator`, `handlebars`, `nodemailer`,
-`pg`, `reflect-metadata`, `rxjs`. **`@nestjs/schedule` is not among them**, and
-nor is `@nestjs/throttler`. The legacy ran its four `@Cron` handlers through
-`@nestjs/schedule`; `angular_v2` does not have it.
+`@nestjs/schedule@^12.0.2` **is** a dependency of `backend/package.json`, and so
+is `@nestjs/throttler@^6.7.1`. The list this paragraph used to quote — the
+tree's dependency list from before either was added — is what made the claim
+below, and it is stale; §9B.12 (2) records the same correction for the
+identical claim in §9B.8. **The recommendation was overridden and the reasoning
+in it was honoured**: the library was added (v12, not v6 — v6 peers on Nest 10/11
+and this tree is Nest 12), and the sweeper still does not use `@Cron`. It runs
+on a plain `unref()`ed `setInterval` registered in `onApplicationBootstrap` and
+handed to `SchedulerRegistry`, through `src/scheduler/job-runner.service.ts` —
+the same one-lock-per-job runner the purge jobs use.
 
-**Recommendation: do not add it.** The reason is not style, it is ordering.
+**The reason the dependency was not refused is ordering, and it still holds.**
 `@Cron` registers its handler during module initialisation — `OnModuleInit`,
 which Nest runs **before** `OnApplicationBootstrap`. A plain interval started in
 `onApplicationBootstrap` is strictly later, which means the sweeper cannot fire
@@ -4236,9 +4240,24 @@ taken explicitly:
    progressive delay runs before the credential check (`throttle.ts:24`), keyed
    on account first and IP subnet second. That is the auth-flood control that is
    real here, and it is a per-account counter rather than a global rate limiter —
-   `@nestjs/throttler` is **not** a dependency and there is **no global
-   application-level rate limiter in `angular_v2` today.** That is a recorded gap
-   in §B6's baseline, not a claim that the requirement is met.
+   **though a global application-level limiter now exists too.**
+   `@nestjs/throttler` **is** a dependency (`@nestjs/throttler@^6.7.1`) and the
+   limiter is **registered globally**: `ThrottlerModule.forRoot({…})` in
+   `src/app.module.ts`, with `ThrottlerGuard` registered as an `APP_GUARD`
+   beside `JwtAuthGuard`, so it runs before authentication and covers every
+   route. The three policies are in `src/common/throttle.ts`
+   (`THROTTLE_POLICIES.global` / `.credential` / `.link`), the routes tighten
+   themselves with `@Throttle` and exempt themselves with the exported
+   `ThrottleSkip`, and `test/unit/throttle/throttler.spec.ts` proves it against
+   the real application. **The two layers are complementary, not alternatives:**
+   the limiter sheds volume by source address, and the per-account gate stops a
+   credential attack against one account — a limiter keyed on an address cannot
+   do that, and §B6 forbids an address-keyed lock precisely because it would be
+   a lock on every account behind that address.
+   **What is still missing is the EDGE limiter in front of PostgREST**, which is
+   a reverse proxy's job (§B6): PostgREST does not rate-limit, and
+   `db-pre-request` runs read-only. That gap is real and is recorded in §B6's
+   baseline; it is not the gap this paragraph used to describe.
 3. **Refuse the tempting fix.** Moving the breaker to a guard to "catch the
    flood" reintroduces exactly the oracle in the paragraph above. **An
    information disclosure to unauthenticated callers is a worse outcome than an
@@ -4252,15 +4271,17 @@ see PostgREST, and no placement choice inside Nest changes that (§9B.0).
 
 #### The schedule library, and what it is sequenced against
 
-**`@nestjs/schedule` is not a dependency.** `backend/package.json:32-47` lists
-`@nestjs/common`, `@nestjs/config`, `@nestjs/core`, `@nestjs/jwt`,
-`@nestjs/platform-fastify`, `@nestjs/swagger`, `bcrypt`, `class-transformer`,
-`class-validator`, `handlebars`, `nodemailer`, `pg`, `reflect-metadata`, `rxjs` —
-and neither `@nestjs/schedule` nor `@nestjs/throttler` is among them. Neither is
-`@Cron` used anywhere in `src/`.
+**`@nestjs/schedule` IS a dependency** (`@nestjs/schedule@^12.0.2`), and so is
+`@nestjs/throttler` (`^6.7.1`). `backend/package.json` lists both, and §9B.12 (2)
+records the correction to the earlier draft of this paragraph, which said
+neither was there. The argument this paragraph makes about `@Cron` is **correct
+and was honoured**: neither `breaker.meter`, `breaker.gate` nor `purge.sweeper`
+uses `@Cron`. Each registers a plain `unref()`ed `setInterval` in
+`onApplicationBootstrap` and hands the handle to `SchedulerRegistry`, which is
+how the plan's ordering requirement and a named lifecycle are both satisfied.
 
-**So it is a new dependency, and it lands WITH the first breakable job — not
-before.** Two reasons, and the second is the one that bites:
+**And the dependency landed WITH the first breakable job — not before.** Two
+reasons, and the second is the one that bites:
 
 1. **A breaker guarding nothing is §2.1's "looks finished and isn't" in its
    purest form.** A green health surface, a trip set, a state machine, and zero
@@ -4268,11 +4289,11 @@ before.** Two reasons, and the second is the one that bites:
    does nothing.
 2. **`@Cron` registers its handler during module initialisation** —
    `OnModuleInit`, which Nest runs **before** `OnApplicationBootstrap`. So a
-   meter registered with `@Cron` can take its first reading **before the breaker
+   meter registered with `@Cron` can take its first reading **before** the breaker
    configuration has been asserted**, which for a control whose entire value
    proposition is refusing bad configuration is precisely the wrong order.
-   §9A.3 reached the same conclusion for the sweeper from the other direction — a
-   plain `unref()`ed interval started in `onApplicationBootstrap` is strictly
+   §9A.3 reached the same conclusion for the sweeper from the other direction —
+   a plain `unref()`ed interval started in `onApplicationBootstrap` is strictly
    later, and is the recommendation there. **The two jobs share one lifecycle and
    therefore must share one answer, and the meter must not be the one that is
    early.**
@@ -4536,6 +4557,33 @@ The field names differ from W72's by snake_case-in-the-DTO rather than by design
 `stopped_dispatches`, `stale_reading`, `probe_in_flight` and `protected`
 (the last echoes the exemption list back, so an operator can see *which* sites are
 exempt at this moment).
+
+**(6) The rate limiter is registered globally, and `@nestjs/throttler` IS a
+dependency.** §9B.8 said *"`@nestjs/throttler` is **not** a dependency and there
+is **no global application-level rate limiter** in `angular_v2` today"*, and its
+schedule paragraph said the same about `@nestjs/schedule`. **Both claims are
+false as of `e3ef367`**, and they are corrected inline where they stood.
+
+Shipped: `@nestjs/throttler@^6.7.1` is a dependency;
+`ThrottlerModule.forRoot({…})` is registered in `src/app.module.ts` with
+`ThrottlerGuard` as an `APP_GUARD` beside `JwtAuthGuard`, so the limiter runs
+**before** authentication and covers every route; the three policies are
+`THROTTLE_POLICIES.global` / `.credential` / `.link` in `src/common/throttle.ts`;
+routes tighten themselves with `@Throttle` and exempt themselves with the
+exported `ThrottleSkip`; and `test/unit/throttle/throttler.spec.ts` proves it
+against the real application.
+
+**The per-account gate in `src/auth/throttle.ts` is unchanged and is still
+primary** — the two layers are complementary, not alternatives. The global
+limiter sheds volume by source address; the per-account counter is what stops a
+credential attack against one account, and an address-keyed counter cannot do
+that (§B6 forbids an address-keyed lock precisely because it would lock every
+account behind that address).
+
+**What is still missing is the EDGE limiter in front of PostgREST**, and that
+is a reverse proxy's job (§B6): PostgREST does not rate-limit, and
+`db-pre-request` runs read-only. That gap is real, and it is not the gap §9B.8
+described.
 
 #### 9B.12.3 Two things the plan got right for the wrong reason, and one claim that is simply false
 

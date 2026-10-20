@@ -7,6 +7,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { restoreAuthenticatorPassword } from '../support/cluster.js';
 import { databaseConfig, loadTestEnvironment } from '../support/database.js';
 import { BACKEND_ROOT } from '../support/paths.js';
+import {
+  describePostgrestStartupFailure,
+  POSTGREST_STARTUP_TIMEOUT_MS,
+  sleepSync,
+  waitForPostgrest,
+} from '../support/postgrest-startup.js';
 import { mintToken, parseJsonArray, request } from './support/jwt.js';
 
 /**
@@ -523,9 +529,24 @@ async function startPostgrest(): Promise<() => void> {
 
   // Retained rather than discarded: if PostgREST dies mid-suite, this is the log
   // that says why, and a security suite that swallows it cannot be debugged.
+  // BOTH streams are captured: PostgREST writes some of its lines to stdout and
+  // some to stderr, so a stderr-only capture loses exactly the lines that
+  // explain a failure.
   let log = '';
   child.stderr?.on('data', (chunk: Buffer) => {
     log += chunk.toString('utf8');
+  });
+  child.stdout?.on('data', (chunk: Buffer) => {
+    log += chunk.toString('utf8');
+  });
+
+  // A child that could not be started at all raises an `error` event, and an
+  // unhandled one takes the test run down with an exception that names neither
+  // the binary nor the port. It is captured here, and it reaches the message.
+  let spawnError: string | undefined;
+  child.on('error', (error: Error) => {
+    spawnError = error.message;
+    log += `\n[the child could not be started: ${error.message}]\n`;
   });
 
   const stop = (): void => {
@@ -533,34 +554,42 @@ async function startPostgrest(): Promise<() => void> {
       child.kill('SIGTERM');
       const deadline = Date.now() + 5_000;
       while (child.exitCode === null && Date.now() < deadline) {
-        spawnSync('sleep', ['0.1']);
+        sleepSync(100);
       }
       if (child.exitCode === null) {
         child.kill('SIGKILL');
-        spawnSync('sleep', ['0.2']);
+        sleepSync(200);
       }
     }
     rmSync(directory, { recursive: true, force: true });
   };
 
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
-      throw new Error(`PostgREST exited with ${child.exitCode} before serving:\n${log}`);
-    }
-    try {
-      const response = await fetch(`${baseUrl()}/`, { signal: AbortSignal.timeout(2000) });
-      if (response.status === 200) {
-        return stop;
-      }
-    } catch {
-      // Not listening yet. Retried until the deadline; never swallowed silently.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+  // The shared wait: a generous ceiling and a message that says what the child
+  // was doing. It used to be 30 seconds, which only fires when the machine is
+  // busy — and when it fired, every test in the file was SKIPPED and the run
+  // reported a count that did not add up.
+  const outcome = await waitForPostgrest(baseUrl(), {
+    timeoutMs: POSTGREST_STARTUP_TIMEOUT_MS,
+    childGone: () => child.exitCode !== null || spawnError !== undefined,
+  });
+
+  if (outcome.ready) {
+    return stop;
   }
 
+  // The child is killed BEFORE the error is thrown, so a failed launch leaves
+  // no orphan holding the port.
   stop();
-  throw new Error(`PostgREST did not answer on port ${PROOF_PORT} within 30s:\n${log}`);
+
+  throw new Error(
+    describePostgrestStartupFailure({
+      port: PROOF_PORT,
+      waitedMs: outcome.waitedMs,
+      timeoutMs: POSTGREST_STARTUP_TIMEOUT_MS,
+      child: { exitCode: child.exitCode, signal: child.signalCode, log, spawnError },
+      probe: outcome.probe,
+    }),
+  );
 }
 
 // =============================================================================

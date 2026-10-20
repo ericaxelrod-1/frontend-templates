@@ -7,6 +7,10 @@ import { restoreAuthenticatorPassword } from '../support/cluster.js';
 import { databaseConfig, loadTestEnvironment } from '../support/database.js';
 import { BACKEND_ROOT } from '../support/paths.js';
 import { startPostgrestProcess, type PostgrestProcess } from '../support/postgrest-process.js';
+import {
+  describePostgrestStartupFailure,
+  POSTGREST_STARTUP_TIMEOUT_MS,
+} from '../support/postgrest-startup.js';
 import { mintToken, parseJsonArray, request, sqlStateOf } from './support/jwt.js';
 
 /**
@@ -612,7 +616,11 @@ beforeAll(async () => {
     jwtSecret: PROOF_JWT_SECRET,
   });
 
-  const readyDeadline = Date.now() + 30_000;
+  // The launcher has already waited for the catalogue over HTTP, so this is a
+  // second opinion rather than the readiness check. It keeps the same ceiling as
+  // every other launcher — the 30 seconds it used to carry was tight enough to
+  // trip on a loaded machine, and when it tripped the whole file was SKIPPED.
+  const readyDeadline = Date.now() + POSTGREST_STARTUP_TIMEOUT_MS;
   let ready = false;
   while (Date.now() < readyDeadline) {
     try {
@@ -626,7 +634,15 @@ beforeAll(async () => {
     }
   }
   if (!ready) {
-    throw new Error(`PostgREST did not answer HTTP on ${postgrest.baseUrl} within 30s:\n${postgrest.log()}`);
+    throw new Error(
+      describePostgrestStartupFailure({
+        port: PROOF_PORT,
+        waitedMs: POSTGREST_STARTUP_TIMEOUT_MS,
+        timeoutMs: POSTGREST_STARTUP_TIMEOUT_MS,
+        child: { exitCode: null, signal: null, log: postgrest.log(), spawnError: undefined },
+        probe: { ready: false, answered: undefined },
+      }),
+    );
   }
 }, TIMEOUT);
 

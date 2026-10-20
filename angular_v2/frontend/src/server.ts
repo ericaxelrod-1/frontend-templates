@@ -7,6 +7,7 @@ import {
 import express from 'express';
 import { join } from 'node:path';
 import { DEFAULT_API_ORIGIN, DEFAULT_POSTGREST_ORIGIN, mountApiProxy } from './server/api-proxy';
+import { createCspMiddleware } from './server/csp';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
@@ -23,6 +24,11 @@ mountApiProxy(
   process.env['POSTGREST_ORIGIN'] ?? DEFAULT_POSTGREST_ORIGIN,
   'the PostgREST API layer',
 );
+
+// Content-Security-Policy for all documents and assets served by the application.
+// Installed AFTER mountApiProxy so upstream API responses (/api, /rest) are not
+// injected with document security headers, but BEFORE static files and Angular SSR.
+app.use(createCspMiddleware());
 
 app.use(
   express.static(browserDistFolder, {

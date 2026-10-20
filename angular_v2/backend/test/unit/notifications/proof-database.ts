@@ -53,6 +53,16 @@ export const CONSENT_PROOF_DATABASE = 'consent_proof';
  */
 export const CONSENT_PURGE_PROOF_DATABASE = 'consent_purge_proof';
 
+/**
+ * A fourth, for the administration proof over the two authorization axes.
+ *
+ * The same reason as the others, and one more: this suite WRITES to `groups` and to
+ * `user_groups`, and it must be able to force a cycle attempt and see the database
+ * refuse it. A refused statement is still a statement against real rows, so the
+ * database it runs against has to be one this suite owns.
+ */
+export const AUTHORIZATION_PROOF_DATABASE = 'authorization_proof';
+
 /** The migration/owner role, which owns every table and never receives a request. */
 const OWNING_ROLE = 'app';
 
@@ -133,6 +143,27 @@ export function dropProofDatabase(database: string = PROOF_DATABASE): void {
 export function authenticatorClient(database: string = PROOF_DATABASE): Promise<Client> {
   const env = loadTestEnvironment();
   return connectAs(env.authenticator.user, env.authenticator.password, database);
+}
+
+/**
+ * A client for the migration/owner role — the role that owns every table.
+ *
+ * Offered for exactly one reason: **a fixture must not depend on the control under
+ * test.** A fixture that creates its rows through the boundary as `app_admin` needs
+ * the very grant the suite is asserting, so removing that grant makes the fixture
+ * fail in `beforeAll` and every assertion in the file is SKIPPED rather than failed
+ * — a red exit code wearing eleven green tests, which is the shape this repository
+ * calls a false green (`AGENTS.md` §B8). A fixture row created by the OWNER depends
+ * on nothing the suite is testing, so the assertions that do depend on it go red on
+ * their own.
+ *
+ * The owner is never used to assert anything: it bypasses every policy, so a
+ * refusal it met would be no refusal at all. It creates the rows; the serving roles
+ * are the ones that answer.
+ */
+export function ownerClient(database: string = PROOF_DATABASE): Promise<Client> {
+  const config = loadTestEnvironment().database;
+  return connectAs(config.user, config.password, database);
 }
 
 async function connectAs(user: string, password: string, database: string): Promise<Client> {

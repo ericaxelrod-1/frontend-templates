@@ -1,0 +1,56 @@
+<section class="access" [attr.aria-label]="ariaLabel()">
+  <h3 class="access__title">Effective access — {{ memberLabel() }}</h3>
+  <p class="access__join">
+    A person's access is the JOIN of the two columns below: the rows they may read, and the things they may
+    do. The two are resolved by two different mechanisms and stored in two different places, so neither column
+    is derived from the other — a role grants capability and never scope.
+  </p>
+
+  <div class="access__axes">
+    <section class="axis axis--scope" aria-label="Scope: which rows">
+      <h4 class="axis__title">Scope — which rows</h4>
+      @if (scope(); as readable) {
+        <p class="axis__label">Groups they are in</p>
+        @if (readable.groups.length > 0) {
+          <ul class="axis__list">
+            @for (group of readable.groups; track group) {
+              <li>{{ group }}</li>
+            }
+          </ul>
+        } @else {
+          <p class="axis__none">none</p>
+        }
+
+        <p class="axis__label">Groups whose rows they may read</p>
+        @if (readable.reachable.length > 0) {
+          <ul class="axis__list">
+            @for (group of readable.reachable; track group) {
+              <li>{{ group }}</li>
+            }
+          </ul>
+        } @else {
+          <p class="axis__none">none</p>
+        }
+      } @else {
+        <p class="axis__none">not readable for this role</p>
+      }
+    </section>
+
+    <section class="axis axis--capability" aria-label="Capability: which objects">
+      <h4 class="axis__title">Capability — which objects</h4>
+      @if (capabilities(); as held) {
+        @if (held.length > 0) {
+          <ul class="axis__list">
+            @for (capability of held; track capability) {
+              <li><code>{{ capability }}</code></li>
+            }
+          </ul>
+        } @else {
+          <p class="axis__none">none</p>
+        }
+      } @else {
+        <p class="axis__none">not readable for this role</p>
+      }
+    </section>
+  </div>
+</section>

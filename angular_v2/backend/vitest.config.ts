@@ -8,5 +8,7 @@ export default defineConfig({
     // passing test. Vitest captures console output by default, which would make
     // those reports invisible; a debt list nobody sees is a silent one.
     disableConsoleIntercept: true,
+    fileParallelism: false,
+    testTimeout: 30_000,
   },
 });

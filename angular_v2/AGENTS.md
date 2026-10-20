@@ -492,45 +492,6 @@ CREATE POLICY row_scope ON projects USING (
   caller-supplied, `current_user` is not, and a member forging `"role":"app_admin"`
   into their own validly-signed token gets zero rows. *(In a policy `current_user` is
   right; inside a `SECURITY DEFINER` function it is wrong. See §Capability.)*
-
-- **Eleven tables in `angular/docs/DATABASE_SCHEMA.md` are SQLite residue and must
-  NOT be recreated.** That document is the SQLite design — its own line 35 says "a
-  clear structure primarily for SQLite" — and it is the single most likely thing to
-  pattern-match a migration off, because it reads like a specification. Creating these
-  would be §2.1 exactly: a populated table that reads like a working mechanism and is
-  not one.
-
-  | Retired table(s) | Why |
-  |---|---|
-  | `rls_rules`, `rls_join_paths`, `rls_join_conditions`, `rls_scope_templates` | SQLite has no row-level security, so tenant isolation meant keeping the predicate **as data** and having the *application* append it to every query — enforcement in application code, which is the design the previous ~2,400-line implementation used and enforced nothing. PostgreSQL enforces this in `0001_rls_foundation.sql`. |
-  | `user_permissions`, `group_permissions` | Both carry `is_granted`, and `is_granted = false` **is** a deny. This section forbids denies, per-user grants and precedence rules. |
-  | `ui_components`, `frontend_routes`, `api_endpoints` + their four permission joins, `cache_components`, `cache_routes`, `cache_endpoints` | The same mechanism aimed at the frontend: "which route and which component need which permission". Table grants and real route guards replaced it. |
-  | `resources` | Empty in the document itself; `permissions.resource_name` carries it. |
-
-  **The argument in one line: a stored predicate must be interpreted by something.**
-  If the *application* interprets it, the application is the enforcement point (§B2's
-  prohibition). If the *database* interprets it, the database already had RLS and the
-  table was never needed. There is no third option — which is why **no new group ever
-  needs a new rule**, and why that is forced rather than chosen: onboarding a customer
-  automatically, with no deploy, requires the policy to be group-agnostic, and
-  `org_closure` is what makes it so.
-
-  **A row in `rls_rules` is a *claim about what enforces a tenant's data***, which is
-  why it must not be mockable either. The legacy RLS pages are not thereby abandoned:
-  they become the surfaces that actually change enforcement — group membership (scope)
-  and role assignment (capability) — plus a read-only inspector over `pg_policies`.
-
-- **`migration:revert` reverts EVERYTHING, not one step.** `node scripts/migrate.ts
-  down` unwinds the whole ledger back to `0001`. It is not the inverse of a single
-  `APPLY` line, and using it to undo one bad migration destroys every migration after
-  it. Worse, the result is not re-appliable on its own: reverting drops columns and
-  tables that later data references, so the next `migration:run` fails FK validation
-  (measured: `0008` refusing `user_roles.user_id` orphans that a migration cannot count,
-  because it runs as the owner of a FORCE-RLS table and reads zero rows).
-  **To undo one migration, drop its objects by hand** and delete its row from
-  `migrations`. To recover from a botched revert, the supported path is
-  `dropdb app_dev && createdb -O app app_dev && npm run db:seed`.
-
 - **The scoping subquery is hoisted once per statement — a `hashed SubPlan`, not an
   `InitPlan`.** Measured `loops = 1` at 305 and at 3305 rows; a correlated variant
   gives `loops = 305`. **Uncorrelatedness buys it, not the node name** — `x IN
@@ -613,6 +574,28 @@ CREATE POLICY row_scope ON projects USING (
     | **The hierarchy** | `groups` | simple `PRIMARY KEY (id)` | not scoped by `group_id` — it *is* the group; self-FK is admin-only-reachable |
     | **Unscoped** | `users`, `actions`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_groups`, `refresh_tokens`, `login_attempts` | simple primary keys | global reference data |
     | **DERIVED** | `email_messages` | simple `PRIMARY KEY (id)` | **has no `group_id` at all** — scope is another table's membership, so an FK to the referenced USER is expected and permitted only at a table members cannot write to |
+    | **ADDRESSED** | `admin_notifications` | simple `PRIMARY KEY (id)` | **the only FK is `user_id`, naming the READER not the payload**; the source row's own key is held in `source_ref` as `text` with **no FK at all** |
+
+  - **ADDRESSED — the fifth category, and it is `admin_notifications`.** A notification
+    is a *rendering* of a row in some other table, so it has no `group_id` (like
+    DERIVED) and its scope is not a membership at all but **who it is for**: an
+    `audience` of `all` (with `user_id` naming one person, or NULL for a broadcast) or
+    `administrators`. The policy is one expression with both branches in it.
+    - **Do not add a `group_id` to make it look like the group-scoped tables.** There is
+      no group dimension in "is this alert for you", and a group a user belongs to is
+      not the same set as the users an administrator may see.
+    - **Do not add an FK to the source table.** Referential-integrity checks bypass RLS
+      and fail OPEN, so an FK to a source the reader may not see is an existence oracle
+      (`23503` against success). `source_ref` is the source's own key held as `text`,
+      which also lets a source whose key is not a UUID be materialised with no schema
+      change here.
+    - **The source's payload goes in `data jsonb`, never as columns.** A generic table
+      with an IP-shaped set of columns is one source's table with extra steps.
+    - **Its identity is `UNIQUE NULLS NOT DISTINCT (source, source_ref, user_id)`.** A
+      default `UNIQUE` treats a NULL `user_id` as distinct from every other NULL, so
+      every system-wide notification becomes insertable again on every pass — and the
+      `ON CONFLICT DO NOTHING` that stops a dismissal being resurrected silently stops
+      matching at all.
 
   - **DERIVED — what the category means, because it is the one an agent will get
     wrong by pattern-matching the other three.** A derived row's scope is resolved
@@ -727,9 +710,14 @@ GRANT  SELECT (id, group_id, name) TO app_member;       -- `secret` unreadable
   **its own membership rows and nothing else** (the policy says `user_id = actor()`),
   and **`app_admin` reads the complete `user_groups` table** — every user, in every
   group. That is the price of the superset on this one table, and it is accepted
-  rather than hidden. Writes: **no serving role has `INSERT`/`UPDATE`/`DELETE` on
-  `user_groups`, `app_admin` included** — the owner role does. That single omission
-  is the control that fails **open** if forgotten.
+  rather than hidden. Writes: **`app_admin` holds `INSERT`/`DELETE` on `user_groups`**
+  — that is the administration of the scope axis, and it is what makes adding and
+  removing a member possible at all (`0031_admin_membership_write.sql`). **No other
+  serving role holds any write verb on it**, `app_member` included: a member who can
+  write their own membership row widens their own scope in one statement, and the
+  scope policy honours it because it reads the table the caller just wrote. That
+  omission is the control that fails **open** if forgotten, and it is asserted from
+  the live catalog in `test/unit/authorization/admin-write-path.spec.ts`.
 
 ### Capability — object-level security over a permission table
 

@@ -185,36 +185,57 @@ code increments, so a dashboard showing a non-zero count is showing seed data.
 
 ## Transport headers
 
-**Neither project sets `Content-Security-Policy`.** No `helmet`, no
-`@fastify/helmet`, no `<meta http-equiv>`, no `contentSecurityPolicy` block in
-`frontend/angular.json`. That is the whole of it, and it is stated here because it
-is the kind of absence a deployer discovers in an audit rather than in a README.
+**Content-Security-Policy is set by the application on the SSR path** (`frontend/src/server.ts`),
+because the SSR server is the single process that serves HTML. In a static hosting
+deployment where no SSR process runs, the reverse proxy sets it instead.
 
-**Where it belongs is the layer in front of the stack.** All three processes are
-plain HTTP on loopback behind a TLS terminator, so the reverse proxy is already
-the place every other transport decision is made — TLS, `NG_TRUST_PROXY_HEADERS`,
-rate limiting on the PostgREST path. A policy header added there costs this
-repository nothing and survives a rebuild; a policy header added in application
-code is duplicated per runtime and can drift between the three processes.
+### The policy and what it enforces
 
-What the template owes an operator is therefore the *statement*, and
-[`deployment-guide.md`](./deployment-guide.md) carries it beside the nginx block
-so the two are read together. Two properties of a policy for this application are
-worth naming before one is written, because both are easy to get wrong:
+The assembled policy (`frontend/src/server/csp.ts`) establishes:
+- `default-src 'self'` — fallback restriction for unspecified resource types.
+- `script-src 'self' 'unsafe-inline' 'unsafe-eval'` — permits same-origin bundles,
+  the critical CSS loader script, and dynamic consent tag evaluation. Additional vendor
+  origins are added via `CSP_ALLOWED_ORIGINS` or `CSP_SCRIPT_SRC`.
+- `style-src 'self' 'unsafe-inline'` — permits same-origin stylesheets, Angular
+  component styles, and critical-CSS inlining. Additional origins added via `CSP_STYLE_SRC`.
+- `img-src 'self' data:` — same-origin images, SVG/data URIs, and configured vendor tracking pixels (`CSP_ALLOWED_ORIGINS` / `CSP_IMG_SRC`).
+- `font-src 'self'` — same-origin fonts. Typography uses a system font stack (`styles.scss`), so no external font requests are made by default. Additional font hosts can be added via `CSP_FONT_SRC`.
+- `connect-src 'self'` — same-origin calls to the relative API paths `/api` and `/rest`, plus configured vendor telemetry endpoints (`CSP_ALLOWED_ORIGINS` / `CSP_CONNECT_SRC`).
+- `frame-src 'self'` — same-origin iframes plus configured vendor frame origins (`CSP_ALLOWED_ORIGINS` / `CSP_FRAME_SRC`).
+- `object-src 'none'` — blocks legacy plugin execution (Flash, Java).
+- `base-uri 'self'` — prevents `<base>` tag injection.
+- `form-action 'self'` — restricts form submission endpoints.
+- `frame-ancestors 'none'` — prevents clickjacking and embedding inside framing contexts.
 
-- **`frame-ancestors`, not `X-Frame-Options`,** for clickjacking. They are not
-  equivalent and the legacy header does not cover nested frames.
-- **`connect-src` must include the same-origin prefixes the application actually
-  uses** — `/api` and `/rest`, both relative. A policy that names `http://127.0.0.1:3000`
-  in `connect-src` because that is what the SSR process proxies to will break every
-  browser request, because the browser never sees that host: it sees
-  `https://your-domain`. See §`NG_ALLOWED_HOSTS` in
-  [`deployment-guide.md`](./deployment-guide.md) for the same trap on the host
-  allowlist.
+### The tension between strict CSP and consent tags
 
-The reverse proxy should also send `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`
-and `Referrer-Policy` — none of which the application can usefully set, because all
-three are meaningless on a plain-HTTP loopback listener.
+**The consent tag mechanism and a strict CSP are in fundamental tension.**
+`consent_tags.snippet` stores vendor tracking snippets verbatim in the database,
+and `SnippetInjector` executes them dynamically in the client browser using DOM
+injection and `globalEval()`. Furthermore, Angular components emit styles inline,
+and `@angular/ssr`'s Beasties inlines critical styles and a bootstrap script into
+the HTML shell.
+
+A policy that strictly forbids `'unsafe-inline'` and `'unsafe-eval'` breaks the tag
+mechanism that the consent feature exists to support, as well as Angular's styling.
+Treating `'unsafe-inline'` as a temporary omission or pretending a policy with
+`unsafe-inline` provides strong XSS mitigation would be theatre. The policy shipped
+acknowledges this reality: it provides strict baseline directives where possible
+(`object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`), makes origin
+expansion explicit and configurable, and documents the inherent trade-off.
+
+### Header ownership and reverse proxy
+
+Two places setting the same header creates a duplicate mechanism (§2.4):
+- **When using SSR (the default):** the application sets the header. Nginx should
+  **not** add `Content-Security-Policy`, as doing so causes the browser to enforce
+  the intersection of both policies and creates configuration drift.
+- **When using static hosting:** Nginx serves `index.html` directly from disk with
+  no Node process running. Nginx must therefore set the `Content-Security-Policy` header.
+
+The reverse proxy terminators should still set `Strict-Transport-Security`,
+`X-Content-Type-Options: nosniff`, and `Referrer-Policy`, which cannot be usefully
+set over plain-HTTP loopback.
 
 ---
 

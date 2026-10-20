@@ -1,0 +1,118 @@
+-- The administration the authorization model depends on: the ADMIN half of the
+-- scope axis.
+--
+-- Target: PostgreSQL 18+, verified on 18.4.
+--
+-- Apply as the migration/owner role, the same way every other migration is applied.
+--
+-- =============================================================================
+-- THE GAP THIS CLOSES
+-- =============================================================================
+-- `groups` is writable by `app_admin` (`0001:993`), `roles`, `role_permissions` and
+-- `user_roles` are writable by `app_admin` (`0001:1007`), and `user_groups` is NOT
+-- (`0001:1009-1019`). A group is therefore administrable and a membership is not:
+-- there is no path, through the API, by which an administrator can put a person into
+-- a group or take them out of one.
+--
+-- The grant that would close it EXISTS, and it is not owned by a migration:
+-- `database/seed.ts` `grantSeedAccess()` runs
+-- `GRANT SELECT, INSERT, UPDATE, DELETE ON user_roles, user_groups TO app_admin`
+-- as seed-time provisioning, and its own comment calls that "a production hardening
+-- step that needs revoking". So on a seeded database the capability is there, and on
+-- a migrations-only database it is not — and an operator who follows the seed's own
+-- hardening advice loses it. `0008:160-171` records the same asymmetry for the
+-- `users` cascade.
+--
+-- This file makes the grant a property of the SCHEMA rather than of a side effect of
+-- provisioning, and states the invariant that matters next to it.
+--
+-- =============================================================================
+-- WHY THE GRANT IS SAFE, AND WHY IT IS THE ONLY ONE
+-- =============================================================================
+-- The omission `0001` documents is real and its reason is not a preference:
+--
+--   "a member who can write their own membership row widens their own scope in one
+--    statement, and the scope policy is happy to honour it, because the policy reads
+--    the table the caller just wrote"
+--
+-- That is why the grant below names `app_admin` and ONLY `app_admin`, and why the
+-- revokes that follow it are not decoration: they are the control, written where the
+-- control lives.
+--
+--   * `app_member` and `app_anon` hold NO write verb on `user_groups`, before and
+--     after this file. The `REVOKE` states the invariant rather than assuming it,
+--     because the seed grants `INSERT, UPDATE, DELETE` to `app_admin` only, and a
+--     future grant to a serving role would otherwise be a widening nobody noticed.
+--   * `app_admin` is the SUPERSET PRINCIPAL, not a bypass (`0001:883-889`): the
+--     `row_scope` policy on every scoped table admits it by `current_user`, so it
+--     already reads every row of every group. Being able to add a membership row
+--     therefore grants it no row it did not already have. It is the administration of
+--     the scope axis, not a second way around it.
+--   * `INSERT` and `DELETE` only, and not `UPDATE`. A membership is ADDED or
+--     REMOVED; there is nothing to edit about the pair `(user_id, group_id)`, and
+--     `UPDATE` on it is a delete and an insert wearing a third verb. The seed's
+--     blanket grant also conveys `UPDATE`; this file does not add it, and does not
+--     take it away either, because taking a verb away from the superset principal is
+--     not this file's business and `0001` grants `app_admin` the full verb set on
+--     every other table it administers.
+--
+-- The policy is already the one the write path expects. `user_groups` carries
+-- `row_scope` (`0001:951`):
+--
+--     USING (current_user = 'app_admin' OR user_id = authz.actor())
+--
+-- with no `WITH CHECK`, so Postgres reuses `USING` for the INSERT and the admin
+-- branch admits any membership row the administrator writes. Nothing here widens
+-- the policy: the grant and the policy are the two halves of one mechanism, and both
+-- were needed. Before this file the policy's admin branch had nothing to admit,
+-- because no serving role held the verb.
+--
+-- WHAT THIS DOES NOT DO. It does not create a per-user capability, it does not let
+-- a member write their own membership, and it does not add a table in which a group
+-- and a role appear on one row. Scope is RLS and capability is OLS, and the two axes
+-- meet nowhere (`AGENTS.md` §B2, ADR-0023).
+--
+-- =============================================================================
+-- THE WRITE PATH THIS OPENS
+-- =============================================================================
+-- PostgREST, with the administrator's own `app_admin` token — the same path every
+-- other administration write uses (`groups`, `roles`, `role_permissions`,
+-- `user_roles`). The thin Nest app is not involved: `AGENTS.md` §B1 says PostgREST
+-- serves base tables and that a controller must not be added for anything
+-- expressible as CRUD over a table, and a membership row is exactly that.
+--
+-- `POST /user_groups` with `{ user_id, group_id }` adds one, and
+-- `DELETE /user_groups?user_id=eq…&group_id=eq…` removes one. The table has a
+-- composite primary key, so the delete is filtered on both columns.
+--
+-- =============================================================================
+-- THE GRANTS
+-- =============================================================================
+-- The administration of the scope axis. The superset principal only.
+--
+-- NOT `REVOKE ALL` first, and the reason is a live one: the scope policy reads
+-- `user_groups` with the QUERYING role's privileges, so a member with no `SELECT`
+-- on this table cannot have a scoped read evaluated at all — every insert, select
+-- and update of a scoped table dies with `permission denied for table
+-- user_groups`. `0001:1009-1019` grants that `SELECT` to every serving role for
+-- exactly that reason, and this file must not take it away.
+GRANT INSERT, DELETE ON user_groups TO app_admin;
+
+-- The invariant, stated where it is enforced rather than left to a comment: no
+-- serving role other than the superset principal may write a membership row, because
+-- a member who can write one widens their own scope in a single statement.
+REVOKE INSERT, UPDATE, DELETE ON user_groups FROM app_member, app_anon;
+
+-- =============================================================================
+-- SCHEMA CACHE
+-- =============================================================================
+-- The grants above are not a schema change, so PostgREST's cache does not need to
+-- know about them; the notification is here because the file is a migration and
+-- every migration ends with one, and because a role's privileges ARE part of what
+-- `openapi-mode = "ignore-privileges"` publishes.
+NOTIFY pgrst, 'reload schema';
+
+-- DOWN
+-- =============================================================================
+-- See database/migrations/0031_admin_membership_write.down.sql. Kept as a separate
+-- file so this one stays append-only for the runner that applies it.

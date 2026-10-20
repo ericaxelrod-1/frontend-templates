@@ -450,6 +450,31 @@ loading spinner over an empty shell.
 
 **Cost:** a resident Node process. See *Memory tuning*.
 
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # In SSR mode, the Node Express server (port 4000) serves HTML, static
+    # assets from dist/frontend/browser, and proxies /api and /rest via api-proxy.ts.
+    # The application itself sets the Content-Security-Policy header on HTML responses.
+    # Do NOT duplicate the Content-Security-Policy header here (§2.4: one mechanism);
+    # Nginx adds only transport headers meaningful at the TLS termination edge.
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+}
+```
+
 ### B. Static hosting
 
 Point a static server at `frontend/dist/frontend/browser`, with a fallback to
@@ -492,9 +517,11 @@ server {
         limit_req zone=api burst=20 nodelay;
     }
 
-    # See docs/security.md §Transport headers: nothing in this template sets a
-    # Content-Security-Policy, and the proxy is where it belongs.
-    add_header Content-Security-Policy "default-src 'self'; frame-ancestors 'none'" always;
+    # In static hosting, no Node SSR process runs, so Nginx is the server emitting
+    # HTML and owns setting the Content-Security-Policy header.
+    # The policy must permit 'unsafe-inline' for Angular component styles and Beasties
+    # critical CSS, and 'unsafe-eval' for consent tag execution.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 }
@@ -728,6 +755,8 @@ The full key set, and where the values come from:
 | `APP_BASE_URL` | **yes, in every mode** | The application's public origin. Every email template carries an absolute link, so there is no default to fall back to. Must be `https:` in production. |
 | `NG_ALLOWED_HOSTS` | **yes, in production** | Comma-separated allowed hostnames for Angular SSR (e.g. `localhost,127.0.0.1,app.example.com`). Configured in `backend/.env.production` (SSR inherits it via `prod.mjs`). **Adds to** the `angular.json` allowlist rather than replacing it — see below. |
 | `NG_TRUST_PROXY_HEADERS` | **yes, behind a reverse proxy** | Comma-separated proxy headers Angular SSR trusts (`x-forwarded-proto,x-forwarded-host,x-forwarded-port`). Configured in `backend/.env.production`. Allows SSR to detect HTTPS behind TLS termination. |
+| `CSP_ALLOWED_ORIGINS` | no (empty) | Comma- or space-separated allowed origins added to `script-src`, `connect-src`, `img-src`, and `frame-src` for third-party consent tags (e.g. `https://www.googletagmanager.com https://*.google-analytics.com`). Inherited by SSR via launcher child env. |
+| `CONTENT_SECURITY_POLICY` | no (assembled) | Complete verbatim override for the Content-Security-Policy header. Directive-specific additions also supported: `CSP_SCRIPT_SRC`, `CSP_CONNECT_SRC`, `CSP_STYLE_SRC`, `CSP_FONT_SRC`, `CSP_IMG_SRC`, `CSP_FRAME_SRC`. |
 | `EMAIL_HOST` `EMAIL_PORT` `EMAIL_USER` `EMAIL_PASSWORD` `EMAIL_FROM` | **yes, in production** | The SMTP submission endpoint. Required with no defaults and **not read at all** outside production, so no mode needs a credential it cannot use. |
 | `EMAIL_SECURE` | no (from the port) | Implicit TLS. Defaults to `true` on port 465, `false` otherwise (STARTTLS on 587). |
 | `APP_NAME` | no (the `APP_BASE_URL` hostname) | The product name used in message subjects. |
@@ -849,14 +878,16 @@ line before trusting one.
   database are fixtures. Detection, scoring and the alert pipeline are owed.
   <!-- gap:telemetry-producers -->
 
-- **No CSP headers.** Nothing in either project sets `Content-Security-Policy`:
-  no `helmet`, no `@fastify/helmet`, no `<meta http-equiv>`, no
-  `contentSecurityPolicy` block in `frontend/angular.json`. **The gap belongs in
-  the layer in front of the stack, and setting it there is the normal answer** —
-  an operator's reverse proxy can add it without touching this repository. What is
-  a gap here is that the template does not say so: a deployer who copies the
-  nginx block below verbatim gets no policy at all and finds out in an audit.
-  [`security.md`](./security.md) §Transport headers. <!-- gap:csp -->
+- **No strict CSP.** The SSR application sets a `Content-Security-Policy`
+  header (`frontend/src/server.ts`), but it permits inline scripts and styles
+  (`'unsafe-inline'`) and dynamic script evaluation (`'unsafe-eval'`). A strict
+  policy that forbids inline scripts cannot satisfy the consent tag injector,
+  which executes vendor snippets verbatim from `consent_tags.snippet`, or
+  Angular's critical CSS inlining (`@angular/ssr` Beasties). The tag mechanism
+  and a strict CSP are in fundamental tension: a policy strict enough to prevent
+  XSS breaks arbitrary third-party tag injection. The policy is configurable via
+  `CSP_ALLOWED_ORIGINS` and directive-specific keys.
+  [`security.md`](./security.md) §Transport headers. <!-- gap:strict-csp -->
 
 - **No cookie is set or read, and no tracker is loaded.** The consent control
   shipped — a universal widget on public pages, a settings surface inside the

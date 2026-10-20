@@ -1,0 +1,185 @@
+<mat-card class="page">
+  <mat-card-header>
+    <mat-card-title>Groups — the scope axis</mat-card-title>
+    <mat-card-subtitle>{{ summary() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <p class="axis-note">
+      A group is SCOPE: it decides which ROWS a person may read. It is not capability — a role decides what a
+      person may DO, and the two are stored apart and never derived from one another. Moving a group under
+      one of its own descendants would close a loop in the hierarchy; the database refuses that, and the
+      refusal is shown here rather than pre-empted.
+    </p>
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading the group tree" />
+    }
+
+    @if (scopeFailure(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+    @if (capabilityFailure(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+    @if (failureReason(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+
+    <h3 class="section__title">The group tree</h3>
+    <ul class="tree">
+      @for (row of tree(); track row.id) {
+        <li>
+          <button
+            type="button"
+            class="tree__row"
+            [class.tree__row--selected]="row.id === selectedGroupId()"
+            (click)="selectGroup(row.id)"
+          >
+            <span class="tree__name" [style.padding-left.rem]="row.indentRem">{{ row.name }}</span>
+            <span class="tree__meta">under {{ row.parentLabel }}</span>
+            <span class="tree__meta">{{ row.memberCount }} members</span>
+            @if (row.isSystem) {
+              <span class="tree__system">system group</span>
+            }
+          </button>
+        </li>
+      } @empty {
+        <li class="empty">No groups were returned to this role.</li>
+      }
+    </ul>
+
+    @if (selectedGroup(); as group) {
+      <h3 class="section__title">{{ group.name }}</h3>
+
+      @if (canAdminister()) {
+        <div class="panel">
+          <div class="field">
+            <label class="field__label" for="group-rename">Rename</label>
+            <input
+              id="group-rename"
+              class="field__input"
+              type="text"
+              [value]="renameValue()"
+              (input)="onRename($event)"
+            />
+            <button type="button" class="button" [disabled]="busy()" (click)="renameSelectedGroup()">
+              Rename
+            </button>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="group-move">Move under</label>
+            <select
+              id="group-move"
+              class="field__select"
+              [value]="moveParentId()"
+              (change)="onMoveParent($event)"
+            >
+              <option value="">choose a parent group</option>
+              @for (candidate of tree(); track candidate.id) {
+                <option [value]="candidate.id">{{ candidate.name }}</option>
+              }
+            </select>
+            <button type="button" class="button" [disabled]="busy()" (click)="moveSelectedGroup()">
+              Move
+            </button>
+          </div>
+        </div>
+      }
+
+      <h3 class="section__title">Members</h3>
+      <p class="axis-note">
+        The roles held by this group's MEMBERS — derived from the membership, not a property of the group: a
+        role is held by a person, and it grants capability and never scope.
+      </p>
+      @if (selectedGroupRoles().length > 0) {
+        <ul class="capabilities">
+          @for (role of selectedGroupRoles(); track role.id) {
+            <li class="capability">{{ role.name }}</li>
+          }
+        </ul>
+      } @else {
+        <p class="empty">no member of this group holds a role</p>
+      }
+
+      <ul class="members">
+        @for (member of members(); track member.id) {
+          <li class="member" [class.member--selected]="member.id === selectedUserId()">
+            <button type="button" class="button" (click)="selectMember(member.id)">
+              {{ member.username }}
+            </button>
+            <span class="tree__meta">{{ member.email }}</span>
+            @if (canAdminister()) {
+              <button type="button" class="button" [disabled]="busy()" (click)="removeMember(member.id)">
+                Remove
+              </button>
+            }
+          </li>
+        } @empty {
+          <li class="empty">This group has no members.</li>
+        }
+      </ul>
+
+      @if (canAdminister()) {
+        <div class="field">
+          <label class="field__label" for="group-add-member">Add a member</label>
+          <select
+            id="group-add-member"
+            class="field__select"
+            [value]="memberToAdd()"
+            (change)="onMemberToAdd($event)"
+          >
+            <option value="">choose a person</option>
+            @for (candidate of candidates(); track candidate.id) {
+              <option [value]="candidate.id">{{ candidate.username }}</option>
+            }
+          </select>
+          <button type="button" class="button" [disabled]="busy()" (click)="addMember()">Add</button>
+        </div>
+      }
+    } @else {
+      <p class="empty">Select a group to see its members and to administer it.</p>
+    }
+
+    @if (canAdminister()) {
+      <h3 class="section__title">Create a group</h3>
+      <div class="field">
+        <label class="field__label" for="group-new-name">Name</label>
+        <input
+          id="group-new-name"
+          class="field__input"
+          type="text"
+          [value]="newGroupName()"
+          (input)="onNewGroupName($event)"
+        />
+        <label class="field__label" for="group-new-parent">Under</label>
+        <select
+          id="group-new-parent"
+          class="field__select"
+          [value]="newGroupParentId()"
+          (change)="onNewGroupParent($event)"
+        >
+          <option value="">no parent — a root group</option>
+          @for (candidate of tree(); track candidate.id) {
+            <option [value]="candidate.id">{{ candidate.name }}</option>
+          }
+        </select>
+        <button type="button" class="button" [disabled]="busy()" (click)="createGroup()">Create</button>
+      </div>
+    }
+
+    @if (selectedMemberName(); as memberName) {
+      <h3 class="section__title">Effective access</h3>
+      @if (accessSettled()) {
+        <app-member-access
+          [memberLabel]="memberName"
+          [scope]="selectedMemberScope()"
+          [capabilities]="selectedMemberCapabilities()"
+        />
+      } @else {
+        <mat-progress-bar mode="indeterminate" aria-label="Loading effective access" />
+      }
+    }
+  </mat-card-content>
+</mat-card>

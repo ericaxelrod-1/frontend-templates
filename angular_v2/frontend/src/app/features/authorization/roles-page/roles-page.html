@@ -1,0 +1,190 @@
+<mat-card class="page">
+  <mat-card-header>
+    <mat-card-title>Roles — the capability axis</mat-card-title>
+    <mat-card-subtitle>{{ summary() }}</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <p class="axis-note">
+      A role is CAPABILITY: it decides what a person may DO — which tables, which verbs, which pages. It is not
+      scope, and it grants none: a role never widens the rows a person can read, and nothing on this page
+      joins the two axes into one answer.
+    </p>
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading roles" />
+    }
+
+    @if (scopeFailure(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+    @if (capabilityFailure(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+    @if (failureReason(); as reason) {
+      <p class="notice notice--error" role="alert">{{ reason }}</p>
+    }
+
+    <h3 class="section__title">The roles</h3>
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Role</th>
+          <th scope="col">Inherits from</th>
+          <th scope="col">Carries directly</th>
+          <th scope="col">May do, inherited included</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (view of roleTable(); track view.role.id) {
+          <tr>
+            <th scope="row">
+              {{ view.role.name }}
+              @if (view.role.is_system_role) {
+                <span class="capability">system role</span>
+              }
+            </th>
+            <td>{{ view.parentLabel }}</td>
+            <td>
+              @if (view.own.length > 0) {
+                <ul class="capabilities">
+                  @for (capability of view.own; track capability) {
+                    <li class="capability"><code>{{ capability }}</code></li>
+                  }
+                </ul>
+              } @else {
+                <span class="empty">none directly</span>
+              }
+            </td>
+            <td>
+              @if (view.effective.length > 0) {
+                <ul class="capabilities">
+                  @for (capability of view.effective; track capability) {
+                    <li class="capability"><code>{{ capability }}</code></li>
+                  }
+                </ul>
+              } @else {
+                <span class="empty">none</span>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td class="empty">No roles were returned to this role.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <h3 class="section__title">The roles a group holds</h3>
+    <p class="axis-note">
+      DERIVED from the group's MEMBERSHIP: nothing associates a role with a group, and nothing may — a role
+      is held by a person. Assigning a role to a person who is in the group is what changes the group's
+      derived set.
+    </p>
+
+    <div class="field">
+      <label class="field__label" for="roles-group">Group</label>
+      <select id="roles-group" class="field__select" [value]="selectedGroupId() ?? ''" (change)="onGroupChange($event)">
+        <option value="">choose a group</option>
+        @for (group of groups(); track group.id) {
+          <option [value]="group.id">{{ group.name }}</option>
+        }
+      </select>
+    </div>
+
+    @if (selectedGroup(); as group) {
+      <div class="panel">
+        <p class="field__label">Roles held by the members of {{ group.name }}</p>
+        @if (groupRoles().length > 0) {
+          <ul class="capabilities">
+            @for (role of groupRoles(); track role.id) {
+              <li class="capability">{{ role.name }}</li>
+            }
+          </ul>
+        } @else {
+          <p class="empty">no member of this group holds a role</p>
+        }
+
+        <p class="field__label">Capabilities held by the members of {{ group.name }}</p>
+        @if (groupCapabilitySet().length > 0) {
+          <ul class="capabilities">
+            @for (capability of groupCapabilitySet(); track capability) {
+              <li class="capability"><code>{{ capability }}</code></li>
+            }
+          </ul>
+        } @else {
+          <p class="empty">none</p>
+        }
+      </div>
+
+      <h3 class="section__title">Members of {{ group.name }}</h3>
+      @if (canAdminister()) {
+        <div class="field">
+          <label class="field__label" for="roles-assign">Role to assign</label>
+          <select
+            id="roles-assign"
+            class="field__select"
+            [value]="roleToAssign()"
+            (change)="onRoleToAssign($event)"
+          >
+            <option value="">choose a role</option>
+            @for (view of roleTable(); track view.role.id) {
+              <option [value]="view.role.id">{{ view.role.name }}</option>
+            }
+          </select>
+        </div>
+      }
+
+      <ul class="members">
+        @for (row of members(); track row.user.id) {
+          <li class="member" [class.member--selected]="row.user.id === selectedUserId()">
+            <button type="button" class="button" (click)="selectMember(row.user.id)">
+              {{ row.user.username }}
+            </button>
+            <span class="field__label">holds</span>
+            @if (row.roles.length > 0) {
+              @for (role of row.roles; track role.id) {
+                <span class="capability">{{ role.name }}</span>
+                @if (canAdminister()) {
+                  <button
+                    type="button"
+                    class="button"
+                    [disabled]="busy()"
+                    (click)="revokeRole(row.user.id, role.id)"
+                  >
+                    Revoke
+                  </button>
+                }
+              }
+            } @else {
+              <span class="empty">no role</span>
+            }
+            @if (canAdminister()) {
+              <button type="button" class="button" [disabled]="busy()" (click)="assignRole(row.user.id)">
+                Assign
+              </button>
+            }
+          </li>
+        } @empty {
+          <li class="empty">This group has no members.</li>
+        }
+      </ul>
+    } @else {
+      <p class="empty">Choose a group to see the roles its members hold.</p>
+    }
+
+    @if (selectedMemberName(); as memberName) {
+      <h3 class="section__title">Effective access</h3>
+      @if (accessSettled()) {
+        <app-member-access
+          [memberLabel]="memberName"
+          [scope]="selectedMemberScope()"
+          [capabilities]="selectedMemberCapabilities()"
+        />
+      } @else {
+        <mat-progress-bar mode="indeterminate" aria-label="Loading effective access" />
+      }
+    }
+  </mat-card-content>
+</mat-card>

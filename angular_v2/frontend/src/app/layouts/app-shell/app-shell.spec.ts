@@ -124,6 +124,8 @@ describe('AppShell', () => {
     expect(hrefs()).toEqual([
       '/profile',
       '/users',
+      '/admin/groups',
+      '/admin/roles',
       '/admin/security-alerts',
       '/admin/ip-reputation',
       '/admin/pattern-detection',
@@ -141,6 +143,8 @@ describe('AppShell', () => {
     // ...and still real routes, because a hidden link is not access control and the
     // database is the authority (AGENTS.md §F7).
     expect(pagePaths(routes)).toContain('/users');
+    expect(pagePaths(routes)).toContain('/admin/groups');
+    expect(pagePaths(routes)).toContain('/admin/roles');
     expect(pagePaths(routes)).toContain('/admin/security-alerts');
     expect(pagePaths(routes)).toContain('/admin/ip-reputation');
     expect(pagePaths(routes)).toContain('/admin/pattern-detection');

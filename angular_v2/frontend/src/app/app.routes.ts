@@ -85,6 +85,24 @@ export const routes: Routes = [
           import('./features/users/users-page/users-page').then((m) => m.UsersPage),
       },
       {
+        // The two administration surfaces for the authorization model: `groups` is the
+        // SCOPE axis (which rows a person may read) and `roles` is the CAPABILITY axis
+        // (what a person may do). They are two pages rather than one because they
+        // answer two different questions about two different tables, and because the
+        // two axes must never be shown as one — a role grants capability and never
+        // scope (AGENTS.md §B2, ADR-0023).
+        path: 'admin/groups',
+        title: 'Groups',
+        loadComponent: () =>
+          import('./features/authorization/groups-page/groups-page').then((m) => m.GroupsPage),
+      },
+      {
+        path: 'admin/roles',
+        title: 'Roles',
+        loadComponent: () =>
+          import('./features/authorization/roles-page/roles-page').then((m) => m.RolesPage),
+      },
+      {
         // The route keeps its name and its place — `/admin/security-alerts` is where
         // operators are sent — but the component behind it is the GENERIC panel over
         // `admin_notifications`, in `features/notifications/`. `security_alerts` is now

@@ -55,6 +55,20 @@ import { mintToken, parseJsonArray, request, sqlStateOf } from './support/jwt.js
 
 const TIMEOUT = 120_000;
 
+/**
+ * The `beforeAll` gets its own, larger budget.
+ *
+ * It rebuilds the proof database, seeds it and then waits for a PostgREST to
+ * bind its port — and that last wait is allowed up to
+ * `POSTGREST_STARTUP_TIMEOUT_MS` (90s) on its own, because a deadline that is
+ * tight enough to trip on a loaded machine is the bug this suite used to hit.
+ * With both inside the 120s the tests use, the hook would time out FIRST and
+ * the launcher's own message — which says what the child was doing — would
+ * never be printed. The operator would get "Hook timed out in 120000ms" and
+ * nothing else.
+ */
+const HOOK_TIMEOUT = 300_000;
+
 let client: Client;
 let stopPostgrest: () => void;
 
@@ -132,7 +146,7 @@ beforeAll(async () => {
 
   const running = await startPostgrest();
   stopPostgrest = running.stop;
-}, TIMEOUT);
+}, HOOK_TIMEOUT);
 
 afterAll(async () => {
   // `rebuildDatabase` rewrote a CLUSTER-scoped role's password, so the cluster is
