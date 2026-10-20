@@ -146,10 +146,9 @@ backend/
 ```
 
 Later W11 slices add `security/` (rate limiting, IP reputation, pattern
-detection) and `captcha/` (the previous self-rolled challenge, which was
-correct and is kept). They are named here so the shape is predictable.
-Scheduled jobs are not cron and not deferred: they run through `src/scheduler/`
-via `@nestjs/schedule` intervals guarded by Postgres advisory locks.
+detection). It is named here so the shape is predictable. Scheduled jobs are not
+cron and not deferred: they run through `src/scheduler/` via `@nestjs/schedule`
+intervals guarded by Postgres advisory locks.
 
 **The storage arrived before the modules, and that is worth being precise
 about.** `0022_security_telemetry.sql` creates `ip_reputation`,
@@ -160,19 +159,21 @@ is no longer true, and was wrong in the direction of understating.
 
 What does **not** exist is the part that makes the tables mean anything:
 
-- **`backend/src/security/` and `backend/src/captcha/` do not exist.** No
-  collector writes `ip_reputation` or `security_detected_patterns` from live
-  traffic; the rows present are seeded, and the admin pages render them
-  honestly as seeded rather than implying a live pipeline.
-- **`captcha` is a table with no issuer and no verifier.** Nothing mints a
-  challenge and nothing checks an answer, so the challenge flow AGENTS.md §B6
-  requires is unbuilt.
+- **`backend/src/security/` does not exist.** No collector writes
+  `ip_reputation` or `security_detected_patterns` from live traffic; the rows
+  present are seeded, and the admin pages render them honestly as seeded rather
+  than implying a live pipeline.
 - **There is still no rate limiter in front of PostgREST**, for the reason §B6
   gives: PostgREST does not rate-limit and `db-pre-request` runs read-only, so
   the limiter for that surface is the reverse proxy's job
   (`docs/deployment-guide.md` §nginx). The **thin app** does have one: a global
   `@nestjs/throttler` limiter registered as an `APP_GUARD` in
   `src/app.module.ts`, with per-route policies in `src/common/throttle.ts`.
+
+**`captcha` is the exception among the five.** It has both halves: the issuer
+and the verifier are `src/auth/captcha.service.ts`, the table is `0022`'s, and
+the challenge is demanded by the login gate when an account is over the failure
+threshold. `docs/security.md` §CAPTCHA has the properties and the ceiling.
 
 The five admin pages are real and tested; what they display is seed data. That
 distinction is recorded in the deployment guide's gap ledger and enforced by

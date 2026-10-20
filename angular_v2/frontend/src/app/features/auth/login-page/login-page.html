@@ -32,6 +32,20 @@
           }
         </mat-form-field>
 
+        @if (challenge(); as outstanding) {
+          <p class="challenge" id="challenge-question">{{ outstanding.challenge }}</p>
+
+          <mat-form-field>
+            <mat-label>Answer to the question</mat-label>
+            <input
+              matInput
+              autocomplete="off"
+              aria-describedby="challenge-question"
+              [formField]="loginForm.captchaAnswer"
+            />
+          </mat-form-field>
+        }
+
         @if (failureReason(); as reason) {
           <p class="notice notice--error" role="alert">{{ reason }}</p>
         }

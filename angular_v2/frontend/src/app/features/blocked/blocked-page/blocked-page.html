@@ -1,0 +1,127 @@
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+}
+
+<mat-card class="blocked-card">
+  <mat-card-header>
+    <mat-card-title>Blocked &amp; Disabled Accounts</mat-card-title>
+    <mat-card-subtitle>Audit registry of operator disables and temporary suspensions</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (feedback(); as msg) {
+      <div class="feedback-box">
+        <span>{{ msg }}</span>
+        <button mat-icon-button (click)="clearFeedback()" aria-label="Dismiss feedback">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    }
+
+    @if (notReadable()) {
+      <div class="blocked-notice">
+        <span>not readable for this role</span>
+      </div>
+    } @else {
+      @if (users().length === 0) {
+        <div class="blocked-notice">
+          <span>No accounts are currently disabled.</span>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table mat-table [dataSource]="users()">
+            <!-- Username & Name Column -->
+            <ng-container matColumnDef="username">
+              <th mat-header-cell *matHeaderCellDef>Account</th>
+              <td mat-cell *matCellDef="let user">
+                <strong>{{ user.username }}</strong>
+                <br>
+                <span style="font-size: 0.85rem; color: var(--mat-sys-on-surface-variant);">
+                  {{ user.email }}
+                  @if (user.first_name || user.last_name) {
+                    ({{ user.first_name }} {{ user.last_name }})
+                  }
+                </span>
+              </td>
+            </ng-container>
+
+            <!-- Disabled At Column -->
+            <ng-container matColumnDef="disabledAt">
+              <th mat-header-cell *matHeaderCellDef>Disabled At</th>
+              <td mat-cell *matCellDef="let user">
+                {{ user.disabled_at | date: 'mediumDate' }}
+              </td>
+            </ng-container>
+
+            <!-- Disabled By Column -->
+            <ng-container matColumnDef="disabledBy">
+              <th mat-header-cell *matHeaderCellDef>Disabled By</th>
+              <td mat-cell *matCellDef="let user">
+                <div class="actor-cell">
+                  @if (user.disabled_by; as actor) {
+                    <span>Administrator</span>
+                    <span class="actor-uuid">{{ actor }}</span>
+                  } @else {
+                    <span>Automated system</span>
+                    <span class="actor-uuid">security pipeline</span>
+                  }
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Reason Column -->
+            <ng-container matColumnDef="reason">
+              <th mat-header-cell *matHeaderCellDef>Reason</th>
+              <td mat-cell *matCellDef="let user">
+                <span class="blocked-reason-labels">
+                  {{ user.disabled_reason | codeLabel: disabledReasons }}
+                </span>
+              </td>
+            </ng-container>
+
+            <!-- Suspension Nature Column (Permanent vs Temporary) -->
+            <ng-container matColumnDef="type">
+              <th mat-header-cell *matHeaderCellDef>Suspension Type</th>
+              <td mat-cell *matCellDef="let user">
+                @if (user.disabled_until | suspensionInfo; as info) {
+                  <div>
+                    <span [class]="'suspension-badge ' + info.cssClass">
+                      {{ info.label }}
+                    </span>
+                    @if (info.isTemporary) {
+                      <div style="font-size: 0.8rem; margin-top: 0.25rem; color: var(--mat-sys-on-surface-variant);">
+                        Expiry: {{ user.disabled_until | date: 'mediumDate' }}
+                      </div>
+                    }
+                  </div>
+                }
+              </td>
+            </ng-container>
+
+            <!-- Actions Column -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>Action</th>
+              <td mat-cell *matCellDef="let user">
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  [disabled]="reEnablingId() === user.id"
+                  (click)="reEnableAccount(user)"
+                >
+                  @if (reEnablingId() === user.id) {
+                    Re-enabling...
+                  } @else {
+                    Re-enable
+                  }
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+          </table>
+        </div>
+      }
+    }
+  </mat-card-content>
+</mat-card>

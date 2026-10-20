@@ -19,6 +19,29 @@
 export interface AuthLoginRequest {
   readonly username: string;
   readonly password: string;
+  /**
+   * The challenge token, when the server demanded a challenge.
+   *
+   * **Both challenge fields are optional because the challenge is RISK-SCOPED**:
+   * a sign-in below the threshold carries neither, and the server's gate decides
+   * which side of the threshold a request is on — never the client.
+   */
+  readonly captchaToken?: string;
+  readonly captchaAnswer?: string;
+}
+
+/**
+ * Mirrors `backend/src/auth/captcha-challenge.dto.ts`.
+ *
+ * **There is no answer field, and there is not one on the wire either** — the
+ * server stores a salted digest, so neither the row nor this payload can be
+ * read to answer the question.
+ */
+export interface AuthCaptchaChallenge {
+  readonly token: string;
+  readonly challenge: string;
+  readonly type: 'text';
+  readonly expiresAt: string;
 }
 
 /**

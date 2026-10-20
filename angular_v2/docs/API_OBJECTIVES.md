@@ -21,7 +21,7 @@ PostgREST is the API layer. A thin Nest app handles what PostgREST cannot
 | Password verification | Nest | bcrypt belongs in an app |
 | Login orchestration | Nest | Combines block check, CAPTCHA, audit, token issuance |
 | Email delivery | Nest | SMTP credentials, template rendering |
-| CAPTCHA generation | Nest | `canvas` is a native Node module |
+| CAPTCHA generation | Nest | A challenge is minted and checked in the thin app; PostgREST cannot issue one |
 | Scheduled jobs | Nest | Behavioural detection, cache cleanup |
 | Multi-step workflows | Nest | Export, delete, consent |
 

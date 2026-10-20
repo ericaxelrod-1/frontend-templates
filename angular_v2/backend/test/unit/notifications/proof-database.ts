@@ -63,6 +63,25 @@ export const CONSENT_PURGE_PROOF_DATABASE = 'consent_purge_proof';
  */
 export const AUTHORIZATION_PROOF_DATABASE = 'authorization_proof';
 
+/**
+ * A fifth, for the CAPTCHA proof.
+ *
+ * The same reason as the others: Vitest runs spec files in parallel, and this
+ * suite WRITES to `public.captcha` — it mints challenges, spends them and reads
+ * the rows back to prove the digest is all that is stored.
+ */
+export const CAPTCHA_PROOF_DATABASE = 'captcha_proof';
+
+/**
+ * A sixth, for the login gate's challenge decision.
+ *
+ * The same reason as the others: this suite writes `login_attempts` rows to put
+ * an account over the threshold, and it must not share a database with the
+ * challenge proof — Vitest runs spec files in parallel, and one file's
+ * `beforeAll` would drop the other's schema mid-run.
+ */
+export const LOGIN_CAPTCHA_PROOF_DATABASE = 'login_captcha_proof';
+
 /** The migration/owner role, which owns every table and never receives a request. */
 const OWNING_ROLE = 'app';
 

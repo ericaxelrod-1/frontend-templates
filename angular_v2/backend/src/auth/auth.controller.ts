@@ -3,6 +3,8 @@ import { Throttle } from '@nestjs/throttler';
 import type { FastifyRequest } from 'fastify';
 import { THROTTLE_POLICIES, ThrottleSkip } from '../common/throttle.js';
 import { AuthService } from './auth.service.js';
+import { CaptchaChallengeDto } from './captcha-challenge.dto.js';
+import { CaptchaService } from './captcha.service.js';
 import { EmailVerificationConfirmDto } from './email-verification-confirm.dto.js';
 import { EmailVerificationConfirmedDto } from './email-verification-confirmed.dto.js';
 import { LoginRequestDto } from './login-request.dto.js';
@@ -20,7 +22,10 @@ import { TokenRequestDto } from './token-request.dto.js';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly captchaService: CaptchaService,
+  ) {}
 
   /**
    * `POST /auth/login` — §B6's `login`, the route this repository's credential
@@ -52,6 +57,37 @@ export class AuthController {
     @Req() req: FastifyRequest,
   ): Promise<LoginResponseDto> {
     return this.authService.login(dto, req.ip);
+  }
+
+  /**
+   * `POST /auth/captcha` — the ISSUER for the risk-scoped challenge.
+   *
+   * **It is public, and it has to be.** The person who receives a challenge is
+   * by definition not signed in — that is the situation the challenge exists
+   * for — and this tree is default deny (§B5), so a route without `@Public()` is
+   * unreachable without a bearer token.
+   *
+   * **`201` because a row is created.** The challenge is a stored row with an
+   * expiry, not a computation; `200 OK` would say "here is the answer to your
+   * question", and the answer is not in the payload.
+   *
+   * **The credential limit, and why it is not a tighter one.** The route is
+   * cheap — one insert and one delete — but it is not free: it is a way to make
+   * this process write rows. The credential policy is the allowance for the
+   * routes that check a credential, and a challenge is the second half of a
+   * credential check, so it shares the budget rather than inventing a second
+   * number. It is a per-address budget, so a person solving three challenges in
+   * a row spends three of it, and a script spends thirty.
+   *
+   * **The answer is not in the payload and never was.** `CaptchaService` stores
+   * a salted digest; the question travels and the answer does not.
+   */
+  @Public()
+  @Throttle({ default: THROTTLE_POLICIES.credential })
+  @Post('captcha')
+  @HttpCode(201)
+  captcha(@Req() req: FastifyRequest): Promise<CaptchaChallengeDto> {
+    return this.captchaService.issue(req.ip);
   }
 
   @Public()

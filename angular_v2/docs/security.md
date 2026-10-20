@@ -28,7 +28,7 @@ same level, because they are not equally strong.
 | **Runs before the query** | `db-pre-request` | Revocation and per-request throttling, ahead of any data access |
 | **Fails on abuse** | Per-account counter → delay + challenge | Cannot be weaponised into a lockout DoS. |
 | **Corroborating** | IP reputation | Weak identity in 2026; never the primary control. |
-| **Speed bump** | CAPTCHA — **storage only, no issuer or verifier** | Would defeat unsophisticated traffic. Bypassable by farms. |
+| **Speed bump** | CAPTCHA — server-issued, server-verified, risk-scoped | Would defeat unsophisticated traffic. Bypassable by farms. |
 | **Triage only** | Behavioural scoring | Informs a decision. Never blocks. |
 
 The previous implementation inverted this: the weakest signal (IP) carried the
@@ -75,17 +75,18 @@ and still counts toward throttling:
 ```
 POST /auth/login          (thin Nest app)
   1. IP block check        ─┐
-  2. CAPTCHA verification   │ before any password is examined   ← NOT IMPLEMENTED, §CAPTCHA
+  2. CAPTCHA verification   │ before any password is examined
   3. bcrypt.compare        ─┘
   4. record the attempt, pass or fail
   5. issue tokens
 ```
 
-Steps 1, 3, 4 and 5 run, in that order, inside the handler. Step 2 is the
-position a CAPTCHA has to occupy, not something that occupies it today: there is
-no issuer and no verifier (§CAPTCHA). The ordering is the part that is
-load-bearing, and it is why the sequence is written with the credential check
-inside the bracket rather than below it.
+Steps 1 through 5 run, in that order, inside the handler. The ordering is the
+part that is load-bearing, and it is why the sequence is written with the
+credential check inside the bracket rather than below it: **a challenge that
+could be skipped by a correct password would be skipped by a correct password.**
+Step 2 runs only when the gate says the account is over the failure threshold;
+see §CAPTCHA for what decides that and what the refusal looks like.
 
 There is no Passport strategy to hook. The checks live inside the handler, ordered
 so they cannot be skipped by a successful credential comparison.
@@ -147,39 +148,69 @@ Detection and alerting.
 
 ## CAPTCHA
 
-**The storage half ships. The logic half does not.** `0022_security_telemetry.sql`
-creates `public.captcha` complete — `token_hash`, a per-row `solution_salt` beside
-`solution_hash`, and an `is_used` / `used_at` pair that makes single-use a property
-of the write rather than a hope about the read. **Nothing in `backend/src/` issues
-a challenge and nothing verifies one.** Read this section as the shape the missing
-code must take, not as a description of what the template does.
+**The challenge is issued and verified server-side.** `0022_security_telemetry.sql`
+created `public.captcha` — `token_hash`, a per-row `solution_salt` beside
+`solution_hash`, and an `is_used` / `used_at` pair that makes single-use a
+property of the write rather than a hope about the read — and
+`src/auth/captcha.service.ts` is the logic half it was waiting for.
 
-The requirements it exists to satisfy are below. They are requirements, not
-current behaviour:
+| Property | How |
+|---|---|
+| **The answer is never in the payload** | The row stores a salted digest; the payload carries the question and the token, and no answer |
+| **The token is never replayable from a dump** | `token_hash` is a SHA-256 digest of a 256-bit random token; only the digest is stored |
+| **Single-use** | The redemption is `UPDATE … SET is_used = true, used_at = now() WHERE id = $1 AND is_used = false`, asserting one row. A replay updates no row and fails |
+| **One attempt per challenge** | The redemption consumes the row whether the answer was right or wrong, so a challenge cannot be brute-forced inside its window |
+| **Expiring** | `expires_at` is `NOT NULL`, `CHECK (expires_at > issued_at)` enforces the window, and the window is `SECURITY_CAPTCHA_TTL_SECONDS` |
+| **Never validated in the browser** | There is nothing to validate client-side — this is impossible rather than unfinished |
+| **Accessible** | The challenge is a **text** question, so it is readable by a screen reader. The table allows `'image'`; this build issues only `'text'`, and there is no inaccessible variant beside it to become the default by accident |
+| **Pruned** | The expired rows are deleted on the next issue, so the table stays bounded by (issuance rate × TTL) with no second mechanism |
 
-- The server issues the challenge and stores the answer. **The answer never
-  appears in the challenge payload.**
-- Single-use: consumed on verification, so replay fails. The columns are shaped
-  for it — `is_used` alone cannot answer "used when", and two replays inside the
-  same instant are indistinguishable on a boolean that does not record the moment
-  it flipped. The redemption path is `UPDATE … SET is_used = true, used_at = now()
-  WHERE id = $1 AND is_used = false`, asserting one row.
-- Expiring: short TTL, plus periodic cleanup of abandoned challenges. `expires_at`
-  is `NOT NULL` and `CHECK (expires_at > issued_at)` already enforces the window.
-- **Never validated in the browser.** There is nothing to validate client-side —
-  this is impossible rather than unfinished.
-- An accessible non-visual alternative is required. An image challenge that
-  excludes screen-reader users is a liability shipped into every fork.
+**It is a SPEED BUMP, and this section says so rather than implying more.** The
+challenge is an arithmetic question, which a determined bot answers with one
+line of code — so this is not an anti-bot product, and a fork that needs one has
+to replace the issuer rather than tune this one. What it *is* good for is the
+thing §B6 asks for: a server-side, single-use, expiring challenge that a person
+can answer and a script cannot skip.
 
-Where it sits in the login path is in §Login flow ordering above: **before any
-password is examined**, so the challenge cannot be skipped by a successful
-credential comparison.
+### Where it sits, and when it is asked for
+
+`src/auth/auth.service.ts` puts the verification **between the gate and
+`bcrypt.compare`**, so a challenge cannot be skipped by a successful credential
+comparison, and the requirement is **risk-scoped**:
+
+- **It is the ACCOUNT's failure count that decides**, never the address's. The
+  address axis has the "blanket CAPTCHA on threshold" problem — an attacker
+  trips the threshold deliberately so that legitimate people get challenged, and
+  behind a CGNAT one corporate NAT challenges hundreds — and the account axis
+  does not. The address count keeps the job it already had: shedding volume.
+- **The threshold is `SECURITY_CAPTCHA_THRESHOLD`** (default 3), and it is
+  validated at boot. Zero is refused, because a threshold of zero would put a
+  challenge in front of every sign-in.
+- **The counter cannot become an enumeration oracle**: `login_attempts` rows are
+  written for every attempt against a name, whether or not the account exists,
+  so the threshold is reached at the same request number either way.
+- **A challenge is a question, not a lock.** It never blocks an account and it
+  never expires a session; the progressive delay and the block are separate
+  controls, and they are what §B6 means by "a risk-scoped challenge, not a hard
+  lockout".
+
+**The refusal is `428 Precondition Required`, not the generic `401`.** One says
+"these credentials were not accepted" and the other says "this request needs
+something else attached", and a client has to be able to tell them apart: one
+retries with a challenge, the other does not. The login page asks for the
+challenge when it sees the `428` and shows it — it never asks for one on its own
+initiative, because a challenge in front of every sign-in is the blanket
+challenge the anti-pattern table names.
+
+**`ip_reputation.captcha_required_count` is still seed data.** Nothing increments
+it, because incrementing it means writing `ip_reputation`, and that table has no
+writer at all — see §Detection and alerting. The decision this mechanism makes is
+recorded where it is made: in the `login_attempts` rows the gate writes.
 
 The three previous implementations were: one correct, one self-solving
 (`challenge: solution`), and one frontend service with the answers hardcoded in
-client JavaScript. Two deleted, one kept — and the kept one is now only half
-present. `ip_reputation.captcha_required_count` is a column the seed fills and no
-code increments, so a dashboard showing a non-zero count is showing seed data.
+client JavaScript. Two deleted, one kept — and the kept one is now whole.
+
 
 ---
 

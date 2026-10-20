@@ -1,0 +1,174 @@
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+}
+
+<mat-card class="privacy-card">
+  <mat-card-header>
+    <mat-card-title>Privacy Dashboard & Account State</mat-card-title>
+    <mat-card-subtitle>Your active data subject record</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (profile(); as user) {
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Account Subject ID</span>
+          <span class="info-value" style="font-family: monospace; font-size: 0.85rem;">{{ user.id }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Username</span>
+          <span class="info-value">{{ user.username }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Email Address</span>
+          <span class="info-value">{{ user.email }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Registration Date</span>
+          <span class="info-value">{{ user.created_at | date: 'mediumDate' }}</span>
+        </div>
+      </div>
+    } @else {
+      <p style="color: var(--mat-sys-on-surface-variant); font-size: 0.9rem;">
+        No active profile could be retrieved from the backend.
+      </p>
+    }
+  </mat-card-content>
+</mat-card>
+
+<mat-card class="privacy-card">
+  <mat-card-header>
+    <mat-card-title>How Privacy Machinery Works in v2</mat-card-title>
+    <mat-card-subtitle>Substantive disclosure of erasure, retention, and tombstones</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div class="substance-columns">
+      <div class="substance-column substance-column--erased">
+        <div class="substance-title">
+          <mat-icon color="primary">delete_forever</mat-icon>
+          <span>What is Erased Immediately</span>
+        </div>
+        <ul class="substance-list">
+          <li>
+            <strong>Email Address:</strong> Overwritten with a cryptographic HMAC tombstone address
+            (e.g., <code>deleted-&lt;hmac&gt;@domain</code>).
+          </li>
+          <li>
+            <strong>Username:</strong> Neutralized to the tombstone local part to prevent identification.
+          </li>
+          <li>
+            <strong>Password Hash:</strong> Overwritten with a CSPRNG-generated bcrypt hash of an
+            unrecorded secret, destroying the credential while preserving verification timing.
+          </li>
+          <li>
+            <strong>Active Sessions:</strong> All refresh tokens are revoked immediately in the database
+            (<code>REVOKE_SESSIONS_SQL</code>).
+          </li>
+          <li>
+            <strong>Authority:</strong> All group memberships and role capabilities are stripped
+            (<code>authz.revoke_subject_authority()</code>).
+          </li>
+          <li>
+            <strong>Receipt:</strong> An automated confirmation receipt is delivered to your registered email
+            prior to anonymisation.
+          </li>
+        </ul>
+      </div>
+
+      <div class="substance-column substance-column--retained">
+        <div class="substance-title">
+          <mat-icon color="accent">security</mat-icon>
+          <span>What is Retained and Why</span>
+        </div>
+        <ul class="substance-list">
+          <li>
+            <strong>Security Telemetry (11 CCR §7111):</strong> Forensic login records in
+            <code>login_attempts</code> (IP address, status, timestamp) are retained to investigate
+            brute-force attacks and abuse. The username is pseudonymised to match the tombstone.
+          </li>
+          <li>
+            <strong>Statutory Compliance Ledger (11 CCR §7101(b)):</strong> Proof that an erasure request
+            was fulfilled is recorded in <code>privacy_request_audits</code>. The subject is keyed by an HMAC
+            pepper (<code>subject_hmac</code>), preserving compliance evidence without PII.
+          </li>
+          <li>
+            <strong>Purge Queue Pipeline:</strong> Soft-deleted tombstones reside in the database until the
+            dormant retention window elapses, at which time the automated purge sweeper runs.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>
+
+<mat-card class="privacy-card">
+  <mat-card-header>
+    <mat-card-title>Exercise Your Right to Be Forgotten</mat-card-title>
+    <mat-card-subtitle>Request self-service account erasure under GDPR / CCPA</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (error(); as err) {
+      <div class="error-box">
+        <strong>Error:</strong> {{ err }}
+      </div>
+    }
+
+    @if (outcome(); as result) {
+      <div class="outcome-box">
+        <h4 style="margin: 0 0 0.5rem 0; font-weight: 600;">Account Erasure Succeeded</h4>
+        <p style="margin: 0 0 0.5rem 0;">
+          Your account has been anonymized. Your email address has been rewritten to:
+          <br>
+          <strong style="font-family: monospace;">{{ result.tombstoneAddress }}</strong>
+        </p>
+        <p style="margin: 0 0 0.5rem 0;">
+          All active sessions have been revoked. You must now sign out.
+        </p>
+        <button mat-flat-button color="primary" (click)="signOutAfterErasure()">
+          Sign Out Now
+        </button>
+      </div>
+    } @else {
+      @if (confirmOpen()) {
+        <div class="erasure-box">
+          <div class="erasure-warning">Are you absolutely sure you want to erase your account?</div>
+          <p style="margin: 0.5rem 0; font-size: 0.9rem; line-height: 1.5;">
+            This action is permanent and irreversible. Your personal profile attributes, password,
+            and sessions will be erased immediately. A receipt will be sent to your email.
+          </p>
+          <div class="erasure-actions">
+            <button
+              mat-flat-button
+              color="warn"
+              [disabled]="erasing()"
+              (click)="executeErasure()"
+            >
+              @if (erasing()) {
+                Processing erasure...
+              } @else {
+                Confirm &amp; Erase My Account
+              }
+            </button>
+            <button
+              mat-button
+              [disabled]="erasing()"
+              (click)="cancelErasure()"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      } @else {
+        <p style="font-size: 0.9rem; color: var(--mat-sys-on-surface-variant); margin-bottom: 1rem;">
+          Requesting erasure will anonymize your identity, revoke all sessions, and replace your
+          account with a tombstone record.
+        </p>
+        <button mat-stroked-button color="warn" (click)="promptErasure()">
+          Request Account Erasure
+        </button>
+      }
+    }
+  </mat-card-content>
+</mat-card>

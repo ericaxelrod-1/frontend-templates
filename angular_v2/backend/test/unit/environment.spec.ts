@@ -50,6 +50,8 @@ describe('loadEnvironment', () => {
         delayCapSeconds: 30,
         blockThreshold: 5,
         enumerationFloorMs: 250,
+        captchaThreshold: 3,
+        captchaTtlSeconds: 300,
       },
       server: { port: 4000 },
       email: {

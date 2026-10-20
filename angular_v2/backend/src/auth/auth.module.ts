@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { CaptchaService } from './captcha.service.js';
 import type { Environment } from '../config/environment.js';
 import { DatabasePoolModule } from '../common/database-pool.module.js';
 import { EmailModule } from '../email/email.module.js';
@@ -55,7 +56,7 @@ import { TokenModule } from '../token/token.module.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, CaptchaService],
   // The JwtService registered above is the same instance the global
   // JwtAuthGuard (AppModule) verifies with — one issuer, one verifier.
   exports: [JwtModule],

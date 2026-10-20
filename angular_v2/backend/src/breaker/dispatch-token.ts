@@ -30,6 +30,24 @@ export const AUTH_LOGOUT: DispatchToken = 'auth.logout';
 export const AUTH_ME: DispatchToken = 'auth.me';
 
 /**
+ * `POST /auth/captcha` — the challenge issuer.
+ *
+ * **Named, and deliberately NOT in `BREAKER_PROTECTED`.**
+ *
+ * Naming it is mandatory: `route-census.ts` refuses to boot a graph with a
+ * mounted route no token names, so an unnamed handler stops the process at
+ * startup rather than degrading quietly.
+ *
+ * Omitting it from the protected list means SHEDDABLE, and shedding it under
+ * memory pressure is correct for the same reason the four one-time-token routes
+ * are sheddable: the caller is told the machine is busy and can come back. A
+ * challenge is a question, not a credential — nothing is minted by asking it and
+ * nothing is consumed by failing it — so a refused issue costs the caller one
+ * request and no state.
+ */
+export const AUTH_CAPTCHA: DispatchToken = 'auth.captcha';
+
+/**
  * The four one-time-token routes, minted and redeemed over `src/token/`.
  *
  * **Named, and deliberately NOT in `BREAKER_PROTECTED`.**
@@ -242,6 +260,7 @@ export const KNOWN_DISPATCH_TOKENS: readonly DispatchToken[] = Object.freeze([
   AUTH_REFRESH,
   AUTH_LOGOUT,
   AUTH_ME,
+  AUTH_CAPTCHA,
   AUTH_PASSWORD_RESET_REQUEST,
   AUTH_PASSWORD_RESET_CONFIRM,
   AUTH_EMAIL_VERIFICATION_REQUEST,

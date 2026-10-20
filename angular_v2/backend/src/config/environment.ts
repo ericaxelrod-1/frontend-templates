@@ -160,6 +160,25 @@ export type SecurityConfig = {
   readonly delayCapSeconds: number;
   readonly blockThreshold: number;
   readonly enumerationFloorMs: number;
+  /**
+   * Failures against one account after which the next sign-in must carry a
+   * challenge.
+   *
+   * **It counts the ACCOUNT and not the address, and that is the whole design.**
+   * `docs/security.md`'s anti-pattern table forbids a blanket challenge: an
+   * attacker trips the threshold deliberately so that legitimate people get
+   * challenged, and behind a CGNAT one corporate NAT challenges hundreds. The
+   * address axis has both of those problems and the account axis has neither —
+   * the address count is what the address-keyed rate limiter is for.
+   */
+  readonly captchaThreshold: number;
+  /**
+   * How long a challenge stays redeemable, in seconds.
+   *
+   * Long enough for a person to read a question and type an answer, short
+   * enough that an issued challenge is not a standing asset.
+   */
+  readonly captchaTtlSeconds: number;
 };
 
 /**
@@ -200,6 +219,27 @@ export const DEFAULT_FAILURE_WINDOW_SECONDS = 600;
 export const DEFAULT_DELAY_SCHEDULE_SECONDS: readonly number[] = [0, 1, 4, 16];
 export const DEFAULT_DELAY_CAP_SECONDS = 30;
 export const DEFAULT_BLOCK_THRESHOLD = 5;
+
+/**
+ * Three failures against one account, then the next sign-in has to carry a
+ * challenge.
+ *
+ * **Below the block threshold (5) and above the first two delays.** The delay
+ * schedule is `[0, 1, 4, 16]`, so the second failure already costs a second and
+ * the third costs four. A challenge at the third failure is the point where the
+ * delay has become uncomfortable and the request is more likely to be a script —
+ * and it is still three failures short of the block, so a person who has simply
+ * mistyped twice is not asked to solve arithmetic.
+ */
+export const DEFAULT_CAPTCHA_THRESHOLD = 3;
+
+/**
+ * Five minutes, the same window `0002`'s refresh tokens use for a one-time link.
+ *
+ * Long enough to read a question and type an answer; short enough that a
+ * challenge left lying around is worthless by the time anybody tries to use it.
+ */
+export const DEFAULT_CAPTCHA_TTL_SECONDS = 300;
 
 /**
  * 250 ms. Chosen against the cost of the work it is hiding, not by taste: a real
@@ -477,13 +517,27 @@ function readSecurity(
   const enumerationFloorMs = readCount(
     source, 'SECURITY_ENUMERATION_FLOOR_MS', problems, DEFAULT_ENUMERATION_FLOOR_MS,
   );
+  // Both challenge keys go through `readCount`, which refuses zero. That refusal
+  // is the point and not a side effect: a threshold of 0 would put a challenge in
+  // front of EVERY sign-in — the blanket challenge `docs/security.md` names as
+  // the anti-pattern — and a TTL of 0 would mint challenges that are already
+  // expired when they are handed over. Neither is a tuning mistake; both are a
+  // control that has been switched off while the file still looks configured.
+  const captchaThreshold = readCount(
+    source, 'SECURITY_CAPTCHA_THRESHOLD', problems, DEFAULT_CAPTCHA_THRESHOLD,
+  );
+  const captchaTtlSeconds = readCount(
+    source, 'SECURITY_CAPTCHA_TTL_SECONDS', problems, DEFAULT_CAPTCHA_TTL_SECONDS,
+  );
   if (
     failureWindowSeconds === undefined ||
     delayScheduleSeconds === undefined ||
     delayScheduleSeconds.length === 0 ||
     delayCapSeconds === undefined ||
     blockThreshold === undefined ||
-    enumerationFloorMs === undefined
+    enumerationFloorMs === undefined ||
+    captchaThreshold === undefined ||
+    captchaTtlSeconds === undefined
   ) {
     if (delayScheduleSeconds !== undefined && delayScheduleSeconds.length === 0) {
       problems.push('SECURITY_DELAY_SCHEDULE_SECONDS must not be an empty list');
@@ -497,6 +551,8 @@ function readSecurity(
     delayCapSeconds,
     blockThreshold,
     enumerationFloorMs,
+    captchaThreshold,
+    captchaTtlSeconds,
   };
 }
 

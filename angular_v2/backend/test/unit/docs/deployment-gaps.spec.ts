@@ -144,32 +144,24 @@ function sourcesUnder(roots: readonly string[]): Source[] {
 }
 
 /**
- * `carveOut` removes one exact token before the pattern is applied. It exists
- * for a COLUMN NAME that legitimately appears in application code — the three
- * `captcha_required_count` hits are a selected field, not a challenge — and it
- * is a whole-token replacement rather than a widened pattern, so nothing
- * adjacent to it can hide.
+ * The paths in a corpus that match a pattern.
+ *
+ * **There is no carve-out any more.** The one that existed removed the exact
+ * token `captcha_required_count` before a pattern was applied, because a column
+ * name that legitimately appears in application code is not the thing the check
+ * was about. It was removed with the `captcha-logic` entry it belonged to: the
+ * entry that needed it is gone, and a parameter nothing passes is a parameter
+ * nobody reads.
  */
-function hits(sources: readonly Source[], pattern: RegExp, carveOut?: string): string[] {
+function hits(sources: readonly Source[], pattern: RegExp): string[] {
   return sources
-    .filter((source) => {
-      const text = carveOut === undefined ? source.text : source.text.split(carveOut).join(' ');
-      return pattern.test(text);
-    })
+    .filter((source) => pattern.test(source.text))
     .map((source) => source.path)
     .sort();
 }
 
 const CODE = sourcesUnder(CODE_ROOTS);
 const SQL = sourcesUnder(SQL_ROOTS);
-
-/**
- * TypeScript and the launcher scripts, for claims about CODE rather than about
- * markup. A template that renders a column named `captcha_required_count` is a
- * page, not an implementation, and `app.routes.ts` naming `/verify-email` is a
- * route table, not a challenge.
- */
-const LOGIC = CODE.filter((source) => /\.(?:ts|mjs|js)$/.test(source.path));
 
 /** `postgrest.conf` and `angular.json`: configuration, not application code. */
 const CONFIG = ['postgrest.conf', 'frontend/angular.json'].map((path) => ({
@@ -366,31 +358,6 @@ const GAPS: readonly Gap[] = [
     problems: () => scriptHits(PROVISION).map((line) => `${line} provisions the role or the database`),
     probe: () =>
       scriptHits(PROVISION, [{ where: 'backend/package.json', scripts: { 'db:create': 'createdb -O app app_dev' } }]),
-  },
-  {
-    id: 'captcha-logic',
-    kind: 'behaviour-absence',
-    claim: 'the `captcha` table is storage; nothing issues or verifies a challenge',
-    cannot:
-      'Two halves, and they are not equally strong. The schema half is exhaustive — it reads the migrations, so dropping the table is caught. The behavioural half is a keyword gate over TypeScript and the launcher scripts: it removes the exact token `captcha_required_count` and then requires zero occurrences of `captcha`. A challenge implemented without ever using that word passes, as does one implemented in a file outside the four roots read here.',
-    problems: () => [
-      ...hits(LOGIC, /captcha/i, 'captcha_required_count').map(
-        (path) => `${path} mentions captcha, so an issuer or a verifier may exist`,
-      ),
-      ...(SQL.some((source) => /CREATE TABLE[^;]*\bcaptcha\b/i.test(source.text))
-        ? []
-        : ["no migration creates a `captcha` table, so this entry's \"storage exists\" half is no longer true"]),
-    ],
-    probe: () =>
-      hits(
-        [
-          {
-            path: 'backend/src/auth/captcha.service.ts',
-            text: "client.query('SELECT challenge, solution_hash FROM public.captcha WHERE token_hash = $1', [hash]);",
-          },
-        ],
-        /captcha/i,
-      ),
   },
   {
     id: 'geo-resolver',

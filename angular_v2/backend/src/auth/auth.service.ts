@@ -14,6 +14,8 @@ import { ipSubnetKey, normalizeIpAddress } from './ip-address.js';
 import { recordActivity } from './last-activity.js';
 import { delayForFailures, isBlocked } from './throttle.js';
 import { uuidv7 } from './uuidv7.js';
+import { CaptchaRequiredException } from './captcha-required.exception.js';
+import { CaptchaService } from './captcha.service.js';
 import type { EmailVerificationConfirmDto } from './email-verification-confirm.dto.js';
 import type { EmailVerificationConfirmedDto } from './email-verification-confirmed.dto.js';
 import type { LoginRequestDto } from './login-request.dto.js';
@@ -296,6 +298,7 @@ export class AuthService {
     config: ConfigService,
     private readonly jwtService: JwtService,
     private readonly tokens: TokenService,
+    private readonly captcha: CaptchaService,
     @Inject(SharedDatabasePool) private readonly pool: DatabaseConnectionSource,
   ) {
     this.env = config.getOrThrow<Environment>('environment');
@@ -341,6 +344,30 @@ export class AuthService {
     }
     if (gate.delayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, gate.delayMs));
+    }
+
+    // THE CHALLENGE, AND WHERE IT SITS.
+    //
+    // `docs/security.md` §Login flow ordering puts it between the block check and
+    // `bcrypt.compare`, and that position is the whole point: **a challenge that
+    // could be skipped by a correct password would be skipped by a correct
+    // password.** So it is answered here, after the gate has said a challenge is
+    // owed and before `issueSession` looks at a password at all.
+    //
+    // The order relative to the delay is deliberate too: the delay is the penalty
+    // for the accumulated failures, and it is paid by EVERY attempt — including
+    // one that fails the challenge. A bot that cannot solve the challenge still
+    // waits, which is the point of having both.
+    //
+    // The refusal is a `428`, not the generic `401`, and it is not an enumeration
+    // oracle: the gate's counter is written for every attempt against the name,
+    // whether or not the account exists, so the threshold is reached at the same
+    // request number either way. See `CaptchaRequiredException`.
+    if (gate.captchaRequired) {
+      const solved = await this.captcha.verify(dto.captchaToken ?? '', dto.captchaAnswer ?? '');
+      if (!solved) {
+        throw new CaptchaRequiredException();
+      }
     }
 
     return this.issueSession(dto, gate.attemptId);
@@ -403,7 +430,7 @@ export class AuthService {
     normalizedIp: string,
     subnet: string,
     allowlisted: boolean,
-  ): Promise<{ blocked: boolean; delayMs: number; attemptId: string }> {
+  ): Promise<{ blocked: boolean; delayMs: number; attemptId: string; captchaRequired: boolean }> {
     const client = await this.pool.connect();
     let committed = false;
     try {
@@ -431,6 +458,34 @@ export class AuthService {
             delayForFailures(ipFailures, this.env.security.delayScheduleSeconds, this.env.security.delayCapSeconds),
           );
 
+      // THE RISK-SCOPED CHALLENGE, and it reads the ACCOUNT's count and not the
+      // ADDRESS's.
+      //
+      // `docs/security.md` §Brute force names two anti-patterns: a hard lock after
+      // N failures, and a "blanket CAPTCHA on threshold" — "attacker deliberately
+      // trips the threshold so legitimate users get challenged. Behind CGNAT, one
+      // corporate NAT challenges hundreds."
+      //
+      // The address count is the one that produces the second anti-pattern: a
+      // shared egress address reaches the threshold and every person behind it is
+      // challenged, for an attack none of them made. The account count cannot do
+      // that — it is about ONE name — and it is the axis §B6 makes primary
+      // ("Per-account failure counting is primary. IP reputation is a secondary
+      // signal"). So the challenge is keyed on the account, and the address axis
+      // keeps the job it already had: shedding volume.
+      //
+      // THE COUNT IS WRITTEN FOR EVERY ATTEMPT AGAINST THE NAME, whether or not
+      // the account exists, so this branch cannot become an enumeration oracle: a
+      // name that does not exist reaches the threshold at the same request number
+      // as one that does.
+      //
+      // An allowlisted address is not counted at all — its rows carry NULL
+      // canonical keys — so its count is zero and it is never challenged. The
+      // `!allowlisted` is belt and braces over a property the counters already
+      // have.
+      const captchaRequired =
+        !allowlisted && subjectFailures >= this.env.security.captchaThreshold;
+
       const tracked = !allowlisted && subnet !== '';
       const attemptId = await this.recordAttempt(
         client,
@@ -443,7 +498,7 @@ export class AuthService {
       );
       await client.query('COMMIT');
       committed = true;
-      return { blocked, delayMs, attemptId };
+      return { blocked, delayMs, attemptId, captchaRequired };
     } catch (error) {
       if (!committed) {
         await client.query('ROLLBACK').catch(() => {});

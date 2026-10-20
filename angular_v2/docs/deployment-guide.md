@@ -752,6 +752,8 @@ The full key set, and where the values come from:
 | `SECURITY_DELAY_SCHEDULE_SECONDS` | no (`0,1,4,16`) | Progressive delay per counted failure. |
 | `SECURITY_DELAY_CAP_SECONDS` | no (30) | Ceiling on any scheduled entry. |
 | `SECURITY_BLOCK_THRESHOLD` | no (5) | Failures before a refusal, before any credential check. |
+| `SECURITY_CAPTCHA_THRESHOLD` | no (3) | Failures against ONE ACCOUNT before the next sign-in must carry a challenge. Zero is refused at boot: a threshold of zero would challenge every sign-in. |
+| `SECURITY_CAPTCHA_TTL_SECONDS` | no (300) | How long a challenge stays redeemable. Zero is refused at boot. |
 | `APP_BASE_URL` | **yes, in every mode** | The application's public origin. Every email template carries an absolute link, so there is no default to fall back to. Must be `https:` in production. |
 | `NG_ALLOWED_HOSTS` | **yes, in production** | Comma-separated allowed hostnames for Angular SSR (e.g. `localhost,127.0.0.1,app.example.com`). Configured in `backend/.env.production` (SSR inherits it via `prod.mjs`). **Adds to** the `angular.json` allowlist rather than replacing it — see below. |
 | `NG_TRUST_PROXY_HEADERS` | **yes, behind a reverse proxy** | Comma-separated proxy headers Angular SSR trusts (`x-forwarded-proto,x-forwarded-host,x-forwarded-port`). Configured in `backend/.env.production`. Allows SSR to detect HTTPS behind TLS termination. |
@@ -841,7 +843,7 @@ Every top-level `- ` bullet in this section is therefore an entry, and each must
 carry a marker. The checks differ in kind and the test says which, per entry.
 *File-absence* entries — "no CI", "no container config" — are near-exhaustive,
 because the thing is a file with a conventional name. *Behaviour-absence* entries
-— "no CAPTCHA issuer", "no telemetry producer" — are keyword gates over source
+— "no telemetry producer", "no geo resolver" — are keyword gates over source
 files that exist, so each one prints its blind spot in the suite's log. Read that
 line before trusting one.
 
@@ -850,16 +852,6 @@ line before trusting one.
   which is cluster-scoped, and the escalation boundary needs `ADMIN OPTION` — so
   neither statement *can* be a migration or a seeded step. There is no
   `npm run db:create`. <!-- gap:db-create -->
-
-- **CAPTCHA has storage and no logic.** `0022_security_telemetry.sql` creates
-  `public.captcha` complete, and its columns are shaped for an issuer and a
-  verifier that do not exist: `token_hash`, a per-row `solution_salt` beside
-  `solution_hash`, and an `is_used` / `used_at` pair that makes single-use a
-  property of the write rather than a hope about the read. **Nothing in
-  `backend/src/` issues a challenge and nothing verifies one.** `AGENTS.md` B6's
-  "validated server-side" is owed, not met, and the migration says so itself.
-  `ip_reputation.captcha_required_count` is a column the seed fills and no code
-  increments. [`security.md`](./security.md) §CAPTCHA. <!-- gap:captcha-logic -->
 
 - **No geo-IP resolution.** `users.geo_source` / `geo_accuracy_km` /
   `geo_updated_at` and `ip_reputation.geo_location` are columns; `shared/geo-place.ts`

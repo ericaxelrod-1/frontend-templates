@@ -2,7 +2,13 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { NEST_BASE_URL } from '../api/api-base-urls';
-import type { AuthLoginRequest, AuthLogoutRequest, AuthMe, AuthTokens } from './auth.types';
+import type {
+  AuthCaptchaChallenge,
+  AuthLoginRequest,
+  AuthLogoutRequest,
+  AuthMe,
+  AuthTokens,
+} from './auth.types';
 
 /**
  * Every call to the thin Nest app. The CRUD layer is PostgREST's job and lives in
@@ -17,6 +23,19 @@ export class AuthApi {
 
   login(request: AuthLoginRequest): Observable<AuthTokens> {
     return this.http.post<AuthTokens>(`${NEST_BASE_URL}/auth/login`, request);
+  }
+
+  /**
+   * Asks for a challenge.
+   *
+   * **It is called only when the server has already said one is required** — the
+   * login route answers `428 Precondition Required` when the gate decides the
+   * request is above the risk threshold. Asking for one beforehand would put a
+   * challenge in front of every sign-in, which is the blanket challenge
+   * `docs/security.md` names as the anti-pattern.
+   */
+  issueCaptcha(): Observable<AuthCaptchaChallenge> {
+    return this.http.post<AuthCaptchaChallenge>(`${NEST_BASE_URL}/auth/captcha`, {});
   }
 
   me(): Observable<AuthMe> {

@@ -11,8 +11,9 @@ import { authGuard } from './core/auth/auth.guard';
  * authenticated area in one place and a future child cannot be added outside it
  * by accident.
  *
- * `/` redirects to `/profile`, and the choice is about the two pages' AUDIENCES
- * rather than about convenience. `/profile` is the one route every signed-in
+ * `/` redirects to `/dashboard`, the landing dashboard providing a summary of real state
+ * across the application. `/profile` remains reachable by every signed-in member.
+ * `/profile` is the one route every signed-in
  * member can use — `GET /api/users/me` is their own row, within their own column
  * grant — while `/users` answers a question only an administrator is asking. Every
  * user holds at least one role (AGENTS.md §B2), so there is no signed-in user for
@@ -71,7 +72,13 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./layouts/app-shell/app-shell').then((m) => m.AppShell),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'profile' },
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        path: 'dashboard',
+        title: 'Dashboard',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard-page/dashboard-page').then((m) => m.DashboardPage),
+      },
       {
         path: 'profile',
         title: 'My profile',
@@ -79,10 +86,28 @@ export const routes: Routes = [
           import('./features/profile/profile-page').then((m) => m.ProfilePage),
       },
       {
+        path: 'privacy',
+        title: 'Privacy',
+        loadComponent: () =>
+          import('./features/privacy/privacy-page/privacy-page').then((m) => m.PrivacyPage),
+      },
+      {
+        path: 'legal',
+        title: 'Legal',
+        loadComponent: () =>
+          import('./features/legal/legal-page/legal-page').then((m) => m.LegalPage),
+      },
+      {
         path: 'users',
         title: 'Users',
         loadComponent: () =>
           import('./features/users/users-page/users-page').then((m) => m.UsersPage),
+      },
+      {
+        path: 'blocked',
+        title: 'Blocked users',
+        loadComponent: () =>
+          import('./features/blocked/blocked-page/blocked-page').then((m) => m.BlockedPage),
       },
       {
         // The two administration surfaces for the authorization model: `groups` is the

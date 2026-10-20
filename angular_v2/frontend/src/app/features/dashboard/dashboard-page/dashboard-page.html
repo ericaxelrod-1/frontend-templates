@@ -1,0 +1,54 @@
+<div class="welcome-header">
+  <h1 class="welcome-title">
+    @if (profile(); as me) {
+      Welcome back, {{ me.first_name || me.username }}
+    } @else {
+      Welcome to angular_v2
+    }
+  </h1>
+  <p class="welcome-sub">
+    System state and operational telemetry aggregated from live database services.
+  </p>
+</div>
+
+<div class="cards-grid">
+  @for (card of cards(); track card.id) {
+    <mat-card class="card">
+      <mat-card-header>
+        <div class="card-header-content">
+          <mat-card-title style="font-size: 1.1rem; font-weight: 600;">
+            {{ card.title }}
+          </mat-card-title>
+          <mat-icon color="primary">{{ card.icon }}</mat-icon>
+        </div>
+      </mat-card-header>
+
+      <mat-card-content style="flex: 1 1 auto; display: flex; flex-direction: column;">
+        @if (card.notReadable) {
+          <div class="card-metric card-metric--blocked">
+            not readable for this role
+          </div>
+        } @else {
+          <div class="card-metric">
+            @if (card.count === null) {
+              ...
+            } @else {
+              {{ card.count }}
+            }
+          </div>
+        }
+
+        <p class="card-description">
+          {{ card.description }}
+        </p>
+      </mat-card-content>
+
+      <mat-card-actions class="card-actions">
+        <a mat-button color="primary" [routerLink]="card.path">
+          View details
+          <mat-icon>chevron_right</mat-icon>
+        </a>
+      </mat-card-actions>
+    </mat-card>
+  }
+</div>

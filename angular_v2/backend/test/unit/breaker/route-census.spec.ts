@@ -133,6 +133,7 @@ describe('the census enumerates the routes Nest actually mounted', () => {
       // pass this one.
       expect(routes.map((route) => `${route.requestMethod} ${route.path}`)).toEqual([
         'POST /auth/login',
+        'POST /auth/captcha',
         'POST /auth/refresh',
         'POST /auth/logout',
         'POST /auth/password-reset/request',
@@ -157,6 +158,7 @@ describe('the census enumerates the routes Nest actually mounted', () => {
       const verdict = assertRouteCoverage(routes);
       expect(verdict.tokens).toEqual([
         'auth.login',
+        'auth.captcha',
         'auth.refresh',
         'auth.logout',
         'auth.password_reset_request',
