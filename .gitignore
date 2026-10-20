@@ -363,3 +363,6 @@ audit_reports/*.log
 # permission rules. Neither belongs in a template that other people fork.
 .kilo/
 sandbox.toml
+
+# Scratch space for agents and tooling. Never committed, never a source directory.
+.tmp/

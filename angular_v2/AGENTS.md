@@ -186,21 +186,27 @@ are the main source of drift in this codebase's history.
 
 ### 2.7 Work inside the repository, and do not leave it
 
-**The shell's working directory persists between commands, and it starts at the
-repository root. Stay in it.** Never `cd` outside the repository and never
-`cd ..` out of it — a `cd` in one command changes where every command after it
-lands, and nothing reports that it happened.
+**The shell's working directory persists between commands and nothing reports on
+it, so it is the one piece of state that goes wrong quietly.** Start every
+command from a known directory — `cd "$(git rev-parse --show-toplevel)" && ...`
+— and the working directory stops being something you have to think about.
 
-Reach other places without moving: `git rev-parse --show-toplevel` finds the
-root, `git -C <dir>` operates in a subdirectory, `npm --prefix <dir>` runs a
-subproject's scripts. Scratch files belong in a gitignored directory **inside**
-the project — and a file a dispatched agent must read belongs in the project,
-not in a scratch area, because a relative path to a scratch area resolves to
-nothing and the agent will do the work from a brief it could not find.
+Leaving the repository is allowed when there is a reason (reading a harness's
+own state, clearing a package cache, configuring an application outside the
+tree); **drifting** — leaving and never coming back — is not. Never `cd ..` out
+of the repository as a matter of habit.
 
-A command that reaches outside the repository will be refused; that refusal is a
-report that the working directory has drifted, not an obstacle to route around.
-Re-anchor and continue.
+Reach other places without moving: `git rev-parse --show-toplevel`,
+`git -C <dir>`, `npm --prefix <dir>`. Scratch files go in **`.tmp/` at the
+repository root**, which is gitignored — and a file a dispatched agent must read
+goes in the project, not in `.tmp/`, because a relative path to a scratch area
+resolves to nothing and the agent will do the work from a brief it could not
+find.
+
+A command that reaches outside the repository will be refused; that refusal is
+a report that the working directory has drifted, not an obstacle to route
+around. Re-anchor and continue. `pwd` is the diagnostic when a command did not
+do what you expected — not a prefix for every command.
 
 **The full rule is [`AGENTS.md` §2.7](../../AGENTS.md) and is stated there once**,
 so there is one mechanism for it rather than two that can drift.
