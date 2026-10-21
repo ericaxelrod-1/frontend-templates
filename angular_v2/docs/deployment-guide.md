@@ -69,6 +69,27 @@ postgrest --version
 sudo -u postgres psql -c '\du'     # must succeed without a password prompt
 ```
 
+### Where the superuser credential comes from
+
+Every superuser statement in this repository — the role bootstrap, the
+`ALTER ROLE … PASSWORD` the integration suites restore, and the
+`CREATE DATABASE` each throwaway proof database needs — runs `psql` as the
+`postgres` role, and **where the credential comes from depends on how the
+machine authenticates**. On Linux that is `sudo -u postgres psql`: the OS user
+is `postgres`, the session is a Unix socket one, and it authenticates by
+**PEER** — no password is involved and none is asked for, which is why `-h` is
+deliberately absent from that spelling (naming a host forces a TCP session, and
+a TCP session is not peer authentication, so it asks the cluster for a password
+the `postgres` role may not have). A machine with no peer authentication —
+Windows, which has neither a `postgres` OS account nor a Unix socket — has to
+supply the credential itself: the session is a TCP one and the password comes
+from **`PGPASSFILE`**, the file that variable names, in libpq's
+`host:port:database:user:password` format
+(`localhost:5432:*:postgres:<password>`), or from `PGPASSWORD`. The test
+harness passes `-w` there, so a missing or unreadable passfile fails the run
+at once with a message naming the variable, rather than prompting on stdin and
+hanging the suite overnight.
+
 ---
 
 ## One-time setup

@@ -216,7 +216,7 @@ dispatches an agent. It is a precondition assertion, and it is what stops a
 `node_modules`, a `dist/`, or a build output from landing in the wrong tree.
 It is also the catch-all for the commands you did not think to anchor.
 
-**The full rule is [`AGENTS.md` §2.7](../../AGENTS.md) and is stated there once**,
+**The full rule is [`AGENTS.md` §2.7](./AGENTS.md#27-work-inside-the-repository-and-do-not-leave-it) and is stated there once**,
 so there is one mechanism for it rather than two that can drift.
 
 ### 2.8 Delegating work: decide here, build there
@@ -255,7 +255,7 @@ model:** was the brief ambiguous (tighten it), was the task actually a kind
 that should have been recognised as a planning pipeline or an investigation (do
 it here), and only then consider a stronger tier.
 
-**The full rule is [`AGENTS.md` §2.8](../../AGENTS.md) and is stated there once**,
+**The full rule is [`AGENTS.md` §2.8](./AGENTS.md#28-delegating-work-decide-here-build-there) and is stated there once**,
 so there is one mechanism for it rather than two that can drift.
 
 ---
